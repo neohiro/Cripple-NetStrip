@@ -119,7 +119,7 @@ class BlocklistView(ctk.CTkFrame):
                         name = pattern.split("/")[-2] + "_list"
                         
                     # Intelligent Category Scanning
-                    detected_category = "ads"
+                    detected_category = "user_blocked"
                     if action == "block":
                         url_lower = pattern.lower()
                         # Comprehensive Heuristic Keywords

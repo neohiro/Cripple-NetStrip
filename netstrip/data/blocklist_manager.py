@@ -142,6 +142,8 @@ class BlocklistManager:
                         self._load_list(filepath, ConnectionCategory.ESSENTIAL)
                     elif filename.startswith('whitelist_'):
                         self._load_list(filepath, ConnectionCategory.USER_ALLOWED)
+                    elif filename.startswith('user_blocked_') or filename.startswith('blocked_'):
+                        self._load_list(filepath, ConnectionCategory.USER_BLOCKED)
                     elif filename.startswith('system_'):
                         import platform
                         sys_name = platform.system().lower()
