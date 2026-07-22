@@ -10,70 +10,69 @@
   
   *Strip away the noise. Take back control of your network.*
   
-  **NetStrip (also known as Cripple)** is a powerful, cross-platform desktop application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
+  **NetStrip (also known as Cripple)** is a cross-platform desktop application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
 
-Cripple works great together with other apps like VPN software, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy, etc.
+  *Fully compatible with VPNs, Torifier, TOR Router, YogaDNS, NextDNS, and dnscrypt-proxy.*
 </div>
 
 <img width="1300" height="780" alt="CripperNetStripDashboard" src="https://github.com/user-attachments/assets/974752d0-1a9a-46ee-832a-dfddcf23ad23" />
+
 ---
 
 ## 🛡️ What is NetStrip?
 
-NetStrip is a next-generation network traffic analyzer. Operating securely at the system level, it drops ads, telemetry, trackers, and malware packets before they even leave your network interface.
+NetStrip is a next-generation network traffic analyzer. Operating securely at the OS-level, it drops ads, telemetry, trackers, and malware packets before they ever leave your network interface.
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss—blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
-## ✨ Core Capabilities
+## ✨ Key Features
 
 ### 🚧 Absolute Zero-Leak Packet Interception
-- **Kernel Integrations**: Uses `WinDivert` (Windows), `route blackholing` (macOS), and dynamic `iptables` (Linux) to drop unwanted packets instantly at the OS level.
-- **DoH Sinkhole**: Intercepts and sinkholes 30+ major DNS-over-HTTPS providers (like Cloudflare, Google, AliDNS) to prevent web browsers from stealthily bypassing NetStrip's filtering.
-- **IPv6 SLAAC Lockdown**: Forcibly disables IPv6 Router Advertisements across all operating systems to prevent rogue routers from slipping external DNS configurations into your OS.
-- **Global IPv6 Killswitch**: 1-click option to brutally disable IPv6 globally across the OS, forcing all traffic onto easily monitorable IPv4 routes.
+- **Kernel-Level Drops**: Utilizes `WinDivert` (Windows), `route blackholing` (macOS), and dynamic `iptables` (Linux) to intercept traffic natively.
+- **DoH Sinkhole**: Forcibly routes 30+ major DNS-over-HTTPS providers (Cloudflare, Google, AliDNS) into the sinkhole, preventing browsers from bypassing your filters.
+- **IPv6 SLAAC Lockdown**: Disables IPv6 Router Advertisements across all operating systems to prevent rogue routers from slipping external DNS configurations into your OS.
+- **Global IPv6 Killswitch**: A 1-click brutal disable of IPv6 globally across the OS, forcing all traffic onto easily monitorable IPv4 routes.
 - **LAN Shield**: Instantly block or allow all private subnet communications (10.x, 172.16.x, 192.168.x).
 
-### 🧠 Smart Shield & Streamer Privacy
-- **Smart Shield**: NetStrip continuously monitors your connections. If severe threats (C&C connections, known malware) are detected, it automatically escalates from Normal to Paranoid Mode—blocking everything except critical apps.
-- **Privacy Stream Mode**: 1-click UI masking feature that seamlessly obscures all Local and Public IP addresses in the dashboard, live logs, and connection sidebars, preventing IP leaks while live streaming.
-- **Kernel Route Monitor (0-ms Killswitch)**: Micro-polls your OS routing table via dummy UDP sockets every 100ms. If your VPN drops and traffic shifts to your ISP, the Master Killswitch engages instantly.
-
-### ⏱️ Dynamic Crash Recovery Watchdog
-- Spawns a detached, invisible `watchdog.py` subprocess. 
-- **Runtime Tamper Verification**: Before initiating any restart, the watchdog cryptographically verifies the SHA-256 hashes of all core engine files against a trusted baseline to prevent malware from hijacking the sinkhole engine.
-- If the main NetStrip engine crashes, the watchdog gracefully attempts to recover the engine up to 3 times.
-- If all attempts fail, it triggers an OS-specific emergency recovery routine. It dynamically reads your original pre-NetStrip DNS configurations from the SQLite database and gracefully restores them (whether they were static IPs or DHCP auto-assigned) to perfectly fail-open and bring your internet back online without disruption.
 ### 📊 Multi-Layered DNS Sinkhole
-- Asynchronous local DNS proxy intercepting queries against over **1.5 million** blocked domains in `O(1)` time.
-- Resolves upstream queries via UDP, DNS-over-TLS (DoT), or native DNS-over-HTTPS (DoH) to secure your downstream privacy.
-- App-specific DNS policies: Define custom rules (e.g., Allow `tracker.com` only when `discord.exe` requests it).
-- Includes quick "15-Minute Time Bomb" temporary allow rules for quickly unbreaking websites.
+- Evaluates queries asynchronously against over **1.5 million** blocked domains in `O(1)` time.
+- Resolves upstream queries via standard UDP, DNS-over-TLS (DoT), or native DNS-over-HTTPS (DoH) for downstream privacy.
+- **App-Specific Policies**: Enforce rules per executable (e.g., allow `tracker.com` only when `discord.exe` requests it).
+- **Time Bombs**: Quick 15-minute temporary allow-rules to quickly unbreak websites without permanently whitelisting them.
 
-### 🖥️ Headless & Embedded Operation
-- Detects Raspberry Pi, ARM embedded systems, or the `--service` CLI flag to run completely silently in the background.
-- By running with `--service`, the main GUI is hidden from startup to achieve zero graphical loading. It runs exclusively as a daemon, accessible via a persistent system tray icon.
-- **Headless Configuration**: When running in service mode without the GUI, users can manually change settings by editing the `~/.netstrip/settings.json` file. The engine dynamically reads the database on restart.
+### 🧠 Smart Shield & Streamer Privacy
+- **Smart Shield**: Auto-escalates from Normal to Paranoid Mode—blocking everything except critical apps—if severe threats (C&C connections, known malware) are detected.
+- **Privacy Stream Mode**: 1-click UI masking that seamlessly obscures all Local and Public IP addresses in the dashboard to prevent leaks while live streaming.
+- **0-ms Kernel Route Monitor**: Micro-polls your OS routing table via dummy UDP sockets every 100ms. If your VPN drops, the Master Killswitch engages instantly before packets can leak to your ISP.
 
-### 🔄 Seamless Multi-Instance Support (IPC)
-- **Single-Instance Lock**: NetStrip uses a built-in IPC (Inter-Process Communication) TCP socket bound to `127.0.0.1:54321` to ensure only one firewall engine is running at a time.
-- **Dynamic GUI Restoration**: Starting up a new instance of the program (directly from `.exe` or via python) while a headless client is already running will seamlessly merge with the running client. It silently sends a `SHOW_GUI` signal to the background service to instantly load the interface, and then the new process exits fluently.
+### 🖥️ Headless Architecture & IPC
+- **True Daemon Mode**: Run completely silently in the background via the `--service` CLI flag, perfect for Raspberry Pi or ARM embedded systems.
+- **Single-Instance Lock**: A built-in TCP socket securely binds to `127.0.0.1:54321` to ensure only one firewall engine runs at a time. 
+- **Dynamic GUI Restoration**: Launching the app while the headless daemon is already running seamlessly merges the two. The new instance silently signals the daemon to load the UI, then exits smoothly.
 
-### 🎨 Hardware-Accelerated GUI
-- Powered by `CustomTkinter` for a stunning, glassmorphism-inspired dark mode experience.
-- Features lazy-loaded tabs, live GeoIP mapping interfaces, comprehensive analytics dashboards, and simple 1-click toggles for complex kernel networking commands.
+## 🔒 Security & Tamper Defenses
+
+NetStrip integrates deep defense-in-depth mechanisms to protect its runtime environment and guarantee internet availability:
+
+- **Runtime Tamper Verification**: Cryptographic SHA-256 validation of the core engine files guarantees that malware cannot quietly replace the sinkhole binaries while NetStrip runs.
+- **Fail-Open Recovery**: If an unrecoverable crash occurs, a detached watchdog process forcibly removes all active firewall hooks. It dynamically reads your original pre-NetStrip DNS configurations from the local database and flawlessly restores them (precisely reverting back to your specific static IPs or DHCP configuration) to guarantee the host machine never loses internet.
+- **Strict Pathing & Privilege Defenses**: Absolute path enforcement and execution policy hardening prevent malicious actors from hijacking the NetStrip daemon via relative path spoofing or DLL sideloading.
+- **Anti-Corruption Database Locks**: The SQLite WAL (Write-Ahead Logging) mode is paired with strict thread-safe isolation to ensure firewall rules and connection logs cannot be deliberately corrupted by aggressive IO attacks.
+- **Local IPC Socket Authorization**: The single-instance communication socket actively validates structured JSON payloads to prevent Local Privilege Escalation (LPE) or unauthorized GUI hijacking from other user accounts.
+- **PowerShell Injection Hardening**: The background icon extraction engine mathematically sanitizes and Base64-encodes all file paths before OS interaction, completely neutralizing arbitrary command execution via crafted executable names.
+- **Subprocess Shell Sandboxing**: All system-level operations (`netsh`, `schtasks`, UAC elevations) are strictly executed with `shell=False` using isolated list arguments, preventing any possibility of OS-level shell injection exploits.
 
 ## 🛠️ Architecture
 
 NetStrip is meticulously divided into two independent layers to maximize stability and minimize overhead:
 
-1. **The Core Engine**: A multi-threaded daemon handling packet evaluation, SQLite logging (WAL mode), DNS proxying, and Kernel Route monitoring.
-2. **The GUI App**: The visualizer. Built independently from the Core Engine, allowing it to be safely minimized to tray or completely closed for pure headless operation.
+1. **The Core Engine**: A multi-threaded daemon handling packet evaluation, SQLite logging, DNS proxying, and Kernel Route monitoring.
+2. **The GUI App**: A hardware-accelerated visualizer powered by `CustomTkinter`. Built entirely independent from the Core Engine, allowing it to be safely minimized to the system tray or completely closed for pure headless operation.
 
 ## 📖 Installation
 
 ### Option 1: Standalone Executable (Recommended for Windows)
-The easiest way to install NetStrip on Windows is to download the pre-compiled `.exe` file from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). 
-Just download, run as Administrator, and you're good to go! No Python installation required.
+Download the pre-compiled `.exe` file from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator. No Python installation required.
 
 ### Option 2: Run from Source (All Platforms)
 
@@ -101,21 +100,23 @@ sudo python3 main.py
 sudo python3 main.py --service
 ```
 
-## 🔒 Security Measures & Tamper Defenses
-NetStrip integrates several layers of defense-in-depth mechanisms to protect its own runtime environment and prevent hostile tampering:
-- **Runtime Tamper Verification**: Cryptographic SHA-256 validation of the core engine files guarantees that malware cannot quietly replace the sinkhole binaries while NetStrip runs.
-- **Fail-Open Recovery Protocol**: If an unrecoverable crash occurs, the detached watchdog forcibly removes all active firewall hooks and flawlessly restores your exact original native OS DNS states (precisely reverting back to your specific static IPs or DHCP configuration) to guarantee the host machine never loses its internet connection.
-- **0-ms Kernel Route Polling**: The engine aggressively micro-polls UDP sockets and routing tables every 100 milliseconds to instantly detect VPN dropouts, activating the Master Killswitch before packets can leak to an ISP.
-- **Strict Pathing & Privilege Escalation Defenses**: Absolute path enforcement and execution policy hardening prevent malicious actors from hijacking the NetStrip daemon via relative path spoofing or DLL sideloading.
-- **Anti-Corruption Database Locks**: The SQLite WAL (Write-Ahead Logging) mode is paired with strict thread-safe isolation to ensure the firewall rules and connection logs cannot be deliberately corrupted or malformed by aggressive IO attacks.
-- **Local IPC Socket Authorization**: The single-instance communication socket is strictly bound to `127.0.0.1` and actively validates structured JSON payloads to prevent Local Privilege Escalation (LPE) or unauthorized GUI hijacking from other user accounts.
-- **PowerShell Injection Hardening**: The background icon extraction engine mathematically sanitizes and cryptographically encodes (Base64) all file paths before interacting with the OS, completely neutralizing arbitrary command execution via crafted executable names.
-- **Subprocess Shell Sandboxing**: All system-level operations (`netsh`, `schtasks`, UAC elevations) are strictly executed with `shell=False` using isolated list arguments, preventing any possibility of OS-level shell injection exploits.
-
 ## 🙏 Credits
+
 Powered by the incredible open-source community:
-- **CustomTkinter** (Tom Schimansky), **dnslib** (PaulC), **psutil** (Giampaolo Rodola), **WinDivert**
-- **Blocklists**: AdGuard, oisd (sjhgvr), Steven Black Hosts, HaGeZi, WindowsSpyBlocker, URLHaus, and many more.
+
+**Core Technologies:**
+- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) by Tom Schimansky
+- [dnslib](https://github.com/paulc/dnslib) by PaulC
+- [psutil](https://github.com/giampaolo/psutil) by Giampaolo Rodola
+- [WinDivert](https://github.com/basil00/Divert) by basil00
+
+**Blocklist Providers:**
+- [AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html)
+- [oisd](https://oisd.nl/) by sjhgvr
+- [Steven Black Hosts](https://github.com/StevenBlack/hosts)
+- [HaGeZi](https://github.com/hagezi/dns-blocklists)
+- [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker)
+- [URLHaus](https://urlhaus.abuse.ch/)
 
 ## 📄 License
 This project is licensed under the MIT License. See `LICENSE` for details.
