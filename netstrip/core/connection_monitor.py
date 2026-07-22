@@ -107,8 +107,10 @@ class ConnectionMonitor:
             if not conn.raddr or not conn.pid or not hasattr(conn.raddr, 'ip'):
                 continue
                 
-            # Ignore internal loopback connections (e.g. dnscrypt-proxy communicating locally)
-            if conn.laddr and conn.laddr.ip in ('127.0.0.1', '::1') and conn.raddr.ip in ('127.0.0.1', '::1'):
+            # Ignore internal loopback connections (e.g. dnscrypt-proxy communicating locally, or DNS requests to 127.127.127.127)
+            if conn.laddr and conn.laddr.ip.startswith('127.') and conn.raddr.ip.startswith('127.'):
+                continue
+            if conn.laddr and conn.laddr.ip == '::1' and conn.raddr.ip == '::1':
                 continue
                 
             # Create a unique signature for the connection
