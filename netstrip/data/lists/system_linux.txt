@@ -1,0 +1,10 @@
+# Linux/Ubuntu OS Telemetry & Metrics
+# These domains are primarily Canonical/Ubuntu metrics and Snapcraft telemetry.
+# This list is manually maintained as no major online Linux telemetry blocklist exists.
+
+metrics.ubuntu.com
+popcon.ubuntu.com
+daisy.ubuntu.com
+api.snapcraft.io
+dashboard.snapcraft.io
+telemetry.ubuntu.com
