@@ -173,6 +173,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
     def _refresh_loop(self):
         if getattr(self, '_destroyed', False):
             return
+        # Skip heavy refresh during active window resize to prevent artifacts
+        if getattr(self, '_resize_paused', False):
+            return
             
         try:
             # Fetch recent connections - increased limit to 500 to prevent active apps falling off 

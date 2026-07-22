@@ -413,19 +413,23 @@ class SettingsView(ctk.CTkFrame):
     def _factory_reset(self):
         import customtkinter as ctk
         dialog = ctk.CTkToplevel(self)
-        dialog.title('Factory Reset')
-        dialog.geometry('400x200')
+        dialog.title('⚠ Factory Reset — Confirm')
+        dialog.geometry('460x260')
+        dialog.configure(fg_color=Colors.BG_DARKEST)
         dialog.transient(self.master)
         dialog.grab_set()
+        dialog.attributes("-topmost", True)
+        dialog.resizable(False, False)
         
         # Center it
         dialog.update_idletasks()
-        x = self.master.winfo_x() + (self.master.winfo_width() - 400) // 2
-        y = self.master.winfo_y() + (self.master.winfo_height() - 200) // 2
+        x = self.master.winfo_x() + (self.master.winfo_width() - 460) // 2
+        y = self.master.winfo_y() + (self.master.winfo_height() - 260) // 2
         dialog.geometry(f'+{x}+{y}')
         
-        ctk.CTkLabel(dialog, text='WARNING: Factory Reset', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, 'bold'), text_color=Colors.DANGER).pack(pady=(20, 10))
-        ctk.CTkLabel(dialog, text='This will permanently delete ALL your App Rules, settings,\nand connection history. Please ensure you have exported a\nBackup Profile first!\n\nThe application will restart after wiping data.', text_color=Colors.TEXT_SECONDARY).pack(pady=(0, 20))
+        ctk.CTkLabel(dialog, text='⚠  FACTORY RESET', font=(Fonts.FAMILY_PRIMARY[0], 20, 'bold'), text_color=Colors.DANGER).pack(pady=(24, 8))
+        ctk.CTkLabel(dialog, text='Are you sure? This action is irreversible.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, 'bold'), text_color=Colors.TEXT_PRIMARY).pack(pady=(0, 6))
+        ctk.CTkLabel(dialog, text='All user rules, settings, connection logs, custom blocklists,\nand online list registrations will be permanently deleted.\nMake sure you have exported a Backup Profile first!\n\nCripper will restart automatically after the wipe.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY, justify='center').pack(pady=(0, 20))
         
         btn_frame = ctk.CTkFrame(dialog, fg_color='transparent')
         btn_frame.pack()
@@ -434,8 +438,8 @@ class SettingsView(ctk.CTkFrame):
             dialog.destroy()
             self._do_factory_wipe()
             
-        ctk.CTkButton(btn_frame, text='Cancel', width=100, fg_color=Colors.BG_ELEVATED, hover_color=Colors.BORDER_DEFAULT, command=dialog.destroy).pack(side='left', padx=10)
-        ctk.CTkButton(btn_frame, text='WIPE DATA', width=100, fg_color=Colors.DANGER, hover_color='#f43f5e', command=on_confirm).pack(side='right', padx=10)
+        ctk.CTkButton(btn_frame, text='Cancel', width=120, height=36, fg_color=Colors.BG_ELEVATED, hover_color=Colors.BORDER_DEFAULT, text_color=Colors.TEXT_PRIMARY, command=dialog.destroy).pack(side='left', padx=10)
+        ctk.CTkButton(btn_frame, text='WIPE & RESTART', width=140, height=36, fg_color=Colors.DANGER, hover_color='#f43f5e', text_color='white', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, 'bold'), command=on_confirm).pack(side='right', padx=10)
         
     def _do_factory_wipe(self):
         try:
@@ -483,8 +487,14 @@ class SettingsView(ctk.CTkFrame):
         except Exception as e:
             print("Failed to clean custom blocklists:", e)
             
-        import sys, os
-        os.execv(sys.executable, ['python'] + sys.argv)
+        import sys, os, subprocess
+        if getattr(sys, 'frozen', False):
+            # PyInstaller exe restart
+            subprocess.Popen([sys.executable] + sys.argv[1:])
+        else:
+            # Python script restart
+            subprocess.Popen([sys.executable] + sys.argv)
+        sys.exit(0)
 
     def _build_about_card(self):
         card = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=14, border_width=1, border_color=Colors.BORDER_SUBTLE)

@@ -71,6 +71,23 @@ NetStrip is meticulously divided into two independent layers to maximize stabili
 1. **The Core Engine**: A multi-threaded daemon handling packet evaluation, SQLite logging, DNS proxying, and Kernel Route monitoring.
 2. **The GUI App**: A hardware-accelerated visualizer powered by `CustomTkinter`. Built entirely independent from the Core Engine, allowing it to be safely minimized to the system tray or completely closed for pure headless operation.
 
+### 🎨 GUI & UX Optimizations
+
+The interface has been meticulously optimized to feel responsive and fluid, even under heavy network traffic:
+
+- **Ghost-Line Sash Dragging**: The divider between the main content and connections sidebar uses a lightweight ghost indicator during drag instead of triggering real-time panel resizes, eliminating all stutter and rendering artifacts.
+- **Debounced Window Resize**: Window resize events are batched and the connections sidebar refresh loop is paused during active resizing. Layout recalculations flush once on release, preventing graphical delays and widget thrashing.
+- **Lazy Tab Preloading**: Non-active tabs are pre-instantiated in staggered 300ms intervals after boot, so switching between Dashboard, Logs, Filter Lists, and Settings is instant with zero construction delay.
+- **View Caching**: Once a tab is built, it is never destroyed — only hidden via `grid_remove()`. Switching tabs is a zero-cost O(1) swap with no widget reconstruction.
+- **3× Faster Scroll Speed**: Mouse wheel events are patched at the framework level to scroll 3 lines per tick instead of CustomTkinter's sluggish default.
+- **Animated Logo Canvas**: The animated logo renders on a lightweight Canvas widget to avoid PIL overhead during idle.
+- **Splash Screen with Progressive Loading**: A splash screen with animated progress bars masks the ~2s cold-start initialization, preventing any white/black window flash on launch.
+- **Flicker-Free Dashboard**: The activity feed uses a pre-allocated widget pool — rows are updated in-place via `configure()` calls rather than being destroyed and recreated every refresh cycle.
+
+### 💾 Backup & Import
+
+Full profile backup and import via JSON is built in. The export captures **all** user settings, app rules, custom online blocklist URLs, and their block/allow classifications into a single portable `.json` file. Importing merges cleanly — custom blocklist sources are de-duplicated by name, and settings are applied immediately. This enables easy migration between machines or deploying identical configurations to headless embedded instances by copying a single file.
+
 ## 📖 Installation
 
 ### Option 1: Standalone Executable (Recommended for Windows)
@@ -101,6 +118,19 @@ sudo python3 main.py
 ```bash
 sudo python3 main.py --service
 ```
+
+## 🔄 Updates (since v1.0)
+
+- **Ghost-Line Sash Resizing**: Dragging the sidebar divider no longer causes stutter — a lightweight ghost indicator follows the cursor and the layout snaps once on mouse release.
+- **Debounced Window Resize**: Resizing the application window no longer causes rendering artifacts or graphical delays. The sidebar refresh loop pauses during active resize and layout recalculation is batched and flushed on release.
+- **Comprehensive Factory Reset**: The Factory Reset button now wipes all user data (rules, settings, logs, statistics), removes custom online blocklist entries from the update registry, deletes downloaded custom list files, and cleanly reboots the application — with a mandatory confirmation popup before any destructive action.
+- **Full Profile Backup & Import**: The JSON profile export now captures the complete application state: settings, user rules, **and** all custom online blocklist URLs with their categories. Import merges sources intelligently without creating duplicates.
+- **Intelligent Heuristic Scanner**: Custom blocklists added via URL are auto-categorized using dual-layer heuristic analysis (URL keywords + file header content scanning) into Tracker, Telemetry, Malware, or System categories.
+- **Cross-OS System Domain Protection**: System domains not native to the current OS (e.g., Apple domains on a Windows machine) are automatically re-mapped to Telemetry to prevent privacy leaks.
+- **Staggered Online List Updates**: The 24-hour auto-update cycle now staggers individual list downloads with randomized delays to prevent bandwidth spikes.
+- **Linux System Domain Coverage**: Added hardcoded Linux system domain lists (Ubuntu, Debian, Fedora, Arch) alongside the existing Windows and macOS lists.
+- **Expanded Layer 1 URL Heuristics**: The keyword engine for auto-categorization now covers 40+ terms across telemetry, tracker, malware, and system categories.
+- **User Blocked Fallback**: Unidentifiable custom blocklists default to "User Blocked" instead of "Ads", keeping category data clean and accurate.
 
 ## 🙏 Credits
 

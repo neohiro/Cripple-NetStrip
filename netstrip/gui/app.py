@@ -68,18 +68,23 @@ class DraggableSash(ctk.CTkFrame):
         self._start_x = event.x_root
         self._initial_width = self.right_frame.winfo_width()
         self.configure(fg_color=Colors.ACCENT_PRIMARY)
+        if not hasattr(self, 'ghost_line'):
+            self.ghost_line = ctk.CTkFrame(self.master, width=4, fg_color=Colors.ACCENT_PRIMARY, corner_radius=0)
+        self.ghost_line.place(x=self.winfo_x(), y=self.winfo_y(), height=self.winfo_height())
+        self.ghost_line.lift()
         
     def _on_drag(self, event):
         dx = event.x_root - self._start_x
         new_width = self._initial_width - dx
         if 250 < new_width < 1200:
-            if self._drag_timer:
-                self.after_cancel(self._drag_timer)
-            # Debounce real-time resize to 20fps (50ms) to prevent UI thread lag
-            self._drag_timer = self.after(50, lambda: self.master.grid_columnconfigure(3, weight=0, minsize=new_width))
+            new_x = self.winfo_x() + dx
+            if hasattr(self, 'ghost_line'):
+                self.ghost_line.place(x=new_x)
             
     def _on_release(self, event):
         self.configure(fg_color=Colors.BORDER_SUBTLE)
+        if hasattr(self, 'ghost_line'):
+            self.ghost_line.place_forget()
         dx = event.x_root - self._start_x
         new_width = self._initial_width - dx
         if 250 < new_width < 1200:
@@ -143,10 +148,22 @@ class NetStripApp(ctk.CTk):
             pass
 
     def _on_window_resize(self, event):
-        pass # Removed visual resize overlay for smoother UI
+        # Only act on top-level window resize events, not child widget reconfigs
+        if event.widget is not self:
+            return
+        # Pause the sidebar refresh loop during active resize to prevent widget thrashing
+        if hasattr(self, 'connections_list'):
+            self.connections_list._resize_paused = True
+        # Debounce: cancel any pending resize-end callback and reset
+        if self._resize_timer is not None:
+            self.after_cancel(self._resize_timer)
+        self._resize_timer = self.after(150, self._on_resize_end)
 
     def _on_resize_end(self):
-        pass
+        self._resize_timer = None
+        # Resume sidebar refresh
+        if hasattr(self, 'connections_list'):
+            self.connections_list._resize_paused = False
 
     def build_ui(self, engine: NetStripEngine):
         self.engine = engine
