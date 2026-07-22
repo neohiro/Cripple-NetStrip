@@ -216,6 +216,8 @@ class BlocklistView(ctk.CTkScrollableFrame):
         if hasattr(self.engine, 'on_status') and self.engine.on_status:
             self.engine.on_status(f"Added custom {action} rule for {pattern}")
             
+        self._refresh_stats_grid()
+            
         self._search_entry.delete(0, 'end')
         self._search_entry.insert(0, pattern)
         self._do_search()
@@ -224,16 +226,28 @@ class BlocklistView(ctk.CTkScrollableFrame):
         if msg and hasattr(self.engine, 'on_status') and self.engine.on_status:
             self.engine.on_status(msg)
             
-        # Re-build stats grid without destroying the whole view
-        for child in self.winfo_children():
-            if isinstance(child, ctk.CTkLabel) and child.cget("text") == "Indexed Categories":
-                continue # keep title
-            if isinstance(child, ctk.CTkFrame) and child != self._results_scroll and child != self.children.get("!ctkframe") and child != self.children.get("!ctkframe2"):
-                child.destroy()
-        
-        # We need a proper rebuild method, but for now we just recreate the view if needed, or simply let the user restart
-        # Actually it's easier to just recreate the stats grid frame
-        pass # Rebuilding the grid dynamically is complex due to layout order. We'll rely on app restart for full stats update, but memory is actively blocking.
+        try:
+            whitelist_size = len(self.engine.blocklist.whitelist)
+            app_whitelist_size = len(self.engine.blocklist.app_whitelist)
+            blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
+            app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
+            
+            from netstrip.core.modes import ConnectionCategory
+            
+            updates = {
+                ConnectionCategory.USER_ALLOWED.value: whitelist_size + app_whitelist_size,
+                ConnectionCategory.USER_BLOCKED.value: blacklist_size + app_blacklist_size,
+            }
+            
+            for cat_val, (card, inner) in getattr(self, '_category_ui_elements', {}).items():
+                if cat_val in updates:
+                    children = inner.winfo_children()
+                    if len(children) >= 2:
+                        children[1].configure(text=f"{updates[cat_val]:,}")
+                        
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error refreshing stats grid: {e}")
 
     def _build_search_bar(self):
         search_row = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL)
@@ -495,78 +509,102 @@ class BlocklistView(ctk.CTkScrollableFrame):
         if self._destroyed or not getattr(self, '_current_results', None):
             return
             
+        if getattr(self, '_is_loading_chunk', False):
+            return
+            
         if self._rendered_count >= len(self._current_results):
             return # Done rendering
             
+        self._is_loading_chunk = True
+            
         chunk = self._current_results[self._rendered_count : self._rendered_count + self._page_size]
         if not chunk:
+            self._is_loading_chunk = False
             return
             
         self._rendered_count += len(chunk)
 
-        for r in chunk:
-            row = ctk.CTkFrame(
-                self._results_container,
-                fg_color=Colors.BG_ELEVATED, corner_radius=0,
-            )
-            row.pack(fill="x", pady=2, padx=4)
-
-            domain = r.get('domain', 'Unknown')
-            cat = r.get('category', 'unknown')
-
-            domain_lbl = ctk.CTkLabel(
-                row, text=domain,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
-                text_color=Colors.TEXT_PRIMARY,
-            )
-            domain_lbl.pack(side="left", padx=Spacing.MD, pady=Spacing.SM)
-            
-            try:
-                from netstrip.gui.utils import bind_copy_tooltip
-                bind_copy_tooltip(domain_lbl, domain, "Link copied!")
-            except Exception:
-                pass
-
-            # Quick Actions
-            btn_frame = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
-            btn_frame.pack(side="right", padx=Spacing.SM, pady=Spacing.SM)
-            
-            def make_action(d=domain, act='allow'):
-                self.engine.db.add_user_rule({
-                    'pattern': d,
-                    'action': act,
-                    'scope': 'global',
-                    'app_name': None,
-                    'category': f'user_{act}ed',
-                    'note': f"Manual {act} from search"
-                })
-                # Refresh blocklist memory
-                rules = self.engine.db.get_user_rules()
-                self.engine.blocklist.sync_user_rules(rules)
+        # Process the chunk in smaller batches to keep UI responsive
+        def _render_batch(items, index=0):
+            if self._destroyed or index >= len(items):
+                self._is_loading_chunk = False
+                return
                 
-                # Visual feedback
-                if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                    self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
-                
-            is_allowed = cat in ('user_allowed', 'essential')
-            btn_text = "Block" if is_allowed else "Whitelist"
-            btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
-            btn_hover = "#be123c" if is_allowed else Colors.SUCCESS
-            act_val = 'block' if is_allowed else 'allow'
+            batch_size = 5
+            for r in items[index : index + batch_size]:
+                row = ctk.CTkFrame(
+                    self._results_container,
+                    fg_color=Colors.BG_ELEVATED, corner_radius=0,
+                )
+                row.pack(fill="x", pady=2, padx=4)
 
-            ctk.CTkButton(
-                btn_frame, text=btn_text, width=60, height=22, corner_radius=4,
-                fg_color=btn_color, hover_color=btn_hover, text_color=Colors.TEXT_PRIMARY,
-                font=(Fonts.FAMILY_PRIMARY[0], 10), command=lambda d=domain, a=act_val: make_action(d, a)
-            ).pack(side="left", padx=(0, 4))
+                domain = r.get('domain', 'Unknown')
+                cat = r.get('category', 'unknown')
+
+                domain_lbl = ctk.CTkLabel(
+                    row, text=domain,
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+                    text_color=Colors.TEXT_PRIMARY,
+                )
+                domain_lbl.pack(side="left", padx=Spacing.MD, pady=Spacing.SM)
+                
+                try:
+                    from netstrip.gui.utils import bind_copy_tooltip
+                    bind_copy_tooltip(domain_lbl, domain, "Link copied!")
+                except Exception:
+                    pass
+
+                # Quick Actions
+                btn_frame = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
+                btn_frame.pack(side="right", padx=Spacing.SM, pady=Spacing.SM)
+                
+                def make_action(d=domain, act='allow'):
+                    mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
+                    self.engine.db.add_user_rule({
+                        'pattern': d,
+                        'action': act,
+                        'scope': 'global',
+                        'app_name': None,
+                        'category': f'user_{act}ed',
+                        'note': f"Manual {act} from search",
+                        'mode_scope': mode_scope
+                    })
+                    # Refresh blocklist memory
+                    rules = self.engine.db.get_user_rules(mode_scope=mode_scope)
+                    if hasattr(self.engine.blocklist, 'sync_user_rules'):
+                        self.engine.blocklist.sync_user_rules(rules)
+                    
+                    # Visual feedback
+                    if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                        self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
+                        
+                    # Auto-refresh the view
+                    self._refresh_stats_grid()
+                    self._do_search()
+                    
+                is_allowed = cat in ('user_allowed', 'essential')
+                btn_text = "Block" if is_allowed else "Whitelist"
+                btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
+                btn_hover = "#be123c" if is_allowed else Colors.SUCCESS
+                act_val = 'block' if is_allowed else 'allow'
+
+                ctk.CTkButton(
+                    btn_frame, text=btn_text, width=60, height=22, corner_radius=4,
+                    fg_color=btn_color, hover_color=btn_hover, text_color=Colors.TEXT_PRIMARY,
+                    font=(Fonts.FAMILY_PRIMARY[0], 10), command=lambda d=domain, a=act_val: make_action(d, a)
+                ).pack(side="left", padx=(0, 4))
+                
+                ctk.CTkLabel(
+                    btn_frame, text=get_category_label(cat).upper(),
+                    fg_color=get_category_color(cat),
+                    corner_radius=4, text_color="white",
+                    font=(Fonts.FAMILY_PRIMARY[0], 9, "bold"),
+                    height=22, width=80,
+                ).pack(side="right")
+                
+            self.after(5, lambda: _render_batch(items, index + batch_size))
             
-            ctk.CTkLabel(
-                btn_frame, text=get_category_label(cat).upper(),
-                fg_color=get_category_color(cat),
-                corner_radius=4, text_color="white",
-                font=(Fonts.FAMILY_PRIMARY[0], 9, "bold"),
-                height=22, width=80,
-            ).pack(side="right")
+        _render_batch(chunk)
 
     def destroy(self):
         self._destroyed = True
