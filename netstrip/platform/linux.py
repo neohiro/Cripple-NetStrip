@@ -155,11 +155,56 @@ class LinuxPlatform(PlatformBase):
             return True
 
     def install_autostart(self) -> bool:
-        # Generate systemd service
-        return True
+        if not self.is_admin():
+            logger.error("Root privileges required to install systemd service.")
+            return False
+            
+        import sys
+        import os
+        exe_path = os.path.abspath(sys.argv[0])
+        service_path = "/etc/systemd/system/netstrip.service"
+        
+        service_content = f"""[Unit]
+Description=Cripple NetStrip Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={exe_path}
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target
+"""
+        try:
+            with open(service_path, "w") as f:
+                f.write(service_content)
+            self._run_cmd(["systemctl", "daemon-reload"])
+            self._run_cmd(["systemctl", "enable", "netstrip.service"])
+            logger.info("systemd service installed and enabled.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to install systemd service: {e}")
+            return False
 
     def uninstall_autostart(self) -> bool:
-        return True
+        if not self.is_admin():
+            logger.error("Root privileges required to uninstall systemd service.")
+            return False
+            
+        service_path = "/etc/systemd/system/netstrip.service"
+        try:
+            self._run_cmd(["systemctl", "disable", "netstrip.service"])
+            if os.path.exists(service_path):
+                os.remove(service_path)
+            self._run_cmd(["systemctl", "daemon-reload"])
+            logger.info("systemd service uninstalled.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to uninstall systemd service: {e}")
+            return False
 
     def is_autostart_installed(self) -> bool:
-        return False
+        import os
+        return os.path.exists("/etc/systemd/system/netstrip.service")

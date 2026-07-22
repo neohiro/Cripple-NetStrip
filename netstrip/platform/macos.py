@@ -124,11 +124,66 @@ class MacOSPlatform(PlatformBase):
         return False
 
     def install_autostart(self) -> bool:
-        # Create launchd plist
-        return True
+        if not self.is_admin():
+            logger.error("Root privileges required to install launchd daemon.")
+            return False
+            
+        import sys
+        import os
+        exe_path = os.path.abspath(sys.argv[0])
+        plist_path = "/Library/LaunchDaemons/com.netstrip.daemon.plist"
+        
+        plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.netstrip.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{exe_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/netstrip.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/netstrip_err.log</string>
+</dict>
+</plist>
+"""
+        try:
+            with open(plist_path, "w") as f:
+                f.write(plist_content)
+            # Fix permissions
+            self._run_cmd(["chown", "root:wheel", plist_path])
+            self._run_cmd(["chmod", "644", plist_path])
+            # Load the daemon
+            self._run_cmd(["launchctl", "load", "-w", plist_path])
+            logger.info("launchd daemon installed and loaded.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to install launchd daemon: {e}")
+            return False
 
     def uninstall_autostart(self) -> bool:
-        return True
+        if not self.is_admin():
+            logger.error("Root privileges required to uninstall launchd daemon.")
+            return False
+            
+        plist_path = "/Library/LaunchDaemons/com.netstrip.daemon.plist"
+        try:
+            if os.path.exists(plist_path):
+                self._run_cmd(["launchctl", "unload", "-w", plist_path])
+                os.remove(plist_path)
+            logger.info("launchd daemon uninstalled.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to uninstall launchd daemon: {e}")
+            return False
 
     def is_autostart_installed(self) -> bool:
-        return False
+        import os
+        return os.path.exists("/Library/LaunchDaemons/com.netstrip.daemon.plist")
