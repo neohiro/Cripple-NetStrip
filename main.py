@@ -124,10 +124,32 @@ def main():
 
     check_dependencies()
 
-    is_headless = "--service" in sys.argv or is_embedded_system()
+    is_embedded = is_embedded_system()
+    is_headless = "--service" in sys.argv or is_embedded
 
-    if is_headless:
-        logger.info("Headless/Service mode active. GUI will not be initialized.")
+    # --- IPC Single-Instance Check ---
+    import socket
+    IPC_PORT = 54321
+    ipc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    is_primary_instance = False
+    try:
+        ipc_socket.bind(('127.0.0.1', IPC_PORT))
+        ipc_socket.listen(1)
+        is_primary_instance = True
+    except OSError:
+        # Another instance is already running
+        try:
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect(('127.0.0.1', IPC_PORT))
+            client.sendall(b"SHOW_GUI\n")
+            client.close()
+        except Exception:
+            pass
+        print("NetStrip is already running. Showing existing GUI.")
+        sys.exit(0)
+
+    if is_embedded:
+        logger.info("Embedded system mode active. GUI will not be initialized.")
         from netstrip.core.engine import NetStripEngine
         engine_instance = NetStripEngine()
         
@@ -152,7 +174,7 @@ def main():
             engine_instance.stop()
             sys.exit(0)
 
-    # Standard GUI Boot Path
+    # Standard GUI Boot Path (used for both desktop AND --service to get tray icon)
     from netstrip.gui.app import NetStripApp
     from netstrip.gui.splash import SplashScreen
     from netstrip.core.engine import NetStripEngine
@@ -160,7 +182,26 @@ def main():
     # Create hidden main app immediately
     app = NetStripApp()
     
-    if not is_fallback:
+    # --- IPC Listener Thread ---
+    def ipc_listener():
+        while True:
+            try:
+                conn, addr = ipc_socket.accept()
+                data = conn.recv(1024)
+                if b"SHOW_GUI" in data:
+                    app.after(0, app.deiconify)
+                    app.after(50, lambda: app.attributes('-topmost', True))
+                    app.after(100, lambda: app.attributes('-topmost', False))
+                    app.after(100, app.lift)
+                    app.after(100, app.focus_force)
+                conn.close()
+            except Exception:
+                pass
+                
+    import threading
+    threading.Thread(target=ipc_listener, daemon=True).start()
+    
+    if not is_fallback and not is_headless:
         splash = SplashScreen(app)
         app.update() # Force draw the splash screen to the OS NOW!
     else:
@@ -203,7 +244,8 @@ def main():
             app.build_ui(engine)
             
             # Force Tkinter to render the widgets while fully transparent
-            app.deiconify()
+            if not is_headless:
+                app.deiconify()
             app.apply_icon()
             app.update() 
             
@@ -211,18 +253,25 @@ def main():
                 elapsed = time.time() - start_time
                 
                 def on_transition_done():
-                    app.lift()
-                    app.attributes('-topmost', True)
-                    app.after(100, lambda: app.attributes('-topmost', False))
-                    app.focus_force()
-                    app.apply_icon() # Force it one more time just to be absolutely sure
-                    
-                    from netstrip.core.sound import sound_manager
-                    sound_manager.set_muted(initial_mute_state)
-                    if not initial_mute_state:
-                        sound_manager.play_intro()
+                    if not is_headless:
+                        app.lift()
+                        app.attributes('-topmost', True)
+                        app.after(100, lambda: app.attributes('-topmost', False))
+                        app.focus_force()
+                        app.apply_icon() # Force it one more time just to be absolutely sure
+                        
+                        from netstrip.core.sound import sound_manager
+                        sound_manager.set_muted(initial_mute_state)
+                        if not initial_mute_state:
+                            sound_manager.play_intro()
+                    else:
+                        app._show_tray_icon()
                         
                 def cross_fade(splash_alpha=1.0, app_alpha=0.0):
+                    if is_headless:
+                        on_transition_done()
+                        return
+                        
                     # Faster, smoother cross-fade (step 0.1 every 10ms = ~100ms total)
                     step = 0.1
                     splash_done = True
@@ -244,7 +293,7 @@ def main():
                         if splash: splash.withdraw()
                         on_transition_done()
                         
-                if is_fallback:
+                if is_fallback or is_headless:
                     if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading:
                         app.attributes('-alpha', 1.0)
                         on_transition_done()

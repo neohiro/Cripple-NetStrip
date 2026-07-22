@@ -193,6 +193,14 @@ class SettingsView(ctk.CTkFrame):
             value = 'true' if switch.get() else 'false'
             self.engine.db.set_setting(setting_key, value)
             
+            if setting_key == 'run_as_service' and value == 'true':
+                toplevel = self.winfo_toplevel()
+                toplevel.withdraw()
+                toplevel._show_tray_icon()
+                if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                    self.engine.on_status("Switched to background service mode")
+                return
+
             if setting_key == 'disable_ipv6_globally':
                 from netstrip.platform.base import get_platform
                 api = get_platform()

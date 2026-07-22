@@ -51,7 +51,12 @@ Designed for absolute privacy and network hygiene, NetStrip prevents bypasses th
 
 ### 🖥️ Headless & Embedded Operation
 - Detects Raspberry Pi, ARM embedded systems, or the `--service` CLI flag to run completely silently in the background.
-- Saves hundreds of megabytes of RAM by unloading the GUI and running exclusively as a daemon.
+- By running with `--service`, the main GUI is hidden from startup to achieve zero graphical loading. It runs exclusively as a daemon, accessible via a persistent system tray icon.
+- **Headless Configuration**: When running in service mode without the GUI, users can manually change settings by editing the `~/.netstrip/settings.json` file. The engine dynamically reads the database on restart.
+
+### 🔄 Seamless Multi-Instance Support (IPC)
+- **Single-Instance Lock**: NetStrip uses a built-in IPC (Inter-Process Communication) TCP socket bound to `127.0.0.1:54321` to ensure only one firewall engine is running at a time.
+- **Dynamic GUI Restoration**: Starting up a new instance of the program (directly from `.exe` or via python) while a headless client is already running will seamlessly merge with the running client. It silently sends a `SHOW_GUI` signal to the background service to instantly load the interface, and then the new process exits fluently.
 
 ### 🎨 Hardware-Accelerated GUI
 - Powered by `CustomTkinter` for a stunning, glassmorphism-inspired dark mode experience.
