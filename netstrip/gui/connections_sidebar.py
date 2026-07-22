@@ -376,6 +376,11 @@ class ConnectionsSidebar(ctk.CTkFrame):
         btn_text = "Collapse All" if self._all_expanded else "Expand All"
         self.btn_expand_all.configure(text=btn_text)
         
+        # Instantly snap scroll view to top when collapsing all to avoid empty void from batch shrinking
+        if not self._all_expanded:
+            try: self.scroll_frame._parent_canvas.yview_moveto(0)
+            except Exception: pass
+        
         groups_to_update = list(self.app_groups.values())
         self._is_expanding_all = True
         
