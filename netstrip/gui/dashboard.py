@@ -261,6 +261,12 @@ class DashboardView(ctk.CTkScrollableFrame):
                         lbl_proc.configure(text=p_name)
                         
                     d_text = r['domain'] or r['ip'] or ""
+                    
+                    privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
+                    if privacy_on:
+                        from netstrip.gui.utils import mask_ip_string
+                        d_text = mask_ip_string(d_text)
+                    
                     if lbl_domain.cget("text") != d_text:
                         lbl_domain.configure(text=d_text)
                         

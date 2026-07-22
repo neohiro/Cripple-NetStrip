@@ -458,12 +458,19 @@ class NetStripApp(ctk.CTk):
         self.after(0, lambda: SmartParanoidModal(self, self.engine, conn_data))
 
     def _update_geoip_ui(self, old_ip: str, geo_data: dict):
-        text = f"{geo_data['flag']} {geo_data['city']}, {geo_data['country']}  |  {geo_data['ip']}"
         def update_ui():
+            privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
+            if privacy_on:
+                text = "🌐 [STREAMER PRIVACY MODE ENABLED]"
+                copy_val = "Hidden for privacy"
+            else:
+                text = f"{geo_data.get('flag', '🌐')} {geo_data.get('city', 'Unknown')}, {geo_data.get('country', 'Unknown')}  |  {geo_data.get('ip', 'Unknown')}"
+                copy_val = geo_data.get('ip', 'Unknown')
+                
             self.lbl_geoip.configure(text=text)
             try:
                 from netstrip.gui.utils import bind_copy_tooltip
-                bind_copy_tooltip(self.lbl_geoip, geo_data['ip'], "Public IP copied!")
+                bind_copy_tooltip(self.lbl_geoip, copy_val, "Copied!")
             except Exception:
                 pass
         self.after(0, update_ui)

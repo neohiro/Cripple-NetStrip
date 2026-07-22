@@ -198,6 +198,29 @@ class SettingsView(ctk.CTkFrame):
                     self.engine.on_status("Switched to background service mode")
                 return
 
+            if setting_key == 'privacy_stream_mode':
+                toplevel = self.winfo_toplevel()
+                if hasattr(toplevel, '_update_geoip_ui'):
+                    geo = getattr(self.engine.geoip, 'last_geo_data', {}) if hasattr(self.engine, 'geoip') else {}
+                    toplevel._update_geoip_ui("", geo)
+
+            if setting_key == 'autostart':
+                from netstrip.platform.base import get_platform
+                api = get_platform()
+                if value == 'true':
+                    api.install_autostart()
+                else:
+                    api.uninstall_autostart()
+                    
+            if setting_key == 'allow_in_browser_dns':
+                import threading
+                def reload_task():
+                    try:
+                        self.engine.blocklist.load_all()
+                    except Exception:
+                        pass
+                threading.Thread(target=reload_task, daemon=True).start()
+
             if setting_key == 'disable_ipv6_globally':
                 from netstrip.platform.base import get_platform
                 api = get_platform()
