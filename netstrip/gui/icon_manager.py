@@ -20,21 +20,21 @@ OS_ICONS = {
 }
 
 APP_ICONS = {
-    'chrome': 'https://www.google.com/s2/favicons?domain=google.com&sz=64',
+    'chrome': 'https://www.google.com/s2/favicons?domain=chrome.com&sz=64',
     'firefox': 'https://www.google.com/s2/favicons?domain=mozilla.org&sz=64',
-    'msedge': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'msedge': 'https://www.google.com/s2/favicons?domain=microsoftedge.com&sz=64',
     'discord': 'https://www.google.com/s2/favicons?domain=discord.com&sz=64',
     'steam': 'https://www.google.com/s2/favicons?domain=steampowered.com&sz=64',
     'spotify': 'https://www.google.com/s2/favicons?domain=spotify.com&sz=64',
-    'code': 'https://www.google.com/s2/favicons?domain=visualstudio.com&sz=64',
+    'code': 'https://www.google.com/s2/favicons?domain=code.visualstudio.com&sz=64',
     'zoom': 'https://www.google.com/s2/favicons?domain=zoom.us&sz=64',
-    'teams': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'teams': 'https://www.google.com/s2/favicons?domain=teams.microsoft.com&sz=64',
     'brave': 'https://www.google.com/s2/favicons?domain=brave.com&sz=64',
     'dns': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64',
     'unknown (dns)': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64',
     'taskhostw': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'svchost': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'explorer': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'explorer': 'https://www.google.com/s2/favicons?domain=windows.com&sz=64',
     'cmd': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'powershell': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'pwsh': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
@@ -80,10 +80,32 @@ class IconManager:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir, exist_ok=True)
             
+        self._check_cache_version()
+            
         # In-memory cache of PIL.Image
         self._image_cache = {}
         # Prevent multiple threads extracting the same icon
         self._in_progress = set()
+
+    def _check_cache_version(self):
+        try:
+            from netstrip import __version__
+            version_file = os.path.join(self.cache_dir, ".version")
+            if os.path.exists(version_file):
+                with open(version_file, "r") as f:
+                    cached_version = f.read().strip()
+                if cached_version == __version__:
+                    return
+                    
+            # Wipe cache
+            for fname in os.listdir(self.cache_dir):
+                try: os.remove(os.path.join(self.cache_dir, fname))
+                except: pass
+                
+            with open(version_file, "w") as f:
+                f.write(__version__)
+        except Exception:
+            pass
 
     def get_icon(self, process_path: str, process_name: str, callback=None) -> Optional[ctk.CTkImage]:
         """

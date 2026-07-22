@@ -151,19 +151,40 @@ class NetStripApp(ctk.CTk):
         # Only act on top-level window resize events, not child widget reconfigs
         if event.widget is not self:
             return
-        # Pause the sidebar refresh loop during active resize to prevent widget thrashing
-        if hasattr(self, 'connections_list'):
-            self.connections_list._resize_paused = True
+            
+        if not getattr(self, '_is_resizing', False):
+            self._is_resizing = True
+            # Temporarily unmap heavy scroll frames to bypass geometry manager lag
+            if hasattr(self, 'connections_list') and hasattr(self.connections_list, 'scroll_frame'):
+                self.connections_list.scroll_frame.pack_forget()
+                self.connections_list._resize_paused = True
+                
+            # Same for active views with heavy scroll frames
+            if getattr(self, 'current_view', None):
+                if hasattr(self.current_view, '_log_scroll'):
+                    self.current_view._log_scroll.pack_forget()
+                if hasattr(self.current_view, 'scroll_frame'):
+                    self.current_view.scroll_frame.pack_forget()
+                
         # Debounce: cancel any pending resize-end callback and reset
         if self._resize_timer is not None:
             self.after_cancel(self._resize_timer)
-        self._resize_timer = self.after(150, self._on_resize_end)
+        self._resize_timer = self.after(200, self._on_resize_end)
 
     def _on_resize_end(self):
         self._resize_timer = None
-        # Resume sidebar refresh
-        if hasattr(self, 'connections_list'):
+        self._is_resizing = False
+        
+        # Restore scroll frames
+        if hasattr(self, 'connections_list') and hasattr(self.connections_list, 'scroll_frame'):
+            self.connections_list.scroll_frame.pack(fill="both", expand=True)
             self.connections_list._resize_paused = False
+            
+        if getattr(self, 'current_view', None):
+            if hasattr(self.current_view, '_log_scroll'):
+                self.current_view._log_scroll.pack(fill="both", expand=True)
+            if hasattr(self.current_view, 'scroll_frame'):
+                self.current_view.scroll_frame.pack(fill="both", expand=True)
 
     def build_ui(self, engine: NetStripEngine):
         self.engine = engine

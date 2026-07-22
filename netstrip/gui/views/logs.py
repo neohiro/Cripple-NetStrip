@@ -22,11 +22,11 @@ class LogView(ctk.CTkFrame):
     """Searchable, auto-refreshing connection log with category color-coding."""
 
     COL_CONFIGS = [
-        {"weight": 0, "minsize": 120},   # Time
-        {"weight": 0, "minsize": 160},  # Process
-        {"weight": 1, "minsize": 220},  # Domain (expands)
-        {"weight": 0, "minsize": 120},  # Category
-        {"weight": 0, "minsize": 80},   # Action
+        {"weight": 1, "minsize": 80},   # Time
+        {"weight": 2, "minsize": 100},  # Process
+        {"weight": 3, "minsize": 120},  # Domain (expands)
+        {"weight": 1, "minsize": 80},   # Category
+        {"weight": 1, "minsize": 60},   # Action
     ]
 
     def __init__(self, master, engine, **kwargs):
