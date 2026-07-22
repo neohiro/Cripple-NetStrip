@@ -45,7 +45,14 @@ class WindowsPlatform(PlatformBase):
             return False
 
     def _run_cmd(self, cmd: List[str]) -> subprocess.CompletedProcess:
-        return subprocess.run(cmd, shell=False, capture_output=True, text=True)
+        import subprocess
+        return subprocess.run(
+            cmd, 
+            shell=False, 
+            capture_output=True, 
+            text=True, 
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
 
     def set_system_dns(self, interface: str, dns_server: str) -> bool:
         try:
