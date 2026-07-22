@@ -98,20 +98,7 @@ class NetStripApp(ctk.CTk):
         self.geometry("1300x750")
         self.configure(fg_color=Colors.BG_DARKEST)
         
-        # Prevent black rendering artifacts on window restore
-        self.bind("<Map>", lambda e: self.after(10, self.update_idletasks))
-        self.bind("<Configure>", self._on_window_resize)
-        self._resize_timer = None
-
-    def _on_window_resize(self, event):
-        pass # Removed visual resize overlay for smoother UI
-
-    def _on_resize_end(self):
-        pass
-
-    def build_ui(self, engine: NetStripEngine):
-        self.engine = engine
-        # Fix Taskbar icon grouping on Windows
+        # Fix Taskbar icon grouping on Windows globally for this process
         try:
             import ctypes
             myappid = 'NetStrip.app.1.0'
@@ -119,7 +106,7 @@ class NetStripApp(ctk.CTk):
         except Exception:
             pass
 
-        # Load and set app icon
+        # Load and set app icon instantly
         try:
             import os
             import sys
@@ -134,11 +121,23 @@ class NetStripApp(ctk.CTk):
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
                 self._icon_image = Image.open(icon_path)
-            else:
-                logger.error(f"Icon not found at {icon_path}")
         except Exception as e:
-            logger.error(f"Failed to set window icon: {e}")
+            pass
+            
+        
+        # Prevent black rendering artifacts on window restore
+        self.bind("<Map>", lambda e: self.after(10, self.update_idletasks))
+        self.bind("<Configure>", self._on_window_resize)
+        self._resize_timer = None
 
+    def _on_window_resize(self, event):
+        pass # Removed visual resize overlay for smoother UI
+
+    def _on_resize_end(self):
+        pass
+
+    def build_ui(self, engine: NetStripEngine):
+        self.engine = engine
         ctk.set_appearance_mode("dark")
 
         # Register notification badge callback

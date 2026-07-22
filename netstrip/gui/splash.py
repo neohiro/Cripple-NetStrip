@@ -18,6 +18,19 @@ class SplashScreen(ctk.CTkToplevel):
         y = (screen_height // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")
         
+        # Explicitly set the icon on the splash screen as well to guarantee it doesn't default to the feather
+        try:
+            import os, sys
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            icon_path = os.path.join(base_path, 'assets', 'logo.ico')
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception:
+            pass
+        
         # Animated Canvas for Logo
         self.logo = AnimatedLogo(self, width=200, height=150, bg_color=Colors.BG_DARKEST)
         self.logo.pack(pady=(40, 20))

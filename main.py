@@ -22,8 +22,16 @@ if "--parent-pid" in sys.argv:
     except Exception:
         pass
 
-# Ensure project root is in PYTHONPATH if running directly
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+# Early Windows Taskbar Fix
+try:
+    if sys.platform == 'win32':
+        import ctypes
+        myappid = 'NetStrip.app.1.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except Exception:
+    pass
 
 def setup_logging():
     logging.basicConfig(
