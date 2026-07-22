@@ -17,7 +17,7 @@ from netstrip.gui.theme import (
 # ═══════════════════════════════════════════════════
 #  BlocklistView
 # ═══════════════════════════════════════════════════
-class BlocklistView(ctk.CTkFrame):
+class BlocklistView(ctk.CTkScrollableFrame):
     """Blocklist stats grid and domain search interface."""
 
     def __init__(self, master, engine, **kwargs):
@@ -389,13 +389,31 @@ class BlocklistView(ctk.CTkFrame):
                 widget.bind("<Button-1>", on_click)
 
     def _build_results_area(self):
-        self._results_scroll = ctk.CTkScrollableFrame(self, **CTK_FRAME_STYLE)
-        self._results_scroll.pack(fill="both", expand=True)
+        self._results_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._results_container.pack(fill="both", expand=True)
         self._restore_empty_state()
+        
+        # Setup infinite scrolling variables
+        self._current_results = []
+        self._rendered_count = 0
+        self._page_size = 50
+        
+        # Bind mouse wheel to check scroll position
+        if hasattr(self, '_parent_canvas'):
+            self.bind_all("<MouseWheel>", self._check_scroll, add="+")
+
+    def _check_scroll(self, event=None):
+        if self._destroyed or not getattr(self, '_parent_canvas', None) or not self.winfo_ismapped():
+            return
+        
+        yview = self._parent_canvas.yview()
+        # yview[1] is the bottom fractional position of the scrollbar (1.0 is bottom)
+        if yview[1] >= 0.98:
+            self._render_next_chunk()
 
     def _restore_empty_state(self):
         self._loading_label = ctk.CTkLabel(
-            self._results_scroll, text="Search for a domain to check if it is blocked.",
+            self._results_container, text="Search for a domain to check if it is blocked.",
             text_color=Colors.TEXT_TERTIARY,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic")
         )
@@ -405,7 +423,7 @@ class BlocklistView(ctk.CTkFrame):
         query = self._search_entry.get().strip()
         cat_filter = getattr(self, '_active_category_filter', None)
 
-        for w in self._results_scroll.winfo_children():
+        for w in self._results_container.winfo_children():
             w.destroy()
 
         if not query and not cat_filter:
@@ -418,7 +436,7 @@ class BlocklistView(ctk.CTkFrame):
             txt += f" in category: {cat_filter.upper()}"
             
         self._loading_label = ctk.CTkLabel(
-            self._results_scroll, text=txt,
+            self._results_container, text=txt,
             text_color=Colors.TEXT_TERTIARY,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic")
         )
@@ -428,30 +446,37 @@ class BlocklistView(ctk.CTkFrame):
         import threading
         def search_task():
             try:
-                results = self.engine.blocklist.search(query, limit=25, category_filter=cat_filter)
+                # Up to 2000 results so we can scroll a lot
+                results = self.engine.blocklist.search(query, limit=2000, category_filter=cat_filter)
             except Exception as e:
                 results = []
             
             # Update UI on main thread safely
             if not self._destroyed:
-                loading_lbl = self._loading_label
-                self.after(0, lambda: self._render_results(results, query, loading_lbl))
+                self.after(0, lambda: self._init_render(results, query))
                 
         threading.Thread(target=search_task, daemon=True).start()
 
-    def _render_results(self, results, query, loading_label):
+    def _init_render(self, results, query):
         if self._destroyed:
             return
             
         try:
-            loading_label.destroy()
+            self._loading_label.destroy()
         except Exception:
             pass
+
+        self._current_results = results
+        self._rendered_count = 0
+        self._current_query = query
+        
+        for w in self._results_container.winfo_children():
+            w.destroy()
 
         if not results:
             msg = f"No matches found for '{query}'" if query else "No domains found in this category."
             ctk.CTkLabel(
-                self._results_scroll, text=msg,
+                self._results_container, text=msg,
                 text_color=Colors.TEXT_TERTIARY,
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             ).pack(pady=Spacing.LG)
@@ -459,14 +484,29 @@ class BlocklistView(ctk.CTkFrame):
 
         if query:
             ctk.CTkLabel(
-                self._results_scroll, text=f"Showing top {len(results)} matches for '{query}':",
+                self._results_container, text=f"Showing top {len(results)} matches for '{query}':",
                 text_color=Colors.TEXT_SECONDARY,
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "italic"),
             ).pack(anchor="w", padx=Spacing.SM, pady=(0, Spacing.SM))
 
-        for r in results:
+        self._render_next_chunk()
+
+    def _render_next_chunk(self):
+        if self._destroyed or not getattr(self, '_current_results', None):
+            return
+            
+        if self._rendered_count >= len(self._current_results):
+            return # Done rendering
+            
+        chunk = self._current_results[self._rendered_count : self._rendered_count + self._page_size]
+        if not chunk:
+            return
+            
+        self._rendered_count += len(chunk)
+
+        for r in chunk:
             row = ctk.CTkFrame(
-                self._results_scroll,
+                self._results_container,
                 fg_color=Colors.BG_ELEVATED, corner_radius=0,
             )
             row.pack(fill="x", pady=2, padx=4)
@@ -530,6 +570,7 @@ class BlocklistView(ctk.CTkFrame):
 
     def destroy(self):
         self._destroyed = True
+        self.unbind_all("<MouseWheel>")
         super().destroy()
 
 

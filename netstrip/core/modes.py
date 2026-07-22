@@ -96,7 +96,7 @@ class ModeConfig:
         if category == ConnectionCategory.USER_BLOCKED:
             return ConnectionAction.BLOCK
             
-        if category in (ConnectionCategory.UPDATE, ConnectionCategory.SECURITY, ConnectionCategory.SYSTEM):
+        if category in (ConnectionCategory.SECURITY, ConnectionCategory.SYSTEM):
             if self.level == ProtectionLevel.PARANOID and category == ConnectionCategory.SYSTEM:
                 return ConnectionAction.BLOCK
             if hasattr(db, 'get_setting'):
