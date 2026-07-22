@@ -259,8 +259,8 @@ class NetStripApp(ctk.CTk):
         self.persistent_logo = AnimatedLogo(logo_frame, width=180, height=120, bg_color=Colors.BG_PANEL)
         self.persistent_logo.pack(anchor="center", pady=(0, 5))
         
-        ctk.CTkLabel(logo_frame, text="Cripple",
-                     font=(Fonts.FAMILY_PRIMARY[0], 30, Fonts.WEIGHT_BOLD),
+        ctk.CTkLabel(logo_frame, text="CRIPPLE",
+                     font=("Segoe UI Black", 38, "bold"),
                      text_color=Colors.TEXT_PRIMARY).pack(anchor="center")
         ctk.CTkLabel(logo_frame, text="Network Debloater",
                      font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
@@ -305,7 +305,7 @@ class NetStripApp(ctk.CTk):
         self.btn_expand.grid(row=8, column=0, pady=20, padx=20, sticky="ew")
 
         # Version
-        ctk.CTkLabel(self.sidebar, text="v1.0.0",
+        ctk.CTkLabel(self.sidebar, text="v2.0.0",
                      font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
                      text_color=Colors.TEXT_TERTIARY).grid(row=9, column=0, pady=(0, 16))
 

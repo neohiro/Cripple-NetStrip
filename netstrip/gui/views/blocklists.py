@@ -291,6 +291,10 @@ class BlocklistView(ctk.CTkFrame):
                 {'filename': 'User Blocked Domains', 'updated': 'Now', 'size': blacklist_size},
                 {'filename': 'User Blocked Apps', 'updated': 'Now', 'size': app_blacklist_size}
             ]
+            
+            metadata[ConnectionCategory.ESSENTIAL] = [
+                {'filename': 'Internal Essential Services', 'updated': 'Now', 'size': 0}
+            ]
                 
         except Exception:
             metadata = {}
