@@ -384,20 +384,23 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self._is_expanding_all = False
                 return
                 
-            group = groups_to_update[index]
-            if getattr(group, '_is_packed', False):
-                if group.is_expanded != self._all_expanded:
-                    group._toggle_expand()
-            else:
-                # Keep state synced for hidden groups but don't force UI redraws
-                group.is_expanded = self._all_expanded
-                if group.is_expanded:
-                    group.btn_expand.configure(text="Collapse ▲", fg_color=Colors.BG_DARK, text_color=Colors.TEXT_SECONDARY)
+            # Process up to 5 groups per UI cycle to balance speed vs freezing
+            batch_size = 5
+            for i in range(index, min(index + batch_size, len(groups_to_update))):
+                group = groups_to_update[i]
+                if getattr(group, '_is_packed', False):
+                    if group.is_expanded != self._all_expanded:
+                        group._toggle_expand()
                 else:
-                    group.btn_expand.configure(text="Expand ▼", fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY)
+                    # Keep state synced for hidden groups but don't force UI redraws
+                    group.is_expanded = self._all_expanded
+                    if group.is_expanded:
+                        group.btn_expand.configure(text="Collapse ▲", fg_color=Colors.BG_DARK, text_color=Colors.TEXT_SECONDARY)
+                    else:
+                        group.btn_expand.configure(text="Expand ▼", fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY)
                     
-            # Yield to UI loop every iteration to keep animations smooth
-            self.after(5, lambda: _update_next(index + 1))
+            # Yield to UI loop
+            self.after(2, lambda: _update_next(index + batch_size))
             
         _update_next()
 

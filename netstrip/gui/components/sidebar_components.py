@@ -163,7 +163,9 @@ class ConnectionRow(ctk.CTkFrame):
         import time
         self.last_updated = time.time()
         self.is_new_traffic = False
-        if hasattr(self, 'conn_data') and conn_data.get('id', 0) > self.conn_data.get('id', 0):
+        new_id = conn_data.get('max_id') or conn_data.get('id', 0)
+        old_id = self.conn_data.get('max_id') or self.conn_data.get('id', 0) if hasattr(self, 'conn_data') else 0
+        if hasattr(self, 'conn_data') and new_id > old_id:
             self.is_new_traffic = True
             
         self.conn_data = conn_data
