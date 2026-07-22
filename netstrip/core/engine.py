@@ -319,6 +319,16 @@ class NetStripEngine:
         self.lan_shield.disable()
         self.set_killswitch(False)
         
+        # Write .clean_exit so watchdog knows this is a graceful shutdown
+        try:
+            import os
+            from pathlib import Path
+            clean_exit_path = Path.home() / ".netstrip" / ".clean_exit"
+            clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
+            clean_exit_path.touch()
+        except Exception as e:
+            logger.error(f"Failed to write clean exit flag: {e}")
+        
         # Restore system DNS
         for interface in self.platform.get_active_interfaces():
             original_dns = self.db.get_setting(f"backup_dns_{interface}", "dhcp")

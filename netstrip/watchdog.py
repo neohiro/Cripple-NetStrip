@@ -84,9 +84,34 @@ def restore_network():
             if not interfaces:
                 interfaces = ["Wi-Fi", "Ethernet"]
                 
+            def get_backup_dns(interface_name):
+                import sqlite3
+                import re
+                db_path = Path.home() / ".netstrip" / "netstrip.db"
+                if db_path.exists():
+                    try:
+                        conn = sqlite3.connect(db_path)
+                        c = conn.cursor()
+                        c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
+                        row = c.fetchone()
+                        conn.close()
+                        if row and row[0] and row[0] != "dhcp":
+                            ip = row[0]
+                            if re.match(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$', ip):
+                                return ip
+                    except Exception as e:
+                        logging.error(f"Failed to read backup DNS from DB: {e}")
+                return None
+                
             for interface in interfaces:
-                logging.info(f"Restoring DNS for interface: {interface}")
-                subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
+                backup_dns = get_backup_dns(interface)
+                if backup_dns:
+                    logging.info(f"Restoring STATIC DNS for interface: {interface} -> {backup_dns}")
+                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "static", backup_dns], creationflags=subprocess.CREATE_NO_WINDOW)
+                else:
+                    logging.info(f"Restoring DHCP DNS for interface: {interface}")
+                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
+                
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
