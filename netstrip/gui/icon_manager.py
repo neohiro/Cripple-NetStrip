@@ -31,7 +31,22 @@ APP_ICONS = {
     'teams': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'brave': 'https://www.google.com/s2/favicons?domain=brave.com&sz=64',
     'dns': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64',
-    'unknown (dns)': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64'
+    'unknown (dns)': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64',
+    'taskhostw': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'svchost': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'explorer': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'cmd': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'powershell': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'pwsh': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'services': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'wininit': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'smss': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'conhost': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'csrss': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'lsass': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'spoolsv': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'wermgr': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64'
 }
 
 class AppIdentifier:
