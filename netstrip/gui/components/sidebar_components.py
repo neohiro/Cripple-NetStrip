@@ -541,6 +541,21 @@ class AppGroupFrame(ctk.CTkFrame):
             action = conn_data.get('action', 'allow')
             self._trigger_pulse(action)
             self.rows[target]._trigger_pulse(action)
+            
+        # Update system block visual override
+        sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
+        if sys_blocked and self._global_action_state != 'allow':
+            is_system = False
+            p_lower = self.process_name.lower()
+            if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe'):
+                is_system = True
+            elif len(self.rows) > 0 and all(r.conn_data.get('category') == 'system' for r in self.rows.values()):
+                is_system = True
+                
+            if is_system:
+                self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
+            elif self._global_action_state != 'block':
+                self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         
     def _toggle_global_action(self, target_action: str):
         def proceed():
