@@ -276,7 +276,7 @@ class NetStripEngine:
         self.route_monitor_thread = threading.Thread(target=self._fast_route_monitor_loop, daemon=True)
         self.route_monitor_thread.start()
         
-        logger.info("Cripper Engine started successfully.")
+        logger.info("Cripple Engine started successfully.")
         self.broadcast_status("✅ Core Engine Initialized")
         return True
 

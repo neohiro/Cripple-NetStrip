@@ -12,7 +12,7 @@ class NotificationPopup(ctk.CTkToplevel):
         self.conn_data = conn_data
         self.on_resolve = on_resolve
         
-        self.title("Cripper - Unknown Connection")
+        self.title("Cripple - Unknown Connection")
         self.geometry("400x160")
         self.resizable(False, False)
         # self.overrideredirect(True) # Remove window decorations for true toast style

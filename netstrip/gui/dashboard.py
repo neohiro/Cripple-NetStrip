@@ -1,6 +1,6 @@
 from netstrip.gui.popups import check_killswitch_override
 """
-Dashboard View for Cripper GUI
+Dashboard View for Cripple GUI
 """
 
 import customtkinter as ctk
@@ -79,7 +79,7 @@ class DashboardView(ctk.CTkScrollableFrame):
         try:
             from netstrip.gui.hovertip import FadingHovertip
             FadingHovertip(self.stat_traffic, "Shows the ratio of allowed vs blocked connections over the rolling 24-hour window.", hover_delay=400)
-            FadingHovertip(self.stat_queries, "Total number of outbound packets intercepted and evaluated by Cripper in the last 24 hours.", hover_delay=400)
+            FadingHovertip(self.stat_queries, "Total number of outbound packets intercepted and evaluated by Cripple in the last 24 hours.", hover_delay=400)
             FadingHovertip(self.stat_active, "The number of distinct applications that have made a connection recently.", hover_delay=400)
             FadingHovertip(self.system_toggle, "Toggle whether to block native Windows/OS background connections.", hover_delay=400)
             FadingHovertip(self.smart_toggle, "When enabled, Paranoid mode dynamically alerts you to background malware domains.", hover_delay=400)

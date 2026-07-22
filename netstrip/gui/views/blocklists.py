@@ -1,5 +1,5 @@
 """
-Cripper GUI Views — App Rules, Blocklist, Logs, Settings.
+Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 

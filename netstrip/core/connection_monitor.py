@@ -171,9 +171,9 @@ class ConnectionMonitor:
         original_exe = "Unknown"
         try:
             if conn.pid == os.getpid():
-                process_name = "Cripper (Internal)"
+                process_name = "Cripple (Internal)"
                 process_path = sys.executable
-                original_exe = "Cripper"
+                original_exe = "Cripple"
             else:
                 proc = psutil.Process(conn.pid)
                 process_name, process_path, root_proc, original_exe = self._resolve_process_identity(proc)
@@ -245,8 +245,8 @@ class ConnectionMonitor:
         else:
             action = self.classifier.mode.get_action_for_category(category, self.db)
              
-        # Cripper Traffic Override
-        if process_name == "Cripper (Internal)":
+        # Cripple Traffic Override
+        if process_name == "Cripple (Internal)":
             category = ConnectionCategory.SYSTEM
             action = ConnectionAction.ALLOW
 

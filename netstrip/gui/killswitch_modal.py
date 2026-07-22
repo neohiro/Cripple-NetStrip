@@ -80,7 +80,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         lbl_title.pack(pady=(20, 10))
         
         lbl_desc = ctk.CTkLabel(frame, text=(
-            "Cripper detected a severe network anomaly while in Paranoid Mode:\n\n"
+            "Cripple detected a severe network anomaly while in Paranoid Mode:\n\n"
             f"{self.message}\n\n"
             "All network traffic has been blocked to protect your system."
         ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="center")

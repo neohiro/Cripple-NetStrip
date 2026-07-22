@@ -225,7 +225,7 @@ class NetStripApp(ctk.CTk):
         self.btn_sound_toggle.grid(row=0, column=1, padx=10, sticky="e")
         
         self.btn_killswitch = ctk.CTkButton(
-            self.top_bar, text="CRIPPER: ON", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+            self.top_bar, text="CRIPPLE: ON", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
             fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS, text_color="white", corner_radius=4, height=28,
             command=self._manual_killswitch_click
         )
@@ -259,7 +259,7 @@ class NetStripApp(ctk.CTk):
         self.persistent_logo = AnimatedLogo(logo_frame, width=180, height=120, bg_color=Colors.BG_PANEL)
         self.persistent_logo.pack(anchor="center", pady=(0, 5))
         
-        ctk.CTkLabel(logo_frame, text="Cripper",
+        ctk.CTkLabel(logo_frame, text="Cripple",
                      font=(Fonts.FAMILY_PRIMARY[0], 30, Fonts.WEIGHT_BOLD),
                      text_color=Colors.TEXT_PRIMARY).pack(anchor="center")
         ctk.CTkLabel(logo_frame, text="Network Debloater",
@@ -478,24 +478,24 @@ class NetStripApp(ctk.CTk):
     def _manual_killswitch_click(self):
         current_state = self.btn_killswitch.cget("text")
         
-        if current_state == "CRIPPER: ON":
+        if current_state == "CRIPPLE: ON":
             # State 1 -> 2: Engage Killswitch
             try:
                 self.after(0, lambda: ManualKillswitchModal(self, self.engine, self._execute_manual_killswitch))
             except Exception:
                 self._execute_manual_killswitch(True) # Fallback to engaging without warning
         elif current_state == "KILLSWITCH ENGAGED":
-            # State 2 -> 3: Cripper OFF (Bypass)
+            # State 2 -> 3: Cripple OFF (Bypass)
             try:
                 self._show_bypass_warning()
             except Exception:
                 self.engine.set_killswitch(False)
                 self.engine.firewall.clear_all_rules()
-                self.btn_killswitch.configure(text="CRIPPER: OFF (BYPASS)", fg_color=Colors.WARNING)
+                self.btn_killswitch.configure(text="CRIPPLE: OFF (BYPASS)", fg_color=Colors.WARNING)
         else:
-            # State 3 -> 1: Cripper ON
+            # State 3 -> 1: Cripple ON
             self.engine.set_killswitch(False)
-            self.btn_killswitch.configure(text="CRIPPER: ON", fg_color=Colors.SUCCESS_DIM)
+            self.btn_killswitch.configure(text="CRIPPLE: ON", fg_color=Colors.SUCCESS_DIM)
 
     def _execute_manual_killswitch(self, confirmed: bool):
         if confirmed:
@@ -503,7 +503,7 @@ class NetStripApp(ctk.CTk):
             self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d")
 
     def _show_bypass_warning(self):
-        # Quick inline warning modal for bypassing Cripper entirely
+        # Quick inline warning modal for bypassing Cripple entirely
         modal = ctk.CTkToplevel(self)
         modal.title("WARNING: BYPASS MODE")
         modal.geometry("450x200")
@@ -512,7 +512,7 @@ class NetStripApp(ctk.CTk):
         lbl_title = ctk.CTkLabel(modal, text="🚨 WARNING: ENDPOINT UNPROTECTED", font=Fonts.h3(), text_color=Colors.WARNING)
         lbl_title.pack(pady=(20, 10))
         
-        lbl_desc = ctk.CTkLabel(modal, text="Switching to OFF will clear all Cripper firewall rules and DNS.\nYour PC will be raw and unprotected.", font=Fonts.body())
+        lbl_desc = ctk.CTkLabel(modal, text="Switching to OFF will clear all Cripple firewall rules and DNS.\nYour PC will be raw and unprotected.", font=Fonts.body())
         lbl_desc.pack(pady=10)
         
         btn_frame = ctk.CTkFrame(modal, fg_color="transparent")
@@ -523,7 +523,7 @@ class NetStripApp(ctk.CTk):
         def confirm_bypass():
             self.engine.set_killswitch(False)
             self.engine.firewall.clear_all_rules()
-            self.btn_killswitch.configure(text="CRIPPER: OFF (BYPASS)", fg_color=Colors.WARNING)
+            self.btn_killswitch.configure(text="CRIPPLE: OFF (BYPASS)", fg_color=Colors.WARNING)
             modal.destroy()
             
         ctk.CTkButton(btn_frame, text="Proceed to OFF", command=confirm_bypass, fg_color=Colors.WARNING, text_color="white").pack(side="left", padx=5)
@@ -583,7 +583,7 @@ class NetStripApp(ctk.CTk):
                     if getattr(self.engine, 'killswitch_active', False):
                         self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d")
                     else:
-                        self.btn_killswitch.configure(text="CRIPPER: ACTIVE", fg_color=Colors.SUCCESS_DIM)
+                        self.btn_killswitch.configure(text="CRIPPLE: ACTIVE", fg_color=Colors.SUCCESS_DIM)
             self.after(0, update_ui)
 
         def is_paranoid_active(item):
@@ -609,14 +609,14 @@ class NetStripApp(ctk.CTk):
                 self.engine.platform.unblock_lan_traffic()
 
         menu = pystray.Menu(
-            pystray.MenuItem('Show Cripper', on_show, default=True),
+            pystray.MenuItem('Show Cripple', on_show, default=True),
             pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
             pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
             pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
             pystray.MenuItem('Quit', on_quit)
         )
 
-        self._tray_icon = pystray.Icon("NetStrip", getattr(self, '_icon_image'), "Cripper", menu)
+        self._tray_icon = pystray.Icon("NetStrip", getattr(self, '_icon_image'), "Cripple", menu)
         
         # pystray blocks, so run it in a thread
         threading.Thread(target=self._tray_icon.run, daemon=True).start()

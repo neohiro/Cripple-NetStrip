@@ -1,5 +1,5 @@
 """
-Custom UI Widgets for Cripper GUI
+Custom UI Widgets for Cripple GUI
 Reusable components built on top of customtkinter.
 """
 

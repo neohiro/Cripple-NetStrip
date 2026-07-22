@@ -42,7 +42,7 @@ class SplashScreen(ctk.CTkToplevel):
         self.logo.pack(pady=(40, 20))
         
         self.logo_label = ctk.CTkLabel(
-            self, text="Cripper - NetStrip",
+            self, text="Cripple - NetStrip",
             font=(Fonts.FAMILY_PRIMARY[0], 28, "bold"),
             text_color=Colors.TEXT_PRIMARY
         )
@@ -88,7 +88,7 @@ class SplashScreen(ctk.CTkToplevel):
                 "Calibrating DNS sinkhole...",
                 "Establishing zero-leak interceptor...",
                 "Synchronizing firewall rules...",
-                "Warming up the Cripper Engine...",
+                "Warming up the Cripple Engine...",
                 "Mapping telemetry endpoints...",
                 "Connecting to secure upstream DNS...",
                 "Parsing behavioral app profiles...",

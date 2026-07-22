@@ -1,5 +1,5 @@
 """
-Cripper GUI Views — App Rules, Blocklist, Logs, Settings.
+Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
@@ -344,7 +344,7 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
         
-        self._add_subtitle(card, "Export or import your complete Cripper settings and App Rules as a JSON profile.")
+        self._add_subtitle(card, "Export or import your complete Cripple settings and App Rules as a JSON profile.")
 
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
@@ -379,7 +379,7 @@ class SettingsView(ctk.CTkFrame):
         init_dir = os.path.expanduser("~/Documents")
         path = fd.asksaveasfilename(
             initialdir=init_dir,
-            title="Export Cripper Profile",
+            title="Export Cripple Profile",
             defaultextension=".json",
             filetypes=[("JSON Profile", "*.json"), ("All Files", "*.*")]
         )
@@ -398,7 +398,7 @@ class SettingsView(ctk.CTkFrame):
         init_dir = os.path.expanduser("~/Documents")
         path = fd.askopenfilename(
             initialdir=init_dir,
-            title="Import Cripper Profile",
+            title="Import Cripple Profile",
             filetypes=[("JSON Profile", "*.json"), ("All Files", "*.*")]
         )
         if path:
@@ -429,7 +429,7 @@ class SettingsView(ctk.CTkFrame):
         
         ctk.CTkLabel(dialog, text='⚠  FACTORY RESET', font=(Fonts.FAMILY_PRIMARY[0], 20, 'bold'), text_color=Colors.DANGER).pack(pady=(24, 8))
         ctk.CTkLabel(dialog, text='Are you sure? This action is irreversible.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, 'bold'), text_color=Colors.TEXT_PRIMARY).pack(pady=(0, 6))
-        ctk.CTkLabel(dialog, text='All user rules, settings, connection logs, custom blocklists,\nand online list registrations will be permanently deleted.\nMake sure you have exported a Backup Profile first!\n\nCripper will restart automatically after the wipe.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY, justify='center').pack(pady=(0, 20))
+        ctk.CTkLabel(dialog, text='All user rules, settings, connection logs, custom blocklists,\nand online list registrations will be permanently deleted.\nMake sure you have exported a Backup Profile first!\n\nCripple will restart automatically after the wipe.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY, justify='center').pack(pady=(0, 20))
         
         btn_frame = ctk.CTkFrame(dialog, fg_color='transparent')
         btn_frame.pack()
@@ -507,7 +507,7 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
 
         ctk.CTkLabel(
-            card, text="Cripper v0.1.0-alpha",
+            card, text="Cripple v0.1.0-alpha",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG)

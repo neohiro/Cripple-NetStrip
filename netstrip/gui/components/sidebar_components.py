@@ -479,7 +479,7 @@ class AppGroupFrame(ctk.CTkFrame):
             _apply_raw_image(img)
         else:
             pname = self.process_name.lower() if self.process_name else ""
-            if pname in ("python.exe", "NetStrip.exe", "pythonw.exe", "NetStrip", "cripper (internal)"):
+            if pname in ("python.exe", "NetStrip.exe", "pythonw.exe", "NetStrip", "cripple (internal)"):
                 self.icon_label.place_forget()
                 self.icon_bg.configure(fg_color=Colors.BG_DARK)
                 from netstrip.gui.animated_logo import AnimatedLogo

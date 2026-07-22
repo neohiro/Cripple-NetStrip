@@ -1,5 +1,5 @@
 """
-Smart Modal for Cripper GUI
+Smart Modal for Cripple GUI
 Displays a critical alert when Smart Paranoid Mode is triggered.
 """
 
@@ -47,7 +47,7 @@ class SmartParanoidModal(ctk.CTkToplevel):
         
         ctk.CTkLabel(
             content, 
-            text="Cripper intercepted a critical security event and automatically locked down the machine into Paranoid Mode.",
+            text="Cripple intercepted a critical security event and automatically locked down the machine into Paranoid Mode.",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             text_color=Colors.TEXT_PRIMARY,
             wraplength=420,

@@ -1,5 +1,5 @@
 """
-Cripper GUI Views — App Rules, Blocklist, Logs, Settings.
+Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
@@ -570,14 +570,14 @@ class LogView(ctk.CTkFrame):
             if not os.path.exists(docs_dir):
                 docs_dir = os.path.expanduser("~")
                 
-            filename = f"Cripper_Logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            filename = f"Cripple_Logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             filepath = os.path.join(docs_dir, filename)
             
             # Fetch all logs (or max 10000 to prevent massive files)
             rows = list(self.engine.db.get_recent_connections(10000))
             
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("Cripper Connection Log Export\n")
+                f.write("Cripple Connection Log Export\n")
                 f.write(f"Exported at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write("-" * 80 + "\n")
                 f.write(f"{'TIME':<22} | {'PROCESS':<25} | {'DOMAIN/IP':<30} | {'CATEGORY':<12} | {'ACTION':<8}\n")
@@ -808,7 +808,7 @@ class SettingsView(ctk.CTkFrame):
 
         # Minimize to tray toggle
         self._add_switch_row(card, "Minimize to Tray", 'minimize_to_tray')
-        self._add_subtitle(card, "Keep Cripper running in the background when closing the window.")
+        self._add_subtitle(card, "Keep Cripple running in the background when closing the window.")
 
         # IP Flux Tolerance
         self._add_switch_row(card, "IP Flux Tolerance", 'ip_flux_tolerance')
@@ -1001,7 +1001,7 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
         
-        self._add_subtitle(card, "Export or import your complete Cripper settings and App Rules as a JSON profile.")
+        self._add_subtitle(card, "Export or import your complete Cripple settings and App Rules as a JSON profile.")
 
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
@@ -1028,7 +1028,7 @@ class SettingsView(ctk.CTkFrame):
         init_dir = os.path.expanduser("~/Documents")
         path = fd.asksaveasfilename(
             initialdir=init_dir,
-            title="Export Cripper Profile",
+            title="Export Cripple Profile",
             defaultextension=".json",
             filetypes=[("JSON Profile", "*.json"), ("All Files", "*.*")]
         )
@@ -1047,7 +1047,7 @@ class SettingsView(ctk.CTkFrame):
         init_dir = os.path.expanduser("~/Documents")
         path = fd.askopenfilename(
             initialdir=init_dir,
-            title="Import Cripper Profile",
+            title="Import Cripple Profile",
             filetypes=[("JSON Profile", "*.json"), ("All Files", "*.*")]
         )
         if path:
@@ -1070,7 +1070,7 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
 
         ctk.CTkLabel(
-            card, text="Cripper v0.1.0-alpha",
+            card, text="Cripple v0.1.0-alpha",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG)

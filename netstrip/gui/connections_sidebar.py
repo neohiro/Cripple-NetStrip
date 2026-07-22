@@ -1,5 +1,5 @@
 """
-Persistent Connections Sidebar for Cripper GUI.
+Persistent Connections Sidebar for Cripple GUI.
 Displays a live list of connections grouped by app name, target, classification color, and allow/block toggle.
 """
 
@@ -195,14 +195,14 @@ class ConnectionsSidebar(ctk.CTkFrame):
                     
                     # Normalize names early for counting
                     domain_ip = str(conn_dict.get('domain') or conn_dict.get('ip') or '')
-                    if p_name and p_name.lower() in ('cripper.exe', 'cripper (internal)', 'netstrip', 'netstrip (internal)'):
-                        p_name = 'Cripper (Internal)'
+                    if p_name and p_name.lower() in ('cripple.exe', 'cripple (internal)', 'netstrip', 'netstrip (internal)'):
+                        p_name = 'Cripple (Internal)'
                     elif p_name and p_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe', 'language_server.exe'):
                         if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
-                            p_name = 'Cripper (Internal)'
+                            p_name = 'Cripple (Internal)'
                     elif p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
                         if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
-                            p_name = 'Cripper (Internal)'
+                            p_name = 'Cripple (Internal)'
                         else:
                             p_name = 'DNS'
                             

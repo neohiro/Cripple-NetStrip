@@ -113,14 +113,14 @@ def main():
             # User declined UAC or it failed. Continue in restricted mode. # Re-show for restricted loading
             messagebox.showwarning(
                 "Elevation Declined", 
-                "Cripper will run in restricted mode. Core firewall and DNS sinkhole features will be disabled or limited."
+                "Cripple will run in restricted mode. Core firewall and DNS sinkhole features will be disabled or limited."
             )
     elif not is_fallback:
         pass
 
     setup_logging()
-    logger = logging.getLogger("Cripper")
-    logger.info("Starting Cripper Initialization...")
+    logger = logging.getLogger("Cripple")
+    logger.info("Starting Cripple Initialization...")
 
     check_dependencies()
 

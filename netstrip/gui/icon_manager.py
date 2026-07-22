@@ -1,5 +1,5 @@
 """
-Icon Manager for Cripper GUI.
+Icon Manager for Cripple GUI.
 Handles app identification, local icon extraction, and online fallback fetching.
 """
 
@@ -73,15 +73,15 @@ class IconManager:
         Attempts to get the icon. 
         Returns immediately if cached. If a download is needed, returns None and fires callback when done.
         """
-        if process_name == "Cripper":
-            if "cripper_logo" in self._image_cache:
-                img = self._image_cache["cripper_logo"]
+        if process_name == "Cripple":
+            if "cripple_logo" in self._image_cache:
+                img = self._image_cache["cripple_logo"]
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             try:
-                logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "assets", "cripper_logo.png")
+                logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "assets", "cripple_logo.png")
                 if os.path.exists(logo_path):
                     img = Image.open(logo_path)
-                    self._image_cache["cripper_logo"] = img
+                    self._image_cache["cripple_logo"] = img
                     return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
                 pass

@@ -25,8 +25,6 @@ netstrip/data/lists/*_*.txt
 # Temporary scripts
 temp.txt
 error.txt
-build.bat
-build.ps1
 fix_*.py
 script.py
 restore.py

@@ -1,5 +1,5 @@
 """
-Cripper GUI Views — App Rules, Blocklist, Logs, Settings.
+Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
@@ -97,14 +97,14 @@ class LogView(ctk.CTkFrame):
             if not os.path.exists(docs_dir):
                 docs_dir = os.path.expanduser("~")
                 
-            filename = f"Cripper_Logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            filename = f"Cripple_Logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             filepath = os.path.join(docs_dir, filename)
             
             # Fetch all logs (or max 10000 to prevent massive files)
             rows = list(self.engine.db.get_recent_connections(10000))
             
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("Cripper Connection Log Export\n")
+                f.write("Cripple Connection Log Export\n")
                 f.write(f"Exported at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write("-" * 80 + "\n")
                 f.write(f"{'TIME':<22} | {'PROCESS':<25} | {'DOMAIN/IP':<30} | {'CATEGORY':<12} | {'ACTION':<8}\n")

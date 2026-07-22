@@ -162,11 +162,11 @@ TOOLTIP_MAP = {
     "Learning Mode": "Interactive mode: prompts you to approve or deny new connections as they happen.",
     
     # Settings View
-    "Minimize to system tray on close": "Keeps Cripper running in the background protecting your network.",
-    "Start on Boot": "Automatically launch Cripper silently when Windows starts.",
+    "Minimize to system tray on close": "Keeps Cripple running in the background protecting your network.",
+    "Start on Boot": "Automatically launch Cripple silently when Windows starts.",
     "Block LAN Traffic": "Prevent local network devices (like smart TVs or printers) from communicating with this PC.",
     "Auto-Block Unknown": "Strict firewall behavior: any unclassified traffic is blocked by default instead of allowed.",
-    "Sync Windows Firewall": "Automatically push Cripper's rules down to the native Windows Defender Firewall.",
+    "Sync Windows Firewall": "Automatically push Cripple's rules down to the native Windows Defender Firewall.",
     "Refresh Network Interfaces": "Re-scan your Wi-Fi and Ethernet adapters.",
     
     # Blocklist View
@@ -183,8 +183,8 @@ TOOLTIP_MAP = {
     "Sinkhole": "Redirect this application's traffic to a safe local loopback address (fools the app into thinking it connected).",
     
     # Main App Header
-    "CRIPPER: ON": "Click to toggle the manual Killswitch. When ON, you are protected.",
-    "CRIPPER: OFF": "Warning: Protection is entirely bypassed.",
+    "CRIPPLE: ON": "Click to toggle the manual Killswitch. When ON, you are protected.",
+    "CRIPPLE: OFF": "Warning: Protection is entirely bypassed.",
     "KILLSWITCH ENGAGED": "Killswitch is active. All traffic is being dropped securely by the OS.",
     "🔊": "Mute notification sounds.",
     "🔇": "Unmute notification sounds."

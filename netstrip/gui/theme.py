@@ -1,5 +1,5 @@
 """
-Cripper GUI Theme — Design system constants for a premium dark interface.
+Cripple GUI Theme — Design system constants for a premium dark interface.
 All colors, fonts, spacing, and styling tokens are defined here.
 """
 

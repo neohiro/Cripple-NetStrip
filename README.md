@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/cripper_logo.png" alt="Cripper Logo" width="200"/>
+  <img src="assets/cripple_logo.png" alt="Cripple Logo" width="200"/>
 
   # NetStrip  -  Cripple
   **Intelligent Network Debloater & Multi-Layered Firewall**
@@ -15,6 +15,7 @@
   *Fully compatible with VPNs, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy and more.*
 </div>
 
+<img width="1300" height="780" alt="CrippleNetStripDashboard" src="https://github.com/user-attachments/assets/974752d0-1a9a-46ee-832a-dfddcf23ad23" />
 ---
 
 ## 🛡️ What is NetStrip?
