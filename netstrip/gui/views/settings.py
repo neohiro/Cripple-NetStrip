@@ -14,8 +14,74 @@ from netstrip.gui.theme import (
 
 #  AppRulesView — Pending Approvals + User Rules
 
+
+class DNSSelectorModal(ctk.CTkToplevel):
+    def __init__(self, master, dns_options_map, current_val, on_select_callback):
+        super().__init__(master)
+        self.title("Select DNS Upstream")
+        self.geometry("400x500")
+        self.minsize(400, 500)
+        self.configure(fg_color=Colors.BG_DARK)
+        self.transient(master)
+        self.grab_set()
+        
+        self.dns_options_map = dns_options_map
+        self.on_select_callback = on_select_callback
+        
+        # Search bar
+        search_frame = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL)
+        search_frame.pack(fill="x", padx=Spacing.LG, pady=Spacing.LG)
+        
+        self.search_entry = ctk.CTkEntry(
+            search_frame, placeholder_text="Search DNS providers...",
+            fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY,
+            border_color=Colors.BORDER_DEFAULT, border_width=1,
+            height=36, corner_radius=8
+        )
+        self.search_entry.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
+        self.search_entry.bind("<KeyRelease>", self._filter_list)
+        
+        # Scrollable list of providers
+        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
+        self.scroll_frame.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, Spacing.LG))
+        
+        self.buttons = []
+        self._populate_list(list(self.dns_options_map.keys()))
+        
+        # Center window
+        self.update_idletasks()
+        x = master.winfo_rootx() + (master.winfo_width() // 2) - (400 // 2)
+        y = master.winfo_rooty() + (master.winfo_height() // 2) - (500 // 2)
+        self.geometry(f"+{x}+{y}")
+        self.search_entry.focus_set()
+
+    def _filter_list(self, event=None):
+        query = self.search_entry.get().lower()
+        filtered = [k for k in self.dns_options_map.keys() if query in k.lower() or query in self.dns_options_map[k].lower()]
+        self._populate_list(filtered)
+
+    def _populate_list(self, items):
+        for btn in self.buttons:
+            btn.destroy()
+        self.buttons.clear()
+        
+        for name in items:
+            btn = ctk.CTkButton(
+                self.scroll_frame, text=name, anchor="w",
+                fg_color=Colors.BG_PANEL, text_color=Colors.TEXT_PRIMARY,
+                hover_color=Colors.BG_ELEVATED, height=36, corner_radius=8,
+                command=lambda n=name: self._select_item(n)
+            )
+            btn.pack(fill="x", pady=2)
+            self.buttons.append(btn)
+            
+    def _select_item(self, name):
+        self.on_select_callback(name)
+        self.destroy()
+
 # ═══════════════════════════════════════════════════
 #  SettingsView
+
 # ═══════════════════════════════════════════════════
 class SettingsView(ctk.CTkFrame):
     """Application settings: autostart, DNS upstream, and about info."""
@@ -188,33 +254,36 @@ class SettingsView(ctk.CTkFrame):
                 current_option = k
                 break
 
-        self._dns_menu = ctk.CTkComboBox(
-            row, width=300, 
-            values=list(self.dns_options_map.keys()),
-            fg_color=Colors.BG_INPUT,
-            button_color=Colors.BG_INPUT,
-            button_hover_color=Colors.BG_ELEVATED,
-            dropdown_fg_color=Colors.BG_ELEVATED,
-            dropdown_hover_color=Colors.BG_PANEL,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM)
+        self.current_dns_label = ctk.CTkLabel(
+            row, text=current_option,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            text_color=Colors.ACCENT_PRIMARY,
+            width=200, anchor="e"
         )
-        self._dns_menu.pack(side="right", padx=(Spacing.SM, 0))
-        self._dns_menu.set(current_option)
-
+        self.current_dns_label.pack(side="right", padx=(Spacing.LG, Spacing.SM))
+        
         ctk.CTkButton(
-            row, text="Save", width=60, height=32, corner_radius=8,
-            fg_color=Colors.ACCENT_PRIMARY, hover_color=Colors.ACCENT_LIGHT,
+            row, text="Select DNS...", width=120, height=32, corner_radius=8,
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_INPUT,
             text_color=Colors.TEXT_PRIMARY,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-            command=self._save_dns,
+            command=self._open_dns_selector,
         ).pack(side="right", padx=(Spacing.SM, 0))
 
-    def _save_dns(self):
+
+
+
+    def _open_dns_selector(self):
         try:
-            selected_name = self._dns_menu.get()
-            # If they picked from the list, get the IP. If they typed a custom IP, use that directly.
+            dns_val = self.engine.db.get_setting('dns_upstream', '1.1.1.1')
+        except:
+            dns_val = '1.1.1.1'
+        DNSSelectorModal(self.winfo_toplevel(), self.dns_options_map, dns_val, self._save_dns)
+
+    def _save_dns(self, selected_name):
+        try:
+            self.current_dns_label.configure(text=selected_name)
             selected_ip = self.dns_options_map.get(selected_name, selected_name.strip())
-            
             self.engine.db.set_setting('dns_upstream', selected_ip)
             if hasattr(self.engine, 'on_status') and self.engine.on_status:
                 self.engine.on_status(f"DNS Upstream changed to {selected_ip}")
