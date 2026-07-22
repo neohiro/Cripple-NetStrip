@@ -64,7 +64,7 @@ NetStrip is meticulously divided into two independent layers to maximize stabili
 ## 📖 Installation
 
 ### Option 1: Standalone Executable (Recommended for Windows)
-The easiest way to install NetStrip on Windows is to download the pre-compiled `.exe` file from the [GitHub Releases page](https://github.com/frenzypenguin/NetStrip/releases). 
+The easiest way to install NetStrip on Windows is to download the pre-compiled `.exe` file from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). 
 Just download, run as Administrator, and you're good to go! No Python installation required.
 
 ### Option 2: Run from Source (All Platforms)
