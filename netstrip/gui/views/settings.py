@@ -451,6 +451,38 @@ class SettingsView(ctk.CTkFrame):
         except Exception as e:
             print('Wipe failed:', e)
             
+        try:
+            import os, json
+            from netstrip.core.engine import NetStripEngine
+            
+            # Reconstruct lists_dir and sources_file path
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            lists_dir = os.path.join(base_dir, 'data', 'lists')
+            sources_file = os.path.join(base_dir, 'data', 'updater_sources.json')
+            
+            # 1. Clean updater_sources.json
+            if os.path.exists(sources_file):
+                with open(sources_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                original_len = len(data.get('sources', []))
+                data['sources'] = [s for s in data.get('sources', []) if not s.get('name', '').startswith('Custom: ')]
+                
+                if len(data['sources']) < original_len:
+                    with open(sources_file, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2)
+                        
+            # 2. Delete custom downloaded txt files and cache
+            if os.path.exists(lists_dir):
+                for fname in os.listdir(lists_dir):
+                    if "Custom_" in fname or fname == "NetStrip_cache.json" or fname == "updater_state.json":
+                        try:
+                            os.remove(os.path.join(lists_dir, fname))
+                        except:
+                            pass
+        except Exception as e:
+            print("Failed to clean custom blocklists:", e)
+            
         import sys, os
         os.execv(sys.executable, ['python'] + sys.argv)
 

@@ -455,7 +455,7 @@ class Database:
                 return (0, 0)
 
     def export_profile(self, filepath: str):
-        """Export all settings and user rules to a JSON file"""
+        """Export all settings, user rules, and custom online blocklists to a JSON file"""
         with self.lock:
             with self._get_connection() as conn:
                 # Get settings
@@ -466,23 +466,39 @@ class Database:
                 rules_rows = conn.execute('SELECT pattern, action, scope, app_name, category, note FROM user_rules').fetchall()
                 rules = [dict(row) for row in rules_rows]
                 
+                # Get updater sources
+                sources = []
+                try:
+                    import os
+                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    sources_file = os.path.join(base_dir, 'data', 'updater_sources.json')
+                    if os.path.exists(sources_file):
+                        with open(sources_file, 'r', encoding='utf-8') as f:
+                            sources_data = json.load(f)
+                            sources = sources_data.get('sources', [])
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to export updater sources: {e}")
+                
                 data = {
                     "version": "1.0",
                     "exported_at": datetime.now().isoformat(),
                     "settings": settings,
-                    "user_rules": rules
+                    "user_rules": rules,
+                    "updater_sources": sources
                 }
                 
                 with open(filepath, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=4)
 
     def import_profile(self, filepath: str):
-        """Import settings and user rules from a JSON file, overwriting current config"""
+        """Import settings, user rules, and custom blocklists from a JSON file"""
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
         settings = data.get("settings", {})
         rules = data.get("user_rules", [])
+        updater_sources = data.get("updater_sources", [])
         
         with self.lock:
             with self._get_connection() as conn:
@@ -502,6 +518,32 @@ class Database:
                         rule.get('scope', 'global'), rule.get('app_name'),
                         rule.get('category'), rule.get('note')
                     ))
+                    
+            # Import updater sources if present
+            if updater_sources:
+                try:
+                    import os
+                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    sources_file = os.path.join(base_dir, 'data', 'updater_sources.json')
+                    
+                    if os.path.exists(sources_file):
+                        with open(sources_file, 'r', encoding='utf-8') as f:
+                            current_sources_data = json.load(f)
+                    else:
+                        current_sources_data = {"sources": []}
+                        
+                    # Merge custom sources (avoiding duplicates by name)
+                    existing_names = {s.get('name') for s in current_sources_data.get('sources', [])}
+                    for src in updater_sources:
+                        if src.get('name') not in existing_names:
+                            current_sources_data.setdefault('sources', []).append(src)
+                            existing_names.add(src.get('name'))
+                            
+                    with open(sources_file, 'w', encoding='utf-8') as f:
+                        json.dump(current_sources_data, f, indent=2)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to import updater sources: {e}")
 
 
 
