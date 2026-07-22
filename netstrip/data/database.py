@@ -107,6 +107,8 @@ class Database:
                         bytes_sent INTEGER DEFAULT 0,
                         bytes_recv INTEGER DEFAULT 0
                     );
+                    
+                    CREATE INDEX IF NOT EXISTS idx_conn_log_timestamp ON connection_log(timestamp);
                 ''')
                 # Initialize today's stats if not exists
                 today = datetime.now().strftime('%Y-%m-%d')
@@ -240,16 +242,20 @@ class Database:
                     import logging
                     logging.getLogger(__name__).error(f"Error caching domain mapping: {e}")
 
-    def get_recent_connections(self, limit: int = 100) -> List[sqlite3.Row]:
+    def get_recent_connections(self, limit: int = 100, unique_only: bool = False) -> List[sqlite3.Row]:
         with self.lock:
             with self._get_connection() as conn:
-                # Group by process and destination to prevent UI thrashing with identical repetitive connections
-                cursor = conn.execute('''
-                    SELECT *, max(id) as max_id 
-                    FROM connection_log 
-                    GROUP BY process_name, coalesce(domain, ip) 
-                    ORDER BY max_id DESC LIMIT ?
-                ''', (limit,))
+                if unique_only:
+                    cursor = conn.execute('''
+                        SELECT *, max(id) as max_id 
+                        FROM (
+                            SELECT * FROM connection_log ORDER BY id DESC LIMIT 5000
+                        )
+                        GROUP BY process_name, coalesce(domain, ip) 
+                        ORDER BY max_id DESC LIMIT ?
+                    ''', (limit,))
+                else:
+                    cursor = conn.execute('SELECT * FROM connection_log ORDER BY id DESC LIMIT ?', (limit,))
                 return cursor.fetchall()
 
     def get_unique_allowed_today(self) -> int:
@@ -261,7 +267,7 @@ class Database:
                         SELECT DISTINCT process_name, coalesce(domain, ip) 
                         FROM connection_log 
                         WHERE action='allow' 
-                        AND date(timestamp, 'localtime') = date('now', 'localtime')
+                        AND timestamp >= date('now', 'localtime')
                     )
                 ''')
                 row = cursor.fetchone()

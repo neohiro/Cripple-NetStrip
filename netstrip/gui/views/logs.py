@@ -137,6 +137,11 @@ class LogView(ctk.CTkFrame):
         if getattr(self, '_destroyed', False):
             return
 
+        if not self.winfo_ismapped():
+            if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
+            self._refresh_logs_id = self.after(500, self._refresh_logs)
+            return
+
         try:
             rows = list(self.engine.db.get_recent_connections(25)) # Keep max 25 in GUI memory
         except Exception:

@@ -144,9 +144,10 @@ class DashboardView(ctk.CTkScrollableFrame):
         if getattr(self, '_destroyed', False):
             return
             
-        # Debounce to prevent overlapping duplicate loop executions
-        if hasattr(self, '_update_stats_id'):
-            self.after_cancel(self._update_stats_id)
+        if not self.winfo_ismapped():
+            self._update_stats_id = self.after(500, self._update_stats)
+            return
+            
         self._update_stats_id = self.after(500, self._update_stats)
         try:
             today_stats = self.engine.db.get_24h_statistics()

@@ -98,6 +98,11 @@ class AppRulesView(ctk.CTkFrame):
     def _refresh_pending(self):
         if getattr(self, '_destroyed', False):
             return
+            
+        if not self.winfo_ismapped():
+            if hasattr(self, '_pending_after_id'): self.after_cancel(self._pending_after_id)
+            self._pending_after_id = self.after(1000, self._refresh_pending)
+            return
 
         if not hasattr(self, '_pending_rows'):
             self._pending_rows = {}
