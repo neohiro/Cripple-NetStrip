@@ -91,6 +91,10 @@ class BlocklistUpdater:
                     logger.info(f"Successfully updated '{name}'")
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
                     
+                    # Prevent network/CPU spike by delaying between downloads
+                    time.sleep(3)
+
+                    
                 except Exception as e:
                     logger.error(f"Failed to update blocklist '{name}': {e}")
                     if os.path.exists(temp_file):
@@ -104,6 +108,9 @@ class BlocklistUpdater:
                         logger.warning(f"Auto-disabling dead blocklist '{name}' after {failures} consecutive failures.")
                         source['enabled'] = False
                         sources_modified = True
+                        
+                    # Prevent network spike even if host rejected connection
+                    time.sleep(3)
                         
             # Save state
             try:
