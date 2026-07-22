@@ -68,6 +68,11 @@ try:
         for _p in _online_providers:
             _ip = _p['ip']
             _name = _p['hostname']
+            
+            # Filter out DNSCrypt servers since we only support DoH, DoT and UDP natively
+            if 'dnscry' in _name.lower() or 'dnscrypt' in _name.lower():
+                continue
+                
             if _p['type'] == 'DoH':
                 DOH_PROVIDERS[_ip] = (_name, _p['path'])
             # We don't have DOT_PROVIDERS dict, we just use DoT implicitly if they aren't in DOH_PROVIDERS

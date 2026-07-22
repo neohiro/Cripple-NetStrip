@@ -369,12 +369,22 @@ class ConnectionsSidebar(ctk.CTkFrame):
         self._on_sort_filter_change()
         
     def _toggle_expand_all(self):
+        if getattr(self, '_is_expanding_all', False):
+            return # Prevent double clicks
+            
         self._all_expanded = not self._all_expanded
         btn_text = "Collapse All" if self._all_expanded else "Expand All"
         self.btn_expand_all.configure(text=btn_text)
         
-        for group in self.app_groups.values():
-            # Only expand/collapse groups that are currently visible to avoid UI freezing
+        groups_to_update = list(self.app_groups.values())
+        self._is_expanding_all = True
+        
+        def _update_next(index=0):
+            if not self.winfo_exists() or index >= len(groups_to_update):
+                self._is_expanding_all = False
+                return
+                
+            group = groups_to_update[index]
             if getattr(group, '_is_packed', False):
                 if group.is_expanded != self._all_expanded:
                     group._toggle_expand()
@@ -385,6 +395,11 @@ class ConnectionsSidebar(ctk.CTkFrame):
                     group.btn_expand.configure(text="Collapse ▲", fg_color=Colors.BG_DARK, text_color=Colors.TEXT_SECONDARY)
                 else:
                     group.btn_expand.configure(text="Expand ▼", fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY)
+                    
+            # Yield to UI loop every iteration to keep animations smooth
+            self.after(5, lambda: _update_next(index + 1))
+            
+        _update_next()
 
     def set_expanded(self, expanded: bool):
         self.is_expanded = expanded
