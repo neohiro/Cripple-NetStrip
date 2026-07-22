@@ -293,7 +293,11 @@ class BlocklistView(ctk.CTkFrame):
             ]
             
             metadata[ConnectionCategory.ESSENTIAL] = [
-                {'filename': 'Internal Essential Services', 'updated': 'Now', 'size': 0}
+                {'filename': 'Internal Essential Services', 'updated': 'Now', 'size': 5}
+            ]
+            
+            metadata[ConnectionCategory.SYSTEM] = [
+                {'filename': 'OS & Native Services', 'updated': 'Now', 'size': 6}
             ]
                 
         except Exception:
@@ -445,18 +449,20 @@ class BlocklistView(ctk.CTkFrame):
             pass
 
         if not results:
+            msg = f"No matches found for '{query}'" if query else "No domains found in this category."
             ctk.CTkLabel(
-                self._results_scroll, text=f"No matches found for '{query}'",
+                self._results_scroll, text=msg,
                 text_color=Colors.TEXT_TERTIARY,
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             ).pack(pady=Spacing.LG)
             return
 
-        ctk.CTkLabel(
-            self._results_scroll, text=f"Showing top {len(results)} matches for '{query}':",
-            text_color=Colors.TEXT_SECONDARY,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "italic"),
-        ).pack(anchor="w", padx=Spacing.SM, pady=(0, Spacing.SM))
+        if query:
+            ctk.CTkLabel(
+                self._results_scroll, text=f"Showing top {len(results)} matches for '{query}':",
+                text_color=Colors.TEXT_SECONDARY,
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "italic"),
+            ).pack(anchor="w", padx=Spacing.SM, pady=(0, Spacing.SM))
 
         for r in results:
             row = ctk.CTkFrame(

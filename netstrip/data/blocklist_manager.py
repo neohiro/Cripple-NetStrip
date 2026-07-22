@@ -386,6 +386,18 @@ class BlocklistManager:
                         results.append({'domain': domain, 'category': 'user_blocked'})
                         if len(results) >= limit: break
 
+            if not category_filter or category_filter == 'essential':
+                for d in ('ip-api.com', 'cloudflare-dns.com', '1.1.1.1', '8.8.8.8', '9.9.9.9'):
+                    if not query or query in d:
+                        results.append({'domain': d, 'category': 'essential'})
+                        if len(results) >= limit: break
+
+            if not category_filter or category_filter == 'system':
+                for d in ('microsoft.com', 'windowsupdate.com', 'msftconnecttest.com', 'apple.com', 'ubuntu.com', 'debian.org'):
+                    if not query or query in d:
+                        results.append({'domain': d, 'category': 'system'})
+                        if len(results) >= limit: break
+
             if len(results) >= limit:
                 return results
                 
