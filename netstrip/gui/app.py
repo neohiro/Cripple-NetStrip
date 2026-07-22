@@ -106,7 +106,14 @@ class NetStripApp(ctk.CTk):
         except Exception:
             pass
 
-        # Load and set app icon instantly
+        self.apply_icon()
+        
+        # Prevent black rendering artifacts on window restore
+        self.bind("<Map>", lambda e: self.after(10, self.update_idletasks))
+        self.bind("<Configure>", self._on_window_resize)
+        self._resize_timer = None
+
+    def apply_icon(self):
         try:
             import os
             import sys
@@ -121,14 +128,19 @@ class NetStripApp(ctk.CTk):
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
                 self._icon_image = Image.open(icon_path)
+                
+                import ctypes
+                myappid = 'NetStrip.app.1.0'
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+                
+                # Also set the small and large icons explicitly using ctypes for taskbar and alt-tab
+                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
+                if hicon:
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
         except Exception as e:
             pass
-            
-        
-        # Prevent black rendering artifacts on window restore
-        self.bind("<Map>", lambda e: self.after(10, self.update_idletasks))
-        self.bind("<Configure>", self._on_window_resize)
-        self._resize_timer = None
 
     def _on_window_resize(self, event):
         pass # Removed visual resize overlay for smoother UI

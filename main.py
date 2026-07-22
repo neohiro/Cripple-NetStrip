@@ -204,6 +204,7 @@ def main():
             
             # Force Tkinter to render the widgets while fully transparent
             app.deiconify()
+            app.apply_icon()
             app.update() 
             
             def check_engine_ready():
@@ -214,6 +215,7 @@ def main():
                     app.attributes('-topmost', True)
                     app.after(100, lambda: app.attributes('-topmost', False))
                     app.focus_force()
+                    app.apply_icon() # Force it one more time just to be absolutely sure
                     
                     from netstrip.core.sound import sound_manager
                     sound_manager.set_muted(initial_mute_state)

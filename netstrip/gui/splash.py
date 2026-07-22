@@ -28,6 +28,12 @@ class SplashScreen(ctk.CTkToplevel):
             icon_path = os.path.join(base_path, 'assets', 'logo.ico')
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
+                import ctypes
+                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+                hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
+                if hicon:
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
         except Exception:
             pass
         
