@@ -176,6 +176,13 @@ class BlocklistUpdater:
 
     def _fetch_dnscrypt_resolvers(self):
         target_file = os.path.join(self.lists_dir, "doh_providers_online.json")
+        
+        # Check file age (skip if updated within the last 24 hours)
+        if os.path.exists(target_file):
+            file_age_seconds = time.time() - os.path.getmtime(target_file)
+            if file_age_seconds < 86400: # 24 hours
+                return
+                
         try:
             logger.info("Fetching dynamic DNSCrypt resolvers list...")
             req = urllib.request.Request('https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md', headers={'User-Agent':'NetStrip/1.0'})
