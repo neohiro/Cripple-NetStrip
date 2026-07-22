@@ -70,8 +70,8 @@ Just download, run as Administrator, and you're good to go! No Python installati
 ### Option 2: Run from Source (All Platforms)
 
 ```bash
-git clone https://github.com/frenzypenguin/NetStrip.git
-cd NetStrip
+git clone https://github.com/neohiro/Cripple-NetStrip.git
+cd Cripple-NetStrip
 pip install -r requirements.txt
 ```
 
