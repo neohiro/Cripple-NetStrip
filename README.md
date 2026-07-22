@@ -101,6 +101,17 @@ sudo python3 main.py
 sudo python3 main.py --service
 ```
 
+## 🔒 Security Measures & Tamper Defenses
+NetStrip integrates several layers of defense-in-depth mechanisms to protect its own runtime environment and prevent hostile tampering:
+- **Runtime Tamper Verification**: Cryptographic SHA-256 validation of the core engine files guarantees that malware cannot quietly replace the sinkhole binaries while NetStrip runs.
+- **Fail-Open Recovery Protocol**: If an unexpected crash occurs, the watchdog forcibly removes the firewall hooks and restores native OS DNS settings (like Windows DHCP or macOS `scutil` configurations) to ensure the host machine never loses internet access.
+- **0-ms Kernel Route Polling**: The engine aggressively micro-polls UDP sockets and routing tables every 100 milliseconds to instantly detect VPN dropouts, activating the Master Killswitch before packets can leak to an ISP.
+- **Strict Pathing & Privilege Escalation Defenses**: Absolute path enforcement and execution policy hardening prevent malicious actors from hijacking the NetStrip daemon via relative path spoofing or DLL sideloading.
+- **Anti-Corruption Database Locks**: The SQLite WAL (Write-Ahead Logging) mode is paired with strict thread-safe isolation to ensure the firewall rules and connection logs cannot be deliberately corrupted or malformed by aggressive IO attacks.
+- **Local IPC Socket Authorization**: The single-instance communication socket is strictly bound to `127.0.0.1` and actively validates structured JSON payloads to prevent Local Privilege Escalation (LPE) or unauthorized GUI hijacking from other user accounts.
+- **PowerShell Injection Hardening**: The background icon extraction engine mathematically sanitizes and cryptographically encodes (Base64) all file paths before interacting with the OS, completely neutralizing arbitrary command execution via crafted executable names.
+- **Subprocess Shell Sandboxing**: All system-level operations (`netsh`, `schtasks`, UAC elevations) are strictly executed with `shell=False` using isolated list arguments, preventing any possibility of OS-level shell injection exploits.
+
 ## 🙏 Credits
 Powered by the incredible open-source community:
 - **CustomTkinter** (Tom Schimansky), **dnslib** (PaulC), **psutil** (Giampaolo Rodola), **WinDivert**

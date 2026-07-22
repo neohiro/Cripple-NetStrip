@@ -124,9 +124,6 @@ class SettingsView(ctk.CTkFrame):
         # Autostart toggle
         self._add_switch_row(card, "Start on Boot", 'autostart')
 
-        # Minimize to tray toggle
-        self._add_switch_row(card, "Minimize to Tray", 'minimize_to_tray')
-        self._add_subtitle(card, "Keep Cripper running in the background when closing the window.")
 
         # Run as Service Only
         self._add_switch_row(card, "Run as Service Only (Headless)", 'run_as_service')

@@ -87,7 +87,10 @@ class IconManager:
                 pass
                 
         if not process_path:
-            return None
+            if not process_name or process_name == 'Unknown' or process_name == 'Unknown (DNS)':
+                return None
+            # Use process_name as a virtual path for caching and fallback logic
+            process_path = process_name
             
         # 1. Check memory cache
         if process_path in self._image_cache:
@@ -228,8 +231,8 @@ class IconManager:
             with urllib.request.urlopen(req, timeout=5) as response, open(save_path, 'wb') as out_file:
                 out_file.write(response.read())
             callback()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Failed to download icon from {url}: {e}")
         finally:
             if process_path in self._in_progress:
                 self._in_progress.remove(process_path)

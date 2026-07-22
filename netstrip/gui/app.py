@@ -531,7 +531,7 @@ class NetStripApp(ctk.CTk):
         self.quit()
 
     def _on_closing(self):
-        val = self.engine.db.get_setting("minimize_to_tray", "false")
+        val = self.engine.db.get_setting("run_as_service", "false")
         if str(val).lower() == "true":
             self.withdraw()
             self._show_tray_icon()
@@ -540,7 +540,6 @@ class NetStripApp(ctk.CTk):
 
     def _show_tray_icon(self):
         import pystray
-        from PIL import Image, ImageDraw
         import threading
 
         if getattr(self, '_tray_icon', None) is not None:
@@ -556,16 +555,47 @@ class NetStripApp(ctk.CTk):
             self._tray_icon = None
             self.after(0, self._perform_clean_exit)
 
-        def on_service(icon, item):
-            import subprocess
-            icon.stop()
-            self._tray_icon = None
-            self._perform_clean_exit()
-            subprocess.Popen([sys.executable, os.path.abspath(sys.argv[0]), "--service"])
+        def is_killswitch_active(item):
+            return getattr(self.engine, 'killswitch_active', False)
+
+        def toggle_killswitch(icon, item):
+            current = is_killswitch_active(item)
+            self.engine.set_killswitch(not current)
+            def update_ui():
+                if hasattr(self, 'btn_killswitch'):
+                    if getattr(self.engine, 'killswitch_active', False):
+                        self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d")
+                    else:
+                        self.btn_killswitch.configure(text="CRIPPER: ACTIVE", fg_color=Colors.SUCCESS_DIM)
+            self.after(0, update_ui)
+
+        def is_paranoid_active(item):
+            mode = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
+            return mode and mode.name == "PARANOID"
+
+        def toggle_paranoid(icon, item):
+            if is_paranoid_active(item):
+                self.engine.classifier.set_mode("STANDARD")
+            else:
+                self.engine.classifier.set_mode("PARANOID")
+
+        def is_lan_shield_active(item):
+            return self.engine.db.get_setting("lan_shield_enabled", "true") == "true"
+
+        def toggle_lan_shield(icon, item):
+            current = is_lan_shield_active(item)
+            new_val = "false" if current else "true"
+            self.engine.db.set_setting("lan_shield_enabled", new_val)
+            if new_val == "true":
+                self.engine.platform.block_lan_traffic()
+            else:
+                self.engine.platform.unblock_lan_traffic()
 
         menu = pystray.Menu(
             pystray.MenuItem('Show Cripper', on_show, default=True),
-            pystray.MenuItem('Run as Service Only', on_service),
+            pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
+            pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
+            pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
             pystray.MenuItem('Quit', on_quit)
         )
 
