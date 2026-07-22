@@ -73,6 +73,31 @@ class TrafficClassifier:
             if p_lower in system_processes:
                 self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
                 return ConnectionCategory.SYSTEM
+                
+            # If the PID could not be inferred (it's just a DNS query proxy request), 
+            # we check the identity to label OS-level connections appropriately.
+            if p_lower in ('dns', 'unknown (dns)'):
+                identity = self.blocklist.get_identity(domain)
+                if identity:
+                    import platform
+                    current_os = platform.system().lower()
+                    identity_lower = identity.lower()
+                    
+                    if identity_lower == 'microsoft':
+                        if current_os == 'windows':
+                            self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
+                            return ConnectionCategory.SYSTEM
+                        else:
+                            self._domain_cache[cache_key] = ConnectionCategory.TELEMETRY
+                            return ConnectionCategory.TELEMETRY
+                            
+                    elif identity_lower == 'apple':
+                        if current_os == 'darwin':
+                            self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
+                            return ConnectionCategory.SYSTEM
+                        else:
+                            self._domain_cache[cache_key] = ConnectionCategory.TELEMETRY
+                            return ConnectionCategory.TELEMETRY
 
         self._domain_cache[cache_key] = ConnectionCategory.UNKNOWN
         
