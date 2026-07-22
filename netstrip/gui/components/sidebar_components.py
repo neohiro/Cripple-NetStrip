@@ -535,8 +535,6 @@ class AppGroupFrame(ctk.CTkFrame):
             action = conn_data.get('action', 'allow')
             self._trigger_pulse(action)
             self.rows[target]._trigger_pulse(action)
-            
-        self.apply_filter(hide_inactive)
         
     def _toggle_global_action(self, target_action: str):
         def proceed():

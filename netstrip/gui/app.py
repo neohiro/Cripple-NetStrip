@@ -119,45 +119,23 @@ class NetStripApp(ctk.CTk):
         except Exception:
             pass
 
-        # Generate and set app icon
+        # Load and set app icon
         try:
             import os
-            import tempfile
-            from PIL import Image, ImageDraw, ImageTk
+            import sys
+            from PIL import Image
             
-            # Draw double arrows on transparent background
-            self._icon_image = Image.new('RGBA', (256, 256), color=(0, 0, 0, 0))
-            d = ImageDraw.Draw(self._icon_image)
-            
-            def hex_to_rgba(hex_color):
-                h = hex_color.lstrip('#')
-                return tuple(int(h[i:i+2], 16) for i in (0, 2, 4)) + (255,)
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 
-            scale_x = 256 / 200.0
-            scale_y = 256 / 150.0
-            
-            up_coords = [
-                (70*scale_x, 120*scale_y), (70*scale_x, 60*scale_y), (50*scale_x, 60*scale_y),
-                (85*scale_x, 20*scale_y), (120*scale_x, 60*scale_y), (100*scale_x, 60*scale_y), (100*scale_x, 120*scale_y)
-            ]
-            down_coords = [
-                (100*scale_x, 30*scale_y), (100*scale_x, 90*scale_y), (80*scale_x, 90*scale_y),
-                (115*scale_x, 130*scale_y), (150*scale_x, 90*scale_y), (130*scale_x, 90*scale_y), (130*scale_x, 30*scale_y)
-            ]
-            
-            d.polygon(up_coords, fill=hex_to_rgba(Colors.ACCENT_PRIMARY))
-            d.polygon(down_coords, fill=hex_to_rgba(Colors.SUCCESS))
-            
-            temp_dir = tempfile.gettempdir()
-            icon_path = os.path.join(temp_dir, 'NetStrip_icon.ico')
-            self._icon_image.save(icon_path, format='ICO', sizes=[(256, 256), (64, 64), (32, 32), (16, 16)])
-            
-            # Save a high-res PNG version for the App Connections sidebar
-            logo_png_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "cripper_logo.png")
-            os.makedirs(os.path.dirname(logo_png_path), exist_ok=True)
-            self._icon_image.save(logo_png_path, format='PNG')
-            
-            self.iconbitmap(icon_path)
+            icon_path = os.path.join(base_path, 'assets', 'logo.ico')
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+                self._icon_image = Image.open(icon_path)
+            else:
+                logger.error(f"Icon not found at {icon_path}")
         except Exception as e:
             logger.error(f"Failed to set window icon: {e}")
 
