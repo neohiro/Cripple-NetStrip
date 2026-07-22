@@ -122,26 +122,32 @@ class BlocklistView(ctk.CTkFrame):
                     detected_category = "ads"
                     if action == "block":
                         url_lower = pattern.lower()
+                        # Comprehensive Heuristic Keywords
+                        kw_telemetry = ["telemetry", "spy", "metrics", "winoffice", "analytics", "diagnostic", "data-collection", "logger", "crash"]
+                        kw_tracker = ["tracker", "tracking", "track", "pixel", "fingerprint", "beacon", "stat", "audience"]
+                        kw_malware = ["malware", "phish", "ransom", "botnet", "c2", "command-and-control", "crypto", "miner", "exploit", "scam", "fraud", "virus", "trojan", "malicious"]
+                        kw_system = ["system", "os", "native", "windows", "apple", "linux", "ubuntu", "debian", "android", "ios", "microsoft", "mac"]
+                        
                         # Layer 1: URL Heuristics
-                        if any(k in url_lower for k in ["telemetry", "spy", "metrics", "winoffice"]):
+                        if any(k in url_lower for k in kw_telemetry):
                             detected_category = "telemetry"
-                        elif any(k in url_lower for k in ["tracker", "tracking"]):
+                        elif any(k in url_lower for k in kw_tracker):
                             detected_category = "tracker"
-                        elif any(k in url_lower for k in ["malware", "phish", "ransom"]):
+                        elif any(k in url_lower for k in kw_malware):
                             detected_category = "malware"
-                        elif any(k in url_lower for k in ["system", "os"]):
+                        elif any(k in url_lower for k in kw_system):
                             detected_category = "system"
                         else:
                             # Layer 2: Content/Header Heuristics
                             try:
                                 header_sample = content[:1000].decode('utf-8', errors='ignore').lower()
-                                if any(k in header_sample for k in ["telemetry", "spy", "metrics"]):
+                                if any(k in header_sample for k in kw_telemetry):
                                     detected_category = "telemetry"
-                                elif any(k in header_sample for k in ["tracker", "tracking"]):
+                                elif any(k in header_sample for k in kw_tracker):
                                     detected_category = "tracker"
-                                elif any(k in header_sample for k in ["malware", "phish", "ransom"]):
+                                elif any(k in header_sample for k in kw_malware):
                                     detected_category = "malware"
-                                elif any(k in header_sample for k in ["system", "os"]):
+                                elif any(k in header_sample for k in kw_system):
                                     detected_category = "system"
                             except Exception:
                                 pass
