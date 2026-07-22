@@ -488,13 +488,19 @@ class SettingsView(ctk.CTkFrame):
             print("Failed to clean custom blocklists:", e)
             
         import sys, os, subprocess
+        creationflags = 0
+        if os.name == 'nt':
+            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            
         if getattr(sys, 'frozen', False):
             # PyInstaller exe restart
-            subprocess.Popen([sys.executable] + sys.argv[1:])
+            subprocess.Popen([sys.executable] + sys.argv[1:], creationflags=creationflags)
         else:
             # Python script restart
-            subprocess.Popen([sys.executable] + sys.argv)
-        sys.exit(0)
+            subprocess.Popen([sys.executable] + sys.argv, creationflags=creationflags)
+        
+        # Kill current process forcefully to ensure clean restart without hanging threads
+        os._exit(0)
 
     def _build_about_card(self):
         card = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=14, border_width=1, border_color=Colors.BORDER_SUBTLE)

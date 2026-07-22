@@ -115,7 +115,7 @@ class NetStripResolver(BaseResolver):
                     # A. Has this exact domain been requested by ANY process recently?
                     query1 = """
                         SELECT process_name FROM connection_log 
-                        WHERE domain = ? AND process_name != 'Unknown (DNS)'
+                        WHERE domain = ? AND process_name NOT IN ('Unknown (DNS)', 'Cripple (Internal)', 'Cripple')
                         ORDER BY id DESC LIMIT 1
                     """
                     row = conn.execute(query1, (domain,)).fetchone()
@@ -128,7 +128,7 @@ class NetStripResolver(BaseResolver):
                         parent_domain = f"%.{parts[-2]}.{parts[-1]}"
                         query2 = """
                             SELECT process_name FROM connection_log 
-                            WHERE domain LIKE ? AND process_name != 'Unknown (DNS)'
+                            WHERE domain LIKE ? AND process_name NOT IN ('Unknown (DNS)', 'Cripple (Internal)', 'Cripple')
                             ORDER BY id DESC LIMIT 1
                         """
                         row = conn.execute(query2, (parent_domain,)).fetchone()
