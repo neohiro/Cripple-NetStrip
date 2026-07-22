@@ -16,7 +16,7 @@ OS_ICONS = {
     'linux': 'https://www.google.com/s2/favicons?domain=kernel.org&sz=64',
     'macos': 'https://www.google.com/s2/favicons?domain=apple.com&sz=64',
     'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'user_app': 'https://www.google.com/s2/favicons?domain=github.com&sz=64'
+    'user_app': 'https://www.google.com/s2/favicons?domain=python.org&sz=64' # Fallback for unknown python apps
 }
 
 APP_ICONS = {
@@ -29,7 +29,9 @@ APP_ICONS = {
     'code': 'https://www.google.com/s2/favicons?domain=visualstudio.com&sz=64',
     'zoom': 'https://www.google.com/s2/favicons?domain=zoom.us&sz=64',
     'teams': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'brave': 'https://www.google.com/s2/favicons?domain=brave.com&sz=64'
+    'brave': 'https://www.google.com/s2/favicons?domain=brave.com&sz=64',
+    'dns': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64',
+    'unknown (dns)': 'https://www.google.com/s2/favicons?domain=cloudflare.com&sz=64'
 }
 
 class AppIdentifier:
@@ -73,7 +75,7 @@ class IconManager:
         Attempts to get the icon. 
         Returns immediately if cached. If a download is needed, returns None and fires callback when done.
         """
-        if process_name == "Cripple":
+        if process_name and process_name.startswith("Cripple"):
             if "cripple_logo" in self._image_cache:
                 img = self._image_cache["cripple_logo"]
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
