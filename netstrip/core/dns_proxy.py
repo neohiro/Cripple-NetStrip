@@ -224,9 +224,45 @@ class NetStripResolver(BaseResolver):
         # 2. Get action from mode
         action = self.classifier.mode.get_action_for_category(category, self.db)
 
-        # 3. Log to DB
         src_port = getattr(handler, 'client_address', (None, None))[1]
         process_name = self._infer_process(domain, src_port)
+
+        # 3. Handle Sinkhole & Throttle Logs
+        if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
+            now = time.time()
+            throttle_key = f"{process_name}:{domain}"
+            last_blocked = getattr(self, '_last_blocked_cache', {}).get(throttle_key, 0)
+            
+            # Initialize cache if missing
+            if not hasattr(self, '_last_blocked_cache'):
+                self._last_blocked_cache = {}
+                
+            # Only log and broadcast if we haven't blocked this exact domain for this app in the last 10 seconds
+            if now - last_blocked > 10:
+                self._last_blocked_cache[throttle_key] = now
+                if self.on_status:
+                    self.on_status(f"DNS Autoblocked {category.value.capitalize()}: {domain}")
+                
+                src_port = getattr(handler, 'client_address', (None, None))[1]
+                self.db.log_connection({
+                    'process_name': process_name,
+                    'domain': domain,
+                    'protocol': 'DNS',
+                    'category': category.value,
+                    'action': action.value,
+                    'mode': self.classifier.mode.name
+                })
+                self.db.update_daily_stats(action.value, category.value)
+                
+            # Always return Sinkhole IP
+            reply = request.reply()
+            reply.add_answer(RR(qname, rdata=A("0.0.0.0")))
+            return reply
+
+        # 4. Handle Allow (Forward to Upstream)
+        
+        # Log Allowed connection unconditionally
+        src_port = getattr(handler, 'client_address', (None, None))[1]
         self.db.log_connection({
             'process_name': process_name,
             'domain': domain,
@@ -236,16 +272,6 @@ class NetStripResolver(BaseResolver):
             'mode': self.classifier.mode.name
         })
         self.db.update_daily_stats(action.value, category.value)
-
-        # 4. Handle Sinkhole
-        if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
-            if self.on_status:
-                self.on_status(f"DNS Autoblocked {category.value.capitalize()}: {domain}")
-            reply = request.reply()
-            reply.add_answer(RR(qname, rdata=A("0.0.0.0")))
-            return reply
-
-        # 5. Handle Allow (Forward to Upstream)
         
         # Check cache
         import time
