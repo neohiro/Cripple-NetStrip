@@ -88,6 +88,10 @@ class NetStripEngine:
         self.watchdog_thread = None
         self.route_monitor_thread = None
         self._last_wan_local_ip = None
+        
+        # Updater state
+        self.update_available = False
+        self.latest_version = None
 
     def set_status_callback(self, callback: Callable):
         self.on_status_update = callback
@@ -205,6 +209,36 @@ class NetStripEngine:
         self.connection_monitor.start()
         self.geoip.start()
         self.network_monitor.start()
+        
+        # Start background updater
+        threading.Thread(target=self._update_checker_loop, daemon=True).start()
+        
+    def _update_checker_loop(self):
+        import urllib.request
+        import json
+        from netstrip import __version__
+        while self.is_running:
+            try:
+                req = urllib.request.Request(
+                    "https://api.github.com/repos/neohiro/Cripple-NetStrip/releases/latest",
+                    headers={'User-Agent': f'Cripple/{__version__}'}
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = json.loads(response.read().decode())
+                    tag = data.get('tag_name', '').lstrip('v')
+                    if tag and tag != __version__:
+                        self.latest_version = tag
+                        self.update_available = True
+                        if hasattr(self, 'gui_update_callback') and self.gui_update_callback:
+                            self.gui_update_callback("UPDATE_AVAILABLE")
+            except Exception as e:
+                logger.error(f"Failed to check for updates: {e}")
+                
+            # Sleep for 24 hours
+            for _ in range(86400):
+                if not self.is_running:
+                    break
+                time.sleep(1)
         
         # Hard-coded IP Kernel Blocking
         try:

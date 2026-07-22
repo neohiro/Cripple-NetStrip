@@ -101,7 +101,103 @@ class SettingsView(ctk.CTkFrame):
         self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
         self.scroll_frame.pack(fill="both", expand=True)
 
+        self._build_updates_card()
         self._build_general_card()
+        
+    def _build_updates_card(self):
+        from netstrip import __version__
+        card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
+        card.pack(fill="x", pady=(0, Spacing.MD))
+
+        ctk.CTkLabel(
+            card, text="Updates",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
+        
+        status_frame = ctk.CTkFrame(card, fg_color="transparent")
+        status_frame.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.MD))
+        
+        self.lbl_current_version = ctk.CTkLabel(
+            status_frame, text=f"Current Version: v{__version__}",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_SECONDARY
+        )
+        self.lbl_current_version.pack(side="left")
+        
+        self.lbl_update_status = ctk.CTkLabel(
+            status_frame, text="Checking...",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+            text_color=Colors.TEXT_TERTIARY
+        )
+        self.lbl_update_status.pack(side="right")
+        
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
+        
+        self.btn_check_update = ctk.CTkButton(
+            btn_frame, text="Check for Updates",
+            width=140, height=32, corner_radius=6,
+            fg_color=Colors.BG_INPUT, hover_color=Colors.BG_ELEVATED,
+            text_color=Colors.TEXT_PRIMARY,
+            command=self._manual_update_check
+        )
+        self.btn_check_update.pack(side="left")
+        
+        self.btn_download_update = ctk.CTkButton(
+            btn_frame, text="Download Update (Browser)",
+            width=200, height=32, corner_radius=6,
+            fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS,
+            text_color=Colors.TEXT_PRIMARY,
+            command=lambda: __import__('webbrowser').open("https://github.com/neohiro/Cripple-NetStrip/releases/latest")
+        )
+        self.btn_download_update.pack(side="right")
+        self.btn_download_update.pack_forget() # Hidden by default
+        
+        self._refresh_update_status()
+        
+    def _refresh_update_status(self):
+        if getattr(self.engine, 'update_available', False):
+            self.lbl_update_status.configure(text=f"New version available: v{self.engine.latest_version}", text_color="#facc15")
+            self.btn_download_update.pack(side="right")
+        else:
+            self.lbl_update_status.configure(text="Up to date", text_color=Colors.SUCCESS)
+            self.btn_download_update.pack_forget()
+            
+    def _manual_update_check(self):
+        self.btn_check_update.configure(state="disabled", text="Checking...")
+        self.lbl_update_status.configure(text="Checking GitHub API...", text_color=Colors.TEXT_TERTIARY)
+        self.btn_download_update.pack_forget()
+        
+        def _check():
+            import urllib.request, json
+            from netstrip import __version__
+            try:
+                req = urllib.request.Request(
+                    "https://api.github.com/repos/neohiro/Cripple-NetStrip/releases/latest",
+                    headers={'User-Agent': f'Cripple/{__version__}'}
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = json.loads(response.read().decode())
+                    tag = data.get('tag_name', '').lstrip('v')
+                    if tag and tag != __version__:
+                        self.engine.latest_version = tag
+                        self.engine.update_available = True
+                        if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
+                            try: self.engine.gui_update_callback("UPDATE_AVAILABLE")
+                            except: pass
+            except Exception:
+                pass
+                
+            def _update_ui():
+                if not self._destroyed:
+                    self.btn_check_update.configure(state="normal", text="Check for Updates")
+                    self._refresh_update_status()
+                    
+            self.after(0, _update_ui)
+            
+        import threading
+        threading.Thread(target=_check, daemon=True).start()
         self._build_network_card()
         self._build_scheduler_card()
         self._build_migration_card()
@@ -526,6 +622,7 @@ class SettingsView(ctk.CTkFrame):
         os._exit(0)
 
     def _build_about_card(self):
+        from netstrip import __version__
         card = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=14, border_width=1, border_color=Colors.BORDER_SUBTLE)
         card.pack(fill="x")
 
@@ -536,7 +633,7 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
 
         ctk.CTkLabel(
-            card, text="Cripple v2.0.0",
+            card, text=f"Cripple v{__version__}",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG)

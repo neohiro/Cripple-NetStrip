@@ -305,9 +305,26 @@ class NetStripApp(ctk.CTk):
         self.btn_expand.grid(row=8, column=0, pady=20, padx=20, sticky="ew")
 
         # Version
-        ctk.CTkLabel(self.sidebar, text="v2.0.0",
+        from netstrip import __version__
+        self.version_label = ctk.CTkLabel(self.sidebar, text=f"v{__version__}",
                      font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
-                     text_color=Colors.TEXT_TERTIARY).grid(row=9, column=0, pady=(0, 16))
+                     text_color=Colors.TEXT_TERTIARY,
+                     cursor="hand2")
+        self.version_label.grid(row=9, column=0, pady=(0, 16))
+        
+        def _nav_to_settings(e):
+            self.show_view(5)
+            # Find the settings view and scroll it to the top (which is where Updates card will be)
+            settings_view = self.views.get(5)
+            if hasattr(settings_view, 'scroll_frame') and hasattr(settings_view.scroll_frame, '_parent_canvas'):
+                try:
+                    settings_view.scroll_frame._parent_canvas.yview_moveto(0)
+                except: pass
+                
+        self.version_label.bind("<Button-1>", _nav_to_settings)
+
+        # Register callback for engine events
+        self.engine.gui_update_callback = self._on_engine_event
 
         # Main content (middle pane)
         self.main_frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARK, corner_radius=0)
@@ -627,3 +644,39 @@ class NetStripApp(ctk.CTk):
         
         # pystray blocks, so run it in a thread
         threading.Thread(target=self._tray_icon.run, daemon=True).start()
+
+    def _on_engine_event(self, event_name: str):
+        if event_name == "UPDATE_AVAILABLE":
+            if not getattr(self, '_update_glow_active', False):
+                self._update_glow_active = True
+                self._animate_update_glow()
+                
+    def _animate_update_glow(self, step=0, increasing=True):
+        if not getattr(self, '_update_glow_active', False) or not self.winfo_exists():
+            return
+            
+        # Pulse between TEXT_TERTIARY (#6b7280) and a glowing yellow (#facc15)
+        try:
+            import colorsys
+            r1, g1, b1 = int('6b', 16), int('72', 16), int('80', 16)
+            r2, g2, b2 = int('fa', 16), int('cc', 16), int('15', 16)
+            
+            ratio = step / 20.0
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            color = f"#{r:02x}{g:02x}{b:02x}"
+            
+            self.version_label.configure(text_color=color)
+            
+            if increasing:
+                step += 1
+                if step >= 20: increasing = False
+            else:
+                step -= 1
+                if step <= 0: increasing = True
+                
+            self.after(50, lambda: self._animate_update_glow(step, increasing))
+        except Exception:
+            pass
+
