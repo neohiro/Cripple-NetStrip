@@ -42,7 +42,7 @@ Designed for absolute privacy and network hygiene, NetStrip prevents bypasses th
 - Spawns a detached, invisible `watchdog.py` subprocess. 
 - **Runtime Tamper Verification**: Before initiating any restart, the watchdog cryptographically verifies the SHA-256 hashes of all core engine files against a trusted baseline to prevent malware from hijacking the sinkhole engine.
 - If the main NetStrip engine crashes, the watchdog gracefully attempts to recover the engine up to 3 times.
-- If all attempts fail, it triggers an OS-specific emergency routine (restoring Windows DHCP, clearing macOS DNS, flushing Linux iptables) to fail-open and bring your internet back online.
+- If all attempts fail, it triggers an OS-specific emergency recovery routine. It dynamically reads your original pre-NetStrip DNS configurations from the SQLite database and gracefully restores them (whether they were static IPs or DHCP auto-assigned) to perfectly fail-open and bring your internet back online without disruption.
 ### 📊 Multi-Layered DNS Sinkhole
 - Asynchronous local DNS proxy intercepting queries against over **1.5 million** blocked domains in `O(1)` time.
 - Resolves upstream queries via UDP, DNS-over-TLS (DoT), or native DNS-over-HTTPS (DoH) to secure your downstream privacy.
@@ -104,7 +104,7 @@ sudo python3 main.py --service
 ## 🔒 Security Measures & Tamper Defenses
 NetStrip integrates several layers of defense-in-depth mechanisms to protect its own runtime environment and prevent hostile tampering:
 - **Runtime Tamper Verification**: Cryptographic SHA-256 validation of the core engine files guarantees that malware cannot quietly replace the sinkhole binaries while NetStrip runs.
-- **Fail-Open Recovery Protocol**: If an unexpected crash occurs, the watchdog forcibly removes the firewall hooks and restores native OS DNS settings (like Windows DHCP or macOS `scutil` configurations) to ensure the host machine never loses internet access.
+- **Fail-Open Recovery Protocol**: If an unrecoverable crash occurs, the detached watchdog forcibly removes all active firewall hooks and flawlessly restores your exact original native OS DNS states (precisely reverting back to your specific static IPs or DHCP configuration) to guarantee the host machine never loses its internet connection.
 - **0-ms Kernel Route Polling**: The engine aggressively micro-polls UDP sockets and routing tables every 100 milliseconds to instantly detect VPN dropouts, activating the Master Killswitch before packets can leak to an ISP.
 - **Strict Pathing & Privilege Escalation Defenses**: Absolute path enforcement and execution policy hardening prevent malicious actors from hijacking the NetStrip daemon via relative path spoofing or DLL sideloading.
 - **Anti-Corruption Database Locks**: The SQLite WAL (Write-Ahead Logging) mode is paired with strict thread-safe isolation to ensure the firewall rules and connection logs cannot be deliberately corrupted or malformed by aggressive IO attacks.
