@@ -213,8 +213,8 @@ def main():
                         sound_manager.play_intro()
                         
                 def cross_fade(splash_alpha=1.0, app_alpha=0.0):
-                    # Faster, smoother cross-fade (step 0.08 every 15ms)
-                    step = 0.08
+                    # Faster, smoother cross-fade (step 0.1 every 10ms = ~100ms total)
+                    step = 0.1
                     splash_done = True
                     app_done = True
                     
@@ -229,7 +229,7 @@ def main():
                         app_done = False
                         
                     if not splash_done or not app_done:
-                        app.after(15, lambda: cross_fade(splash_alpha, app_alpha))
+                        app.after(10, lambda: cross_fade(splash_alpha, app_alpha))
                     else:
                         if splash: splash.withdraw()
                         on_transition_done()

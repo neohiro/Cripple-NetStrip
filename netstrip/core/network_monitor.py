@@ -47,7 +47,11 @@ class NetworkMonitor:
 
     def _get_arp_mac(self, ip: str) -> Optional[str]:
         try:
-            res = subprocess.run(["arp", "-a"], capture_output=True, text=True)
+            import os
+            kwargs = {}
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            res = subprocess.run(["arp", "-a"], capture_output=True, text=True, **kwargs)
             # Find the line containing the IP and a MAC address
             # e.g., 192.168.1.1       00-11-22-33-44-55     dynamic
             for line in res.stdout.splitlines():

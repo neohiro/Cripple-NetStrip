@@ -62,20 +62,32 @@ class SplashScreen(ctk.CTkToplevel):
             return
             
         import random
-        phrases = [
-            "Initializing deep packet inspection...",
-            "Loading threat intelligence lists...",
-            "Calibrating DNS sinkhole...",
-            "Establishing zero-leak interceptor...",
-            "Synchronizing firewall rules...",
-            "Warming up the Cripper Engine...",
-            "Mapping telemetry endpoints..."
-        ]
+        if not hasattr(self, '_phrases'):
+            self._phrases = [
+                "Initializing deep packet inspection...",
+                "Loading threat intelligence lists...",
+                "Calibrating DNS sinkhole...",
+                "Establishing zero-leak interceptor...",
+                "Synchronizing firewall rules...",
+                "Warming up the Cripper Engine...",
+                "Mapping telemetry endpoints...",
+                "Connecting to secure upstream DNS...",
+                "Parsing behavioral app profiles...",
+                "Arming the manual killswitch...",
+                "Validating LAN passthrough routes...",
+                "Initializing local SQLite database...",
+                "Booting the background monitor...",
+                "Loading visual layout engines...",
+                "Ensuring memory safety bounds..."
+            ]
+            random.shuffle(self._phrases)
+            self._phrase_idx = 0
         
         # Don't overwrite if it's a specific engine broadcast
         current = self.status_label.cget("text")
         if current.endswith("..."):
-            self.status_label.configure(text=random.choice(phrases))
+            self.status_label.configure(text=self._phrases[self._phrase_idx])
+            self._phrase_idx = (self._phrase_idx + 1) % len(self._phrases)
             
         # Slightly advance progress bar artificially
         current_prog = self.progress.get()
