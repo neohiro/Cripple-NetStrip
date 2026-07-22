@@ -243,7 +243,13 @@ class Database:
     def get_recent_connections(self, limit: int = 100) -> List[sqlite3.Row]:
         with self.lock:
             with self._get_connection() as conn:
-                cursor = conn.execute('SELECT * FROM connection_log ORDER BY id DESC LIMIT ?', (limit,))
+                # Group by process and destination to prevent UI thrashing with identical repetitive connections
+                cursor = conn.execute('''
+                    SELECT *, max(id) as max_id 
+                    FROM connection_log 
+                    GROUP BY process_name, coalesce(domain, ip) 
+                    ORDER BY max_id DESC LIMIT ?
+                ''', (limit,))
                 return cursor.fetchall()
 
     def get_unique_allowed_today(self) -> int:

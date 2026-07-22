@@ -184,8 +184,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
             db_cache = {"block_system_connections": sys_val}
             
             if len(conns) > 0:
-                # Group by process
-                for i, row_data in enumerate(conns):
+                # Reverse conns so we insert oldest first. This guarantees that when self.rows hits the 50 limit, 
+                # next(iter(self.rows)) pops the actual oldest connection, not the newest one!
+                for i, row_data in enumerate(reversed(conns)):
                     conn_dict = dict(row_data)
                     p_name = conn_dict.get('process_name', 'Unknown')
                     p_path = conn_dict.get('process_path', '')
