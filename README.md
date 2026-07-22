@@ -10,7 +10,7 @@
   
   *Strip away the noise. Take back control of your network.*
   
-  **NetStrip (also known as Cripple)** is a cross-platform desktop application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
+  **NetStrip (also known as Cripple)** is a cross-platform desktop FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
 
   *Fully compatible with VPNs, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy and more.*
 </div>
