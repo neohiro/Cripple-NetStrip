@@ -15,8 +15,7 @@
 Cripple works great together with other apps like VPN software, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy, etc.
 </div>
 
-<img width="1300" height="780" alt="CripperNetStripDashboard" src="https://github.com/user-attachments/assets/00ff79ab-7fd7-4afb-97ef-e532694bd4f6" />
-
+<img width="1300" height="780" alt="CripperNetStripDashboard" src="https://github.com/user-attachments/assets/974752d0-1a9a-46ee-832a-dfddcf23ad23" />
 ---
 
 ## 🛡️ What is NetStrip?
