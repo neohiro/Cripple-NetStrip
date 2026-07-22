@@ -236,16 +236,25 @@ class BlocklistView(ctk.CTkFrame):
             metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
             metadata = dict(metadata) # clone it to avoid mutating core dict
             
-            # Add safe domains as a pseudo-source
+            # Add safe and blocked domains as pseudo-sources
             whitelist_size = len(self.engine.blocklist.whitelist)
             app_whitelist_size = len(self.engine.blocklist.app_whitelist)
             
-            if whitelist_size > 0 or app_whitelist_size > 0:
-                from netstrip.core.modes import ConnectionCategory
-                metadata[ConnectionCategory.USER_ALLOWED] = [
-                    {'filename': 'User Whitelisted Domains', 'updated': 'Now', 'size': whitelist_size},
-                    {'filename': 'User Allowed Apps', 'updated': 'Now', 'size': app_whitelist_size}
-                ]
+            blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
+            app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
+            
+            from netstrip.core.modes import ConnectionCategory
+            
+            # Always show these categories so the user knows they exist
+            metadata[ConnectionCategory.USER_ALLOWED] = [
+                {'filename': 'User Whitelisted Domains', 'updated': 'Now', 'size': whitelist_size},
+                {'filename': 'User Allowed Apps', 'updated': 'Now', 'size': app_whitelist_size}
+            ]
+            
+            metadata[ConnectionCategory.USER_BLOCKED] = [
+                {'filename': 'User Blocked Domains', 'updated': 'Now', 'size': blacklist_size},
+                {'filename': 'User Blocked Apps', 'updated': 'Now', 'size': app_blacklist_size}
+            ]
                 
         except Exception:
             metadata = {}
