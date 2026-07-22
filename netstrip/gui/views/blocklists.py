@@ -118,6 +118,36 @@ class BlocklistView(ctk.CTkFrame):
                     if not name or name == "hosts":
                         name = pattern.split("/")[-2] + "_list"
                         
+                    # Intelligent Category Scanning
+                    detected_category = "ads"
+                    if action == "block":
+                        url_lower = pattern.lower()
+                        # Layer 1: URL Heuristics
+                        if any(k in url_lower for k in ["telemetry", "spy", "metrics", "winoffice"]):
+                            detected_category = "telemetry"
+                        elif any(k in url_lower for k in ["tracker", "tracking"]):
+                            detected_category = "tracker"
+                        elif any(k in url_lower for k in ["malware", "phish", "ransom"]):
+                            detected_category = "malware"
+                        elif any(k in url_lower for k in ["system", "os"]):
+                            detected_category = "system"
+                        else:
+                            # Layer 2: Content/Header Heuristics
+                            try:
+                                header_sample = content[:1000].decode('utf-8', errors='ignore').lower()
+                                if any(k in header_sample for k in ["telemetry", "spy", "metrics"]):
+                                    detected_category = "telemetry"
+                                elif any(k in header_sample for k in ["tracker", "tracking"]):
+                                    detected_category = "tracker"
+                                elif any(k in header_sample for k in ["malware", "phish", "ransom"]):
+                                    detected_category = "malware"
+                                elif any(k in header_sample for k in ["system", "os"]):
+                                    detected_category = "system"
+                            except Exception:
+                                pass
+                                
+                    final_category = "whitelist" if action == "allow" else detected_category
+                        
                     # Save to updater_sources.json
                     sources_file = os.path.join(self.engine.blocklist.lists_dir, '..', 'updater_sources.json')
                     if os.path.exists(sources_file):
@@ -128,7 +158,7 @@ class BlocklistView(ctk.CTkFrame):
                             "name": "Custom: " + name,
                             "url": pattern,
                             "format": "domains" if ".txt" in pattern else "hosts",
-                            "category": "whitelist" if action == "allow" else "ads",
+                            "category": final_category,
                             "enabled": True
                         }
                         data.setdefault('sources', []).append(new_source)
@@ -138,7 +168,7 @@ class BlocklistView(ctk.CTkFrame):
                             
                     # Save the downloaded file directly to lists dir
                     safe_name = new_source['name'].replace(' ', '_').replace('/', '_').replace(':', '')
-                    file_prefix = "whitelist_" if action == "allow" else "ads_"
+                    file_prefix = f"{final_category}_" if action == "block" else "whitelist_"
                     target_file = os.path.join(self.engine.blocklist.lists_dir, f"{file_prefix}{safe_name}.txt")
                     with open(target_file, 'wb') as f:
                         f.write(content)

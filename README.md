@@ -36,6 +36,7 @@ Designed for absolute privacy and network hygiene, NetStrip prevents bypasses th
 
 ### 📊 Multi-Layered DNS Sinkhole
 - Evaluates queries asynchronously against over **1.5 million** blocked domains in `O(1)` time.
+- **Auto-Updating Engine**: Online blocklists are automatically refreshed every 24 hours in the background (with staggered network throttling to prevent bandwidth spikes).
 - Resolves upstream queries via DNS-over-TLS (DoT), native DNS-over-HTTPS (DoH) for downstream privacy or UDP as a last resort if using internal DNS proxy (autodetects third-party local DNS proxy software!).
 - **App-Specific Policies**: Enforce rules per executable (e.g., allow `tracker.com` only when `discord.exe` requests it).
 - **Time Bombs**: Quick 15-minute temporary allow-rules to quickly unbreak websites without permanently whitelisting them.
