@@ -249,7 +249,7 @@ class ConnectionMonitor:
              
         # Cripple Traffic Override
         if process_name == "Cripple (Internal)":
-            category = ConnectionCategory.SYSTEM
+            category = ConnectionCategory.ESSENTIAL
             action = ConnectionAction.ALLOW
 
         conn_data = {
