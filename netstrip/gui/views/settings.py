@@ -513,7 +513,7 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
 
         ctk.CTkLabel(
-            card, text="Cripple v0.1.0-alpha",
+            card, text="Cripple v2.0.0",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG)

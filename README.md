@@ -154,5 +154,11 @@ Powered by the incredible open-source community:
 - [AdAway](https://adaway.org/)
 - [Energized Protection](https://energized.pro/)
 
+## 🚀 Release Notes (v2.0.0)
+- **New Version v2.0.0**: Cripple has officially reached version 2.0.0!
+- **System Classification Engine**: New intelligent DNS-level OS tracking telemetry interception.
+- **Auto-Updater Rate Limits**: Implemented proper caching for dynamic DNSCrypt resolvers.
+- **GUI Refinements**: Fully rebranded all references to Cripple, optimized memory leaks, and improved factory reset resilience.
+
 ## 📄 License
 This project is licensed under the MIT License. See `LICENSE` for details.
