@@ -101,20 +101,26 @@ class IconManager:
         if os.path.exists(cached_exe_icon):
             try:
                 img = Image.open(cached_exe_icon)
+                img.verify() # Validate it's a real image
+                img = Image.open(cached_exe_icon) # Re-open after verify
                 self._image_cache[process_path] = img
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
-                pass
+                try: os.remove(cached_exe_icon)
+                except Exception: pass
 
         # 3. Check disk cache for App Fallback
         app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
         if os.path.exists(app_icon_path):
             try:
                 img = Image.open(app_icon_path)
+                img.verify()
+                img = Image.open(app_icon_path)
                 self._image_cache[process_path] = img
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
-                pass
+                try: os.remove(app_icon_path)
+                except Exception: pass
                 
         # 4. Check disk cache for OS Fallback
         os_type = AppIdentifier.identify(process_path)
@@ -122,10 +128,13 @@ class IconManager:
         if os.path.exists(cached_os_icon_path):
             try:
                 img = Image.open(cached_os_icon_path)
+                img.verify()
+                img = Image.open(cached_os_icon_path)
                 self._image_cache[process_path] = img
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
-                pass
+                try: os.remove(cached_os_icon_path)
+                except Exception: pass
                 
         # If not cached anywhere and we don't have a callback, bail out
         if not callback:
@@ -182,7 +191,8 @@ class IconManager:
                 timeout=5
             )
             
-            if os.path.exists(save_path) and os.path.getsize(save_path) > 0:
+            # Require at least 200 bytes to filter out corrupt/blank 1x1 PNGs
+            if os.path.exists(save_path) and os.path.getsize(save_path) > 200:
                 success = True
         except Exception:
             pass
@@ -192,6 +202,8 @@ class IconManager:
                 self._in_progress.remove(process_path)
             callback()
         else:
+            try: os.remove(save_path)
+            except Exception: pass
             self._do_fallback(process_path, process_name, callback)
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
