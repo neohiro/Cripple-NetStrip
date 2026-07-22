@@ -15,8 +15,6 @@
   *Fully compatible with VPNs, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy and more.*
 </div>
 
-<img width="1300" height="780" alt="CripperNetStripDashboard" src="https://github.com/user-attachments/assets/974752d0-1a9a-46ee-832a-dfddcf23ad23" />
-
 ---
 
 ## 🛡️ What is NetStrip?
