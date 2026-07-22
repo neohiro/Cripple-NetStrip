@@ -12,7 +12,7 @@
   
   **NetStrip (also known as Cripple)** is a powerful, cross-platform desktop application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
 
-Cripple works great together with other apps like Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy, etc.
+Cripple works great together with other apps like VPN software, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy, etc.
 </div>
 
 
