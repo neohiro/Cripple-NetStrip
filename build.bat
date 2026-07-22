@@ -1,6 +1,6 @@
 @echo off
 echo ========================================================
-echo Cripper (NetStrip) - PyInstaller Build Script
+echo Cripple (NetStrip) - PyInstaller Build Script
 echo ========================================================
 echo.
 
@@ -19,7 +19,7 @@ echo [3] Cleaning previous build directories...
 rmdir /S /Q build 2>nul
 rmdir /S /Q dist 2>nul
 
-echo [4] Building Cripper executable...
+echo [4] Building Cripple executable...
 echo    This will take a few minutes. Please wait...
 pyinstaller ^
     --noconfirm ^
@@ -27,7 +27,7 @@ pyinstaller ^
     --noconsole ^
     --windowed ^
     --uac-admin ^
-    --name "Cripper" ^
+    --name "Cripple" ^
     --icon "assets/logo.ico" ^
     --add-data "%CTK_PATH%;customtkinter/" ^
     --add-data "netstrip/data/lists;netstrip/data/lists" ^
@@ -39,7 +39,7 @@ pyinstaller ^
 
 echo.
 echo [5] Build Complete!
-echo You can find the compiled executable in the 'dist\Cripper' folder.
-echo You should compress the 'Cripper' folder into a .zip file for distribution.
+echo You can find the compiled executable in the 'dist\Cripple' folder.
+echo You should compress the 'Cripple' folder into a .zip file for distribution.
 echo.
 pause
