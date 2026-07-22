@@ -1,0 +1,214 @@
+{
+  "sources": [
+    {
+      "name": "Steven Black Unified",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+      "format": "hosts",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Multi",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/multi.txt",
+      "format": "hosts",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Windows Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.winoffice.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Apple Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.apple.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Amazon Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.amazon.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "OISD Big",
+      "url": "https://big.oisd.nl/domainswild",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "Dan Pollock Hosts",
+      "url": "https://someonewhocares.org/hosts/zero/hosts",
+      "format": "hosts",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "Peter Lowe AdServers",
+      "url": "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
+      "format": "hosts",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "AdAway Default",
+      "url": "https://adaway.org/hosts.txt",
+      "format": "hosts",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "Energized Blu",
+      "url": "https://block.energized.pro/blu/formats/domains.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "URLhaus Malware",
+      "url": "https://urlhaus.abuse.ch/downloads/hostfile/",
+      "format": "hosts",
+      "category": "malware",
+      "enabled": true
+    },
+    {
+      "name": "WindowsSpyBlocker - Spy",
+      "url": "https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/spy.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "WindowsSpyBlocker - Update (Paranoid)",
+      "url": "https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/update.txt",
+      "format": "hosts",
+      "category": "update",
+      "enabled": true
+    },
+    {
+      "name": "WindowsSpyBlocker - Extra (Paranoid)",
+      "url": "https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/extra.txt",
+      "format": "hosts",
+      "category": "security",
+      "enabled": true
+    },
+    {
+      "name": "AdGuard Base Filter",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "AdGuard Tracking Protection",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt",
+      "format": "domains",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "AdGuard Mobile Ads",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_11.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "AdGuard Russian",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_104.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "AdGuard French",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_106.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "AdGuard Japanese",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_107.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "AdGuard Turkish",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_112.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "AdGuard Chinese",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_224.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": false
+    },
+    {
+      "name": "Identity: Microsoft",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/microsoft",
+      "format": "v2fly",
+      "category": "identity_microsoft",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Google",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google",
+      "format": "v2fly",
+      "category": "identity_google",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Apple",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/apple",
+      "format": "v2fly",
+      "category": "identity_apple",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Amazon",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/amazon",
+      "format": "v2fly",
+      "category": "identity_amazon",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Facebook",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/facebook",
+      "format": "v2fly",
+      "category": "identity_facebook",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Cloudflare",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/cloudflare",
+      "format": "v2fly",
+      "category": "identity_cloudflare",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Fastly",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/fastly",
+      "format": "v2fly",
+      "category": "identity_fastly",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi DoH DoT",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/doh.txt",
+      "format": "hosts",
+      "category": "doh_providers",
+      "enabled": true
+    }
+  ]
+}

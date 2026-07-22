@@ -1,0 +1,6 @@
+customtkinter>=5.2.2
+psutil>=5.9.8
+Pillow>=10.2.0
+plyer>=2.1.0
+dnslib>=0.9.24
+maxminddb>=2.5.2

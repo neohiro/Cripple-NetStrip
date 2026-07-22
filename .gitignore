@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# Project specifics
+.vscode/
+build/
+dist/
+*.spec
+*.db
+netstrip/data/NetStrip.db
+netstrip/data/lists/NetStrip_cache.json
+netstrip/data/lists/updater_state.json
+netstrip/data/lists/doh_providers_online.json
+netstrip/data/lists/*_*.txt
+!netstrip/data/lists/ip_blacklist.txt
+
+# Temporary scripts
+temp.txt
+error.txt
+build.bat
+build.ps1
+fix_*.py
+script.py
+restore.py
+install_service.py
+test_*.py
+scratch/

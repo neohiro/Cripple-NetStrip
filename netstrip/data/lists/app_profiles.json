@@ -1,0 +1,137 @@
+{
+  "profiles": {
+    "chrome.exe": {
+      "display_name": "Google Chrome",
+      "essential_domains": ["*.google.com", "*.gstatic.com", "*.googleapis.com"],
+      "tracker_domains": ["clients.l.google.com", "safebrowsing.googleapis.com"],
+      "telemetry_domains": ["clientservices.googleapis.com"],
+      "default_action": "profile"
+    },
+    "firefox.exe": {
+      "display_name": "Mozilla Firefox",
+      "essential_domains": ["*.mozilla.org", "*.mozilla.net"],
+      "telemetry_domains": ["telemetry.mozilla.org", "incoming.telemetry.mozilla.org"],
+      "default_action": "profile"
+    },
+    "msedge.exe": {
+      "display_name": "Microsoft Edge",
+      "essential_domains": ["*.microsoft.com", "*.windows.com"],
+      "telemetry_domains": ["vortex.data.microsoft.com", "browser.events.data.microsoft.com"],
+      "default_action": "profile"
+    },
+    "spotify.exe": {
+      "display_name": "Spotify",
+      "essential_domains": ["*.spotify.com", "*.scdn.co"],
+      "tracker_domains": ["spclient.wg.spotify.com"],
+      "default_action": "profile"
+    },
+    "discord.exe": {
+      "display_name": "Discord",
+      "essential_domains": ["*.discord.com", "*.discordapp.com", "*.discordapp.net", "*.discord.gg"],
+      "telemetry_domains": ["metrics.discord.com"],
+      "default_action": "profile"
+    },
+    "steam.exe": {
+      "display_name": "Steam",
+      "essential_domains": ["*.steampowered.com", "*.steamcommunity.com", "*.steamgames.com"],
+      "default_action": "allow"
+    },
+    "code.exe": {
+      "display_name": "VS Code",
+      "essential_domains": ["*.vscode.dev", "*.microsoft.com", "*.visualstudio.com"],
+      "telemetry_domains": ["vortex.data.microsoft.com", "dc.services.visualstudio.com"],
+      "default_action": "profile"
+    },
+    "slack.exe": {
+      "display_name": "Slack",
+      "essential_domains": ["*.slack-msgs.com", "*.slack.com", "*.slack-edge.com"],
+      "telemetry_domains": ["metrics.slack.com"],
+      "default_action": "profile"
+    },
+    "zoom.exe": {
+      "display_name": "Zoom",
+      "essential_domains": ["*.zoom.us"],
+      "telemetry_domains": ["ping.zoom.us"],
+      "default_action": "profile"
+    },
+    "teams.exe": {
+      "display_name": "Microsoft Teams",
+      "essential_domains": ["*.teams.microsoft.com", "*.skype.com", "*.lync.com"],
+      "telemetry_domains": ["vortex.data.microsoft.com", "stat.teams.microsoft.com"],
+      "default_action": "profile"
+    },
+    "skype.exe": {
+      "display_name": "Skype",
+      "essential_domains": ["*.skype.com"],
+      "telemetry_domains": ["vortex.data.microsoft.com", "pipe.skype.com"],
+      "default_action": "profile"
+    },
+    "epicgameslauncher.exe": {
+      "display_name": "Epic Games",
+      "essential_domains": ["*.epicgames.com"],
+      "telemetry_domains": ["tracking.epicgames.com"],
+      "default_action": "profile"
+    },
+    "origin.exe": {
+      "display_name": "Origin",
+      "essential_domains": ["*.ea.com", "*.origin.com"],
+      "default_action": "allow"
+    },
+    "whatsapp.exe": {
+      "display_name": "WhatsApp Desktop",
+      "essential_domains": ["*.whatsapp.net", "*.whatsapp.com"],
+      "default_action": "allow"
+    },
+    "telegram.exe": {
+      "display_name": "Telegram",
+      "essential_domains": ["*.telegram.org"],
+      "default_action": "allow"
+    },
+    "signal.exe": {
+      "display_name": "Signal",
+      "essential_domains": ["*.signal.org"],
+      "default_action": "allow"
+    },
+    "obs64.exe": {
+      "display_name": "OBS Studio",
+      "essential_domains": ["*.obsproject.com"],
+      "default_action": "allow"
+    },
+    "vlc.exe": {
+      "display_name": "VLC Media Player",
+      "essential_domains": ["*.videolan.org"],
+      "default_action": "allow"
+    },
+    "7zfm.exe": {
+      "display_name": "7-Zip",
+      "essential_domains": [],
+      "default_action": "allow"
+    },
+    "winrar.exe": {
+      "display_name": "WinRAR",
+      "essential_domains": ["*.rarlab.com"],
+      "default_action": "allow"
+    },
+    "notepad++.exe": {
+      "display_name": "Notepad++",
+      "essential_domains": ["*.notepad-plus-plus.org"],
+      "default_action": "allow"
+    },
+    "thunderbird.exe": {
+      "display_name": "Thunderbird",
+      "essential_domains": ["*.mozilla.org"],
+      "telemetry_domains": ["telemetry.mozilla.org"],
+      "default_action": "profile"
+    },
+    "yogadns.exe": {
+      "display_name": "YogaDNS",
+      "essential_domains": ["*"],
+      "default_action": "allow"
+    },
+    "dnscrypt-proxy.exe": {
+      "display_name": "DNSCrypt Proxy",
+      "essential_domains": ["*"],
+      "default_action": "allow"
+    }
+  }
+}
