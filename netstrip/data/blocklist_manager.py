@@ -80,14 +80,22 @@ class BlocklistManager:
         
         if os.path.exists(cache_file):
             try:
+                import time
                 with open(cache_file, "r", encoding="utf-8") as f:
                     cache_data = json.load(f)
                 if cache_data.get("hash") == current_hash:
+                    # Chunk reconstruction to prevent GIL lock
+                    items = list(cache_data["domain_map"].items())
+                    new_domain_map = {}
+                    chunk_size = 25000
+                    for i in range(0, len(items), chunk_size):
+                        chunk = items[i:i + chunk_size]
+                        for k, v in chunk:
+                            new_domain_map[k] = ConnectionCategory(v)
+                        time.sleep(0.005) # Yield GIL
+                        
                     with self.lock:
-                        # Reconstruct domain_map with ConnectionCategory enum values
-                        self.domain_map = {
-                            k: ConnectionCategory(v) for k, v in cache_data["domain_map"].items()
-                        }
+                        self.domain_map = new_domain_map
                         self.identity_map = cache_data["identity_map"]
                         self.stats = {
                             ConnectionCategory(k): v for k, v in cache_data["stats"].items()
@@ -217,23 +225,33 @@ class BlocklistManager:
         self.add_domains(domains, category, identity_name)
 
     def add_domains(self, domains: Set[str], category: Optional[ConnectionCategory], identity_name: str = None):
-        """Thread-safe method to add multiple domains."""
-        with self.lock:
-            for domain in domains:
-                d = domain.lower()
-                if category:
-                    if d not in self.domain_map:
-                        self.domain_map[d] = category
-                        self.stats[category] = self.stats.get(category, 0) + 1
-                    else:
-                        existing_cat = self.domain_map[d]
-                        # If the new category is higher priority, overwrite it
-                        if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+        """Thread-safe method to add multiple domains in chunks to avoid blocking the GIL and UI."""
+        import time
+        domains_list = list(domains)
+        chunk_size = 5000
+        
+        for i in range(0, len(domains_list), chunk_size):
+            chunk = domains_list[i:i + chunk_size]
+            with self.lock:
+                for domain in chunk:
+                    d = domain.lower()
+                    if category:
+                        if d not in self.domain_map:
                             self.domain_map[d] = category
-                            self.stats[existing_cat] -= 1
                             self.stats[category] = self.stats.get(category, 0) + 1
-                elif identity_name:
-                    self.identity_map[d] = identity_name
+                        else:
+                            existing_cat = self.domain_map[d]
+                            # If the new category is higher priority, overwrite it
+                            if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+                                self.domain_map[d] = category
+                                self.stats[existing_cat] -= 1
+                                self.stats[category] = self.stats.get(category, 0) + 1
+                                
+                    if identity_name:
+                        self.identity_map[d] = identity_name
+            
+            # Yield GIL and processor time to ensure GUI (Tkinter mainloop) stays 60fps
+            time.sleep(0.001)
 
     def remove_domains(self, domains: Set[str]):
         pass

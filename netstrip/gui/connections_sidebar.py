@@ -177,33 +177,39 @@ class ConnectionsSidebar(ctk.CTkFrame):
         try:
             # Fetch recent connections - increased limit to 500 to prevent active apps falling off 
             # during high traffic bursts (like initial load)
-            conns = self.engine.db.get_recent_connections(limit=500)
+            conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
             self.engine._cached_recent = conns
             
             sys_val = self.engine.db.get_setting("block_system_connections", "false")
             db_cache = {"block_system_connections": sys_val}
             
             if len(conns) > 0:
-                # Reverse conns so we insert oldest first. This guarantees that when self.rows hits the 50 limit, 
-                # next(iter(self.rows)) pops the actual oldest connection, not the newest one!
-                for i, row_data in enumerate(reversed(conns)):
+                # Process newest first, limit to 50 per app to prevent UI widget thrashing
+                app_conn_counts = {}
+                for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
                     p_name = conn_dict.get('process_name', 'Unknown')
-                    p_path = conn_dict.get('process_path', '')
                     
+                    # Normalize names early for counting
                     domain_ip = str(conn_dict.get('domain') or conn_dict.get('ip') or '')
-                    if p_name and p_name.lower() in ('cripper.exe', 'cripper (internal)', 'NetStrip', 'NetStrip (internal)'):
+                    if p_name and p_name.lower() in ('cripper.exe', 'cripper (internal)', 'netstrip', 'netstrip (internal)'):
                         p_name = 'Cripper (Internal)'
                     elif p_name and p_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe', 'language_server.exe'):
                         if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
                             p_name = 'Cripper (Internal)'
-                        # Else leave it as it is (e.g. python.exe)!
                     elif p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
                         if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
                             p_name = 'Cripper (Internal)'
                         else:
                             p_name = 'DNS'
+                            
+                    if app_conn_counts.get(p_name, 0) >= 50:
+                        continue
                         
+                    app_conn_counts[p_name] = app_conn_counts.get(p_name, 0) + 1
+                    
+                    p_path = conn_dict.get('process_path', '')
+                    
                     if p_name == 'DNS':
                         conn_dict['category'] = 'dns'
                         

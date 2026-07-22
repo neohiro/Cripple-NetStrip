@@ -527,7 +527,11 @@ class AppGroupFrame(ctk.CTkFrame):
             is_new = True
             # Infinite Uptime Optimization: max 50 rows per app group
             if len(self.rows) > 50:
-                oldest_target = next(iter(self.rows))
+                # Find the oldest row by timestamp (using getattr to handle missing attributes safely)
+                oldest_target = min(
+                    self.rows.keys(), 
+                    key=lambda k: getattr(self.rows[k], 'conn_data', {}).get('timestamp', 0)
+                )
                 old_row = self.rows.pop(oldest_target)
                 old_row.destroy()
                 

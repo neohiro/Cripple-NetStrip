@@ -57,6 +57,16 @@ class NetStripEngine:
         self.interceptor = get_interceptor(self._evaluate_packet, engine=self)
         self.engine_ready = False
         self.interceptor.start() # Start immediately to catch early boot connections
+        
+        # Boost process priority to ensure GUI responsiveness and low-latency packet inspection
+        try:
+            p = psutil.Process(os.getpid())
+            if sys.platform == 'win32':
+                p.nice(psutil.ABOVE_NORMAL_PRIORITY_CLASS)
+            else:
+                p.nice(-5)
+        except Exception:
+            pass
 
         self.on_status_update: Callable = lambda x: None
         self.on_smart_trigger: Callable = None
