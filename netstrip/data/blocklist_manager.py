@@ -19,6 +19,7 @@ CATEGORY_PRIORITY = {
     ConnectionCategory.TRACKER: 60,
     ConnectionCategory.AD: 40,
     ConnectionCategory.SECURITY: 20,
+    ConnectionCategory.SYSTEM: 20,
     ConnectionCategory.UPDATE: 10,
     ConnectionCategory.UNKNOWN: 0
 }
@@ -141,6 +142,23 @@ class BlocklistManager:
                         self._load_list(filepath, ConnectionCategory.ESSENTIAL)
                     elif filename.startswith('whitelist_'):
                         self._load_list(filepath, ConnectionCategory.USER_ALLOWED)
+                    elif filename.startswith('system_'):
+                        import platform
+                        sys_name = platform.system().lower()
+                        fname = filename.lower()
+                        
+                        load_it = False
+                        if "windows" in fname or "winoffice" in fname or "spyblocker" in fname:
+                            if sys_name == "windows": load_it = True
+                        elif "apple" in fname or "macos" in fname or "darwin" in fname:
+                            if sys_name == "darwin": load_it = True
+                        elif "linux" in fname or "ubuntu" in fname:
+                            if sys_name == "linux": load_it = True
+                        else:
+                            load_it = True
+                            
+                        if load_it:
+                            self._load_list(filepath, ConnectionCategory.SYSTEM)
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'

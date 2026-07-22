@@ -189,6 +189,7 @@ class Icons:
     MALWARE = "☠"         # Skull
     ESSENTIAL = "✦"       # Star
     LAN = "🖧"             # Network
+    SYSTEM = "💻"          # System / OS
 
     # Actions
     REFRESH = "↻"         # Refresh
@@ -314,6 +315,6 @@ def get_category_icon(category) -> str:
         'malware': Icons.MALWARE, 'essential': Icons.ESSENTIAL,
         'user_allowed': Icons.ALLOWED, 'user_blocked': Icons.BLOCKED,
         'lan': Icons.LAN, 'update': Icons.REFRESH, 'security': "🛡",
-        'dns': "🌐", 'system': "⚙",
+        'dns': "🌐", 'system': Icons.SYSTEM,
     }
     return mapping.get(category, Icons.PENDING)
