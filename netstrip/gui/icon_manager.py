@@ -88,6 +88,19 @@ class IconManager:
             except Exception:
                 pass
                 
+        if process_name and "dns" in process_name.lower():
+            if "dns_logo" in self._image_cache:
+                img = self._image_cache["dns_logo"]
+                return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
+            try:
+                logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "assets", "dns_logo.png")
+                if os.path.exists(logo_path):
+                    img = Image.open(logo_path)
+                    self._image_cache["dns_logo"] = img
+                    return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
+            except Exception:
+                pass
+                
         if not process_path:
             if not process_name or process_name == 'Unknown' or process_name == 'Unknown (DNS)':
                 return None
