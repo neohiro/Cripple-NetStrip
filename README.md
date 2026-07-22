@@ -110,13 +110,18 @@ Powered by the incredible open-source community:
 - [psutil](https://github.com/giampaolo/psutil) by Giampaolo Rodola
 - [WinDivert](https://github.com/basil00/Divert) by basil00
 
-**Blocklist Providers:**
+**Blocklists & Identity Providers:**
 - [AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html)
 - [oisd](https://oisd.nl/) by sjhgvr
 - [Steven Black Hosts](https://github.com/StevenBlack/hosts)
 - [HaGeZi](https://github.com/hagezi/dns-blocklists)
 - [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker)
 - [URLHaus](https://urlhaus.abuse.ch/)
+- [v2fly / domain-list-community](https://github.com/v2fly/domain-list-community) (Used for Corporate Identity Profiling)
+- [Peter Lowe's Ad/Tracking List](https://pgl.yoyo.org/adservers/)
+- [Dan Pollock's hosts](https://someonewhocares.org/hosts/)
+- [AdAway](https://adaway.org/)
+- [Energized Protection](https://energized.pro/)
 
 ## 📄 License
 This project is licensed under the MIT License. See `LICENSE` for details.
