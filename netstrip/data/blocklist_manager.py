@@ -147,18 +147,22 @@ class BlocklistManager:
                         sys_name = platform.system().lower()
                         fname = filename.lower()
                         
-                        load_it = False
+                        is_native_os = False
                         if "windows" in fname or "winoffice" in fname or "spyblocker" in fname:
-                            if sys_name == "windows": load_it = True
+                            if sys_name == "windows": is_native_os = True
                         elif "apple" in fname or "macos" in fname or "darwin" in fname:
-                            if sys_name == "darwin": load_it = True
+                            if sys_name == "darwin": is_native_os = True
                         elif "linux" in fname or "ubuntu" in fname:
-                            if sys_name == "linux": load_it = True
+                            if sys_name == "linux": is_native_os = True
                         else:
-                            load_it = True
+                            is_native_os = True
                             
-                        if load_it:
+                        if is_native_os:
+                            # Native OS background noise
                             self._load_list(filepath, ConnectionCategory.SYSTEM)
+                        else:
+                            # Non-native (e.g., Apple software on Windows), treat as standard App Telemetry
+                            self._load_list(filepath, ConnectionCategory.TELEMETRY)
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
