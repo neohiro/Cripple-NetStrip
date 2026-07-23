@@ -3,236 +3,301 @@
 
   # NetStrip  —  Cripple
 
-  **Intelligent Network Debloater & Multi-Layered Firewall**
+  **See everything. Control everything. Trust nothing.**
 
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
   [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-lightgray.svg)](https://github.com/)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
   [![Build Status](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/release.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions)
 
-  *Strip away the noise. Take back control of your network.*
+  > **v3.1.0** — SSH safeguard, dual Android VPN, 25+ CLI commands, always-on LAN mesh, and full headless management.
 
 </div>
 
 ---
 
-## 📑 Table of Contents
+## Why Cripple?
 
-- [Overview](#overview)
-- [Core Features](#-core-features)
-- [Network Capabilities](#-network-capabilities)
-- [Security & Tamper Defenses](#-security--tamper-defenses)
-- [GUI & UX](#-gui--ux)
-- [Mobile (Android)](#-mobile-android)
-- [Architecture](#%EF%B8%8F-architecture)
-- [Installation](#-installation)
+Every second your computer is online, dozens of applications are silently phoning home. Your browser leaks DNS queries through encrypted side channels. Your operating system broadcasts telemetry you never consented to. Smart devices on your network talk to servers in countries you've never heard of. And traditional firewalls? They can't even see most of it.
+
+**Cripple strips all of that away.**
+
+It's not just a DNS blocker. It intercepts traffic at the raw packet level — before it ever leaves your machine — so nothing escapes. Not hardcoded IPs, not encrypted DNS tunnels, not stealthy IPv6 broadcasts. If something tries to talk to the internet without your permission, Cripple kills it.
+
+### What you get
+
+- **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time
+- **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click
+- **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS
+- **Zero-configuration privacy** — Ships with 1.5 million blocked domains out of the box. Ads, trackers, telemetry, and malware — gone before you even open a browser
+- **Your network, offline** — Run it on a Raspberry Pi, a NUC, or a home server and protect every device on your LAN without installing anything on them
+
+---
+
+## 📑 Contents
+
+- [How It Works](#how-it-works)
+- [What Gets Blocked](#what-gets-blocked)
+- [Protecting Your LAN](#-protecting-your-lan)
+- [Android](#-android)
+- [Headless & Remote Management](#-headless--remote-management)
+- [Safety & Anti-Lockout](#-safety--anti-lockout)
+- [Under the Hood](#-under-the-hood)
+- [Getting Started](#-getting-started)
 - [Release Notes](#-release-notes)
-- [Credits](#-credits)
 
 ---
 
-## Overview
+## How It Works
 
-**NetStrip (Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
+Most "ad blockers" and "firewalls" work at a single layer — they rewrite DNS queries or filter HTTP headers. Cripple is different. It works at **three layers simultaneously**:
 
-Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss — blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
+### Layer 1 — DNS Sinkhole
+Every DNS query your system makes passes through Cripple first. Known bad domains (ads, trackers, telemetry, malware) get sinkholes — they resolve to `0.0.0.0` so the connection never happens. This is fast, silent, and invisible to the apps making the requests.
 
----
+> **Why this matters to you:** Your browser loads pages faster because ad networks never even get contacted. Your system uses less bandwidth. And tracking companies get zero data about you.
 
-## ✨ Core Features
+### Layer 2 — Packet Interception
+Some apps don't use DNS. They hardcode IP addresses directly. Cripple hooks into the OS kernel (`WinDivert` on Windows, `NFQueue` on Linux, `PF` on macOS) and inspects every outbound packet before it leaves. If the destination is on a blocklist — or if the connection wasn't explicitly allowed — it gets destroyed.
 
-### 🚧 Zero-Leak Packet Interception
-Most blockers rely on DNS filtering, which fails when applications hardcode IP addresses. NetStrip uses OS-level hooking (`WinDivert` on Windows, `NFQueue` on Linux, `PF` on macOS) to intercept traffic at the IP packet layer, destroying telemetry that bypasses traditional DNS.
+> **Why this matters to you:** This closes the biggest gap in traditional blockers. When your graphics driver phones home to an analytics server via raw IP, Cripple catches it. Browser extensions never will.
 
-### 📊 Multi-Layered DNS Sinkhole
-- Evaluates queries asynchronously against **1.5M+ blocked domains** in `O(1)` time
-- Online blocklists auto-refresh every 24 hours with staggered network throttling
-- Paste any raw `.txt` URL — the engine auto-classifies lists into Trackers, Telemetry, Malware, or System categories
-- Upstream resolution via DoT, native DoH, or UDP fallback (auto-detects local DNS proxies)
+### Layer 3 — Deep Packet Inspection
+For encrypted traffic, Cripple reads TLS handshake headers (SNI) to identify the destination domain even when the payload is encrypted. It also detects DNS-over-HTTPS tunnels and force-routes them back through the sinkhole.
 
-### 🛡️ Smart Shield & Deep Kernel Integrity
-- Real-time malicious behavioral anomaly detection with active neutralization
-- **Deep Kernel XDP Mode** — fileless eBPF programs injected into the physical NIC on Linux
-- **Layer 2 ARP Lockdown** — pins gateway MAC address to prevent ARP Spoofing / MITM
-- **Kernel Bypass Scanner** — neutralizes rogue virtual VPN adapters and Pcap packet-injection tools
-
-### 🧠 DPI & Privacy Filters
-- **SNI Extraction** — intercepts HTTP/HTTPS headers via deep packet inspection
-- **Deep Connection ARP Pinning** — per-connection MAC validation; terminates on MAC swap
-- **IoT Botnet Detection** — identifies rapid-fire scanning (>50 outbound spikes/sec) via sliding rate windows
-- **Privacy Stream Mode** — masks all IP addresses in the dashboard for safe live streaming
-
-### 🔑 LAN Shield E2E Mesh
-- Cryptographically paired LAN clients via Fernet (AES-128-CBC) pre-shared keys
-- Broadcasts encrypted UDP `ANOMALY`, `KILLSWITCH`, and `RESTORE` commands
-- One client's anomaly locks down your entire local network grid
-- **Easy PSK management** — Copy / Paste / Regenerate buttons with Fernet validation and hot-reload
-- PSK persists in `~/.netstrip/netstrip.db` — survives app updates
+> **Why this matters to you:** Chrome, Firefox, and Edge all try to bypass your DNS settings using DoH. Cripple intercepts 30+ DoH providers and redirects them. Your privacy settings actually stick.
 
 ---
 
-## 🌐 Network Capabilities
+## What Gets Blocked
 
-| Feature | Description |
-|---|---|
-| **DoH Sinkhole** | Force-routes 30+ DNS-over-HTTPS providers into the sinkhole |
-| **IPv6 SLAAC Lockdown** | Disables IPv6 Router Advertisements across all platforms |
-| **Global IPv6 Killswitch** | 1-click brutal disable of IPv6 system-wide |
-| **Ghost Mode Killswitch** | Drops ALL traffic across all NICs and protocols — true network ghost |
-| **Home Assistant IoT** | Pushes threat events via JSON POST webhooks to Home Assistant, Node-RED, Zigbee/Thread |
-| **WMI AV Integration** | Auto-whitelists third-party antivirus (BitDefender, Kaspersky, etc.) via SecurityCenter2 |
-| **App-Specific Policies** | Per-executable domain rules |
-| **Time Bombs** | 15-minute temporary allow-rules for quick troubleshooting |
-| **VPN Pre-Cipher** | Filters traffic before VPN encryption (WireGuard, OpenVPN compatible) |
-| **Multi-NIC Gateway** | Full support for dual-adapter NUCs acting as network-wide firewalls |
+Out of the box, with no configuration, Cripple blocks:
 
----
+| Category | What it covers | Why you care |
+|---|---|---|
+| **Ads** | Banner ads, video pre-rolls, pop-ups, native ads | Faster page loads, cleaner browsing, less bandwidth |
+| **Trackers** | Cross-site tracking pixels, fingerprinting scripts | Companies can't build a profile of your browsing habits |
+| **Telemetry** | OS phoning home, app crash reports, usage statistics | Your computer stops reporting your behavior to Microsoft/Apple/Google |
+| **Malware** | Known C2 servers, phishing domains, exploit kits | Protection against drive-by downloads and compromised sites |
+| **IoT Chatter** | Smart devices calling home to cloud servers | Your smart TV stops sending your viewing habits to advertisers |
 
-## 🔒 Security & Tamper Defenses
+You can customize everything: add your own blocklists (paste any URL), create per-app rules, set temporary "time bomb" allows that auto-expire, or switch between three protection modes:
 
-| Defense Layer | Implementation |
-|---|---|
-| **HMAC-SHA256 Watchdog** | Periodic live integrity scanning of all engine files with keyed hashes |
-| **Crash Report Guarantee** | Essential domain whitelist + 5× retry with exponential backoff; reports always get out |
-| **DLL Sideloading Mitigation** | `SetDefaultDllDirectories` restricts DLL search paths at startup |
-| **IPC Command Validation** | Regex-validated ALLOW/BLOCK commands on the single-instance IPC socket |
-| **Fail-Open Recovery** | Watchdog restores DNS, firewall rules, IPv4/IPv6 protocols, and killswitch state on crash |
-| **Runtime Tamper Check** | SHA-256 validation of core engine files at runtime |
-| **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
-| **PowerShell Hardening** | Base64-encoded paths neutralize command injection via crafted filenames |
-| **Shell Sandboxing** | All system commands use `shell=False` with isolated list arguments |
-| **Anti-Replay Nonces** | LAN Shield broadcasts include nonces to prevent replay attacks |
-| **API Bind & Auth** | IoT Local API binds to localhost only with optional token authentication |
+| Mode | Behavior | Best for |
+|---|---|---|
+| **🔓 Loose** | Blocks confirmed bad domains only | Maximum compatibility, minimal friction |
+| **🔰 Normal** | Blocks ads + trackers + telemetry | Daily use (recommended) |
+| **🔒 Paranoid** | Blocks everything not explicitly whitelisted | Maximum security, hardened environments |
 
 ---
 
-## 🎨 GUI & UX
+## 🔑 Protecting Your LAN
 
-### Desktop (CustomTkinter)
-- Fully detached from the core engine — all heavy work runs on multi-threaded C-based backends
-- Lag-free UI even at 10,000+ queries per second
-- **Live App Connections Sidebar** — real-time process traffic with flashing red/green traffic lights
-- **Adaptive polling** — 250ms when GUI visible (smooth live feel), 2000ms when headless (CPU saver)
-- Conditional version glow animation — only pulses when an update is available
+Cripple doesn't just protect one machine — it can protect your entire local network.
 
-### UX Optimizations
+### LAN Shield Mesh
+When you run Cripple on multiple devices, they communicate via **encrypted UDP broadcasts** using a shared pre-shared key (PSK). If one device detects a threat, it instantly broadcasts an encrypted `LOCKDOWN` command — and every other Cripple instance on the network locks down simultaneously.
 
-| Optimization | Detail |
-|---|---|
-| Ghost-Line Sash | Lightweight ghost indicator during drag instead of real-time panel resizes |
-| Debounced Resize | Batched window resize events with deferred layout flush |
-| Lazy Tab Preloading | Staggered 300ms pre-instantiation for zero-delay tab switching |
-| View Caching | Tabs via `grid_remove()` — O(1) swap, never destroyed |
-| 3× Scroll Speed | Framework-level mouse wheel patching |
-| Splash Loading | Animated splash masks ~2s cold-start initialization |
-| Flicker-Free Dashboard | Pre-allocated widget pool with in-place `configure()` updates |
+**Setting it up is two commands:**
+```bash
+# On your first device — get the auto-generated key
+python main.py --get-psk
 
-### Android (Kivy)
-- Live App Connections as priority tab with flashing traffic lights and blinking connection rows
-- Tab layout matches desktop order with connections as index 0
-- Cripple branding in upper bar
-- Built via GitHub Actions → `buildozer.spec` → standalone `.apk`
+# On every other device — paste it in
+python main.py --set-psk "your-key-here"
+```
+
+The PSK uses **Fernet (AES-128-CBC)** encryption with anti-replay nonces, and the listener is **always active** — it survives killswitch mode, ghost mode, and interface failures with automatic socket recovery.
+
+### Ghost Mode vs. Killswitch
+
+Two levels of network isolation, depending on how serious the threat is:
+
+| | Ghost Mode | Killswitch |
+|---|---|---|
+| **Severity** | ⚠ Stealth isolation | ☠ Total network death |
+| **Whitelists** | Ghost Mode preferences honored | Nothing honored — no exceptions |
+| **SSH** | Survives if whitelisted in Ghost prefs | Disconnects (unless SSH Safeguard is on) |
+| **Remote recovery** | `--unghost` works remotely | Requires physical access |
+| **LAN Shield** | Listeners stay active | Everything dies |
+| **Use case** | "Go dark but stay manageable" | "Nuke it — I'll deal with it in person" |
+
+Both require typing `YES` to confirm in the CLI. Pressing Enter always cancels.
 
 ---
 
-## 📱 Mobile (Android)
+## 📱 Android
 
-NetStrip supports Android through a Python-for-Android headless bridge with **dual VPN mode**:
+Cripple runs natively on Android with **two VPN modes** — choose at launch:
 
-### Native VPN Mode (Default)
-NetStrip occupies Android's VPN slot directly — **all traffic** (DNS, TCP, UDP) routes through NetStrip's TUN interface for complete packet filtering. No other VPN app needed. Blocked connections are silently dropped at the packet level.
+### Native VPN (Default)
+Cripple **becomes your device's VPN**. All traffic — DNS, TCP, UDP — flows through Cripple's TUN interface. Blocked connections are silently dropped at the packet level. No root required.
+
+> **When to use this:** You want one app that handles everything. No other VPN app needed.
 
 ### Companion Mode
-DNS-only filtering at `127.0.0.1:5353`. Designed to work **alongside another VPN app** (RethinkDNS, AdGuard, WireGuard, etc.) that handles the actual encrypted tunnel. Point your VPN app's DNS server to `127.0.0.1:5353` for seamless filtering.
+DNS-only filtering at `127.0.0.1:5353`. Designed for users who already run a VPN (WireGuard, AdGuard, etc.) and want Cripple to handle just the blocking.
 
-### Build Pipeline
-GitHub Actions compiles the Python backend, Kivy GUI, Java VPN service, and JNI components into a standalone `.apk` on every tagged release.
-
----
-
-## 🛠️ Architecture
-
-NetStrip is divided into two independent layers:
-
-1. **Core Engine** — Multi-threaded daemon handling packet evaluation, SQLite logging, DNS proxying, and kernel route monitoring
-2. **GUI App** — Hardware-accelerated visualizer powered by CustomTkinter, fully independent from the engine. Can be minimized to tray or closed entirely for headless operation
-
-### Headless & Remote Management
-Run completely silently via `--service` for Raspberry Pi, NUCs, or ARM embedded systems. Fully manageable remotely via SSH using live IPC commands. See the **[CLI Guide](CLI_GUIDE.md)** for boot variables and live management commands.
-
-### Backup & Import
-Full profile backup and import via JSON. Exports capture all user settings, app rules, custom blocklist URLs, and classifications into a single portable `.json` file. Importing merges cleanly with de-duplication by name.
+> **When to use this:** You're already running a VPN for geo-unblocking or work, and you want Cripple for privacy filtering alongside it.
 
 ---
 
-## 📖 Installation
+## 🖥 Headless & Remote Management
 
-### Option 1: Standalone Executable (Recommended)
-Download the pre-compiled binary from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator/sudo. No Python required.
+Cripple is designed to run silently on servers, Raspberry Pis, NUCs, and embedded systems. Start it with `--service` and manage everything via SSH.
+
+### 25+ CLI Commands
+
+**No daemon needed** — these work directly on the database:
+```bash
+python main.py --get-psk              # Display LAN Shield PSK
+python main.py --set-psk "key"        # Import PSK from another device
+python main.py --export backup.json   # Full profile export
+python main.py --import backup.json   # Import on another machine
+python main.py --set ssh_safeguard true   # Never lock yourself out
+```
+
+**Live commands** — sent to the running daemon via IPC:
+```bash
+python main.py --block evil-tracker.com   # Block a domain instantly
+python main.py --allow example.com        # Whitelist a domain
+python main.py --mode PARANOID            # Escalate protection
+python main.py --status                   # Check daemon status
+python main.py --stats                    # View 24h statistics
+python main.py --ghost                    # Go dark (with confirmation)
+python main.py --killswitch              # Nuclear option (with confirmation)
+python main.py --update-blocklists       # Force blocklist refresh
+```
+
+Full reference: **[CLI Guide](CLI_GUIDE.md)**
+
+---
+
+## 🛡 Safety & Anti-Lockout
+
+Cripple is designed to never lock you out of your own machine, even when running the most aggressive security modes.
+
+### SSH Safeguard
+A single setting that guarantees you can always SSH in — no matter what:
+
+```bash
+python main.py --set ssh_safeguard true
+```
+
+When enabled, inbound connections on **port 22 and 2222 are always allowed** — even during killswitch, ghost mode, paranoid mode, or strict inbound blocking. This check runs **before** every other security evaluation in the engine.
+
+> Auto-enabled when you start Cripple in headless mode (`--service`). You'll never accidentally lock yourself out of a remote Pi.
+
+### Confirmation Prompts
+Every CLI command that could sever your connection requires explicit confirmation:
+
+| Command | Confirmation required? |
+|---|---|
+| `--killswitch` | ✅ Must type `YES` (Enter cancels) |
+| `--ghost` | ✅ Must type `YES` (Enter cancels) |
+| `--mode PARANOID` | ✅ Must type `YES` (Enter cancels) |
+| `--blockinbound` | ✅ Must type `YES` (Enter cancels) |
+| `--unkillswitch` | ❌ Instant (recovery should be fast) |
+| `--unghost` | ❌ Instant |
+| `--mode NORMAL` | ❌ Instant |
+
+All prompts can be bypassed with `--force` for scripted automation.
+
+### Crash Recovery
+If Cripple crashes, the watchdog automatically restores:
+- DNS settings to their original state
+- Firewall rules (removes all NetStrip rules)
+- IPv4/IPv6 protocol bindings (re-enables if they were disabled)
+- Killswitch state (clears the lockdown flag)
+
+You'll never end up with a bricked network because Cripple died mid-operation.
+
+---
+
+## ⚙ Under the Hood
+
+For the technically curious — here's what powers the engine.
+
+### Architecture
+Two independent layers that never block each other:
+
+1. **Core Engine** — Multi-threaded C-level daemon: packet evaluation, SQLite logging, DNS proxying, kernel route monitoring, anomaly detection
+2. **GUI** — Hardware-accelerated CustomTkinter visualizer, fully optional. Can be closed for pure headless operation
+
+### Security Hardening
+
+| Layer | What it does |
+|---|---|
+| **HMAC-SHA256 Watchdog** | Periodically verifies integrity of all engine files with keyed hashes |
+| **DLL Sideloading Mitigation** | `SetDefaultDllDirectories` restricts DLL search paths at startup |
+| **IPC Command Validation** | Regex-validated domain commands on the IPC socket |
+| **Shell Sandboxing** | All system commands use `shell=False` with isolated arguments |
+| **Anti-Replay Nonces** | LAN Shield broadcasts include nonces — replaying old packets does nothing |
+| **Crash Report Guarantee** | Essential domains are whitelisted, crash reports retry 5× with exponential backoff |
+| **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
+| **ARP Lockdown** | Gateway MAC address pinned — prevents ARP spoofing / MITM attacks |
+| **eBPF XDP Mode** | On Linux, fileless eBPF programs injected into the NIC for wire-speed filtering |
+
+### Performance
+
+| Optimization | Effect |
+|---|---|
+| Adaptive polling | 250ms refresh when GUI visible, 2000ms when headless |
+| View caching | Tab swaps in O(1) via `grid_remove()`, never destroyed |
+| Lazy preloading | Tabs pre-instantiated at 300ms intervals for zero-delay switching |
+| Debounced resize | Batched window resize events prevent layout thrashing |
+| Flicker-free dashboard | Pre-allocated widget pool with in-place `configure()` updates |
+| 3× scroll speed | Framework-level mouse wheel patching |
+
+---
+
+## 📖 Getting Started
+
+### Option 1: Download (Recommended)
+Grab the pre-compiled binary from [Releases](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator/sudo. No Python required.
 
 ### Option 2: Run from Source
-
 ```bash
 git clone https://github.com/neohiro/Cripple-NetStrip.git
 cd Cripple-NetStrip
 pip install -r requirements.txt
 ```
 
-### Running
-
-**Windows:**
-```powershell
-python main.py
-```
-
-**macOS / Linux:**
-```bash
-sudo python3 main.py
-```
-
-**Headless Mode:**
-```bash
-sudo python3 main.py --service
-```
+**Windows:** `python main.py`  
+**macOS / Linux:** `sudo python3 main.py`  
+**Headless:** `sudo python3 main.py --service`  
+**Android:** Built via GitHub Actions → standalone `.apk`
 
 ### Requirements
 - **OS:** Windows 10/11, macOS, Linux, Android
-- **Python:** 3.10+
-- **Permissions:** Administrator/Root required for core interception (Android uses VPN Service)
+- **Python:** 3.10+ (not needed for pre-compiled binaries)
+- **Permissions:** Administrator/Root (Android uses VPN Service)
 
 ---
 
 ## 🚀 Release Notes
 
-### v3.1.0 — Security Hardening & Live Traffic Polish
-- **Crash Report Delivery Guarantee** — essential domain whitelist (`api.github.com`, `frenzypenguin.media`, `github.com`) + 5× retry with exponential backoff
-- **HMAC-SHA256 Watchdog** — periodic live integrity scanning of all engine files
-- **Adaptive Live Traffic Polling** — 250ms GUI / 2000ms headless for real-time connection feel without CPU waste
-- **LAN Shield PSK Management** — copy/paste/regenerate with Fernet validation and hot-reload
-- **Conditional Version Glow** — RGB animation only when an update is actually available
-- **Watchdog Crash Recovery** — full firewall reset, IPv4/IPv6 re-enable, killswitch DB state clear
-- **DLL Sideloading Mitigation** — `SetDefaultDllDirectories` at startup
-- **IPC Command Sanitization** — regex-validated ALLOW/BLOCK domains
-- **Anti-Replay Nonces** — LAN Shield broadcast replay protection
-- **Build Pipeline Fix** — PyInstaller `--additional-hooks-dir` compat, fallback zip bundles
+### v3.1.0 — Security Hardening & Full CLI
+- SSH Safeguard — always allows port 22/2222, survives all lockdown modes
+- Dual Android VPN — native VPN slot or companion mode alongside another VPN
+- 25+ CLI commands — PSK management, settings, export/import, killswitch, ghost, stats
+- Confirmation prompts for all lockout-risk commands (killswitch, ghost, paranoid, blockinbound)
+- Always-on LAN Shield listener with auto-recovery on socket death
+- Crash report delivery guarantee with essential domain whitelist
+- HMAC-SHA256 watchdog for engine file integrity
+- Adaptive 250ms/2000ms GUI/headless polling
+- Anti-replay nonces on LAN Shield broadcasts
 
 ### v3.0.0 — Zero-Leak Engine
-- Rebuilt zero-leak kernel interception engine
+- Rebuilt kernel interception engine with zero-leak packet evaluation
 - Multi-platform IPC daemon architecture
 - Futuristic-minimalist UI theme
 - CPU stability improvements
-- Enhanced anomaly whitelisting logic
 
 ### v2.0.0 — System Classification Engine
-- System Classification Engine
-- Auto-Updater rate limits
-- GUI rebrand and memory leak optimizations
-
----
-
-## ⏰ Build Metrics
-
-This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL, system tray integrations, IPC layers, and security audits — was built in **~2.5 days** of pure active coding time.
+- Automatic domain classification engine
+- Auto-updater with rate limiting
+- GUI rebrand and memory optimizations
 
 ---
 
@@ -241,11 +306,11 @@ This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL,
 **Core Technologies:**  
 [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) • [dnslib](https://github.com/paulc/dnslib) • [psutil](https://github.com/giampaolo/psutil) • [WinDivert](https://github.com/basil00/Divert) • [cryptography](https://github.com/pyca/cryptography)
 
-**Blocklists & Identity Providers:**  
-[AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html) • [oisd](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [HaGeZi](https://github.com/hagezi/dns-blocklists) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [URLHaus](https://urlhaus.abuse.ch/) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [Energized Protection](https://energized.pro/)
+**Blocklists:**  
+[AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html) • [oisd](https://oisd.nl/) • [Steven Black](https://github.com/StevenBlack/hosts) • [HaGeZi](https://github.com/hagezi/dns-blocklists) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [URLHaus](https://urlhaus.abuse.ch/) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [Energized Protection](https://energized.pro/)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+MIT License. See `LICENSE` for details.
