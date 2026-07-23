@@ -146,28 +146,7 @@ class BlocklistManager:
                     elif filename.startswith('user_blocked_') or filename.startswith('blocked_'):
                         self._load_list(filepath, ConnectionCategory.USER_BLOCKED)
                     elif filename.startswith('system_'):
-                        import platform
-                        sys_name = platform.system().lower()
-                        fname = filename.lower()
-                        
-                        is_native_os = False
-                        if "windows" in fname or "winoffice" in fname or "spyblocker" in fname:
-                            if sys_name == "windows": is_native_os = True
-                        elif "apple" in fname or "macos" in fname or "darwin" in fname:
-                            if sys_name == "darwin": is_native_os = True
-                        elif "linux" in fname or "ubuntu" in fname:
-                            if sys_name == "linux": is_native_os = True
-                        elif "android" in fname:
-                            if os.environ.get('NETSTRIP_ANDROID') == '1': is_native_os = True
-                        else:
-                            is_native_os = True
-                            
-                        if is_native_os:
-                            # Native OS background noise
-                            self._load_list(filepath, ConnectionCategory.SYSTEM)
-                        else:
-                            # Non-native (e.g., Apple software on Windows), treat as standard App Telemetry
-                            self._load_list(filepath, ConnectionCategory.TELEMETRY)
+                        self._load_list(filepath, ConnectionCategory.SYSTEM)
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
