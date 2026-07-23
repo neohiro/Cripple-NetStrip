@@ -45,8 +45,8 @@ android.minapi = 21
 # (list) List of Java files to add to the android project
 android.add_src = src
 
-# (str) Extra xml to write directly inside the <manifest><application> tag
-android.extra_manifest_application_arguments = ./extra_manifest_app.xml
+# (str) Extra xml file to write directly inside the <manifest><application> tag
+android.extra_manifest_application = extra_manifest_app.xml
 
 # (bool) If True, then automatically accept SDK license
 android.accept_sdk_license = True
