@@ -73,10 +73,13 @@ If the daemon is already running (e.g. in `tmux` or as a systemd service), these
 | Command | Action |
 |---|---|
 | `--mode <LEVEL>` | Switch mode: `LOOSE`, `STANDARD`, `STRICT`, `PARANOID`. |
-| `--killswitch` | Engage Master Killswitch — drops ALL traffic. |
+| `--killswitch` | Engage Master Killswitch — **requires confirmation** (type `YES`). |
 | `--unkillswitch` | Disengage Master Killswitch. |
-| `--ghost` | Ghost Mode — total network isolation (blocks everything including loopback). |
+| `--ghost` | Ghost Mode — **requires confirmation** (type `YES`). |
 | `--unghost` | Disengage Ghost Mode. |
+| `--force` | Skip confirmation prompts (for scripts/automation). |
+
+> **⚠ Warning:** `--killswitch` and `--ghost` will sever ALL connections including SSH and remote terminals. If you are connected remotely, you will be locked out. Recovery requires physical access or a local `--unkillswitch` / `--unghost` command. The confirmation prompt defaults to cancel (just press Enter to abort).
 
 ### Monitoring
 | Command | Action |
