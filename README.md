@@ -20,7 +20,7 @@
 
 ## Overview
 
-**NetStrip (Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every network request your system makes, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
+**NetStrip (Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss — blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
