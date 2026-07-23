@@ -74,6 +74,20 @@ else
         --add-data "assets:assets/" \
         --hidden-import "PIL._tkinter_finder" \
         main.py
+        
+    echo "[5.5] Generating Linux .desktop shortcut..."
+    cat > dist/NetStrip.desktop << EOL
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NetStrip
+Comment=Intelligent Network Traffic Debloater
+Exec=bash -c '"\$(dirname "\%k")/NetStrip/NetStrip"'
+Icon=assets/logo.png
+Terminal=false
+Categories=Utility;Network;Security;
+EOL
+    chmod +x dist/NetStrip.desktop
 fi
 
 echo ""
