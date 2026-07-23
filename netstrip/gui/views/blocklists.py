@@ -45,6 +45,21 @@ class BlocklistView(ctk.CTkScrollableFrame):
 
         # Search Results Area
         self._build_results_area()
+        
+        # Start periodic poll to update counts as background blocklist loading completes
+        self._poll_loading()
+
+    def _poll_loading(self):
+        if getattr(self, '_destroyed', False):
+            return
+        if not self.winfo_ismapped():
+            self.after(1000, self._poll_loading)
+            return
+
+        self._refresh_stats_grid()
+
+        if getattr(self.engine.blocklist, 'is_loading', False):
+            self.after(500, self._poll_loading)
 
     def _build_add_rule_bar(self):
         add_row = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL)
@@ -227,6 +242,10 @@ class BlocklistView(ctk.CTkScrollableFrame):
             self.engine.on_status(msg)
             
         try:
+            metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
+            stats = getattr(self.engine.blocklist, 'stats', {})
+            domain_map = getattr(self.engine.blocklist, 'domain_map', {})
+            
             whitelist_size = len(self.engine.blocklist.whitelist)
             app_whitelist_size = len(self.engine.blocklist.app_whitelist)
             blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
@@ -234,17 +253,20 @@ class BlocklistView(ctk.CTkScrollableFrame):
             
             from netstrip.core.modes import ConnectionCategory
             
-            updates = {
-                ConnectionCategory.USER_ALLOWED.value: whitelist_size + app_whitelist_size,
-                ConnectionCategory.USER_BLOCKED.value: blacklist_size + app_blacklist_size,
-            }
-            
-            for cat_val, (card, inner) in getattr(self, '_category_ui_elements', {}).items():
-                if cat_val in updates:
-                    children = inner.winfo_children()
-                    if len(children) >= 2:
-                        children[1].configure(text=f"{updates[cat_val]:,}")
+            for cat_enum, (card, inner, lbl_count) in getattr(self, '_category_ui_elements', {}).items():
+                if cat_enum == ConnectionCategory.USER_ALLOWED:
+                    cnt = whitelist_size + app_whitelist_size
+                elif cat_enum == ConnectionCategory.USER_BLOCKED:
+                    cnt = blacklist_size + app_blacklist_size
+                else:
+                    sources = metadata.get(cat_enum, [])
+                    cnt = sum(s.get('size', 0) for s in sources)
+                    if cnt == 0 and stats:
+                        cnt = stats.get(cat_enum, 0)
+                    if cnt == 0 and domain_map:
+                        cnt = sum(1 for c in domain_map.values() if c == cat_enum)
                         
+                lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error refreshing stats grid: {e}")
@@ -282,46 +304,30 @@ class BlocklistView(ctk.CTkScrollableFrame):
         grid_frame.pack(fill="x", pady=(0, Spacing.LG))
         grid_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        try:
-            metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
-            metadata = dict(metadata) # clone it to avoid mutating core dict
-            
-            # Add safe and blocked domains as pseudo-sources
-            whitelist_size = len(self.engine.blocklist.whitelist)
-            app_whitelist_size = len(self.engine.blocklist.app_whitelist)
-            
-            blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
-            app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
-            
-            from netstrip.core.modes import ConnectionCategory
-            
-            # Always show these categories so the user knows they exist
-            metadata[ConnectionCategory.USER_ALLOWED] = [
-                {'filename': 'User Whitelisted Domains', 'updated': 'Now', 'size': whitelist_size},
-                {'filename': 'User Allowed Apps', 'updated': 'Now', 'size': app_whitelist_size}
-            ]
-            
-            metadata[ConnectionCategory.USER_BLOCKED] = [
-                {'filename': 'User Blocked Domains', 'updated': 'Now', 'size': blacklist_size},
-                {'filename': 'User Blocked Apps', 'updated': 'Now', 'size': app_blacklist_size}
-            ]
-            
-            metadata[ConnectionCategory.ESSENTIAL] = [
-                {'filename': 'Internal Essential Services', 'updated': 'Now', 'size': 5}
-            ]
-            
-            metadata[ConnectionCategory.SYSTEM] = [
-                {'filename': 'OS & Native Services', 'updated': 'Now', 'size': 6}
-            ]
-                
-        except Exception:
-            metadata = {}
+        from netstrip.core.modes import ConnectionCategory
+        
+        categories_to_display = [
+            ConnectionCategory.AD,
+            ConnectionCategory.TRACKER,
+            ConnectionCategory.TELEMETRY,
+            ConnectionCategory.MALWARE,
+            ConnectionCategory.SYSTEM,
+            ConnectionCategory.UPDATE,
+            ConnectionCategory.SECURITY,
+            ConnectionCategory.ESSENTIAL,
+            ConnectionCategory.USER_ALLOWED,
+            ConnectionCategory.USER_BLOCKED,
+        ]
 
-        if not metadata:
-            ctk.CTkLabel(grid_frame, text="Blocklists are loading...", text_color=Colors.TEXT_TERTIARY).pack(pady=Spacing.LG)
-            return
+        metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
+        stats = getattr(self.engine.blocklist, 'stats', {})
+        domain_map = getattr(self.engine.blocklist, 'domain_map', {})
+        whitelist_size = len(self.engine.blocklist.whitelist)
+        app_whitelist_size = len(self.engine.blocklist.app_whitelist)
+        blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
+        app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
 
-        for idx, (category, sources) in enumerate(metadata.items()):
+        for idx, category in enumerate(categories_to_display):
             card = ctk.CTkFrame(grid_frame, **CTK_FRAME_STYLE)
             card.grid(
                 row=idx // 4, column=idx % 4,
@@ -348,7 +354,18 @@ class BlocklistView(ctk.CTkScrollableFrame):
             )
             lbl_title.pack(anchor="w")
             
-            total_size = sum(s.get('size', 0) for s in sources)
+            if category == ConnectionCategory.USER_ALLOWED:
+                total_size = whitelist_size + app_whitelist_size
+            elif category == ConnectionCategory.USER_BLOCKED:
+                total_size = blacklist_size + app_blacklist_size
+            else:
+                sources = metadata.get(category, [])
+                total_size = sum(s.get('size', 0) for s in sources)
+                if total_size == 0 and stats:
+                    total_size = stats.get(category, 0)
+                if total_size == 0 and domain_map:
+                    total_size = sum(1 for c in domain_map.values() if c == category)
+
             lbl_count = ctk.CTkLabel(
                 inner,
                 text=f"{total_size:,}",
@@ -365,30 +382,30 @@ class BlocklistView(ctk.CTkScrollableFrame):
             )
             lbl_desc.pack(anchor="w")
             
-            self._category_ui_elements[category.value] = (card, inner)
+            self._category_ui_elements[category] = (card, inner, lbl_count)
 
             # Bindings
-            def on_enter(e, cat_val=category.value):
-                if self._active_category_filter != cat_val:
-                    c, i = self._category_ui_elements[cat_val]
+            def on_enter(e, cat_enum=category):
+                if self._active_category_filter != cat_enum.value:
+                    c, i, _ = self._category_ui_elements[cat_enum]
                     c.configure(fg_color=Colors.BG_ELEVATED)
                     i.configure(fg_color=Colors.BG_ELEVATED)
 
-            def on_leave(e, cat_val=category.value):
-                if self._active_category_filter != cat_val:
-                    c, i = self._category_ui_elements[cat_val]
+            def on_leave(e, cat_enum=category):
+                if self._active_category_filter != cat_enum.value:
+                    c, i, _ = self._category_ui_elements[cat_enum]
                     c.configure(fg_color=Colors.BG_PANEL)
                     i.configure(fg_color=Colors.BG_PANEL)
 
-            def on_click(e, cat_val=category.value):
-                if self._active_category_filter == cat_val:
+            def on_click(e, cat_enum=category):
+                if self._active_category_filter == cat_enum.value:
                     self._active_category_filter = None
                 else:
-                    self._active_category_filter = cat_val
+                    self._active_category_filter = cat_enum.value
                 
                 # Update visual state of all cards
-                for kv, (c, i) in self._category_ui_elements.items():
-                    if kv == self._active_category_filter:
+                for kv_enum, (c, i, _) in self._category_ui_elements.items():
+                    if kv_enum.value == self._active_category_filter:
                         c.configure(fg_color="#1e1e2d") # Bright active highlight
                         i.configure(fg_color="#1e1e2d")
                     else:
