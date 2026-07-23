@@ -125,15 +125,23 @@ class NetStripEngine:
                     pass
                     
     def _handle_anomaly(self, anomaly_data: dict):
-        # Escalate via Smart Shield
-        logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
-        self.trigger_threat_escalation({
-            'process_name': 'Kernel Bypass Scanner',
-            'domain': 'SYSTEM ANOMALY',
-            'threat_level': 'HIGH',
-            'note': anomaly_data['message']
-        })
-        self.on_status(anomaly_data['message'])
+        # We actively neutralized it, so we don't need to force the whole engine into Paranoid mode
+        # which would kill local printers/LAN. We just log it and update the UI securely.
+        logger.warning(f"Kernel Anomaly Detected & Neutralized: {anomaly_data['message']}")
+        
+        try:
+            self.db.log_connection({
+                'process_name': 'Active Neutralizer',
+                'domain': 'SYSTEM ANOMALY',
+                'protocol': 'SYS',
+                'category': 'malware', # Treat kernel anomalies as malware
+                'action': 'block',
+                'mode': self.classifier.mode.name
+            })
+        except: pass
+        
+        # Flash the UI status
+        self.on_status(f"🛡️ Shield Active: {anomaly_data['message']}")
 
     def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""

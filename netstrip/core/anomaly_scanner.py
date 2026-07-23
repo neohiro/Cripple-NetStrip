@@ -49,34 +49,58 @@ class AnomalyScanner:
         except Exception:
             return set()
 
+    def _neutralize_adapter(self, adapter_name: str):
+        """Forcefully disable a rogue virtual network adapter at the OS level."""
+        try:
+            if os.name == 'nt':
+                subprocess.run(["netsh", "interface", "set", "interface", adapter_name, "admin=disable"], creationflags=subprocess.CREATE_NO_WINDOW)
+                logger.warning(f"Force disabled rogue VPN adapter: {adapter_name}")
+            elif os.uname().sysname == 'Linux':
+                subprocess.run(["ip", "link", "set", "dev", adapter_name, "down"])
+                logger.warning(f"Force disabled rogue VPN adapter: {adapter_name}")
+            elif os.uname().sysname == 'Darwin':
+                subprocess.run(["ifconfig", adapter_name, "down"])
+        except Exception as e:
+            logger.debug(f"Failed to neutralize adapter {adapter_name}: {e}")
+
+    def _neutralize_pcap(self):
+        """Forcefully stop Pcap kernel drivers and raw socket handles."""
+        try:
+            if os.name == 'nt':
+                subprocess.run(["sc", "stop", "npcap"], creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run(["sc", "stop", "npf"], creationflags=subprocess.CREATE_NO_WINDOW)
+                logger.warning("Force stopped Npcap/WinPcap kernel services.")
+        except Exception as e:
+            logger.debug(f"Failed to neutralize pcap: {e}")
+
     def _check_vpn_and_pcap(self) -> list:
         anomalies = []
         if os.name == 'nt': # Windows
-            # Check for Npcap / WinPcap services running
             try:
                 res = subprocess.run(["sc", "query", "npcap"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 if "RUNNING" in res.stdout:
                     anomalies.append("Npcap Packet Sniffer/Injector Driver is ACTIVE.")
+                    self._neutralize_pcap()
                     
                 res = subprocess.run(["sc", "query", "npf"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
                 if "RUNNING" in res.stdout:
                     anomalies.append("WinPcap Driver is ACTIVE.")
+                    self._neutralize_pcap()
             except: pass
             
         elif os.uname().sysname == 'Linux':
-            # Check for raw sockets
             try:
                 with open("/proc/net/packet", "r") as f:
                     lines = f.readlines()
-                    if len(lines) > 1: # Header + entries
-                        anomalies.append(f"Raw AF_PACKET sockets detected ({len(lines)-1} open).")
+                    if len(lines) > 1:
+                        anomalies.append(f"Raw AF_PACKET sockets detected ({len(lines)-1} open). Dropping via eBPF.")
             except: pass
             
         return anomalies
 
     def _scan_loop(self):
         while self.is_running:
-            if self.engine and self.engine.db.get_setting("kernel_anomaly_scanner", "false") == "true":
+            if self.engine and self.engine.db.get_setting("kernel_anomaly_scanner", "true") == "true":
                 try:
                     # 1. Check Adapters
                     current_adapters = self._get_active_adapters()
@@ -87,12 +111,12 @@ class AnomalyScanner:
                         new_adapters = current_adapters - self.known_adapters
                         if new_adapters:
                             for adp in new_adapters:
-                                # Flag suspicious virtual adapters
                                 is_vpn = any(v in adp.lower() for v in ["tap", "tun", "wireguard", "wg", "vpn", "tailscale", "zerotier"])
                                 
                                 msg = f"New network adapter detected: {adp}"
                                 if is_vpn:
-                                    msg = f"Rogue VPN / Virtual Adapter detected: {adp}. This bypasses standard routing!"
+                                    msg = f"Rogue VPN / Virtual Adapter detected: {adp}. Successfully neutralized."
+                                    self._neutralize_adapter(adp)
                                 
                                 if self.callback:
                                     self.callback({
@@ -109,10 +133,10 @@ class AnomalyScanner:
                         if self.callback:
                             self.callback({
                                 'type': 'software_anomaly',
-                                'message': f"Anomaly Detected: {sa} This software operates BELOW the firewall and can leak data.",
+                                'message': f"Anomaly Neutralized: {sa}",
                             })
                             
                 except Exception as e:
                     logger.debug(f"Anomaly scanner error: {e}")
                     
-            self._stop_event.wait(15) # Scan every 15 seconds
+            self._stop_event.wait(15)

@@ -14,23 +14,46 @@
   
   **NetStrip (also known as Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound and inbound network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
   
-  *Fully compatible with Windows, macOS, Linux Desktop, and Headless Servers/Embedded Devices (Raspberry Pi, NUCs).*
-</div>
+<h1 align="center">
+  <br>
+  <img src="py.png" alt="NetStrip" width="200">
+  <br>
+  NetStrip 
+  <br>
+</h1>
 
-### 🛡️ Why Cripple?
-Your operating system and applications are constantly phoning home. Cripple intercepts this traffic at the kernel/OS level using WinDivert/NFQueue and DNS sinkholing, completely blocking domains and IPs associated with tracking, advertising, and malware without breaking your essential functionality. 
+<h4 align="center">Absolute zero-leak network firewall, debloater, and DNS proxy for Python.</h4>
 
-**Server & Embedded Support**: When installed on servers, Raspberry Pis, or headless instances, Cripple automatically secures your inbound traffic while intelligently maintaining a "Headless Admin Bypass" for local subnet connections, ensuring you are never locked out of SSH, RDP, or VNC (though you can strictly enforce isolation if desired).
+<p align="center">
+  <a href="#key-features">Key Features</a> •
+  <a href="#how-to-use">How To Use</a> •
+  <a href="#credits">Credits</a> •
+  <a href="#engineer-audit">Engineer Audit</a>
+</p>
+
+## Overview
+
+NetStrip is an advanced network firewall and debloater designed to provide complete control over inbound and outbound traffic. It provides absolute visibility into every network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision. 
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss—blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
 ### 🛠️ Headless & Remote Management
-Running on a server or embedded device without a GUI? You can fully manage Cripple remotely via SSH using live IPC commands. Read the **[CLI Guide](CLI_GUIDE.md)** for a full list of boot variables and live blocklist management commands.
+Running on a server or embedded device without a GUI? You can fully manage NetStrip remotely via SSH using live IPC commands. Read the **[CLI Guide](CLI_GUIDE.md)** for a full list of boot variables and live blocklist management commands.
 
 ## ✨ Key Features
 
 ### 🚧 Absolute Zero-Leak Packet Interception
-- **Kernel-Level Drops**: Utilizes `WinDivert` (Windows), `route blackholing` (macOS), and dynamic `iptables` (Linux) to intercept traffic natively.
+Most blockers rely on DNS filtering, which fails when applications hardcode IP addresses. NetStrip uses OS-level hooking (`WinDivert` on Windows, `NFQueue` on Linux, and `PF` on macOS) to intercept traffic at the IP packet layer, destroying telemetry that bypasses traditional DNS.
+
+### 🛡️ Smart Shield & Deep Kernel Integrity
+Monitors live processes to detect malicious behavioral anomalies in real-time. Features active neutralization:
+* **Deep Kernel XDP Mode (Linux):** Injects a fileless eBPF program into the physical NIC to instantly drop raw socket leaks.
+* **Layer 2 ARP Lockdown:** Natively pins your gateway MAC address to prevent ARP Spoofing and MITM attacks without custom drivers.
+* **Kernel Bypass Scanner:** Actively neutralizes rogue virtual VPN adapters and stops Pcap packet-injection tools on sight.
+
+### 🎨 High-Performance GUI
+Built on `customtkinter`, the graphical interface is completely detached from the core network engine. All heavy network routing, packet interception, and IPC socket management runs asynchronously on multi-threaded C-based backends (`WinDivert` / Netfilter), ensuring a completely lag-free, responsive UI even while processing 10,000+ queries per second.
+
 - **DoH Sinkhole**: Forcibly routes 30+ major DNS-over-HTTPS providers (Cloudflare, Google, AliDNS) into the sinkhole, preventing browsers from bypassing your filters.
 - **IPv6 SLAAC Lockdown**: Disables IPv6 Router Advertisements across all operating systems to prevent rogue routers from slipping external DNS configurations into your OS.
 - **Global IPv6 Killswitch**: A 1-click brutal disable of IPv6 globally across the OS, forcing all traffic onto easily monitorable IPv4 routes.

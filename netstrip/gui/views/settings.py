@@ -273,8 +273,11 @@ class SettingsView(ctk.CTkFrame):
         try:
             if setting_key == 'inbound_lan_bypass':
                 default_val = 'true' if self.engine.is_headless else 'false'
+            elif setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications', 
+                                 'kernel_anomaly_scanner', 'layer2_arp_lockdown', 'linux_ebpf_mode'):
+                default_val = 'true'
             else:
-                default_val = 'true' if setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications') else 'false'
+                default_val = 'false'
             
             current_val = self.engine.db.get_setting(setting_key, default_val)
             current = str(current_val).lower() == 'true'
