@@ -22,10 +22,16 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Linux
+            target: linux
+          - os: ubuntu-latest
+            name: Android
+            target: android
           - os: macos-latest
             name: macOS
+            target: macos
           - os: windows-latest
             name: Windows
+            target: windows
 
     steps:
       - name: Checkout Code
@@ -36,7 +42,7 @@ jobs:
         with:
           python-version: '3.11'
           
-      - name: Install System Dependencies (Linux)
+      - name: Install System Dependencies (Linux & Android)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
@@ -51,32 +57,37 @@ jobs:
           pip install Pillow pyinstaller buildozer "cython==0.29.33" virtualenv maturin
 
       - name: Build Windows Executable
-        if: matrix.os == 'windows-latest'
+        if: matrix.target == 'windows'
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
           Compress-Archive -Path "dist\Cripple" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
 
-      - name: Build macOS / Linux Executable
-        if: matrix.os != 'windows-latest'
+      - name: Build macOS Executable
+        if: matrix.target == 'macos'
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
           bash build.sh
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            cd dist
-            zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip NetStrip.app
-            cd ..
-          else
-            cd dist
-            zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip NetStrip
-            cd ..
-          fi
+          cd dist
+          zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip NetStrip.app
+          cd ..
 
-      - name: Build Android APK
-        if: matrix.os == 'ubuntu-latest'
+      - name: Build Linux Executable
+        if: matrix.target == 'linux'
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          chmod +x build.sh run.sh
+          bash build.sh
+          cd dist
+          zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip NetStrip
+          cd ..
+
+      - name: Build Android Package
+        if: matrix.target == 'android'
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
@@ -85,33 +96,12 @@ jobs:
           cd bin
           zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
           cd ..
-          
-      - name: Upload Release Asset (Windows Binaries)
-        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'windows-latest'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            NetStrip-*-Windows.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Asset (macOS / Linux Binaries)
-        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os != 'windows-latest'
+      - name: Upload Release Asset
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            NetStrip-*-macOS.zip
-            NetStrip-*-Linux.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset (Android Zip)
-        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'ubuntu-latest'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: NetStrip-*-Android.zip
+          files: NetStrip-*-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
