@@ -121,6 +121,25 @@ def main():
         print(f"{'='*50}\n")
         sys.exit(0)
 
+    # Handle telemetry token setup
+    if "--set-telemetry-token" in sys.argv:
+        try:
+            idx = sys.argv.index("--set-telemetry-token")
+            token = sys.argv[idx + 1]
+            from pathlib import Path
+            from netstrip.data.database import Database
+            db_path = Path.home() / ".netstrip" / "netstrip.db"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db = Database(str(db_path))
+            db.set_setting("telemetry_github_token", token)
+            db.stop()
+            print(f"Telemetry token saved successfully.")
+        except (IndexError, ValueError):
+            print("Usage: --set-telemetry-token <GITHUB_PAT>")
+        except Exception as e:
+            print(f"Error saving token: {e}")
+        sys.exit(0)
+
     is_fallback = "--fallback-admin" in sys.argv
     is_elevated_retry = "--elevated" in sys.argv
 

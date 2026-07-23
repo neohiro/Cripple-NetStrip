@@ -237,7 +237,18 @@ class AnalyticsReporter:
             try:
                 if self.is_enabled():
                     payload = self._collect_payload()
-                    success = self._send_report(payload)
+                    
+                    # Primary: GitHub Issues on Cripple-Telemetry repo
+                    success = False
+                    try:
+                        from netstrip.core.github_telemetry import submit_analytics
+                        success = submit_analytics(payload)
+                    except Exception:
+                        pass
+                    
+                    # Fallback: HTTPS endpoint + email
+                    if not success:
+                        success = self._send_report(payload)
                     if success:
                         logger.debug("Analytics report sent successfully")
                     else:

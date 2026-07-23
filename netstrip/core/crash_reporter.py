@@ -293,16 +293,34 @@ def send_crash_report(
     _save_crash_report_locally(report, crash_id)
     
     # Attempt to send via available channels (non-blocking)
+    # Determine label: genuine crashes vs caught errors
+    is_crash = context in ("unhandled_exception", "watchdog_crash_recovery", "mainloop")
+    
     def _send():
         sent = False
         
-        # Try HTTPS endpoint first
+        # Channel 1: GitHub Issues (primary — goes to Cripple-Telemetry repo)
+        try:
+            from netstrip.core.github_telemetry import submit_crash, submit_error
+            if is_crash:
+                if submit_crash(subject, report):
+                    sent = True
+            else:
+                if submit_error(subject, report):
+                    sent = True
+        except Exception:
+            pass
+        
+        # Channel 2: HTTPS endpoint (fallback)
         if _send_via_https(subject, report):
             sent = True
         
-        # Try email delivery
-        if _send_email(subject, report):
-            sent = True
+        # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
+        if is_crash:
+            _send_email(subject, report)
+        elif not sent:
+            # For non-fatal errors, only email if GitHub delivery failed
+            _send_email(subject, report)
         
         if sent:
             logger.info(f"Crash report {crash_id} delivered successfully")
