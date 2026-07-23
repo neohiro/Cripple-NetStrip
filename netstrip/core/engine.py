@@ -232,6 +232,15 @@ class NetStripEngine:
 
     def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
+
+        # SSH Safeguard: Always allow inbound SSH (port 22, 2222) when enabled.
+        # This prevents lockout on headless/remote-managed devices during
+        # killswitch, ghost mode, paranoid mode, or strict inbound shield.
+        if is_inbound and dst_port in (22, 2222):
+            ssh_safeguard = self.db.get_setting('ssh_safeguard', 'true' if self.is_headless else 'false')
+            if ssh_safeguard == 'true':
+                return True
+
         if self.killswitch_active:
             if dst_ip not in ("127.0.0.1", "127.127.127.127", "::1"):
                 return False

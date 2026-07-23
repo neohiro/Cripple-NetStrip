@@ -122,9 +122,13 @@ def main():
         print(f"{'='*60}")
         print("\nBOOT VARIABLES:")
         print("  --service              Headless/daemon mode (no GUI).")
-        print("  --blockinbound         Block ALL inbound connections (strict isolation).")
+        print("  --blockinbound         Block ALL inbound (requires confirmation).")
         print("  --allowlan             Permit LAN connections even in strict modes.")
         print("  --android              Force Android/Mobile layout for UI testing.")
+        print("\nSSH SAFEGUARD:")
+        print("  --set ssh_safeguard true   Always allow inbound port 22/2222.")
+        print("                             Auto-enabled in headless mode.")
+        print("                             Survives killswitch, ghost, and paranoid.")
         print("\nDIRECT COMMANDS (no running daemon needed):")
         print("  --set-psk <KEY>        Set LAN Shield PSK (44-char Fernet key).")
         print("  --get-psk              Display the current LAN Shield PSK.")
@@ -326,9 +330,24 @@ def main():
     
     # --- CLI Boot Overrides ---
     if "--blockinbound" in sys.argv:
-        # Force strict isolation (overrides auto-server detection)
-        # We don't have the engine loaded yet, so we'll pass this as a flag to engine
-        pass
+        if "--force" not in sys.argv:
+            print("")
+            print("  ╔══════════════════════════════════════════════════════╗")
+            print("  ║  ⚠  STRICT INBOUND BLOCK — SSH WARNING             ║")
+            print("  ╠══════════════════════════════════════════════════════╣")
+            print("  ║  ALL inbound connections will be blocked,           ║")
+            print("  ║  including SSH, VNC, and remote terminals.          ║")
+            print("  ║                                                      ║")
+            print("  ║  • Overrides the Headless Admin LAN Bypass          ║")
+            print("  ║  • Remote access will be lost if not safeguarded    ║")
+            print("  ║                                                      ║")
+            print("  ║  Tip: --set ssh_safeguard true  (keeps port 22/2222)║")
+            print("  ╚══════════════════════════════════════════════════════╝")
+            print("")
+            confirm = input("  Type YES to block all inbound, or press Enter to cancel: ")
+            if confirm != "YES":
+                print("  Cancelled. Starting without --blockinbound.")
+                sys.argv.remove("--blockinbound")
     if "--allowlan" in sys.argv:
         pass
 
@@ -358,9 +377,28 @@ def main():
                 client.sendall(f"ALLOW:{domain}\n".encode())
                 print(f"✓ Sent allow command for {domain}")
             elif "--mode" in sys.argv:
-                mode = sys.argv[sys.argv.index("--mode") + 1]
+                mode = sys.argv[sys.argv.index("--mode") + 1].upper()
+                if mode in ("PARANOID", "STRICT") and "--force" not in sys.argv:
+                    print("")
+                    print("  ╔══════════════════════════════════════════════════════╗")
+                    print("  ║  ⚠  PARANOID MODE — RESTRICTIVE LOCKDOWN            ║")
+                    print("  ╠══════════════════════════════════════════════════════╣")
+                    print("  ║  Blocks ALL connections not explicitly whitelisted.  ║")
+                    print("  ║                                                      ║")
+                    print("  ║  • Unknown connections will be dropped               ║")
+                    print("  ║  • OS updates and background services blocked        ║")
+                    print("  ║  • SSH may disconnect if not safeguarded             ║")
+                    print("  ║                                                      ║")
+                    print("  ║  Tip: --set ssh_safeguard true  (keeps port 22/2222) ║")
+                    print("  ╚══════════════════════════════════════════════════════╝")
+                    print("")
+                    confirm = input("  Type YES to switch to Paranoid, or press Enter to cancel: ")
+                    if confirm != "YES":
+                        print("  Cancelled.")
+                        client.close()
+                        sys.exit(0)
                 client.sendall(f"MODE:{mode}\n".encode())
-                print(f"✓ Mode changed to {mode.upper()}")
+                print(f"✓ Mode changed to {mode}")
             elif "--allow-anomaly" in sys.argv:
                 anomaly = sys.argv[sys.argv.index("--allow-anomaly") + 1]
                 client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
