@@ -1,6 +1,8 @@
 name: Auto-Build Executables
 
 on:
+  push:
+    branches: [ main ]
   release:
     types: [published]
   workflow_dispatch:
