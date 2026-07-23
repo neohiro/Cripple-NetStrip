@@ -438,34 +438,130 @@ class SettingsView(ctk.CTkFrame):
         psk_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
         
         ctk.CTkLabel(
-            psk_row, text="LAN Shield E2E Key",
+            psk_row, text="🔑  LAN Shield Pre-Shared Key",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY
         ).pack(side="left")
-        
+
         psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
-        
-        btn_copy = ctk.CTkButton(
-            psk_row, text="Copy", width=60, height=28,
+
+        # Button row (right-aligned): Regenerate | Paste | Copy
+        btn_frame = ctk.CTkFrame(psk_row, fg_color="transparent")
+        btn_frame.pack(side="right")
+
+        def _copy_psk():
+            """Copy PSK to clipboard with visual feedback."""
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(psk_entry.get())
+                btn_copy.configure(text="Copied ✓", fg_color=Colors.SUCCESS_DIM, text_color=Colors.SUCCESS)
+                self.after(2000, lambda: btn_copy.configure(
+                    text="📋 Copy", fg_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_PRIMARY
+                ))
+            except Exception:
+                pass
+
+        def _paste_psk():
+            """Paste and validate a PSK from clipboard."""
+            try:
+                raw = self.clipboard_get().strip()
+            except Exception:
+                _show_psk_status("Nothing in clipboard", is_error=True)
+                return
+            # Validate: Fernet keys are 44 char, URL-safe base64 ending with '='
+            if len(raw) != 44 or not raw.endswith('='):
+                _show_psk_status("Invalid key — must be a 44-char Fernet key", is_error=True)
+                return
+            try:
+                from cryptography.fernet import Fernet
+                Fernet(raw.encode('utf-8'))  # Validates key structure
+            except Exception:
+                _show_psk_status("Invalid Fernet key format", is_error=True)
+                return
+            # Valid — save
+            psk_entry.configure(state="normal")
+            psk_entry.delete(0, "end")
+            psk_entry.insert(0, raw)
+            psk_entry.configure(state="readonly")
+            self.engine.db.set_setting("lan_shield_psk", raw)
+            # Hot-reload the LAN Shield with the new key
+            try:
+                if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
+                    self.engine.lan_shield._psk = raw.encode('utf-8')
+                    from cryptography.fernet import Fernet as F
+                    self.engine.lan_shield._fernet = F(raw.encode('utf-8'))
+            except Exception:
+                pass
+            _show_psk_status("Key applied ✓ — LAN Shield updated", is_error=False)
+
+        def _regen_psk():
+            """Generate a fresh Fernet key."""
+            try:
+                from cryptography.fernet import Fernet
+                new_key = Fernet.generate_key().decode('utf-8')
+                psk_entry.configure(state="normal")
+                psk_entry.delete(0, "end")
+                psk_entry.insert(0, new_key)
+                psk_entry.configure(state="readonly")
+                self.engine.db.set_setting("lan_shield_psk", new_key)
+                # Hot-reload
+                if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
+                    self.engine.lan_shield._psk = new_key.encode('utf-8')
+                    self.engine.lan_shield._fernet = Fernet(new_key.encode('utf-8'))
+                _show_psk_status("New key generated ✓ — share with paired devices", is_error=False)
+            except Exception:
+                _show_psk_status("Key generation failed", is_error=True)
+
+        btn_regen = ctk.CTkButton(
+            btn_frame, text="🔄 New Key", width=80, height=28,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.WARNING_DIM, hover_color=Colors.WARNING,
+            text_color=Colors.TEXT_PRIMARY,
+            command=_regen_psk
+        )
+        btn_regen.pack(side="right", padx=(4, 0))
+
+        btn_paste = ctk.CTkButton(
+            btn_frame, text="📥 Paste", width=70, height=28,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
             fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
-            command=lambda: self.clipboard_clear() or self.clipboard_append(psk_entry.get())
+            command=_paste_psk
         )
-        btn_copy.pack(side="right")
-        
-        psk_entry = ctk.CTkEntry(psk_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
-        psk_entry.pack(side="right", padx=(Spacing.MD, Spacing.SM))
-        psk_entry.insert(0, psk_val)
-        
-        # Debounce save
-        def save_psk(e):
-            if hasattr(self, '_psk_timer'):
-                self.after_cancel(self._psk_timer)
-            self._psk_timer = self.after(1000, lambda: self.engine.db.set_setting("lan_shield_psk", psk_entry.get()))
-            
-        psk_entry.bind("<KeyRelease>", save_psk)
+        btn_paste.pack(side="right", padx=(4, 0))
 
-        self._add_subtitle(card, "Pre-Shared Key for E2E Encrypted LAN Shield Broadcasts. Copy this key to other NetStrip devices on your network to pair them. When one device detects a severe anomaly, it will broadcast an encrypted lockdown signal to all paired devices.", pady=(0, Spacing.LG))
+        btn_copy = ctk.CTkButton(
+            btn_frame, text="📋 Copy", width=70, height=28,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
+            command=_copy_psk
+        )
+        btn_copy.pack(side="right", padx=(4, 0))
+
+        # Key display — readonly to prevent accidental corruption
+        psk_entry = ctk.CTkEntry(
+            card, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM),
+            height=36, state="normal"
+        )
+        psk_entry.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
+        psk_entry.insert(0, psk_val)
+        psk_entry.configure(state="readonly")
+
+        # Status label for feedback messages
+        psk_status = ctk.CTkLabel(
+            card, text="", height=18,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
+            text_color=Colors.TEXT_SECONDARY
+        )
+        psk_status.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
+
+        def _show_psk_status(msg, is_error=False):
+            psk_status.configure(
+                text=msg,
+                text_color=Colors.DANGER if is_error else Colors.SUCCESS
+            )
+            self.after(4000, lambda: psk_status.configure(text=""))
+
+        self._add_subtitle(card, "Copy this key to other Cripple / NetStrip devices on your LAN to pair them for E2E encrypted broadcast lockdown signals. Use Paste to import a key from another device. This key persists across app updates.", pady=(0, Spacing.LG))
 
         # Home Automation & IoT Integrations
         self._add_title(card, "Home Automation & IoT Integrations", icon="🏠", pady=(Spacing.LG, Spacing.SM))
