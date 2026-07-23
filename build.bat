@@ -39,6 +39,60 @@ pyinstaller ^
     --add-data "assets;assets/" ^
     --hidden-import "PIL._tkinter_finder" ^
     --hidden-import "pystray._win32" ^
+    --hidden-import "netstrip" ^
+    --hidden-import "netstrip.core" ^
+    --hidden-import "netstrip.core.engine" ^
+    --hidden-import "netstrip.core.firewall" ^
+    --hidden-import "netstrip.core.classifier" ^
+    --hidden-import "netstrip.core.connection_monitor" ^
+    --hidden-import "netstrip.core.dns_proxy" ^
+    --hidden-import "netstrip.core.anomaly_scanner" ^
+    --hidden-import "netstrip.core.geoip" ^
+    --hidden-import "netstrip.core.lan_shield" ^
+    --hidden-import "netstrip.core.linux_ebpf_monitor" ^
+    --hidden-import "netstrip.core.modes" ^
+    --hidden-import "netstrip.core.network_monitor" ^
+    --hidden-import "netstrip.core.notifier" ^
+    --hidden-import "netstrip.core.sound" ^
+    --hidden-import "netstrip.core.updater" ^
+    --hidden-import "netstrip.core.interceptor" ^
+    --hidden-import "netstrip.core.interceptor.base" ^
+    --hidden-import "netstrip.core.interceptor.windows" ^
+    --hidden-import "netstrip.core.interceptor.linux" ^
+    --hidden-import "netstrip.core.interceptor.macos" ^
+    --hidden-import "netstrip.data" ^
+    --hidden-import "netstrip.data.database" ^
+    --hidden-import "netstrip.data.blocklist_manager" ^
+    --hidden-import "netstrip.gui" ^
+    --hidden-import "netstrip.gui.app" ^
+    --hidden-import "netstrip.gui.animated_logo" ^
+    --hidden-import "netstrip.gui.connections_sidebar" ^
+    --hidden-import "netstrip.gui.dashboard" ^
+    --hidden-import "netstrip.gui.hovertip" ^
+    --hidden-import "netstrip.gui.icon_manager" ^
+    --hidden-import "netstrip.gui.killswitch_modal" ^
+    --hidden-import "netstrip.gui.notification_popup" ^
+    --hidden-import "netstrip.gui.popups" ^
+    --hidden-import "netstrip.gui.smart_modal" ^
+    --hidden-import "netstrip.gui.splash" ^
+    --hidden-import "netstrip.gui.theme" ^
+    --hidden-import "netstrip.gui.utils" ^
+    --hidden-import "netstrip.gui.widgets" ^
+    --hidden-import "netstrip.gui.components" ^
+    --hidden-import "netstrip.gui.components.sidebar_components" ^
+    --hidden-import "netstrip.gui.views" ^
+    --hidden-import "netstrip.gui.views.anomaly_alert" ^
+    --hidden-import "netstrip.gui.views.blocklists" ^
+    --hidden-import "netstrip.gui.views.logs" ^
+    --hidden-import "netstrip.gui.views.rules" ^
+    --hidden-import "netstrip.gui.views.settings" ^
+    --hidden-import "netstrip.platform" ^
+    --hidden-import "netstrip.platform.base" ^
+    --hidden-import "netstrip.platform.windows" ^
+    --hidden-import "netstrip.platform.linux" ^
+    --hidden-import "netstrip.platform.linux_ebpf" ^
+    --hidden-import "netstrip.platform.macos" ^
+    --hidden-import "netstrip.watchdog" ^
     main.py
 
 echo.

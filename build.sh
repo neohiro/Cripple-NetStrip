@@ -30,7 +30,66 @@ rm -rf build dist 2>/dev/null
 echo "[5] Building NetStrip executable..."
 echo "   This will take a few minutes. Please wait..."
 
-# Detect OS to handle sudo/admin flags
+# Common hidden imports for all netstrip modules
+HIDDEN_IMPORTS=(
+    --hidden-import "PIL._tkinter_finder"
+    --hidden-import "netstrip"
+    --hidden-import "netstrip.core"
+    --hidden-import "netstrip.core.engine"
+    --hidden-import "netstrip.core.firewall"
+    --hidden-import "netstrip.core.classifier"
+    --hidden-import "netstrip.core.connection_monitor"
+    --hidden-import "netstrip.core.dns_proxy"
+    --hidden-import "netstrip.core.anomaly_scanner"
+    --hidden-import "netstrip.core.geoip"
+    --hidden-import "netstrip.core.lan_shield"
+    --hidden-import "netstrip.core.linux_ebpf_monitor"
+    --hidden-import "netstrip.core.modes"
+    --hidden-import "netstrip.core.network_monitor"
+    --hidden-import "netstrip.core.notifier"
+    --hidden-import "netstrip.core.sound"
+    --hidden-import "netstrip.core.updater"
+    --hidden-import "netstrip.core.interceptor"
+    --hidden-import "netstrip.core.interceptor.base"
+    --hidden-import "netstrip.core.interceptor.windows"
+    --hidden-import "netstrip.core.interceptor.linux"
+    --hidden-import "netstrip.core.interceptor.macos"
+    --hidden-import "netstrip.data"
+    --hidden-import "netstrip.data.database"
+    --hidden-import "netstrip.data.blocklist_manager"
+    --hidden-import "netstrip.gui"
+    --hidden-import "netstrip.gui.app"
+    --hidden-import "netstrip.gui.animated_logo"
+    --hidden-import "netstrip.gui.connections_sidebar"
+    --hidden-import "netstrip.gui.dashboard"
+    --hidden-import "netstrip.gui.hovertip"
+    --hidden-import "netstrip.gui.icon_manager"
+    --hidden-import "netstrip.gui.killswitch_modal"
+    --hidden-import "netstrip.gui.notification_popup"
+    --hidden-import "netstrip.gui.popups"
+    --hidden-import "netstrip.gui.smart_modal"
+    --hidden-import "netstrip.gui.splash"
+    --hidden-import "netstrip.gui.theme"
+    --hidden-import "netstrip.gui.utils"
+    --hidden-import "netstrip.gui.widgets"
+    --hidden-import "netstrip.gui.components"
+    --hidden-import "netstrip.gui.components.sidebar_components"
+    --hidden-import "netstrip.gui.views"
+    --hidden-import "netstrip.gui.views.anomaly_alert"
+    --hidden-import "netstrip.gui.views.blocklists"
+    --hidden-import "netstrip.gui.views.logs"
+    --hidden-import "netstrip.gui.views.rules"
+    --hidden-import "netstrip.gui.views.settings"
+    --hidden-import "netstrip.platform"
+    --hidden-import "netstrip.platform.base"
+    --hidden-import "netstrip.platform.windows"
+    --hidden-import "netstrip.platform.linux"
+    --hidden-import "netstrip.platform.linux_ebpf"
+    --hidden-import "netstrip.platform.macos"
+    --hidden-import "netstrip.watchdog"
+)
+
+# Detect OS to handle platform-specific flags
 OS="$(uname -s)"
 if [ "$OS" = "Darwin" ]; then
     echo "[5.5] Generating macOS .icns icon..."
@@ -59,7 +118,7 @@ if [ "$OS" = "Darwin" ]; then
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
         --add-data "assets:assets/" \
-        --hidden-import "PIL._tkinter_finder" \
+        "${HIDDEN_IMPORTS[@]}" \
         main.py
 else
     # Linux
@@ -72,7 +131,7 @@ else
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
         --add-data "assets:assets/" \
-        --hidden-import "PIL._tkinter_finder" \
+        "${HIDDEN_IMPORTS[@]}" \
         main.py
         
     echo "[5.5] Generating Linux .desktop shortcut..."
@@ -82,7 +141,7 @@ Version=1.0
 Type=Application
 Name=NetStrip
 Comment=Intelligent Network Traffic Debloater
-Exec=bash -c '"\$(dirname "\%k")/NetStrip/NetStrip"'
+Exec=bash -c '"\\$(dirname "\\%k")/NetStrip/NetStrip"'
 Icon=assets/logo.png
 Terminal=false
 Categories=Utility;Network;Security;
