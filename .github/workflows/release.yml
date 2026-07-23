@@ -1,0 +1,59 @@
+name: Auto-Build Executables
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install System Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Windows Executable
+        if: matrix.os == 'windows-latest'
+        run: |
+          cmd.exe /c build.bat
+          Compress-Archive -Path "dist\Cripple\*" -DestinationPath "NetStrip-Windows.zip" -Force
+
+      - name: Build macOS / Linux Executable
+        if: matrix.os != 'windows-latest'
+        run: |
+          chmod +x build.sh
+          bash build.sh
+          cd dist
+          zip -r ../NetStrip-${{ runner.os }}.zip ./*
+
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            NetStrip-Windows.zip
+            NetStrip-${{ runner.os }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
