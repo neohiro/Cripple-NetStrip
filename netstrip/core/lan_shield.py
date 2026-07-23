@@ -56,14 +56,28 @@ class LANShield:
             logger.error(f"LAN Shield listener failed to bind: {e}")
             return
 
+        seen_nonces = set()
         while self._running:
             try:
                 data, addr = sock.recvfrom(4096)
                 if data.startswith(b"NetStrip:ANOMALY:"):
                     encrypted_payload = data[len(b"NetStrip:ANOMALY:"):]
                     try:
-                        decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min TTL for clock drift
+                        decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min Fernet TTL
                         payload = json.loads(decrypted.decode('utf-8'))
+                        
+                        # Replay Attack Prevention Audit: Validate timestamp drift & nonce
+                        pkt_time = float(payload.get('timestamp', 0))
+                        nonce = payload.get('nonce') or f"{pkt_time}_{addr[0]}"
+                        if abs(time.time() - pkt_time) > 60:
+                            logger.warning(f"LAN Shield: Dropped expired broadcast from {addr[0]} (clock drift/replay attempt).")
+                            continue
+                        if nonce in seen_nonces:
+                            continue
+                        seen_nonces.add(nonce)
+                        if len(seen_nonces) > 200:
+                            seen_nonces.clear()
+
                         # Validate the payload
                         btype = payload.get('type')
                         if btype == 'LAN_THREAT_BROADCAST':
@@ -103,9 +117,11 @@ class LANShield:
                 return
                 
         try:
+            import secrets
             payload = {
                 'type': btype,
                 'timestamp': time.time(),
+                'nonce': secrets.token_hex(16),
                 'note': note
             }
             encrypted = self._fernet.encrypt(json.dumps(payload).encode('utf-8'))

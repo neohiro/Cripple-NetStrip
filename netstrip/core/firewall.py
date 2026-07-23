@@ -4,10 +4,26 @@ Wraps the platform-specific firewall implementations to provide a high-level API
 """
 
 import logging
+import re
+import ipaddress
 from typing import List, Optional
 from netstrip.platform.base import get_platform
 
 logger = logging.getLogger(__name__)
+
+def sanitize_ip(ip_str: str) -> str:
+    """Validate and sanitize an IP address or CIDR notation string."""
+    ip_str = ip_str.strip()
+    try:
+        if '/' in ip_str:
+            return str(ipaddress.ip_network(ip_str, strict=False))
+        return str(ipaddress.ip_address(ip_str))
+    except ValueError:
+        return ""
+
+def sanitize_rule_name(name: str) -> str:
+    """Sanitize rule name to alphanumeric and underscore characters only."""
+    return re.sub(r'[^a-zA-Z0-9_\-]', '_', name)
 
 class FirewallController:
     def __init__(self):
@@ -16,8 +32,13 @@ class FirewallController:
 
     def block_ip(self, ip: str, rule_name: Optional[str] = None) -> bool:
         """Block an IP address completely (inbound and outbound)."""
-        name = rule_name or f"NetStrip_Block_{ip}"
-        success = self.platform.block_ip(ip, name)
+        clean_ip = sanitize_ip(ip)
+        if not clean_ip:
+            logger.warning(f"Firewall block_ip rejected invalid IP string: '{ip}'")
+            return False
+            
+        name = sanitize_rule_name(rule_name or f"NetStrip_Block_{clean_ip}")
+        success = self.platform.block_ip(clean_ip, name)
         if success:
             self.active_rules.add(name)
         return success

@@ -9,35 +9,47 @@ from pathlib import Path
 # Setup basic logging for the watchdog
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - Watchdog - %(message)s')
 
+import hmac
+import secrets
+
+# Generate ephemeral in-memory 256-bit secret key per watchdog session
+HMAC_SECRET_KEY = secrets.token_bytes(32)
+
 def get_critical_files():
     base_dir = Path(__file__).parent.parent
-    return [
+    files = [
         base_dir / "main.py",
-        base_dir / "netstrip" / "core" / "engine.py",
-        base_dir / "netstrip" / "core" / "dns_proxy.py",
     ]
+    netstrip_dir = base_dir / "netstrip"
+    if netstrip_dir.exists():
+        for path in netstrip_dir.rglob("*.py"):
+            files.append(path)
+    return files
 
 def snapshot_integrity():
-    """Hash critical files on startup to establish a trusted baseline."""
+    """Hash all critical files on startup using keyed HMAC-SHA256 baseline to prevent hash forgery."""
     baseline = {}
     for filepath in get_critical_files():
         if filepath.exists():
             try:
                 with open(filepath, 'rb') as f:
-                    baseline[str(filepath)] = hashlib.sha256(f.read()).hexdigest()
+                    content = f.read()
+                h = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha256).hexdigest()
+                baseline[str(filepath)] = h
             except Exception as e:
                 logging.error(f"Failed to hash {filepath}: {e}")
     return baseline
 
 def verify_integrity(baseline):
-    """Verify that critical files have not been tampered with since startup."""
+    """Verify keyed HMAC-SHA256 baseline of all core modules and engine files."""
     tampered = []
     for filepath in get_critical_files():
         if filepath.exists():
             try:
                 with open(filepath, 'rb') as f:
-                    current_hash = hashlib.sha256(f.read()).hexdigest()
-                if str(filepath) in baseline and current_hash != baseline[str(filepath)]:
+                    content = f.read()
+                current_hmac = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha256).hexdigest()
+                if str(filepath) in baseline and current_hmac != baseline[str(filepath)]:
                     tampered.append(filepath.name)
             except Exception:
                 pass
@@ -45,7 +57,7 @@ def verify_integrity(baseline):
             tampered.append(f"{filepath.name} (DELETED)")
             
     if tampered:
-        logging.error(f"Integrity check failed. Tampered files: {', '.join(tampered)}")
+        logging.error(f"Integrity check failed. Tampered/Modified files: {', '.join(tampered)}")
         try:
             import tkinter as tk
             from tkinter import messagebox
@@ -53,7 +65,7 @@ def verify_integrity(baseline):
             root.withdraw()
             messagebox.showerror(
                 "Critical Security Alert - Tampering Detected",
-                f"NetStrip (Cripple) Watchdog has blocked a restart attempt because critical core files were modified or deleted while the program was running:\n\n{', '.join(tampered)}\n\nThis may indicate malware attempting to hijack the DNS sinkhole or firewall."
+                f"NetStrip (Cripple) Watchdog detected unauthorized tampering or deletion of core security components:\n\n{', '.join(tampered)}\n\nExecution terminated to prevent malicious hijacking."
             )
             root.update()
             time.sleep(2)
@@ -216,10 +228,21 @@ def main():
         parent_process = None
         
     # Monitor loop
+    loop_ticks = 0
     while True:
         try:
             exit_code = None
             if parent_process and parent_process.is_running():
+                # Perform periodic live HMAC integrity check every ~10 seconds
+                loop_ticks += 1
+                if loop_ticks % 5 == 0:
+                    if not verify_integrity(baseline_hashes):
+                        logging.critical("Live tampering detected during process execution! Terminating process...")
+                        try: parent_process.kill()
+                        except: pass
+                        restore_network()
+                        break
+
                 exit_code = parent_process.wait(timeout=2.0)
             
             # If we get here, process died!

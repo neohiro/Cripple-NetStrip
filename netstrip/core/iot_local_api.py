@@ -22,8 +22,19 @@ class IoTLocalAPI:
 
         @self.app.route("/metrics", methods=["GET"])
         def get_metrics():
+            from flask import request
             if not self.engine:
                 return jsonify({"status": "starting"}), 503
+
+            # Security Authentication Audit: Validate token if set in database
+            required_token = self.engine.db.get_setting("iot_sensor_auth_token", "")
+            if required_token:
+                auth_header = request.headers.get("Authorization", "")
+                custom_header = request.headers.get("X-NetStrip-Token", "")
+                token_provided = auth_header.replace("Bearer ", "").strip() if auth_header else custom_header.strip()
+                if token_provided != required_token:
+                    logger.warning(f"Unauthorized IoT Local API access attempt from {request.remote_addr}")
+                    return jsonify({"error": "Unauthorized"}), 401
                 
             try:
                 stats = self.engine.db.get_statistics()
@@ -46,7 +57,7 @@ class IoTLocalAPI:
                 return jsonify(payload)
             except Exception as e:
                 logger.error(f"Error serving IoT metrics: {e}")
-                return jsonify({"error": str(e)}), 500
+                return jsonify({"error": "Internal Error"}), 500
 
     def start(self):
         enabled = self.engine.db.get_setting("iot_local_sensor_enabled", "false") == "true"
@@ -58,12 +69,16 @@ class IoTLocalAPI:
         except ValueError:
             self.port = 8080
 
-        logger.info(f"Starting IoT Local API on port {self.port}...")
+        # Security Binding Audit: Default to local loopback (127.0.0.1) unless external bind is explicitly enabled
+        bind_all = self.engine.db.get_setting("iot_local_sensor_bind_all", "false") == "true"
+        bind_host = "0.0.0.0" if bind_all else "127.0.0.1"
+
+        logger.info(f"Starting IoT Local API on {bind_host}:{self.port}...")
         self._is_running = True
 
         # Start Flask server
         self.server_thread = threading.Thread(
-            target=lambda: self.app.run(host="0.0.0.0", port=self.port, debug=False, use_reloader=False),
+            target=lambda: self.app.run(host=bind_host, port=self.port, debug=False, use_reloader=False),
             daemon=True,
             name="IoT_Local_API"
         )
