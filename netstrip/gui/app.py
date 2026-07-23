@@ -100,7 +100,7 @@ class NetStripApp(ctk.CTk):
 
         # Setup Window
         self.title("NetStrip — Intelligent Network Debloater")
-        self.geometry("1300x750")
+        self.geometry("1500x800")
         self.configure(fg_color=Colors.BG_DARKEST)
         
         # Fix Taskbar icon grouping on Windows globally for this process
