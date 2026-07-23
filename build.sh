@@ -117,7 +117,7 @@ if [ "$OS" = "Darwin" ]; then
         --name "NetStrip" \
         --icon "assets/logo.icns" \
         --paths "." \
-        --hookspath "hooks" \
+        --additional-hooks-dir "hooks" \
         --collect-all "netstrip" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \
@@ -132,7 +132,7 @@ else
         --windowed \
         --name "NetStrip" \
         --paths "." \
-        --hookspath "hooks" \
+        --additional-hooks-dir "hooks" \
         --collect-all "netstrip" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \

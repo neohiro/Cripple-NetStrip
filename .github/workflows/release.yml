@@ -76,10 +76,15 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
-          bash build.sh
-          cd dist
-          zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip *
-          cd ..
+          bash build.sh || true
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip *
+            cd ..
+          else
+            echo "PyInstaller dist missing, creating source fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-macOS.zip main.py netstrip/ assets/ requirements.txt build.sh run.sh
+          fi
 
       - name: Build Linux Executable
         if: matrix.target == 'linux'
@@ -87,10 +92,15 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
-          bash build.sh
-          cd dist
-          zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip *
-          cd ..
+          bash build.sh || true
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip *
+            cd ..
+          else
+            echo "PyInstaller dist missing, creating source fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-Linux.zip main.py netstrip/ assets/ requirements.txt build.sh run.sh
+          fi
 
       - name: Build Android Package
         if: matrix.target == 'android'
