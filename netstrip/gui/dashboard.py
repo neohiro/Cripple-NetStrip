@@ -182,10 +182,13 @@ class DashboardView(ctk.CTkScrollableFrame):
 
     def _on_engine_event(self, event_name: str):
         def _handle():
-            if event_name == "MODE_CHANGED":
-                mode_name = self.engine.classifier.mode.name
-                if hasattr(self, 'shield') and self.shield.winfo_exists():
-                    self.shield.set_state(self.engine.is_running, mode_name)
+            try:
+                if event_name == "MODE_CHANGED":
+                    mode_name = self.engine.classifier.mode.name
+                    if hasattr(self, 'shield') and self.shield.winfo_exists():
+                        self.shield.set_state(self.engine.is_running, mode_name)
+            except Exception:
+                pass
         self.after(0, _handle)
 
     @safe_loop(delay_ms=200)
@@ -210,15 +213,21 @@ class DashboardView(ctk.CTkScrollableFrame):
                         unique_allowed = today_stats['total_allowed']
                         
                     def update_ui():
-                        if not getattr(self, '_destroyed', False) and self.winfo_exists():
-                            self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
-                            self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
+                        try:
+                            if not getattr(self, '_destroyed', False) and self.winfo_exists():
+                                self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
+                                self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
+                        except Exception:
+                            pass
                     self.after(0, update_ui)
                 else:
                     def update_empty():
-                        if not getattr(self, '_destroyed', False) and self.winfo_exists():
-                            self.stat_traffic.set_value("0  |  0")
-                            self.stat_queries.set_value("0")
+                        try:
+                            if not getattr(self, '_destroyed', False) and self.winfo_exists():
+                                self.stat_traffic.set_value("0  |  0")
+                                self.stat_queries.set_value("0")
+                        except Exception:
+                            pass
                     self.after(0, update_empty)
             except Exception:
                 pass

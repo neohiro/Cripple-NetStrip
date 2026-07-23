@@ -1,5 +1,5 @@
-# Linux/Ubuntu OS Telemetry & Metrics
-# These domains are primarily Canonical/Ubuntu metrics and Snapcraft telemetry.
+# Linux/Ubuntu/Debian/Fedora OS Telemetry & Metrics
+# These domains are primarily Canonical/Ubuntu metrics, Snapcraft telemetry, and OS endpoints.
 # This list is manually maintained as no major online Linux telemetry blocklist exists.
 
 metrics.ubuntu.com
@@ -8,3 +8,12 @@ daisy.ubuntu.com
 api.snapcraft.io
 dashboard.snapcraft.io
 telemetry.ubuntu.com
+security.debian.org
+deb.debian.org
+fedoraproject.org
+mirrors.fedoraproject.org
+pkgbuild.com
+archlinux.org
+mirrorlist.centos.org
+download.opensuse.org
+registry.suse.com

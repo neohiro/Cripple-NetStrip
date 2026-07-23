@@ -228,8 +228,8 @@ class ConnectionRow(ctk.CTkFrame):
             self.target_label.configure(text_color=Colors.TEXT_PRIMARY)
             
             def fade(step_idx=1):
-                if not self.winfo_exists(): return
                 try:
+                    if not self.winfo_exists(): return
                     if step_idx < len(steps):
                         self._bg_rect.configure(fg_color=steps[step_idx])
                         self.after(120, lambda: fade(step_idx + 1))
@@ -239,7 +239,10 @@ class ConnectionRow(ctk.CTkFrame):
                 except Exception:
                     pass
                     
-            self.after(200, fade)
+            try:
+                self.after(200, fade)
+            except Exception:
+                pass
 
     def _on_action(self, new_action: str):
         def proceed():
@@ -466,9 +469,13 @@ class AppGroupFrame(ctk.CTkFrame):
         # Pass a callback to update UI if it downloads in the background
         def on_loaded():
             def _apply():
-                img = self.icon_manager.get_icon(self.process_path, self.process_name)
-                if img:
-                    _apply_raw_image(img)
+                try:
+                    if not self.winfo_exists(): return
+                    img = self.icon_manager.get_icon(self.process_path, self.process_name)
+                    if img:
+                        _apply_raw_image(img)
+                except Exception:
+                    pass
             try:
                 self.after(0, _apply)
             except Exception:
@@ -505,8 +512,8 @@ class AppGroupFrame(ctk.CTkFrame):
             self.header.configure(fg_color=steps[0])
             
             def fade(step_idx=1):
-                if not self.winfo_exists(): return
                 try:
+                    if not self.winfo_exists(): return
                     if step_idx < len(steps):
                         self.header.configure(fg_color=steps[step_idx])
                         self.after(120, lambda: fade(step_idx + 1))
@@ -515,7 +522,10 @@ class AppGroupFrame(ctk.CTkFrame):
                 except Exception:
                     pass
                     
-            self.after(200, fade)
+            try:
+                self.after(200, fade)
+            except Exception:
+                pass
             
     def add_connection(self, conn_data: dict, hide_inactive: bool):
         target = conn_data.get('domain') or conn_data.get('ip')

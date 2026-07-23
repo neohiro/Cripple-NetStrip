@@ -174,12 +174,16 @@ class WindowsPlatform(PlatformBase):
 
     def remove_all_NetStrip_rules(self) -> bool:
         # Use PowerShell to safely remove all rules with the NetStrip_ prefix
-        cmd = ["powershell", "-Command", "Remove-NetFirewallRule -DisplayName 'NetStrip_*' -ErrorAction SilentlyContinue"]
+        # NOTE: -DisplayName does NOT support wildcards — must filter via Where-Object
+        cmd = ["powershell", "-Command",
+               "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"]
         res = self._run_cmd(cmd)
         return res.returncode == 0
 
     def remove_all_app_block_rules(self) -> bool:
-        cmd = ["powershell", "-Command", "Remove-NetFirewallRule -DisplayName 'NetStrip_AppBlock_*' -ErrorAction SilentlyContinue"]
+        # NOTE: -DisplayName does NOT support wildcards — must filter via Where-Object
+        cmd = ["powershell", "-Command",
+               "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_AppBlock_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"]
         res = self._run_cmd(cmd)
         return res.returncode == 0
 

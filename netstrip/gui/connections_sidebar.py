@@ -12,6 +12,7 @@ import os
 
 from netstrip.gui.components.sidebar_components import ConnectionRow, AppGroupFrame
 from netstrip.gui.utils import safe_loop
+from netstrip.gui.popups import check_killswitch_override
 
 class ConnectionsSidebar(ctk.CTkFrame):
     def __init__(self, master, engine: NetStripEngine, **kwargs):
@@ -184,10 +185,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
                 def process_ui():
-                    if getattr(self, '_destroyed', False) or not self.winfo_exists():
-                        return
-                    self.engine._cached_recent = conns
-                    self._process_connections(conns, sys_val)
+                    try:
+                        if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                            return
+                        self.engine._cached_recent = conns
+                        self._process_connections(conns, sys_val)
+                    except Exception:
+                        pass
                 self.after(0, process_ui)
             except Exception:
                 pass
@@ -422,7 +426,10 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         group.btn_expand.configure(text="Expand ▼", fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY)
                     
             # Yield to UI loop
-            self.after(2, lambda: _update_next(index + batch_size))
+            try:
+                self.after(2, lambda: _update_next(index + batch_size))
+            except Exception:
+                pass
             
         _update_next()
 

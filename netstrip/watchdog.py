@@ -134,6 +134,15 @@ def restore_network():
             # Fail-open: Always re-enable IPv6/IPv4 bindings if the engine crashes, so the user has internet
             subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            # Fail-open: Remove ALL NetStrip firewall rules (killswitch, IP blocks, LAN blocks, app blocks)
+            # This is critical — without this, orphaned killswitch rules permanently block all traffic
+            logging.info("Removing all NetStrip firewall rules...")
+            subprocess.run(
+                ["powershell", "-Command",
+                 "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"],
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
                 
         elif sys_plat == "Darwin": # macOS
             res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)

@@ -244,21 +244,15 @@ class SettingsView(ctk.CTkFrame):
         # Bottom padding
         ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()
 
-    def _add_subtitle(self, parent, text):
+    def _add_subtitle(self, parent, text, pady=(2, Spacing.MD)):
         lbl = ctk.CTkLabel(
             parent, text=text,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
             text_color=Colors.TEXT_TERTIARY,
-            justify="left"
+            justify="left",
+            wraplength=650
         )
-        lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=(2, Spacing.MD))
-        
-        def on_resize(event):
-            if abs(getattr(lbl, '_last_wrap_width', 0) - event.width) > 10:
-                lbl._last_wrap_width = event.width
-                lbl.configure(wraplength=max(100, event.width - 10))
-                
-        lbl.bind('<Configure>', on_resize)
+        lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=pady)
 
     def _add_switch_row(self, parent, label_text, setting_key, tooltip_text=None):
         row = ctk.CTkFrame(parent, fg_color=Colors.BG_PANEL)

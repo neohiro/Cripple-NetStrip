@@ -85,8 +85,11 @@ def is_server_or_embedded():
         if 'Server' in platform.win32_ver()[0]:
             return True
             
-    # Check Linux Server (Ubuntu Server, Debian headless, etc.)
+    # Check Linux Server (Ubuntu Server, Debian headless, etc.) or missing display
     if platform.system() == 'Linux':
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            return True
+            
         try:
             with open('/etc/os-release', 'r') as f:
                 os_release = f.read().lower()

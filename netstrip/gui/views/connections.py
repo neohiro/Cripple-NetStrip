@@ -12,6 +12,7 @@ import os
 
 from netstrip.gui.components.sidebar_components import ConnectionRow, AppGroupFrame
 from netstrip.gui.utils import safe_loop
+from netstrip.gui.popups import check_killswitch_override
 
 class ConnectionsView(ctk.CTkFrame):
     def __init__(self, master, engine: NetStripEngine, **kwargs):

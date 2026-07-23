@@ -74,6 +74,7 @@ class TrafficClassifier:
                 
                 # Linux
                 'systemd-resolved', 'systemd-timesyncd', 'networkmanager', 'dhclient', 'avahi-daemon', 'cupsd', 'packagekitd', 'snapd', 'fwupd',
+                'chronyd', 'ntpd', 'dbus-daemon', 'rpcbind', 'systemd-networkd', 'unattended-upgrades', 'apt', 'dpkg', 'yum', 'dnf', 'zypper', 'pacman', 'dockerd', 'containerd', 'kubelet',
                 
                 # macOS
                 'mdnsresponder', 'kernel_task', 'configd', 'syspolicyd', 'networkd', 'nsurlsessiond', 'apsd', 'softwareupdated', 'trustd', 'rapportd'
@@ -124,6 +125,14 @@ class TrafficClassifier:
                             
                     elif identity_lower == 'apple':
                         if current_os == 'darwin':
+                            self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
+                            return ConnectionCategory.SYSTEM
+                        else:
+                            self._domain_cache[cache_key] = ConnectionCategory.TELEMETRY
+                            return ConnectionCategory.TELEMETRY
+                            
+                    elif identity_lower in ('canonical', 'ubuntu', 'redhat', 'suse', 'debian', 'fedora'):
+                        if current_os == 'linux':
                             self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
                             return ConnectionCategory.SYSTEM
                         else:

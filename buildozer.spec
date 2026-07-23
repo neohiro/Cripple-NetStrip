@@ -19,7 +19,7 @@ version = 3.0.2
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,pyjnius,cryptography,dnslib,maxminddb,requests
+requirements = python3,kivy,pyjnius,cryptography,dnslib,maxminddb,requests,psutil,packaging
 
 # (str) Icon of the application
 icon.filename = %(source.dir)s/assets/cripple_logo.png

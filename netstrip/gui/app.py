@@ -181,6 +181,13 @@ class NetStripApp(ctk.CTk):
         if self._update_geoip_ui not in self.engine.geoip.callbacks:
             self.engine.geoip.callbacks.append(self._update_geoip_ui)
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+        
+        if getattr(self.engine, 'is_headless', False):
+            # Headless Mode: Skip heavy UI widget construction and polling loops
+            self.withdraw()
+            self.engine.set_status_callback(self._show_status)
+            return
+
         self._build_ui()
         
         # Register status callback
@@ -189,17 +196,18 @@ class NetStripApp(ctk.CTk):
     def _show_status(self, msg: str):
         def _update():
             try:
-                self.status_label.configure(text=msg)
-                if hasattr(self, '_status_timer'):
-                    self.after_cancel(self._status_timer)
-                self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
+                if hasattr(self, 'status_label'):
+                    self.status_label.configure(text=msg)
+                    if hasattr(self, '_status_timer'):
+                        self.after_cancel(self._status_timer)
+                    self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
                 
-                # If app is hidden/minimized to tray, send a system notification
-                if getattr(self, 'icon', None) and getattr(self.engine, 'is_headless', False) is False:
-                    # Don't spam notifications for minor updates, only important ones
-                    if "blocked" in msg.lower() or "mode changed" in msg.lower() or "threat" in msg.lower() or "whitelist" in msg.lower() or "killswitch" in msg.lower():
-                        if not self.winfo_ismapped():
-                            self.icon.notify(msg, "NetStrip Status")
+                # If app is hidden/minimized to tray or headless, send a system notification
+                if getattr(self, '_tray_icon', None):
+                    if not self.winfo_ismapped() or getattr(self.engine, 'is_headless', False):
+                        # Don't spam notifications for minor updates, only important ones
+                        if "blocked" in msg.lower() or "mode changed" in msg.lower() or "threat" in msg.lower() or "whitelist" in msg.lower() or "killswitch" in msg.lower() or "anomaly" in msg.lower():
+                            self._tray_icon.notify(msg, "NetStrip Status")
             except Exception:
                 pass
         self.after(0, _update)
@@ -599,10 +607,16 @@ class NetStripApp(ctk.CTk):
             self._perform_clean_exit()
 
     def _show_tray_icon(self):
-        import pystray
-        import threading
-
-        if getattr(self, '_tray_icon', None) is not None:
+        try:
+            import pystray
+            import threading
+    
+            if getattr(self, '_tray_icon', None) is not None:
+                return
+        except Exception as e:
+            # Pystray requires a display server (X11/Wayland/Explorer).
+            # If we fail here, we are on a truly headless OS or broken environment.
+            self._tray_icon = None
             return
 
         def on_show(icon, item):

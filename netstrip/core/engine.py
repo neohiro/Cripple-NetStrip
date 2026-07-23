@@ -52,7 +52,8 @@ class NetStripEngine:
         dns_port = 5353 if is_android else 53
         
         self.dns_proxy = DNSProxyService(self.classifier, self.db, bind_ip=dns_bind_ip, port=dns_port, engine=self)
-        self.connection_monitor = ConnectionMonitor(self.classifier, self.db, poll_interval=0.2)
+        poll_interval = 2.0 if self.is_headless else 0.2
+        self.connection_monitor = ConnectionMonitor(self.classifier, self.db, poll_interval=poll_interval)
         
         self.firewall = FirewallController()
         self.lan_shield = LANShield(engine=self)
@@ -124,22 +125,22 @@ class NetStripEngine:
         
     def broadcast_status(self, msg: str):
         if self.on_status_update:
-            # We are likely running in a background thread, so wrap it
-            import tkinter as tk
-            root = tk._default_root
-            if root:
-                try:
-                    root.after(0, lambda: self.on_status_update(msg))
-                except Exception:
+            if not getattr(self, 'is_headless', False):
+                # We are likely running in a background thread, so wrap it
+                import tkinter as tk
+                root = tk._default_root
+                if root:
                     try:
-                        self.on_status_update(msg)
+                        root.after(0, lambda: self.on_status_update(msg))
+                        return
                     except Exception:
                         pass
-            else:
-                try:
-                    self.on_status_update(msg)
-                except Exception:
-                    pass
+            
+            # Headless or rootless fallback
+            try:
+                self.on_status_update(msg)
+            except Exception:
+                pass
                     
     def trigger_threat_escalation(self, threat_data: dict):
         """Escalate to Paranoid Mode + Killswitch and broadcast anomaly."""
@@ -190,54 +191,44 @@ class NetStripEngine:
         # 1.5. Persist the state for headless servers / system tray
         self.db.set_setting("pending_kernel_threat", f"{anomaly_name}|{anomaly_data['message']}")
         
-        # 2. Fire OS / Headless Notifications
-        if self.is_headless:
-            from netstrip.core.notifier import NotificationManager
-            NotificationManager.send_critical_os_notification(
-                "NetStrip KERNEL INTRUSION", 
-                f"{anomaly_data['message']}\nTo whitelist, run: python main.py --allow-anomaly {anomaly_name}"
-            )
-            # Active neutralize
-            if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
-                self.anomaly_scanner._neutralize_adapter(anomaly_name)
-            elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
-                self.anomaly_scanner._neutralize_pcap()
-        else:
-            # GUI Popup
-            def _handle_decision(decision):
-                self.db.set_setting("pending_kernel_threat", "")
-                if decision == 'neutralize':
-                    logger.warning(f"User neutralized threat: {anomaly_name}")
-                    if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
-                        self.anomaly_scanner._neutralize_adapter(anomaly_name)
-                    elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
-                        self.anomaly_scanner._neutralize_pcap()
-                elif decision == 'whitelist':
-                    logger.info(f"User whitelisted anomaly: {anomaly_name}")
-                    self.db.whitelist_anomaly(anomaly_name)
-                    self.set_killswitch(False) # Restore network
-                elif decision == 'disable_scanner':
-                    logger.warning("User disabled Kernel Anomaly Scanner.")
-                    self.db.set_setting("kernel_anomaly_scanner", "false")
-                    if self.anomaly_scanner:
-                        self.anomaly_scanner.stop()
-                    self.set_killswitch(False) # Restore network
+        # 2. Fire OS Notification via Tray
+        self.broadcast_status(f"CRITICAL ANOMALY: {anomaly_data['message']}")
+        
+        # 3. Always show GUI Popup (Even in headless mode, the hidden Tk root allows Toplevels)
+        def _handle_decision(decision):
+            self.db.set_setting("pending_kernel_threat", "")
+            if decision == 'neutralize':
+                logger.warning(f"User neutralized threat: {anomaly_name}")
+                if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
+                    self.anomaly_scanner._neutralize_adapter(anomaly_name)
+                elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
+                    self.anomaly_scanner._neutralize_pcap()
+            elif decision == 'whitelist':
+                logger.info(f"User whitelisted anomaly: {anomaly_name}")
+                self.db.whitelist_anomaly(anomaly_name)
+                self.set_killswitch(False) # Restore network
+            elif decision == 'disable_scanner':
+                logger.warning("User disabled Kernel Anomaly Scanner.")
+                self.db.set_setting("kernel_anomaly_scanner", "false")
+                if self.anomaly_scanner:
+                    self.anomaly_scanner.stop()
+                self.set_killswitch(False) # Restore network
+        
+        try:
+            import tkinter as tk
+            from netstrip.gui.views.anomaly_alert import CTkAnomalyAlert
             
-            try:
-                import tkinter as tk
-                from netstrip.gui.views.anomaly_alert import CTkAnomalyAlert
-                
-                # Get the root window from the App
-                # We need to find the main root to attach the toplevel
-                # The engine has access to the app or root via callbacks, but easiest is to just use tk._default_root
-                root = tk._default_root
-                if root:
-                    root.after(0, lambda: CTkAnomalyAlert(root, self, anomaly_data, _handle_decision))
-                else:
-                    _handle_decision('neutralize')
-            except Exception as e:
-                logger.error(f"Failed to show Anomaly Alert GUI: {e}")
+            # Get the root window from the App
+            # We need to find the main root to attach the toplevel
+            # The engine has access to the app or root via callbacks, but easiest is to just use tk._default_root
+            root = tk._default_root
+            if root:
+                root.after(0, lambda: CTkAnomalyAlert(root, self, anomaly_data, _handle_decision))
+            else:
                 _handle_decision('neutralize')
+        except Exception as e:
+            logger.error(f"Failed to show Anomaly Alert GUI: {e}")
+            _handle_decision('neutralize')
 
     def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
@@ -573,19 +564,44 @@ class NetStripEngine:
         self.is_running = False
         self._stop_event.set()
         
-        self.interceptor.stop()
-        self.dns_proxy.stop()
-        self.connection_monitor.stop()
-        self.iot_sync.stop()
-        self.iot_local_api.stop()
-        self.geoip.stop()
-        self.network_monitor.stop()
-        self.anomaly_scanner.stop()
+        # Stop each subsystem individually — a failure in one must NOT prevent
+        # critical cleanup (firewall rules, DNS restore) from running.
+        for name, subsystem_stop in [
+            ("interceptor", self.interceptor.stop),
+            ("dns_proxy", self.dns_proxy.stop),
+            ("connection_monitor", self.connection_monitor.stop),
+            ("iot_sync", self.iot_sync.stop),
+            ("iot_local_api", self.iot_local_api.stop),
+            ("geoip", self.geoip.stop),
+            ("network_monitor", self.network_monitor.stop),
+            ("anomaly_scanner", self.anomaly_scanner.stop),
+        ]:
+            try:
+                subsystem_stop()
+            except Exception as e:
+                logger.error(f"Error stopping {name}: {e}")
+        
         if self.ebpf_manager:
-            self.ebpf_manager.stop()
-        self.firewall.clear_all_rules()
-        self.lan_shield.disable()
-        self.set_killswitch(False)
+            try:
+                self.ebpf_manager.stop()
+            except Exception as e:
+                logger.error(f"Error stopping ebpf_manager: {e}")
+        
+        # Critical cleanup — must always execute
+        try:
+            self.firewall.clear_all_rules()
+        except Exception as e:
+            logger.error(f"Error clearing firewall rules: {e}")
+        
+        try:
+            self.lan_shield.disable()
+        except Exception as e:
+            logger.error(f"Error disabling LAN shield: {e}")
+        
+        try:
+            self.set_killswitch(False)
+        except Exception as e:
+            logger.error(f"Error disabling killswitch: {e}")
         
         # Write .clean_exit so watchdog knows this is a graceful shutdown
         try:
@@ -598,9 +614,12 @@ class NetStripEngine:
             logger.error(f"Failed to write clean exit flag: {e}")
         
         # Restore system DNS
-        for interface in self.platform.get_active_interfaces():
-            original_dns = self.db.get_setting(f"backup_dns_{interface}", "dhcp")
-            self.platform.restore_system_dns(interface, original_dns)
+        try:
+            for interface in self.platform.get_active_interfaces():
+                original_dns = self.db.get_setting(f"backup_dns_{interface}", "dhcp")
+                self.platform.restore_system_dns(interface, original_dns)
+        except Exception as e:
+            logger.error(f"Error restoring system DNS: {e}")
             
         # Re-enable global IPv6 so the user's internet is not permanently broken after exiting
         if self.db.get_setting("disable_ipv6_globally", "false") == "true":

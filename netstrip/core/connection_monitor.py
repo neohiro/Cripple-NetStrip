@@ -3,7 +3,23 @@ Connection Monitor for NetStrip
 Uses psutil to poll network connections, mapping them to process names.
 """
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    class DummyPsutil:
+        class Error(Exception): pass
+        class NoSuchProcess(Exception): pass
+        class AccessDenied(Exception): pass
+        
+        @staticmethod
+        def net_connections(*args, **kwargs):
+            return []
+            
+        class Process:
+            def __init__(self, pid):
+                raise self.NoSuchProcess()
+                
+    psutil = DummyPsutil()
 import threading
 import time
 import logging
