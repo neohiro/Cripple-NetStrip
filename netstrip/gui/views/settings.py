@@ -458,10 +458,13 @@ class SettingsView(ctk.CTkFrame):
 
         self._add_subtitle(card, "Pre-Shared Key for E2E Encrypted LAN Shield Broadcasts. Copy this key to other NetStrip devices on your network to pair them. When one device detects a severe anomaly, it will broadcast an encrypted lockdown signal to all paired devices.", pady=(0, Spacing.LG))
 
-        # IoT Webhook Configuration
+        # Home Automation & IoT Integrations
+        self._add_title(card, "Home Automation & IoT Integrations", icon="🏠", pady=(Spacing.LG, Spacing.SM))
+        
+        # Webhook URL
         webhook_url_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
-        webhook_url_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
-        ctk.CTkLabel(webhook_url_row, text="IoT Webhook URL (e.g. Home Assistant)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        webhook_url_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(webhook_url_row, text="IoT Webhook URL (e.g. Home Assistant)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
         webhook_url_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_webhook_url", "")
         webhook_url_entry = ctk.CTkEntry(webhook_url_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
@@ -473,9 +476,10 @@ class SettingsView(ctk.CTkFrame):
             self._wh_url_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_webhook_url", webhook_url_entry.get()))
         webhook_url_entry.bind("<KeyRelease>", save_webhook_url)
 
+        # Webhook Secret
         webhook_sec_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
-        webhook_sec_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.SM))
-        ctk.CTkLabel(webhook_sec_row, text="Webhook Bearer Token / Secret (Optional)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY).pack(side="left")
+        webhook_sec_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(webhook_sec_row, text="Webhook Bearer Token / Secret (Optional)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_SECONDARY).pack(side="left")
         
         webhook_sec_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_webhook_secret", "")
         webhook_sec_entry = ctk.CTkEntry(webhook_sec_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM), show="*")
@@ -486,8 +490,49 @@ class SettingsView(ctk.CTkFrame):
             if hasattr(self, '_wh_sec_timer'): self.after_cancel(self._wh_sec_timer)
             self._wh_sec_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_webhook_secret", webhook_sec_entry.get()))
         webhook_sec_entry.bind("<KeyRelease>", save_webhook_sec)
+        
+        # Continuous Telemetry Toggle
+        telemetry_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        telemetry_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(telemetry_row, text="Continuous Webhook Telemetry Sync", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        
+        telemetry_var = ctk.StringVar(value=getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_telemetry_enabled", "false"))
+        def toggle_telemetry():
+            val = telemetry_var.get()
+            self.engine.db.set_setting("iot_telemetry_enabled", val)
+            
+        telemetry_switch = ctk.CTkSwitch(telemetry_row, text="", variable=telemetry_var, onvalue="true", offvalue="false", command=toggle_telemetry, progress_color=Colors.SUCCESS_DIM)
+        telemetry_switch.pack(side="right")
+        
+        # Telemetry Interval
+        interval_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        interval_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(interval_row, text="Telemetry Sync Interval (Seconds)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY).pack(side="left")
+        
+        interval_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_telemetry_interval", "10.0")
+        interval_entry = ctk.CTkEntry(interval_row, width=80, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
+        interval_entry.pack(side="right", padx=(Spacing.MD, 28)) # Aligned under the switch slightly
+        interval_entry.insert(0, interval_val)
+        
+        def save_interval(e):
+            if hasattr(self, '_wh_int_timer'): self.after_cancel(self._wh_int_timer)
+            self._wh_int_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_telemetry_interval", interval_entry.get()))
+        interval_entry.bind("<KeyRelease>", save_interval)
+        
+        # Google Nest Home
+        nest_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        nest_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
+        ctk.CTkLabel(nest_row, text="Google Nest Home Dashboard Broadcast", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        
+        nest_var = ctk.StringVar(value=getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_nest_sensor_enabled", "false"))
+        def toggle_nest():
+            val = nest_var.get()
+            self.engine.db.set_setting("iot_nest_sensor_enabled", val)
+            
+        nest_switch = ctk.CTkSwitch(nest_row, text="", variable=nest_var, onvalue="true", offvalue="false", command=toggle_nest, progress_color=Colors.SUCCESS_DIM)
+        nest_switch.pack(side="right")
 
-        self._add_subtitle(card, "Sends an automated POST Webhook API broadcast upon critical threat escalations (e.g., LAN Killswitch). Easily maps to Home Assistant, Google Home via API integrations, or Node-RED for local automated alarms.", pady=(0, Spacing.LG))
+        self._add_subtitle(card, "Sends live JSON telemetry (Stats, Modes, Active Connections) to your Webhook endpoint to build custom Dashboards on external monitors via HAOS or Node-RED. Google Nest Home integration pushes active sensor payloads to compatible Cast displays.", pady=(0, Spacing.LG))
 
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
