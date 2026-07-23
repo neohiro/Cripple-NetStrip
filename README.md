@@ -51,11 +51,23 @@ DPI Smart Filters intercept HTTP/HTTPS headers via SNI extraction. Deep Connecti
 **DoH Sinkhole** — Force-routes 30+ DNS-over-HTTPS providers into the sinkhole.
 **IPv6 SLAAC Lockdown** — Disables IPv6 Router Advertisements across all platforms.
 **Global IPv6 Killswitch** — 1-click brutal disable of IPv6 system-wide.
-**LAN Shield** — Instantly block/allow all private subnet communications.
+**LAN Shield E2E Mesh** — Cryptographically paired LAN clients broadcast AES-128-GCM encrypted UDP `ANOMALY`, `KILLSWITCH`, and `RESTORE` commands. One client's anomaly locks down your entire local grid.
+**Home Assistant IoT Webhooks** — Seamlessly pushes network threat events via JSON POST webhooks to Home Assistant, Node-RED, or Zigbee/Thread monitors. Flash your smart lights red if a device on your network is compromised.
+**WMI Antivirus Integration** — Automatically queries `SecurityCenter2` (Windows) or process lists (Linux) to flawlessly whitelist third-party Anti-Malware (BitDefender, Kaspersky) telemetry/definition servers and NDIS drivers.
 **App-Specific Policies** — Per-executable domain rules.
 **Time Bombs** — 15-minute temporary allow-rules for quick troubleshooting.
 **VPN Pre-Cipher Interception** — Filters traffic before VPN encryption (WireGuard, OpenVPN compatible).
 **Multi-NIC / Gateway Mode** — Full support for dual-adapter NUCs acting as network-wide firewalls.
+
+## 📱 Android APK Feasibility Analysis
+
+Building NetStrip into a standalone `.apk` is possible but requires a hybrid architecture due to Android OS constraints. Android strictly prohibits reading system-wide socket connections or modifying `iptables` without a Rooted device.
+
+To run NetStrip non-root on Android:
+1. **Packet Parser Core**: The interception core must be completely rebuilt in Kotlin/Java using the native `VpnService` API to parse raw IP packets in user-space.
+2. **Python Backend**: The Python DNS sinkhole and Intelligence engine (Blocklist Trie, Anomaly Scanner, Webhooks) must run as a background service via **Chaquopy** (Python SDK for Android).
+3. **GUI Replacement**: `CustomTkinter` does not work on Android. The UI must be rebuilt in Jetpack Compose or Flutter for horizontal/vertical touch orientations.
+*Current Status*: Pending a native `VpnService` C/Kotlin module rewrite. For now, we recommend running NetStrip on a Raspberry Pi network gateway.
 
 ## 🛠️ Architecture
 

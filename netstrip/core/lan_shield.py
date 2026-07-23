@@ -63,12 +63,19 @@ class LANShield:
                         decrypted = self._fernet.decrypt(encrypted_payload, ttl=60) # 60 sec TTL replay prevention
                         payload = json.loads(decrypted.decode('utf-8'))
                         # Validate the payload
-                        if payload.get('type') == 'LAN_THREAT_BROADCAST':
+                        btype = payload.get('type')
+                        if btype == 'LAN_THREAT_BROADCAST':
                             logger.critical(f"LAN SHIELD: Received Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown...")
-                            # Trigger local lockdown
                             if self.engine:
-                                # Run in separate thread to prevent blocking
-                                threading.Thread(target=self.engine.trigger_threat_escalation, args=({'process_name': 'LAN Shield Remote Broadcast', 'domain': 'LAN_THREAT', 'note': payload.get('note', 'Remote Host Compromised')},)).start()
+                                threading.Thread(target=self.engine.trigger_threat_escalation, args=({'process_name': 'LAN Shield Remote Broadcast', 'domain': 'LAN_THREAT', 'note': payload.get('note', 'Remote Host Compromised'), 'is_remote': True},)).start()
+                        elif btype == 'LAN_RESTORE_BROADCAST':
+                            logger.info(f"LAN SHIELD: Received Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch...")
+                            if self.engine:
+                                threading.Thread(target=self._handle_remote_restore).start()
+                        elif btype == 'LAN_KILLSWITCH_TRIGGER':
+                            logger.critical(f"LAN SHIELD: Received Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch...")
+                            if self.engine:
+                                threading.Thread(target=self.engine.set_killswitch, args=(True, False)).start()
                     except Exception as e:
                         logger.debug(f"LAN Shield dropped invalid/expired encrypted broadcast: {e}")
             except socket.timeout:
@@ -76,13 +83,18 @@ class LANShield:
             except Exception as e:
                 logger.debug(f"LAN Shield listener error: {e}")
 
-    def broadcast_anomaly(self, anomaly_data: dict):
+    def _handle_remote_restore(self):
+        # Drop back to Normal mode and disable killswitch without broadcasting back
+        self.engine.set_killswitch(False, broadcast_lan=False)
+        self.engine.set_mode(ProtectionLevel.NORMAL)
+
+    def _send_encrypted_broadcast(self, btype: str, note: str = ""):
         if not self._fernet: return
         try:
             payload = {
-                'type': 'LAN_THREAT_BROADCAST',
+                'type': btype,
                 'timestamp': time.time(),
-                'note': anomaly_data.get('note', 'Unknown Threat')
+                'note': note
             }
             encrypted = self._fernet.encrypt(json.dumps(payload).encode('utf-8'))
             msg = b"NetStrip:ANOMALY:" + encrypted
@@ -91,9 +103,18 @@ class LANShield:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.sendto(msg, ("255.255.255.255", 54321))
             sock.close()
-            logger.info("LAN Shield: Successfully broadcasted encrypted E2E threat warning to LAN clients.")
+            logger.info(f"LAN Shield: Successfully broadcasted {btype} to LAN clients.")
         except Exception as e:
-            logger.error(f"Failed to broadcast LAN threat: {e}")
+            logger.error(f"Failed to broadcast {btype}: {e}")
+
+    def broadcast_anomaly(self, anomaly_data: dict):
+        self._send_encrypted_broadcast('LAN_THREAT_BROADCAST', anomaly_data.get('note', 'Unknown Threat'))
+
+    def broadcast_restore(self):
+        self._send_encrypted_broadcast('LAN_RESTORE_BROADCAST', 'User restored network locally')
+
+    def broadcast_killswitch(self):
+        self._send_encrypted_broadcast('LAN_KILLSWITCH_TRIGGER', 'User triggered network killswitch')
 
     def apply_mode(self, level: ProtectionLevel):
         """Apply LAN shielding based on the selected mode and user preference."""

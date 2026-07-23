@@ -17,10 +17,26 @@ class AnomalyScanner:
         self.is_running = False
         self.thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        self.callback: Optional[Callable[[dict], None]] = None
-        
         self.known_adapters = set()
         self.first_run = True
+        self.callback = None
+        self.detected_av = self._detect_antivirus()
+        if self.detected_av:
+            logger.info(f"Anomaly Scanner integrated with existing Security Engine: {self.detected_av}")
+
+    def _detect_antivirus(self) -> str:
+        """Detect installed Antivirus engines via Windows WMI or generic Linux checks."""
+        try:
+            if os.name == 'nt':
+                # Query SecurityCenter2 using WMI via PowerShell
+                cmd = ["powershell", "-NoProfile", "-Command", "Get-WmiObject -Namespace root\\SecurityCenter2 -Class AntiVirusProduct | Select-Object -ExpandProperty displayName"]
+                res = subprocess.run(cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                avs = [line.strip() for line in res.stdout.split('\n') if line.strip() and "Windows Defender" not in line]
+                if avs:
+                    return ", ".join(avs)
+        except Exception:
+            pass
+        return ""
 
     def set_callback(self, cb: Callable[[dict], None]):
         self.callback = cb

@@ -449,6 +449,37 @@ class SettingsView(ctk.CTkFrame):
 
         self._add_subtitle(card, "Pre-Shared Key for E2E Encrypted LAN Shield Broadcasts. Copy this key to other NetStrip devices on your network to pair them. When one device detects a severe anomaly, it will broadcast an encrypted lockdown signal to all paired devices.", pady=(0, Spacing.LG))
 
+        # IoT Webhook Configuration
+        webhook_url_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        webhook_url_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
+        ctk.CTkLabel(webhook_url_row, text="IoT Webhook URL (e.g. Home Assistant)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        
+        webhook_url_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_webhook_url", "")
+        webhook_url_entry = ctk.CTkEntry(webhook_url_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
+        webhook_url_entry.pack(side="right", padx=(Spacing.MD, 0))
+        webhook_url_entry.insert(0, webhook_url_val)
+        
+        def save_webhook_url(e):
+            if hasattr(self, '_wh_url_timer'): self.after_cancel(self._wh_url_timer)
+            self._wh_url_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_webhook_url", webhook_url_entry.get()))
+        webhook_url_entry.bind("<KeyRelease>", save_webhook_url)
+
+        webhook_sec_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        webhook_sec_row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.SM))
+        ctk.CTkLabel(webhook_sec_row, text="Webhook Bearer Token / Secret (Optional)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY).pack(side="left")
+        
+        webhook_sec_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_webhook_secret", "")
+        webhook_sec_entry = ctk.CTkEntry(webhook_sec_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM), show="*")
+        webhook_sec_entry.pack(side="right", padx=(Spacing.MD, 0))
+        webhook_sec_entry.insert(0, webhook_sec_val)
+        
+        def save_webhook_sec(e):
+            if hasattr(self, '_wh_sec_timer'): self.after_cancel(self._wh_sec_timer)
+            self._wh_sec_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_webhook_secret", webhook_sec_entry.get()))
+        webhook_sec_entry.bind("<KeyRelease>", save_webhook_sec)
+
+        self._add_subtitle(card, "Sends an automated POST Webhook API broadcast upon critical threat escalations (e.g., LAN Killswitch). Easily maps to Home Assistant, Google Home via API integrations, or Node-RED for local automated alarms.", pady=(0, Spacing.LG))
+
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
 

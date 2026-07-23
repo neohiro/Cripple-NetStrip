@@ -146,6 +146,21 @@ class NetStripEngine:
         # Broadcast via LAN Shield
         if hasattr(self, 'lan_shield') and hasattr(self.lan_shield, 'broadcast_anomaly'):
             self.lan_shield.broadcast_anomaly(threat_data)
+            
+        # Broadcast via IoT Webhook (e.g. Home Assistant)
+        webhook_url = self.db.get_setting("iot_webhook_url", "")
+        if webhook_url and not threat_data.get('is_remote', False): # Prevent infinite webhook loops on LAN
+            def send_webhook():
+                try:
+                    import requests
+                    headers = {"Content-Type": "application/json"}
+                    secret = self.db.get_setting("iot_webhook_secret", "")
+                    if secret: headers["Authorization"] = f"Bearer {secret}"
+                    requests.post(webhook_url, json=threat_data, headers=headers, timeout=3.0)
+                except Exception as e:
+                    logger.debug(f"IoT Webhook failed: {e}")
+            import threading
+            threading.Thread(target=send_webhook, daemon=True).start()
 
     def _handle_anomaly(self, anomaly_data: dict):
         logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
@@ -649,13 +664,17 @@ class NetStripEngine:
             if self.on_smart_trigger:
                 self.on_smart_trigger(conn_data)
 
-    def set_killswitch(self, active: bool):
+    def set_killswitch(self, active: bool, broadcast_lan: bool = True):
         self.killswitch_active = active
         if active:
             self.platform.enable_killswitch()
             self.lan_shield.enable()
+            if broadcast_lan and hasattr(self.lan_shield, 'broadcast_killswitch'):
+                self.lan_shield.broadcast_killswitch()
         else:
             self.platform.disable_killswitch()
+            if broadcast_lan and hasattr(self.lan_shield, 'broadcast_restore'):
+                self.lan_shield.broadcast_restore()
 
     def _handle_geoip_change(self, old_ip: str, geo_data: dict):
         if old_ip in ('Loading...', 'Unknown', 'PARANOID MODE'):
