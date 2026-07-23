@@ -170,14 +170,19 @@ class ConnectionsSidebar(ctk.CTkFrame):
     def _on_sort_filter_change(self, choice=None):
         self._refresh_loop()
         
-    @safe_loop(delay_ms=200)
+    @safe_loop(delay_ms=1000)
     def _refresh_loop(self):
         if getattr(self, '_destroyed', False):
+            return
+        if not self.winfo_ismapped():
             return
         # Skip heavy refresh during active window resize to prevent artifacts
         if getattr(self, '_resize_paused', False):
             return
+        if getattr(self, '_is_fetching', False):
+            return
             
+        self._is_fetching = True
         # Fetch recent connections in background thread to prevent UI micro-stutters
         def fetch():
             try:
@@ -192,9 +197,11 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         self._process_connections(conns, sys_val)
                     except Exception:
                         pass
+                    finally:
+                        self._is_fetching = False
                 self.after(0, process_ui)
             except Exception:
-                pass
+                self._is_fetching = False
                 
         import threading
         threading.Thread(target=fetch, daemon=True).start()

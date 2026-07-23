@@ -84,21 +84,33 @@ class NetStripAndroidUI(BoxLayout):
 
     def update_trust_btn(self, dt):
         if not hasattr(self, '_engine') or not self._engine: return
-        try:
-            ssid = self._engine.platform.get_current_ssid()
-            if not ssid:
-                self.trust_btn.text = "No WiFi connected"
-                self.trust_btn.disabled = True
-                return
-                
-            self.trust_btn.disabled = False
-            trusted = self._engine.db.get_trusted_wifis()
-            if ssid in trusted:
-                self.trust_btn.text = f"Untrust WiFi ({ssid})"
-            else:
-                self.trust_btn.text = f"Trust WiFi ({ssid})"
-        except Exception:
-            pass
+        if getattr(self, '_is_updating_trust', False): return
+        self._is_updating_trust = True
+        
+        def _fetch_bg():
+            try:
+                ssid = self._engine.platform.get_current_ssid()
+                trusted = self._engine.db.get_trusted_wifis() if ssid else []
+                def _update_ui(dt):
+                    try:
+                        if not ssid:
+                            self.trust_btn.text = "No WiFi connected"
+                            self.trust_btn.disabled = True
+                        else:
+                            self.trust_btn.disabled = False
+                            if ssid in trusted:
+                                self.trust_btn.text = f"Untrust WiFi ({ssid})"
+                            else:
+                                self.trust_btn.text = f"Trust WiFi ({ssid})"
+                    except Exception:
+                        pass
+                    finally:
+                        self._is_updating_trust = False
+                Clock.schedule_once(_update_ui, 0)
+            except Exception:
+                self._is_updating_trust = False
+
+        threading.Thread(target=_fetch_bg, daemon=True).start()
 
     def toggle_trust_wifi(self, instance):
         if not hasattr(self, '_engine') or not self._engine: return

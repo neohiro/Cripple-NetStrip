@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev
-          sudo apt-get install -y zip unzip autoconf libtool pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
+          sudo apt-get install -y zip unzip autoconf libtool libltdl-dev automake autotools-dev m4 pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
 
       - name: Install Python Dependencies
         run: |

@@ -200,12 +200,22 @@ class DashboardView(ctk.CTkScrollableFrame):
             self._update_stats_id = self.after(500, self._update_stats)
             return
             
-        self._update_stats_id = self.after(500, self._update_stats)
+        if not self.winfo_ismapped():
+            self._update_stats_id = self.after(1000, self._update_stats)
+            return
+
+        if getattr(self, '_is_fetching_stats', False):
+            self._update_stats_id = self.after(500, self._update_stats)
+            return
+
+        self._update_stats_id = self.after(1000, self._update_stats)
+        self._is_fetching_stats = True
         
         # Run DB queries in background thread to prevent UI micro-stutters
         def fetch():
             try:
                 today_stats = self.engine.db.get_24h_statistics()
+                db_sent, db_recv = self.engine.db.get_24h_bandwidth()
                 if today_stats:
                     try:
                         unique_allowed = self.engine.db.get_unique_allowed_today()
@@ -219,6 +229,8 @@ class DashboardView(ctk.CTkScrollableFrame):
                                 self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
                         except Exception:
                             pass
+                        finally:
+                            self._is_fetching_stats = False
                     self.after(0, update_ui)
                 else:
                     def update_empty():
@@ -228,9 +240,11 @@ class DashboardView(ctk.CTkScrollableFrame):
                                 self.stat_queries.set_value("0")
                         except Exception:
                             pass
+                        finally:
+                            self._is_fetching_stats = False
                     self.after(0, update_empty)
             except Exception:
-                pass
+                self._is_fetching_stats = False
                 
         import threading
         threading.Thread(target=fetch, daemon=True).start()
@@ -278,7 +292,7 @@ class DashboardView(ctk.CTkScrollableFrame):
                         
                     self.stat_bandwidth.set_value(f"{format_speed(down_speed)} | {format_speed(up_speed)}")
                     
-                    db_sent, db_recv = self.engine.db.get_24h_bandwidth()
+                    db_sent, db_recv = getattr(self, '_cached_bandwidth', (0, 0))
                     if db_sent > 0 or db_recv > 0:
                         total_vol = db_sent + db_recv
                         label_suffix = "Last 24h"

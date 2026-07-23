@@ -394,16 +394,11 @@ class NetStripApp(ctk.CTk):
         self._cached_views = {}
         self._select_nav(self.nav_btns[0])
         
-        # Lazy pre-load other tabs in the background, giving the main UI time to breathe first
-        self.after(1500, self._preload_next_view, 1)
-        
+        # Lazy pre-load disabled: views are instantiated on-demand when clicked
+        pass
+
     def _preload_next_view(self, index):
-        if index < len(self.nav_btns):
-            view_class = self.nav_btns[index]._view_class
-            if view_class not in self._cached_views:
-                # Instantiate but don't grid it
-                self._cached_views[view_class] = view_class(self.main_frame, self.engine)
-            self.after(300, self._preload_next_view, index + 1)
+        pass
 
     def _toggle_sidebar_expand(self):
         from netstrip.core.sound import sound_manager
