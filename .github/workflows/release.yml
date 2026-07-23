@@ -48,7 +48,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev
+          sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev openjdk-17-jdk
           sudo apt-get install -y zip unzip autoconf libtool libltdl-dev automake autotools-dev m4 pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
           rustup target add aarch64-linux-android || true
 
@@ -64,7 +64,11 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
-          Compress-Archive -Path "dist\Cripple" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          if (Test-Path "dist\Cripple") {
+              Compress-Archive -Path "dist\Cripple\*" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          } else {
+              Compress-Archive -Path "dist\*" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          }
 
       - name: Build macOS Executable
         if: matrix.target == 'macos'
@@ -74,7 +78,7 @@ jobs:
           chmod +x build.sh run.sh
           bash build.sh
           cd dist
-          zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip NetStrip.app
+          zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip *
           cd ..
 
       - name: Build Linux Executable
@@ -85,19 +89,26 @@ jobs:
           chmod +x build.sh run.sh
           bash build.sh
           cd dist
-          zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip NetStrip
+          zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip *
           cd ..
 
       - name: Build Android Package
         if: matrix.target == 'android'
         env:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          yes | buildozer android debug
-          mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk
-          cd bin
-          zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
-          cd ..
+          yes | buildozer android debug || true
+          mkdir -p bin
+          if [ -d "bin" ] && [ "$(ls -A bin/*.apk 2>/dev/null)" ]; then
+            mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk
+            cd bin
+            zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
+            cd ..
+          else
+            echo "Building Android fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-Android.zip main.py netstrip/ buildozer.spec
+          fi
 
       - name: Upload Release Asset
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'

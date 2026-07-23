@@ -24,12 +24,13 @@ if "--parent-pid" in sys.argv:
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Early Windows Taskbar Fix
+# Anti-Exploit Mitigation: Enforce strict DLL directory search path on Windows (LOAD_LIBRARY_SEARCH_SYSTEM32)
 try:
     if sys.platform == 'win32':
         import ctypes
         myappid = 'NetStrip.app.1.0'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        ctypes.windll.kernel32.SetDefaultDllDirectories(0x00000800)
 except Exception:
     pass
 
@@ -272,6 +273,7 @@ def main():
                     continue
                     
                 data = data.decode()
+                import re
                 
                 if "SHOW_GUI" in data and app:
                     app.after(0, app.deiconify)
@@ -281,12 +283,14 @@ def main():
                 if engine_instance:
                     if data.startswith("BLOCK:"):
                         domain = data.split("BLOCK:")[1].strip()
-                        engine_instance.db.add_user_rule(domain, "block", "global", "Added via CLI")
-                        engine_instance.classifier.user_rules[domain] = "block"
+                        if re.match(r'^[a-zA-Z0-9.\-_*]{1,253}$', domain):
+                            engine_instance.db.add_user_rule(domain, "block", "global", "Added via CLI")
+                            engine_instance.classifier.user_rules[domain] = "block"
                     elif data.startswith("ALLOW:"):
                         domain = data.split("ALLOW:")[1].strip()
-                        engine_instance.db.add_user_rule(domain, "allow", "global", "Added via CLI")
-                        engine_instance.classifier.user_rules[domain] = "allow"
+                        if re.match(r'^[a-zA-Z0-9.\-_*]{1,253}$', domain):
+                            engine_instance.db.add_user_rule(domain, "allow", "global", "Added via CLI")
+                            engine_instance.classifier.user_rules[domain] = "allow"
                     elif data.startswith("MODE:"):
                         mode_str = data.split("MODE:")[1].strip().upper()
                         from netstrip.core.modes import ProtectionLevel

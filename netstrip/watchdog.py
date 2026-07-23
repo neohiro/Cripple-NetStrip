@@ -127,14 +127,59 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-            # Fail-open: Fast batch PowerShell command to re-enable bindings and wipe all NetStrip firewall rules in a single process
-            logging.info("Removing NetStrip firewall rules & re-enabling adapters...")
+            # Fail-open: Fast batch PowerShell command to re-enable bindings, wipe all NetStrip firewall rules,
+            # and restore IPv6/IPv4 protocol bindings that may have been disabled by the engine.
+            logging.info("Removing NetStrip firewall rules, re-enabling adapters & protocol bindings...")
             ps_script = (
                 "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'; "
                 "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'; "
                 "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"
             )
             subprocess.run(["powershell", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            # Restore IPv6/IPv4 global settings from DB if they were disabled by the engine
+            def get_db_setting(key, default="false"):
+                import sqlite3
+                db_path = Path.home() / ".netstrip" / "netstrip.db"
+                if db_path.exists():
+                    try:
+                        conn = sqlite3.connect(db_path)
+                        c = conn.cursor()
+                        c.execute("SELECT value FROM settings WHERE key=?", (key,))
+                        row = c.fetchone()
+                        conn.close()
+                        if row and row[0]:
+                            return row[0]
+                    except Exception:
+                        pass
+                return default
+            
+            def clear_db_setting(key):
+                import sqlite3
+                db_path = Path.home() / ".netstrip" / "netstrip.db"
+                if db_path.exists():
+                    try:
+                        conn = sqlite3.connect(db_path)
+                        c = conn.cursor()
+                        c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
+                        conn.commit()
+                        conn.close()
+                    except Exception:
+                        pass
+            
+            if get_db_setting("disable_ipv6_globally") == "true":
+                logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
+                subprocess.run(["powershell", "-Command",
+                    "Set-NetAdapterBinding -ComponentID ms_tcpip6 -Enabled $true -Name '*'"],
+                    creationflags=subprocess.CREATE_NO_WINDOW)
+                clear_db_setting("disable_ipv6_globally")
+                
+            if get_db_setting("disable_ipv4_globally") == "true":
+                logging.info("Re-enabling global IPv4 (was disabled by engine before crash)...")
+                clear_db_setting("disable_ipv4_globally")
+            
+            # Reset killswitch state in DB so the app starts fresh
+            clear_db_setting("killswitch_active")
                 
         elif sys_plat == "Darwin": # macOS
             res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)

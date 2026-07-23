@@ -714,6 +714,13 @@ class NetStripApp(ctk.CTk):
     def _on_engine_event(self, event_name: str, *args, **kwargs):
         def _handle_event():
             if event_name == "UPDATE_AVAILABLE":
+                # Start the glow animation now that an update is available
+                if not getattr(self, '_update_glow_active', False):
+                    self._start_version_glow_animation()
+                # Update version label text to show latest version
+                if hasattr(self, 'version_label') and hasattr(self.engine, 'latest_version'):
+                    from netstrip import __version__
+                    self.version_label.configure(text=f"v{__version__} → v{self.engine.latest_version}")
                 # Ensure update status refreshed if settings view is cached
                 from netstrip.gui.views.settings import SettingsView
                 settings_view = self._cached_views.get(SettingsView)
@@ -724,22 +731,35 @@ class NetStripApp(ctk.CTk):
         self.after(0, _handle_event)
                 
     def _start_version_glow_animation(self):
-        self._update_glow_active = True
-        self._animate_version_glow(step=0, increasing=True)
+        """Only start the glow animation if an update is actually available."""
+        self._update_glow_active = getattr(self.engine, 'update_available', False)
+        if self._update_glow_active:
+            self._animate_version_glow(step=0, increasing=True)
+        else:
+            # Static cyan color — app is up to date
+            try:
+                if hasattr(self, 'version_label') and self.version_label.winfo_exists():
+                    self.version_label.configure(text_color=Colors.ACCENT_CYAN)
+            except Exception:
+                pass
 
     def _animate_version_glow(self, step=0, increasing=True):
         if not hasattr(self, 'version_label') or not self.version_label.winfo_exists():
             return
+        
+        # Stop animation if no update is available (user may have updated)
+        if not getattr(self.engine, 'update_available', False):
+            self._update_glow_active = False
+            try:
+                self.version_label.configure(text_color=Colors.ACCENT_CYAN)
+            except Exception:
+                pass
+            return
             
         try:
-            # If an update is available: pulse yellow/gold (#6b7280 -> #facc15)
-            # Default desktop left pane glow: smooth cyber pulse between cyan (#06b6d4) and purple (#a78bfa)
-            if getattr(self.engine, 'update_available', False):
-                r1, g1, b1 = int('6b', 16), int('72', 16), int('80', 16)
-                r2, g2, b2 = int('fa', 16), int('cc', 16), int('15', 16)
-            else:
-                r1, g1, b1 = int('06', 16), int('b6', 16), int('d4', 16)
-                r2, g2, b2 = int('a7', 16), int('8b', 16), int('fa', 16)
+            # Update available: pulse yellow/gold (#6b7280 -> #facc15)
+            r1, g1, b1 = 0x6b, 0x72, 0x80
+            r2, g2, b2 = 0xfa, 0xcc, 0x15
             
             ratio = step / 25.0
             r = int(r1 + (r2 - r1) * ratio)

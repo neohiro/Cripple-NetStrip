@@ -175,11 +175,18 @@ class ConnectionsSidebar(ctk.CTkFrame):
         if getattr(self, '_destroyed', False):
             return
         if not self.winfo_ismapped():
+            # Not visible yet — reschedule so the loop doesn't die permanently
+            if not self._destroyed:
+                self.after(1000, self._refresh_loop)
             return
         # Skip heavy refresh during active window resize to prevent artifacts
         if getattr(self, '_resize_paused', False):
+            if not self._destroyed:
+                self.after(500, self._refresh_loop)
             return
         if getattr(self, '_is_fetching', False):
+            if not self._destroyed:
+                self.after(500, self._refresh_loop)
             return
             
         self._is_fetching = True
@@ -202,6 +209,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self.after(0, process_ui)
             except Exception:
                 self._is_fetching = False
+                # Reschedule even on fetch failure so the loop survives
+                if not getattr(self, '_destroyed', False):
+                    self.after(1000, self._refresh_loop)
                 
         import threading
         threading.Thread(target=fetch, daemon=True).start()
