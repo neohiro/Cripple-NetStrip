@@ -56,6 +56,15 @@ class NetStripAndroidUI(BoxLayout):
         self.status_label.text = "NetStrip Core Engine is Running in Background."
         self.btn.disabled = True
         
+        # Start Java VpnService
+        try:
+            context = PythonActivity.mActivity
+            service_intent = Intent(context, autoclass('org.cripple.netstrip.NetStripVpnService'))
+            service_intent.setAction("START")
+            context.startService(service_intent)
+        except Exception as e:
+            self.status_label.text = f"Failed to start Java VPN: {e}"
+        
         # Add a button to trust the current WiFi
         self.trust_btn = Button(text="Trust Current WiFi", size_hint=(1, 0.2))
         self.trust_btn.bind(on_press=self.toggle_trust_wifi)
