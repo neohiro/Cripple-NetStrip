@@ -49,7 +49,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
-          Move-Item -Path "dist\Cripple.exe" -Destination "NetStrip-${env:RELEASE_TAG}-Windows.exe" -Force
+          Compress-Archive -Path "dist\Cripple" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
 
       - name: Build macOS / Linux Executable
         if: matrix.os != 'windows-latest'
@@ -63,7 +63,9 @@ jobs:
             zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip NetStrip.app
             cd ..
           else
-            mv dist/NetStrip NetStrip-${RELEASE_TAG}-Linux
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip NetStrip
+            cd ..
           fi
 
       - name: Build Android APK
@@ -80,7 +82,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            NetStrip-*-Windows.exe
+            NetStrip-*-Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -91,7 +93,7 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             NetStrip-*-macOS.zip
-            NetStrip-*-Linux
+            NetStrip-*-Linux.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

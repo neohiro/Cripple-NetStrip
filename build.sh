@@ -113,7 +113,6 @@ if [ "$OS" = "Darwin" ]; then
     # macOS
     pyinstaller \
         --noconfirm \
-        --onefile \
         --windowed \
         --name "NetStrip" \
         --icon "assets/logo.icns" \
@@ -127,7 +126,6 @@ else
     # Linux
     pyinstaller \
         --noconfirm \
-        --onefile \
         --windowed \
         --name "NetStrip" \
         --add-data "$CTK_PATH:customtkinter/" \
@@ -138,18 +136,19 @@ else
         main.py
         
     echo "[5.5] Generating Linux .desktop shortcut..."
-    cat > dist/NetStrip.desktop << EOL
+    cat > dist/NetStrip/NetStrip.desktop << EOL
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=NetStrip
 Comment=Intelligent Network Traffic Debloater
-Exec=bash -c '"\\$(dirname "\\%k")/NetStrip/NetStrip"'
+Exec=bash -c '"\$(dirname "\%k")/NetStrip"'
 Icon=assets/logo.png
 Terminal=false
 Categories=Utility;Network;Security;
 EOL
-    chmod +x dist/NetStrip.desktop
+    chmod +x dist/NetStrip/NetStrip.desktop
+    cp assets/cripple_logo.png dist/NetStrip/assets/logo.png 2>/dev/null || true
 fi
 
 echo ""
