@@ -124,12 +124,22 @@ class LinuxPlatform(PlatformBase):
         return success
 
     def unblock_lan_traffic(self) -> bool:
-        lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         success = True
-        for subnet in lan_subnets:
+        subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+        for subnet in subnets:
             if self._run_cmd(["iptables", "-D", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode != 0:
                 success = False
+            if self._run_cmd(["iptables", "-D", "INPUT", "-s", subnet, "-j", "DROP"]).returncode != 0:
+                success = False
         return success
+
+    def lockdown_arp(self, ip: str, mac: str) -> bool:
+        res = self._run_cmd(["arp", "-s", ip, mac])
+        return res.returncode == 0
+        
+    def unlock_arp(self, ip: str) -> bool:
+        res = self._run_cmd(["arp", "-d", ip])
+        return res.returncode == 0
 
     def disable_ipv6(self) -> bool:
         success = True

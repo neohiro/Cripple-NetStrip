@@ -372,6 +372,20 @@ class SettingsView(ctk.CTkFrame):
         self._add_switch_row(card, "Disable IPv4 Globally", 'disable_ipv4_globally')
         self._add_subtitle(card, "EXPERIMENTAL: Rips IPv4 completely out of the OS network stack. Forces the machine to run exclusively on IPv6. Will break most standard LAN/WAN connections.")
 
+        # Kernel Anomaly Scanner
+        self._add_switch_row(card, "Kernel Anomaly Scanner", 'kernel_anomaly_scanner')
+        self._add_subtitle(card, "Actively scans for unauthorized NDIS filter drivers, WinPcap/libpcap raw sockets, and rogue VPN adapters that could bypass NetStrip's firewall. Escalates to Smart Shield upon detection.")
+
+        # Layer 2 ARP Lockdown
+        self._add_switch_row(card, "Layer 2 ARP Lockdown", 'layer2_arp_lockdown')
+        self._add_subtitle(card, "Enforces static MAC-to-IP pinning for your default gateway at the OS level. Mathematically prevents ARP Spoofing and Layer 2 redirection attacks without needing a custom kernel driver.")
+
+        # Linux Deep Kernel XDP Mode
+        import os
+        if os.name != 'nt' and os.uname().sysname == 'Linux':
+            self._add_switch_row(card, "Deep Kernel XDP Mode (eBPF)", 'linux_ebpf_mode')
+            self._add_subtitle(card, "Hooks a custom eBPF/XDP program directly into the physical Network Interface Card (NIC) driver to drop rogue Layer 2 and raw socket traffic before the Linux Kernel processes it.")
+
         # Strict Inbound Shield
         self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield')
         self._add_subtitle(card, "Overrides OS exceptions and hard-drops all unsolicited inbound connections (silently). May break local file sharing or game servers.")

@@ -102,6 +102,14 @@ class MacOSPlatform(PlatformBase):
                 success = False
         return success
 
+    def lockdown_arp(self, ip: str, mac: str) -> bool:
+        res = self._run_cmd(["arp", "-s", ip, mac])
+        return res.returncode == 0
+        
+    def unlock_arp(self, ip: str) -> bool:
+        res = self._run_cmd(["arp", "-d", ip])
+        return res.returncode == 0
+
     def disable_ipv6(self) -> bool:
         success = True
         for interface in self.get_active_interfaces():

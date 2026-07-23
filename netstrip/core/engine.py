@@ -53,6 +53,15 @@ class NetStripEngine:
         self.geoip = GeoIPService(self._handle_geoip_change, engine=self)
         self.network_monitor = NetworkMonitor(self._handle_network_change, engine=self)
         
+        from netstrip.core.anomaly_scanner import AnomalyScanner
+        self.anomaly_scanner = AnomalyScanner(engine=self)
+        self.anomaly_scanner.set_callback(self._handle_anomaly)
+        
+        self.ebpf_manager = None
+        if os.name != 'nt' and os.uname().sysname == 'Linux':
+            from netstrip.platform.linux_ebpf import EBPFManager
+            self.ebpf_manager = EBPFManager(interface="eth0") # Default fallback, will bind active later
+        
         # Zero-leak interceptor
         self.interceptor = get_interceptor(self._evaluate_packet, engine=self)
         self.engine_ready = False
@@ -114,6 +123,17 @@ class NetStripEngine:
                     self.on_status_update(msg)
                 except Exception:
                     pass
+                    
+    def _handle_anomaly(self, anomaly_data: dict):
+        # Escalate via Smart Shield
+        logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
+        self.trigger_threat_escalation({
+            'process_name': 'Kernel Bypass Scanner',
+            'domain': 'SYSTEM ANOMALY',
+            'threat_level': 'HIGH',
+            'note': anomaly_data['message']
+        })
+        self.on_status(anomaly_data['message'])
 
     def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
@@ -263,6 +283,9 @@ class NetStripEngine:
         self.connection_monitor.start()
         self.geoip.start()
         self.network_monitor.start()
+        self.anomaly_scanner.start()
+        if self.ebpf_manager and self.db.get_setting("linux_ebpf_mode", "false") == "true":
+            self.ebpf_manager.start()
         
         # Start background updater
         threading.Thread(target=self._update_checker_loop, daemon=True).start()
@@ -427,6 +450,9 @@ class NetStripEngine:
         self.connection_monitor.stop()
         self.geoip.stop()
         self.network_monitor.stop()
+        self.anomaly_scanner.stop()
+        if self.ebpf_manager:
+            self.ebpf_manager.stop()
         self.firewall.clear_all_rules()
         self.lan_shield.disable()
         self.set_killswitch(False)

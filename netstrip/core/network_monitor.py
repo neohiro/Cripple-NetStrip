@@ -76,11 +76,20 @@ class NetworkMonitor:
         if not self.current_state['gateway_ip']:
             self.current_state['gateway_ip'] = gw_ip
             self.current_state['gateway_mac'] = gw_mac
+            if self.engine and self.engine.db.get_setting("layer2_arp_lockdown", "false") == "true":
+                logger.info(f"ARP Lockdown Enabled: Pinning Gateway {gw_ip} to {gw_mac}")
+                self.platform.lockdown_arp(gw_ip, gw_mac)
             return
 
         # Check for changes
         if self.current_state['gateway_ip'] == gw_ip and self.current_state['gateway_mac'] != gw_mac:
             # ARP Spoofing detected! Gateway IP is the same, but the MAC address changed suddenly.
+            
+            # If we are locked down, re-assert the pin to fight the spoofer
+            if self.engine and self.engine.db.get_setting("layer2_arp_lockdown", "false") == "true":
+                logger.warning(f"ARP Spoofing mitigated! Re-pinning static ARP for {gw_ip}")
+                self.platform.lockdown_arp(gw_ip, self.current_state['gateway_mac'])
+                
             if self.callback:
                 self.callback({
                     'type': 'arp_spoof',
@@ -92,6 +101,13 @@ class NetworkMonitor:
 
         elif self.current_state['gateway_ip'] != gw_ip:
             # Network changed (e.g. connected to new Wi-Fi)
+            
+            # Unlock the old one if we were locked
+            if self.engine and self.engine.db.get_setting("layer2_arp_lockdown", "false") == "true":
+                self.platform.unlock_arp(self.current_state['gateway_ip'])
+                logger.info(f"ARP Lockdown: Pinning NEW Gateway {gw_ip} to {gw_mac}")
+                self.platform.lockdown_arp(gw_ip, gw_mac)
+                
             if self.callback:
                 self.callback({
                     'type': 'network_change',
