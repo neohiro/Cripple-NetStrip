@@ -34,13 +34,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk
+          sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev
+          sudo apt-get install -y zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libstdc++6
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install Pillow pyinstaller
+          pip install Pillow pyinstaller buildozer cython virtualenv
 
       - name: Build Windows Executable
         if: matrix.os == 'windows-latest'
@@ -55,7 +56,14 @@ jobs:
           bash build.sh
           cd dist
           zip -r ../NetStrip-${{ runner.os }}.zip ./*
+          cd ..
 
+      - name: Build Android APK
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          yes | buildozer android debug || true
+          # Note: buildozer usually outputs to bin/
+          
       - name: Upload Release Asset (Windows)
         if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v2
@@ -71,5 +79,14 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: NetStrip-${{ runner.os }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset (Android APK)
+        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: bin/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import threading
+import sys
 from typing import Callable, Optional
 
 import psutil
@@ -43,7 +44,13 @@ class NetStripEngine:
         
         self.blocklist = BlocklistManager(db=self.db)
         self.classifier = TrafficClassifier(self.blocklist, db=self.db)
-        self.dns_proxy = DNSProxyService(self.classifier, self.db, bind_ip="127.127.127.127", engine=self)
+        
+        # On Android, binding to port 53 is forbidden without root. Bind to 5353 instead.
+        is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
+        dns_bind_ip = "127.0.0.1" if is_android else "127.127.127.127"
+        dns_port = 5353 if is_android else 53
+        
+        self.dns_proxy = DNSProxyService(self.classifier, self.db, bind_ip=dns_bind_ip, port=dns_port, engine=self)
         self.connection_monitor = ConnectionMonitor(self.classifier, self.db, poll_interval=0.2)
         
         self.firewall = FirewallController()
