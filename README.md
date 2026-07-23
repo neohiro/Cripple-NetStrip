@@ -91,7 +91,7 @@ Full profile backup and import via JSON is built in. The export captures **all**
 ## 📖 Installation
 
 ### Option 1: Standalone Executable (Recommended for Windows, macOS & Linux)
-Download the pre-compiled `.exe` file from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator. No Python installation required.
+Download the pre-compiled `.exe/...` runfile from the [GitHub Releases page](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator/sudo. No Python installation required.
 
 ### Option 2: Run from Source (All Platforms)
 
