@@ -115,6 +115,9 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
+            # Fail-open: Always re-enable IPv6 bindings if the engine crashes, so the user has internet
+            subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
+                
         elif sys_plat == "Darwin": # macOS
             res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)
             interfaces = [line.strip() for line in res.stdout.splitlines() if line.strip() and "*" not in line]
@@ -124,6 +127,7 @@ def restore_network():
             for interface in interfaces:
                 logging.info(f"Restoring DNS for interface: {interface}")
                 subprocess.run(["networksetup", "-setdnsservers", interface, "Empty"])
+                subprocess.run(["networksetup", "-setv6automatic", interface])
                 
             subprocess.run(["sysctl", "-w", "net.inet6.ip6.accept_rtadv=1"])
             
@@ -132,6 +136,8 @@ def restore_network():
             for proto in ["udp", "tcp"]:
                 subprocess.run(["iptables", "-t", "nat", "-D", "OUTPUT", "-p", proto, "--dport", "53", "-j", "REDIRECT", "--to-ports", "53"])
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
+            subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0"])
+            subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
             
         logging.info("Emergency restore completed successfully.")
     except Exception as e:

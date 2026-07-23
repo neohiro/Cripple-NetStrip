@@ -260,6 +260,13 @@ class NetStripEngine:
         for interface in self.platform.get_active_interfaces():
             current_upstream = self.db.get_setting("dns_upstream")
             
+        # Re-apply global IPv6 block if user had it enabled in settings
+        if self.db.get_setting("disable_ipv6_globally", "false") == "true":
+            try:
+                self.platform.disable_ipv6()
+            except Exception as e:
+                logger.error(f"Failed to re-apply global IPv6 block: {e}")
+            
             # If the current upstream is corrupted/looping to itself, clear it
             if current_upstream == "127.127.127.127":
                 current_upstream = None
@@ -377,6 +384,13 @@ class NetStripEngine:
         for interface in self.platform.get_active_interfaces():
             original_dns = self.db.get_setting(f"backup_dns_{interface}", "dhcp")
             self.platform.restore_system_dns(interface, original_dns)
+            
+        # Re-enable global IPv6 so the user's internet is not permanently broken after exiting
+        if self.db.get_setting("disable_ipv6_globally", "false") == "true":
+            try:
+                self.platform.enable_ipv6()
+            except Exception as e:
+                logger.error(f"Failed to restore global IPv6: {e}")
             
         if self.watchdog_thread:
             self.watchdog_thread.join(timeout=1.0)
