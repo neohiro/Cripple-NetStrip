@@ -117,31 +117,53 @@ def is_server_or_embedded():
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
-        print(f"\n{'='*50}\nCripple (NetStrip) V2 CLI / Daemon\n{'='*50}")
-        print("BOOT VARIABLES:")
-        print("  --service         Force headless/daemon mode (no UI).")
-        print("  --blockinbound    Strict isolation mode (blocks all inbound connections).")
-        print("  --allowlan        Permit LAN connections even in strict modes.")
-        print("  --android         Force Android/Mobile layout for UI testing.")
-        print("\nCLI MANAGEMENT COMMANDS (Sent to running background daemon via IPC):")
-        print("  --block <domain>  Add a domain to the user blocklist dynamically.")
-        print("  --allow <domain>  Add a domain to the user allowlist dynamically.")
-        print("  --mode <MODE>     Switch the engine mode (LOOSE, STANDARD, STRICT, PARANOID).")
-        print("  --status          Print the current lockdown state & active kernel anomalies.")
-        print("  --allow-anomaly <name> Whitelist a specific kernel threat and unlock the system.")
-        print(f"{'='*50}\n")
+        print(f"\n{'='*60}")
+        print(f"  Cripple (NetStrip) v3.1.0 — CLI / Daemon")
+        print(f"{'='*60}")
+        print("\nBOOT VARIABLES:")
+        print("  --service              Headless/daemon mode (no GUI).")
+        print("  --blockinbound         Block ALL inbound connections (strict isolation).")
+        print("  --allowlan             Permit LAN connections even in strict modes.")
+        print("  --android              Force Android/Mobile layout for UI testing.")
+        print("\nDIRECT COMMANDS (no running daemon needed):")
+        print("  --set-psk <KEY>        Set LAN Shield PSK (44-char Fernet key).")
+        print("  --get-psk              Display the current LAN Shield PSK.")
+        print("  --set <key> <value>    Set any engine setting directly in the database.")
+        print("  --get <key>            Get any engine setting from the database.")
+        print("  --set-telemetry-token <PAT>  Save GitHub telemetry token.")
+        print("  --export <file.json>   Export full settings/rules profile to JSON.")
+        print("  --import <file.json>   Import settings/rules profile from JSON.")
+        print("\nLIVE IPC COMMANDS (sent to running daemon):")
+        print("  --block <domain>       Add domain to user blocklist.")
+        print("  --allow <domain>       Add domain to user allowlist.")
+        print("  --mode <MODE>          Switch mode: LOOSE, STANDARD, STRICT, PARANOID.")
+        print("  --status               Print daemon status, mode, and active threats.")
+        print("  --stats                Print 24h connection statistics.")
+        print("  --allow-anomaly <name> Whitelist a kernel threat and unlock system.")
+        print("  --killswitch           Engage the master killswitch (drop all traffic).")
+        print("  --unkillswitch         Disengage the master killswitch.")
+        print("  --ghost                Engage Ghost Mode (total network isolation).")
+        print("  --unghost              Disengage Ghost Mode.")
+        print("  --update-blocklists    Force an immediate blocklist refresh.")
+        print("  --trust-wifi <SSID>    Mark a WiFi network as trusted for LAN Shield.")
+        print("  --untrust-wifi <SSID>  Remove a WiFi network from trusted list.")
+        print(f"{'='*60}\n")
         sys.exit(0)
+
+    # --- Direct database commands (no running daemon needed) ---
+    def _get_db():
+        from pathlib import Path
+        from netstrip.data.database import Database
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return Database(str(db_path))
 
     # Handle telemetry token setup
     if "--set-telemetry-token" in sys.argv:
         try:
             idx = sys.argv.index("--set-telemetry-token")
             token = sys.argv[idx + 1]
-            from pathlib import Path
-            from netstrip.data.database import Database
-            db_path = Path.home() / ".netstrip" / "netstrip.db"
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            db = Database(str(db_path))
+            db = _get_db()
             db.set_setting("telemetry_github_token", token)
             db.stop()
             print(f"Telemetry token saved successfully.")
@@ -149,6 +171,111 @@ def main():
             print("Usage: --set-telemetry-token <GITHUB_PAT>")
         except Exception as e:
             print(f"Error saving token: {e}")
+        sys.exit(0)
+
+    # PSK management
+    if "--set-psk" in sys.argv:
+        try:
+            idx = sys.argv.index("--set-psk")
+            psk = sys.argv[idx + 1].strip()
+            # Validate Fernet key format
+            if len(psk) != 44 or not psk.endswith('='):
+                print("Error: PSK must be a 44-character Fernet key (base64 ending with '=').")
+                sys.exit(1)
+            try:
+                from cryptography.fernet import Fernet
+                Fernet(psk.encode('utf-8'))  # Validates structure
+            except Exception:
+                print("Error: Invalid Fernet key format.")
+                sys.exit(1)
+            db = _get_db()
+            db.set_setting("lan_shield_psk", psk)
+            db.stop()
+            print(f"LAN Shield PSK saved successfully.")
+            print(f"Restart the daemon for the new key to take effect, or use the GUI which hot-reloads.")
+        except IndexError:
+            print("Usage: --set-psk <44-char-Fernet-key>")
+        except Exception as e:
+            print(f"Error saving PSK: {e}")
+        sys.exit(0)
+
+    if "--get-psk" in sys.argv:
+        try:
+            db = _get_db()
+            psk = db.get_setting("lan_shield_psk", "")
+            db.stop()
+            if psk:
+                print(f"LAN Shield PSK: {psk}")
+                print(f"Copy this key to other Cripple instances on your LAN to pair them.")
+            else:
+                print("No PSK configured yet. Start the daemon once to auto-generate, or use --set-psk.")
+        except Exception as e:
+            print(f"Error reading PSK: {e}")
+        sys.exit(0)
+
+    # Generic settings get/set
+    if "--set" in sys.argv and "--set-psk" not in sys.argv and "--set-telemetry-token" not in sys.argv:
+        try:
+            idx = sys.argv.index("--set")
+            key = sys.argv[idx + 1]
+            value = sys.argv[idx + 2]
+            db = _get_db()
+            db.set_setting(key, value)
+            db.stop()
+            print(f"Setting '{key}' = '{value}' saved.")
+        except IndexError:
+            print("Usage: --set <key> <value>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    if "--get" in sys.argv and "--get-psk" not in sys.argv:
+        try:
+            idx = sys.argv.index("--get")
+            key = sys.argv[idx + 1]
+            db = _get_db()
+            value = db.get_setting(key, "(not set)")
+            db.stop()
+            print(f"{key} = {value}")
+        except IndexError:
+            print("Usage: --get <key>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    # Profile export/import
+    if "--export" in sys.argv:
+        try:
+            idx = sys.argv.index("--export")
+            filepath = sys.argv[idx + 1]
+            db = _get_db()
+            profile = db.export_profile()
+            db.stop()
+            import json
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(profile, f, indent=2)
+            print(f"Profile exported to {filepath}")
+        except IndexError:
+            print("Usage: --export <output.json>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    if "--import" in sys.argv:
+        try:
+            idx = sys.argv.index("--import")
+            filepath = sys.argv[idx + 1]
+            import json
+            with open(filepath, 'r', encoding='utf-8') as f:
+                profile = json.load(f)
+            db = _get_db()
+            db.import_profile(profile)
+            db.stop()
+            print(f"Profile imported from {filepath}")
+        except IndexError:
+            print("Usage: --import <input.json>")
+        except Exception as e:
+            print(f"Error: {e}")
         sys.exit(0)
 
     is_fallback = "--fallback-admin" in sys.argv
@@ -218,26 +345,54 @@ def main():
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(('127.0.0.1', IPC_PORT))
+            client.settimeout(5.0)
             
             # CLI Management Commands
             if "--block" in sys.argv:
                 domain = sys.argv[sys.argv.index("--block") + 1]
                 client.sendall(f"BLOCK:{domain}\n".encode())
-                print(f"Sent block command for {domain} to background daemon.")
+                print(f"✓ Sent block command for {domain}")
             elif "--allow" in sys.argv:
                 domain = sys.argv[sys.argv.index("--allow") + 1]
                 client.sendall(f"ALLOW:{domain}\n".encode())
-                print(f"Sent allow command for {domain} to background daemon.")
+                print(f"✓ Sent allow command for {domain}")
             elif "--mode" in sys.argv:
                 mode = sys.argv[sys.argv.index("--mode") + 1]
                 client.sendall(f"MODE:{mode}\n".encode())
-                print(f"Sent mode change command ({mode}) to background daemon.")
+                print(f"✓ Mode changed to {mode.upper()}")
             elif "--allow-anomaly" in sys.argv:
                 anomaly = sys.argv[sys.argv.index("--allow-anomaly") + 1]
                 client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
-                print(f"Sent whitelist command for anomaly '{anomaly}' to background daemon.")
+                print(f"✓ Whitelisted anomaly: {anomaly}")
+            elif "--killswitch" in sys.argv and "--unkillswitch" not in sys.argv:
+                client.sendall(b"KILLSWITCH:ON\n")
+                print("✓ Master Killswitch ENGAGED — all traffic dropped")
+            elif "--unkillswitch" in sys.argv:
+                client.sendall(b"KILLSWITCH:OFF\n")
+                print("✓ Master Killswitch DISENGAGED")
+            elif "--ghost" in sys.argv and "--unghost" not in sys.argv:
+                client.sendall(b"GHOST:ON\n")
+                print("✓ Ghost Mode ENGAGED — total network isolation")
+            elif "--unghost" in sys.argv:
+                client.sendall(b"GHOST:OFF\n")
+                print("✓ Ghost Mode DISENGAGED")
+            elif "--update-blocklists" in sys.argv:
+                client.sendall(b"UPDATE_BLOCKLISTS\n")
+                print("✓ Blocklist refresh triggered")
+            elif "--trust-wifi" in sys.argv:
+                ssid = sys.argv[sys.argv.index("--trust-wifi") + 1]
+                client.sendall(f"TRUSTWIFI:{ssid}\n".encode())
+                print(f"✓ WiFi '{ssid}' marked as trusted")
+            elif "--untrust-wifi" in sys.argv:
+                ssid = sys.argv[sys.argv.index("--untrust-wifi") + 1]
+                client.sendall(f"UNTRUSTWIFI:{ssid}\n".encode())
+                print(f"✓ WiFi '{ssid}' removed from trusted list")
             elif "--status" in sys.argv:
                 client.sendall(b"STATUS\n")
+                response = client.recv(4096).decode()
+                print(response)
+            elif "--stats" in sys.argv:
+                client.sendall(b"STATS\n")
                 response = client.recv(4096).decode()
                 print(response)
             elif "--service" in sys.argv:
@@ -304,14 +459,58 @@ def main():
                         if pending.startswith(anomaly):
                             engine_instance.db.set_setting("pending_kernel_threat", "")
                             engine_instance.set_killswitch(False)
+                    elif data.startswith("KILLSWITCH:"):
+                        state = data.split("KILLSWITCH:")[1].strip().upper()
+                        engine_instance.set_killswitch(state == "ON")
+                        logger.info(f"Killswitch {'engaged' if state == 'ON' else 'disengaged'} via CLI")
+                    elif data.startswith("GHOST:"):
+                        state = data.split("GHOST:")[1].strip().upper()
+                        if state == "ON":
+                            engine_instance.db.set_setting("ghost_mode", "true")
+                            engine_instance.set_killswitch(True)
+                            logger.warning("Ghost Mode engaged via CLI — total network isolation")
+                        else:
+                            engine_instance.db.set_setting("ghost_mode", "false")
+                            engine_instance.set_killswitch(False)
+                            logger.info("Ghost Mode disengaged via CLI")
+                    elif data.startswith("UPDATE_BLOCKLISTS"):
+                        if hasattr(engine_instance, 'updater') and engine_instance.updater:
+                            engine_instance.updater.check_and_update()
+                            logger.info("Blocklist update triggered via CLI")
+                    elif data.startswith("TRUSTWIFI:"):
+                        ssid = data.split("TRUSTWIFI:")[1].strip()
+                        engine_instance.db.add_trusted_wifi(ssid)
+                        logger.info(f"WiFi '{ssid}' trusted via CLI")
+                    elif data.startswith("UNTRUSTWIFI:"):
+                        ssid = data.split("UNTRUSTWIFI:")[1].strip()
+                        engine_instance.db.remove_trusted_wifi(ssid)
+                        logger.info(f"WiFi '{ssid}' untrusted via CLI")
+                    elif data.startswith("STATS"):
+                        try:
+                            stats = engine_instance.db.get_today_stats()
+                            stat_str = f"NetStrip 24h Statistics:\n"
+                            stat_str += f"  Blocked:    {stats.get('blocked', 0):,}\n"
+                            stat_str += f"  Allowed:    {stats.get('allowed', 0):,}\n"
+                            stat_str += f"  DNS:        {stats.get('dns_queries', 0):,}\n"
+                            stat_str += f"  Ads:        {stats.get('blocked_ads', 0):,}\n"
+                            stat_str += f"  Trackers:   {stats.get('blocked_trackers', 0):,}\n"
+                            stat_str += f"  Telemetry:  {stats.get('blocked_telemetry', 0):,}\n"
+                            stat_str += f"  Malware:    {stats.get('blocked_malware', 0):,}\n"
+                            conn.sendall(stat_str.encode())
+                        except Exception as e:
+                            conn.sendall(f"Error fetching stats: {e}\n".encode())
                     elif data.startswith("STATUS"):
                         status_str = f"NetStrip Daemon Status:\n"
-                        status_str += f"Mode: {engine_instance.classifier.mode.name}\n"
+                        status_str += f"  Mode:       {engine_instance.classifier.mode.name}\n"
+                        status_str += f"  Killswitch: {'ACTIVE' if engine_instance.db.get_setting('killswitch_active', 'false') == 'true' else 'inactive'}\n"
+                        status_str += f"  Ghost Mode: {'ACTIVE' if engine_instance.db.get_setting('ghost_mode', 'false') == 'true' else 'inactive'}\n"
+                        psk = engine_instance.db.get_setting('lan_shield_psk', '')
+                        status_str += f"  LAN Shield: {'paired (PSK set)' if psk else 'not configured'}\n"
                         pending = engine_instance.db.get_setting("pending_kernel_threat", "")
                         if pending:
-                            status_str += f"CRITICAL SYSTEM LOCKDOWN ACTIVE: {pending}\n"
+                            status_str += f"  ⚠ LOCKDOWN: {pending}\n"
                         else:
-                            status_str += "No active kernel threats detected\n"
+                            status_str += "  Threats:    none detected\n"
                         conn.sendall(status_str.encode())
                 conn.close()
             except Exception:
