@@ -32,6 +32,8 @@ pyinstaller ^
     --uac-admin ^
     --name "Cripple" ^
     --icon "assets/logo.ico" ^
+    --paths "." ^
+    --collect-all "netstrip" ^
     --add-data "%CTK_PATH%;customtkinter/" ^
     --add-data "netstrip/data/lists;netstrip/data/lists" ^
     --add-data "netstrip/data/updater_sources.json;netstrip/data" ^

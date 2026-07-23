@@ -116,6 +116,8 @@ if [ "$OS" = "Darwin" ]; then
         --windowed \
         --name "NetStrip" \
         --icon "assets/logo.icns" \
+        --paths "." \
+        --collect-all "netstrip" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
@@ -128,6 +130,8 @@ else
         --noconfirm \
         --windowed \
         --name "NetStrip" \
+        --paths "." \
+        --collect-all "netstrip" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
