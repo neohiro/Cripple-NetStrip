@@ -208,8 +208,8 @@ def _send_email(subject: str, body: str) -> bool:
 
 def _send_via_https(subject: str, body: str) -> bool:
     """
-    Send crash report via HTTPS POST to a crash collection endpoint.
-    Falls back to creating a GitHub issue if the primary endpoint fails.
+    Send crash report via HTTPS POST to the GitHub API crash endpoint.
+    This is a secondary delivery method backing up the primary GitHub telemetry module.
     """
     try:
         import urllib.request
@@ -221,18 +221,18 @@ def _send_via_https(subject: str, body: str) -> bool:
             "labels": ["crash-report", "automated"]
         }).encode("utf-8")
         
-        # Primary: NetStrip crash endpoint
+        # Direct GitHub Issues API (public repo)
         try:
             req = urllib.request.Request(
-                "https://crash.netstrip.io/v1/report",
+                GITHUB_CRASH_ENDPOINT,
                 data=payload,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
             ctx = ssl.create_default_context()
             with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
-                if resp.status == 200:
-                    logger.info("Crash report sent via HTTPS endpoint")
+                if resp.status in (200, 201):
+                    logger.info("Crash report sent via GitHub Issues API")
                     return True
         except Exception:
             pass

@@ -370,7 +370,7 @@ class SettingsView(ctk.CTkFrame):
 
             if setting_key == 'analytics_opt_in':
                 # Whitelist/un-whitelist the telemetry delivery domains
-                telemetry_domains = ['api.github.com', 'analytics.netstrip.io', 'crash.netstrip.io']
+                telemetry_domains = ['api.github.com']
                 bl = self.engine.classifier.blocklist
                 if value == 'true':
                     for d in telemetry_domains:

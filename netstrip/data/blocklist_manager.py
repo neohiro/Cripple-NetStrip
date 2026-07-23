@@ -28,9 +28,8 @@ CATEGORY_PRIORITY = {
 # Crash report infrastructure — NEVER block these, even in Paranoid mode.
 # These domains are categorized as Essential so crash telemetry always reaches the developer.
 CRASH_REPORT_ESSENTIAL_DOMAINS = frozenset({
-    'api.github.com',        # Primary: GitHub Issues API for crash reports
-    'crash.netstrip.io',     # Secondary: HTTPS crash collection endpoint
-    'frenzypenguin.media',   # Tertiary: MX email delivery for crash reports
+    'api.github.com',        # Primary: GitHub Issues API for crash reports & telemetry
+    'frenzypenguin.media',   # Secondary: MX email delivery for crash reports
     'github.com',            # GitHub web (update checks, release downloads)
 })
 
@@ -400,7 +399,7 @@ class BlocklistManager:
                     '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
                     'ip-api.com', 'ipify.org',
                     # Crash Reporting (Essential) — always allowed
-                    'api.github.com', 'crash.netstrip.io', 'frenzypenguin.media', 'github.com',
+                    'api.github.com', 'frenzypenguin.media', 'github.com',
                 )
                 for d in essential_dns:
                     if not query or query in d:

@@ -36,8 +36,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Analytics endpoint — receives anonymous JSON payloads via HTTPS POST
-ANALYTICS_ENDPOINT = "https://analytics.netstrip.io/v1/report"
+# Analytics delivery uses GitHub telemetry (see github_telemetry.py) as primary channel
 
 # How often to send analytics (in seconds) — once every 24 hours
 REPORT_INTERVAL = 86400
@@ -76,7 +75,7 @@ class AnalyticsReporter:
         """Whitelist the telemetry delivery endpoints so reports can pass the firewall."""
         try:
             bl = self.engine.classifier.blocklist
-            for d in ('api.github.com', 'analytics.netstrip.io', 'crash.netstrip.io'):
+            for d in ('api.github.com',):
                 bl.add_user_whitelist(d)
             self.engine.classifier._domain_cache.clear()
         except Exception:
@@ -176,24 +175,13 @@ class AnalyticsReporter:
         """Send the analytics payload. Tries HTTPS endpoint first, then email fallback."""
         sent = False
         
-        # Channel 1: HTTPS POST to analytics endpoint
+        # Channel 1: GitHub telemetry (primary — real working endpoint)
         try:
-            import urllib.request
-            import ssl
-
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                ANALYTICS_ENDPOINT,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
-                if resp.status == 200:
-                    sent = True
+            from netstrip.core.github_telemetry import submit_analytics
+            if submit_analytics(payload):
+                sent = True
         except Exception as e:
-            logger.debug(f"HTTPS analytics delivery failed (non-critical): {e}")
+            logger.debug(f"GitHub analytics delivery failed (non-critical): {e}")
         
         # Channel 2: Email fallback to developer
         if not sent:
