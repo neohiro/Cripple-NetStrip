@@ -142,6 +142,7 @@ class LANShield:
                 logger.warning(f"LAN Shield Passive Mode: Dropping '{btype}' broadcast. Untrusted WiFi: {current_ssid or '<unknown>'}")
                 return
                 
+        sock = None
         try:
             import secrets
             payload = {
@@ -156,10 +157,13 @@ class LANShield:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.sendto(msg, ("255.255.255.255", 54321))
-            sock.close()
             logger.info(f"LAN Shield: Successfully broadcasted {btype} to LAN clients.")
         except Exception as e:
             logger.error(f"Failed to broadcast {btype}: {e}")
+        finally:
+            if sock:
+                try: sock.close()
+                except: pass
 
     def broadcast_anomaly(self, anomaly_data: dict):
         self._send_encrypted_broadcast('LAN_THREAT_BROADCAST', anomaly_data.get('note', 'Unknown Threat'))

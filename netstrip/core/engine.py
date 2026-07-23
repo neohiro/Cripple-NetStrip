@@ -99,6 +99,10 @@ class NetStripEngine:
         self.on_smart_trigger: Callable = None
         self.killswitch_active = False
         
+        # SSH Safeguard: cached in-memory to avoid DB queries on every inbound packet
+        ssh_val = self.db.get_setting('ssh_safeguard', 'true' if self.is_headless else 'false')
+        self.ssh_safeguard_enabled = (ssh_val == 'true')
+        
         # HIGH-7: PID→process name cache to avoid costly psutil.Process().name() on every packet
         self._pid_name_cache = {}  # {pid: (name, timestamp)}
         self._pid_cache_ttl = 60  # seconds
@@ -234,12 +238,11 @@ class NetStripEngine:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
 
         # SSH Safeguard: Always allow inbound SSH (port 22, 2222) when enabled.
+        # Cached in self.ssh_safeguard_enabled to avoid per-packet DB queries.
         # This prevents lockout on headless/remote-managed devices during
         # killswitch, ghost mode, paranoid mode, or strict inbound shield.
-        if is_inbound and dst_port in (22, 2222):
-            ssh_safeguard = self.db.get_setting('ssh_safeguard', 'true' if self.is_headless else 'false')
-            if ssh_safeguard == 'true':
-                return True
+        if is_inbound and dst_port in (22, 2222) and self.ssh_safeguard_enabled:
+            return True
 
         if self.killswitch_active:
             if dst_ip not in ("127.0.0.1", "127.127.127.127", "::1"):

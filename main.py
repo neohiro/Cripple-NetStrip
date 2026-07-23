@@ -367,17 +367,31 @@ def main():
             client.connect(('127.0.0.1', IPC_PORT))
             client.settimeout(5.0)
             
-            # CLI Management Commands
+            # CLI Management Commands — validate args before IPC send
+            def _get_cli_arg(flag):
+                """Get the argument after a CLI flag, or print usage and exit."""
+                idx = sys.argv.index(flag)
+                if idx + 1 >= len(sys.argv):
+                    print(f"Error: {flag} requires an argument. Run --help for usage.")
+                    client.close()
+                    sys.exit(1)
+                return sys.argv[idx + 1]
+
             if "--block" in sys.argv:
-                domain = sys.argv[sys.argv.index("--block") + 1]
+                domain = _get_cli_arg("--block")
                 client.sendall(f"BLOCK:{domain}\n".encode())
                 print(f"✓ Sent block command for {domain}")
             elif "--allow" in sys.argv:
-                domain = sys.argv[sys.argv.index("--allow") + 1]
+                domain = _get_cli_arg("--allow")
                 client.sendall(f"ALLOW:{domain}\n".encode())
                 print(f"✓ Sent allow command for {domain}")
             elif "--mode" in sys.argv:
-                mode = sys.argv[sys.argv.index("--mode") + 1].upper()
+                mode = _get_cli_arg("--mode").upper()
+                from netstrip.core.modes import ProtectionLevel
+                if not hasattr(ProtectionLevel, mode):
+                    print(f"Error: Unknown mode '{mode}'. Valid: LOOSE, STANDARD, NORMAL, STRICT, PARANOID.")
+                    client.close()
+                    sys.exit(1)
                 if mode in ("PARANOID", "STRICT") and "--force" not in sys.argv:
                     print("")
                     print("  ╔══════════════════════════════════════════════════════╗")
@@ -400,7 +414,7 @@ def main():
                 client.sendall(f"MODE:{mode}\n".encode())
                 print(f"✓ Mode changed to {mode}")
             elif "--allow-anomaly" in sys.argv:
-                anomaly = sys.argv[sys.argv.index("--allow-anomaly") + 1]
+                anomaly = _get_cli_arg("--allow-anomaly")
                 client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
                 print(f"✓ Whitelisted anomaly: {anomaly}")
             elif "--killswitch" in sys.argv and "--unkillswitch" not in sys.argv:
@@ -461,11 +475,11 @@ def main():
                 client.sendall(b"UPDATE_BLOCKLISTS\n")
                 print("✓ Blocklist refresh triggered")
             elif "--trust-wifi" in sys.argv:
-                ssid = sys.argv[sys.argv.index("--trust-wifi") + 1]
+                ssid = _get_cli_arg("--trust-wifi")
                 client.sendall(f"TRUSTWIFI:{ssid}\n".encode())
                 print(f"✓ WiFi '{ssid}' marked as trusted")
             elif "--untrust-wifi" in sys.argv:
-                ssid = sys.argv[sys.argv.index("--untrust-wifi") + 1]
+                ssid = _get_cli_arg("--untrust-wifi")
                 client.sendall(f"UNTRUSTWIFI:{ssid}\n".encode())
                 print(f"✓ WiFi '{ssid}' removed from trusted list")
             elif "--status" in sys.argv:
@@ -568,11 +582,11 @@ def main():
                         logger.info(f"WiFi '{ssid}' untrusted via CLI")
                     elif data.startswith("STATS"):
                         try:
-                            stats = engine_instance.db.get_today_stats()
+                            stats = engine_instance.db.get_24h_statistics()
                             stat_str = f"NetStrip 24h Statistics:\n"
-                            stat_str += f"  Blocked:    {stats.get('blocked', 0):,}\n"
-                            stat_str += f"  Allowed:    {stats.get('allowed', 0):,}\n"
-                            stat_str += f"  DNS:        {stats.get('dns_queries', 0):,}\n"
+                            stat_str += f"  Blocked:    {stats.get('total_blocked', 0):,}\n"
+                            stat_str += f"  Allowed:    {stats.get('total_allowed', 0):,}\n"
+                            stat_str += f"  Total DNS:  {stats.get('total_queries', 0):,}\n"
                             stat_str += f"  Ads:        {stats.get('blocked_ads', 0):,}\n"
                             stat_str += f"  Trackers:   {stats.get('blocked_trackers', 0):,}\n"
                             stat_str += f"  Telemetry:  {stats.get('blocked_telemetry', 0):,}\n"

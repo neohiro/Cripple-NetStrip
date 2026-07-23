@@ -9,9 +9,11 @@ from typing import List
 
 
 class ProtectionLevel(Enum):
-    """The three core protection modes."""
+    """The core protection modes."""
     PARANOID = auto()
+    STRICT = auto()     # Alias for PARANOID (CLI compatibility)
     NORMAL = auto()
+    STANDARD = auto()   # Alias for NORMAL (CLI compatibility)
     LOOSE = auto()
 
 
@@ -207,7 +209,9 @@ LOOSE_MODE = ModeConfig(
 # Mode lookup
 MODES = {
     ProtectionLevel.PARANOID: PARANOID_MODE,
+    ProtectionLevel.STRICT: PARANOID_MODE,    # STRICT is an alias for PARANOID
     ProtectionLevel.NORMAL: NORMAL_MODE,
+    ProtectionLevel.STANDARD: NORMAL_MODE,    # STANDARD is an alias for NORMAL
     ProtectionLevel.LOOSE: LOOSE_MODE,
 }
 
