@@ -12,7 +12,7 @@
 
   *Strip away the noise. Take back control of your network.*
 
-  > **🚀 v3.0.0** — Rebuilt zero-leak kernel interception engine, multi-platform IPC daemon architecture, and futuristic-minimalist UI.
+  > **🚀 v3.0.0** — Rebuilt zero-leak kernel interception engine, multi-platform IPC daemon architecture, and more!
 
 </div>
 
