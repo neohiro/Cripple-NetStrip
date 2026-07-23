@@ -489,6 +489,11 @@ def main():
         app.mainloop()
     except Exception as e:
         logger.error(f"Mainloop Error: {e}")
+        if engine_instance:
+            try:
+                engine_instance.stop()
+            except Exception:
+                pass
         try:
             from netstrip.core.crash_reporter import send_crash_report
             send_crash_report(exception=e, context="mainloop")
@@ -496,7 +501,10 @@ def main():
             pass
     finally:
         if engine_instance:
-            engine_instance.stop()
+            try:
+                engine_instance.stop()
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     main()

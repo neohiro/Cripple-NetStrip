@@ -66,24 +66,8 @@ def get_clean_exit_path():
     return Path.home() / ".netstrip" / ".clean_exit"
 
 def restore_network():
-    """Fail-Open: Restore the OS DNS settings to default if NetStrip crashes."""
-    logging.info("NetStrip crash detected! Initiating emergency DNS restore...")
-    
-    # Send crash report to developer (consent-aware)
-    try:
-        sys.path.insert(0, str(Path(__file__).parent.parent))
-        from netstrip.core.crash_reporter import send_crash_report
-        send_crash_report(
-            context="watchdog_crash_recovery",
-            extra_info={
-                "trigger": "Parent process died unexpectedly",
-                "watchdog_pid": os.getpid(),
-                "action": "Restoring network to fail-open state",
-            },
-            require_consent=True,
-        )
-    except Exception as e:
-        logging.error(f"Failed to send watchdog crash report: {e}")
+    """Fail-Open: Restore the OS DNS settings and firewall rules to default if NetStrip crashes."""
+    logging.info("NetStrip crash detected! Initiating emergency DNS and network restore...")
     
     import platform
     sys_plat = platform.system()
@@ -131,18 +115,14 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-            # Fail-open: Always re-enable IPv6/IPv4 bindings if the engine crashes, so the user has internet
-            subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
-            
-            # Fail-open: Remove ALL NetStrip firewall rules (killswitch, IP blocks, LAN blocks, app blocks)
-            # This is critical — without this, orphaned killswitch rules permanently block all traffic
-            logging.info("Removing all NetStrip firewall rules...")
-            subprocess.run(
-                ["powershell", "-Command",
-                 "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"],
-                creationflags=subprocess.CREATE_NO_WINDOW
+            # Fail-open: Fast batch PowerShell command to re-enable bindings and wipe all NetStrip firewall rules in a single process
+            logging.info("Removing NetStrip firewall rules & re-enabling adapters...")
+            ps_script = (
+                "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'; "
+                "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'; "
+                "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"
             )
+            subprocess.run(["powershell", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
                 
         elif sys_plat == "Darwin": # macOS
             res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)
@@ -171,9 +151,28 @@ def restore_network():
             while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
                 subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
             
-        logging.info("Emergency restore completed successfully.")
+        logging.info("Emergency network restore completed successfully.")
     except Exception as e:
         logging.error(f"Failed to restore network: {e}")
+
+    # Briefly wait for OS network interface sockets and routes to settle
+    time.sleep(0.3)
+    
+    # Send crash report to developer (consent-aware) AFTER internet connectivity is restored
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from netstrip.core.crash_reporter import send_crash_report
+        send_crash_report(
+            context="watchdog_crash_recovery",
+            extra_info={
+                "trigger": "Parent process died unexpectedly",
+                "watchdog_pid": os.getpid(),
+                "action": "Restored network to fail-open state",
+            },
+            require_consent=True,
+        )
+    except Exception as e:
+        logging.error(f"Failed to send watchdog crash report: {e}")
 
 def main():
     baseline_hashes = snapshot_integrity()
