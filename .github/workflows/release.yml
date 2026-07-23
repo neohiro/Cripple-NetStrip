@@ -76,6 +76,9 @@ jobs:
         run: |
           yes | buildozer android debug
           mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk
+          cd bin
+          zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
+          cd ..
           
       - name: Upload Release Asset (Windows Binaries)
         if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'windows-latest'
@@ -98,11 +101,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Asset (Android APK)
+      - name: Upload Release Asset (Android APK & Zip)
         if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: bin/*.apk
+          files: |
+            NetStrip-*-Android.zip
+            bin/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

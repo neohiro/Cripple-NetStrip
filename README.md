@@ -160,9 +160,11 @@ This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL,
 [URLHaus](https://urlhaus.abuse.ch/) •
 [v2fly](https://github.com/v2fly/domain-list-community) •
 [Peter Lowe](https://pgl.yoyo.org/adservers/) •
-[Dan Pollock](https://someonewhocares.org/hosts/) •
-[AdAway](https://adaway.org/) •
-[Energized Protection](https://energized.pro/)
+[Dan Pollock](https://someonewhocares.org/hosts/)  
+[AdAway](https://adaway.org/)  
+[Energized Protection](https://energized.pro/)  
+[AdGuard Mobile Ads & Android Filters](https://adguard.com/en/blog/adguard-dns-filter.html)  
+[HaGeZi Android & Mobile OEM Telemetry](https://github.com/hagezi/dns-blocklists)
 
 ## 📄 License
 

@@ -36,3 +36,8 @@ scratch/
 *.ico
 *.png
 changelog_utf8.md
+*.log
+.buildozer/
+bin/
+*.apk
+*.zip
