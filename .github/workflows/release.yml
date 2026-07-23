@@ -101,13 +101,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Asset (Android APK & Zip)
+      - name: Upload Release Asset (Android Zip)
         if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            NetStrip-*-Android.zip
-            bin/*.apk
+          files: NetStrip-*-Android.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
