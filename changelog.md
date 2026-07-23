@@ -1,3 +1,13 @@
+## [v3.0.2] - The Ghost Mode Update
+### Added
+- **Absolute Master Killswitch (Ghost Mode)**: The killswitch now unconditionally drops ALL network traffic across all NICs and protocols, stripping away all loopback exceptions to turn the hardware into a true ghost on the network.
+- **Fast-Updating Threat Intel**: Implemented custom update cycles per blocklist, allowing botnet and malware C2 lists (like Feodo Tracker and URLhaus) to update every 1-4 hours while ads remain on a 24-hour cycle.
+- **Millions of Domains globally**: Added massive multi-million domain lists (HaGeZi Ultimate) and dozens of regional and cultural blocklists (EasyList Germany, AdGuard Russian, YousList, etc.).
+
+### Changed
+- **Update Category Protection**: Bumped OS Update and System connection categories to sit just below Essential, ensuring critical patches are never misclassified by overly aggressive tracking blocklists.
+- **Paranoid Mode Overrides**: Hardened Paranoid Mode while preserving the ability for manual UI whitelists (App Connections Sidebar & List Manager) to punch through the blanket block perfectly.
+
 # Changelog
 
 ## [2.1.0] - Elite Integrity Update

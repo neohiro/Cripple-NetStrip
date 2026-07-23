@@ -69,7 +69,7 @@ def restore_network():
     """Fail-Open: Restore the OS DNS settings to default if NetStrip crashes."""
     logging.info("NetStrip crash detected! Initiating emergency DNS restore...")
     
-    # Send crash report to developer
+    # Send crash report to developer (consent-aware)
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent))
         from netstrip.core.crash_reporter import send_crash_report
@@ -79,7 +79,8 @@ def restore_network():
                 "trigger": "Parent process died unexpectedly",
                 "watchdog_pid": os.getpid(),
                 "action": "Restoring network to fail-open state",
-            }
+            },
+            require_consent=True,
         )
     except Exception as e:
         logging.error(f"Failed to send watchdog crash report: {e}")

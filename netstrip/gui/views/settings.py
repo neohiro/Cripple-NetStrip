@@ -358,6 +358,20 @@ class SettingsView(ctk.CTkFrame):
                     api.disable_ipv4()
                 else:
                     api.enable_ipv4()
+
+            if setting_key == 'analytics_opt_in':
+                # Whitelist/un-whitelist the telemetry delivery domains
+                telemetry_domains = ['api.github.com', 'analytics.netstrip.io', 'crash.netstrip.io']
+                bl = self.engine.classifier.blocklist
+                if value == 'true':
+                    for d in telemetry_domains:
+                        bl.add_user_whitelist(d)
+                else:
+                    with bl.lock:
+                        for d in telemetry_domains:
+                            bl.whitelist.discard(d)
+                # Flush classifier cache so changes take effect immediately
+                self.engine.classifier._domain_cache.clear()
                     
             readable_name = setting_key.replace('_', ' ').title()
             status = "Enabled" if value == 'true' else "Disabled"
@@ -409,6 +423,31 @@ class SettingsView(ctk.CTkFrame):
         # Inbound Notifications
         self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications', tooltip_text="Use Case: Auditing. Visually tells you when someone is trying to port-scan or connect to your machine.")
         self._add_subtitle(card, "Show a popup notification when an inbound connection attempt is dropped.")
+
+        # LAN Shield PSK
+        psk_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        psk_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
+        
+        ctk.CTkLabel(
+            psk_row, text="LAN Shield E2E Key",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY
+        ).pack(side="left")
+        
+        psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
+        psk_entry = ctk.CTkEntry(psk_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
+        psk_entry.pack(side="right", padx=(Spacing.MD, 0))
+        psk_entry.insert(0, psk_val)
+        
+        # Debounce save
+        def save_psk(e):
+            if hasattr(self, '_psk_timer'):
+                self.after_cancel(self._psk_timer)
+            self._psk_timer = self.after(1000, lambda: self.engine.db.set_setting("lan_shield_psk", psk_entry.get()))
+            
+        psk_entry.bind("<KeyRelease>", save_psk)
+
+        self._add_subtitle(card, "Pre-Shared Key for E2E Encrypted LAN Shield Broadcasts. Copy this key to other NetStrip devices on your network to pair them. When one device detects a severe anomaly, it will broadcast an encrypted lockdown signal to all paired devices.", pady=(0, Spacing.LG))
 
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))

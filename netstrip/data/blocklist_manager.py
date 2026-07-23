@@ -14,13 +14,14 @@ from netstrip.core.modes import ConnectionCategory
 logger = logging.getLogger(__name__)
 
 CATEGORY_PRIORITY = {
+    ConnectionCategory.ESSENTIAL: 200,
+    ConnectionCategory.SYSTEM: 190,
+    ConnectionCategory.UPDATE: 180,
     ConnectionCategory.MALWARE: 100,
     ConnectionCategory.TELEMETRY: 80,
     ConnectionCategory.TRACKER: 60,
     ConnectionCategory.AD: 40,
     ConnectionCategory.SECURITY: 20,
-    ConnectionCategory.SYSTEM: 20,
-    ConnectionCategory.UPDATE: 10,
     ConnectionCategory.UNKNOWN: 0
 }
 

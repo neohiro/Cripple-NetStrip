@@ -129,6 +129,24 @@ class NetStripEngine:
                 except Exception:
                     pass
                     
+    def trigger_threat_escalation(self, threat_data: dict):
+        """Escalate to Paranoid Mode + Killswitch and broadcast anomaly."""
+        logger.critical(f"THREAT ESCALATION: {threat_data}")
+        # Log to DB
+        self.db.log_connection({
+            'process_name': threat_data.get('process_name', 'KERNEL_ANOMALY'),
+            'domain': threat_data.get('domain', 'SYSTEM_THREAT'),
+            'category': 'ANOMALY',
+            'action': 'block',
+            'note': threat_data.get('note', '')
+        })
+        # Set modes
+        self.set_mode(ProtectionLevel.PARANOID)
+        self.set_killswitch(True)
+        # Broadcast via LAN Shield
+        if hasattr(self, 'lan_shield') and hasattr(self.lan_shield, 'broadcast_anomaly'):
+            self.lan_shield.broadcast_anomaly(threat_data)
+
     def _handle_anomaly(self, anomaly_data: dict):
         logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
         
@@ -343,6 +361,8 @@ class NetStripEngine:
         self.geoip.start()
         self.network_monitor.start()
         self.anomaly_scanner.start()
+        if hasattr(self.lan_shield, 'start'):
+            self.lan_shield.start()
         if self.ebpf_manager and self.db.get_setting("linux_ebpf_mode", "false") == "true":
             self.ebpf_manager.start()
         
@@ -375,6 +395,15 @@ class NetStripEngine:
                 
             # Sleep for 24 hours
             for _ in range(86400):
+                if not self.is_running:
+                    break
+                time.sleep(1)
+                
+    def _blocklist_updater_loop(self):
+        while self.is_running:
+            self.updater.check_and_update()
+            # Sleep for 1 hour between checks
+            for _ in range(3600):
                 if not self.is_running:
                     break
                 time.sleep(1)
@@ -440,7 +469,8 @@ class NetStripEngine:
             self.platform.set_system_dns(interface, "127.127.127.127")
             
         # Trigger auto-update in background to prevent UI freeze
-        threading.Thread(target=self.updater.check_and_update, daemon=True).start()
+        # Now runs in a 1-hour loop for fast-updating threat lists
+        threading.Thread(target=self._blocklist_updater_loop, daemon=True).start()
         
         self.is_running = True
         self.engine_ready = True

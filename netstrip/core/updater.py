@@ -65,15 +65,21 @@ class BlocklistUpdater:
                 temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
                 target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
                 
-                # Check file age (skip if updated within the last 24 hours)
+                # Get the update interval for this source (default 24h)
+                update_interval_hours = float(source.get('update_interval_hours', 24))
+                update_interval_seconds = update_interval_hours * 3600
+                
+                # Check file age (skip if updated within the required interval)
                 if os.path.exists(target_file):
                     file_age_seconds = time.time() - os.path.getmtime(target_file)
-                    if file_age_seconds < 86400: # 24 hours
+                    if file_age_seconds < update_interval_seconds:
                         continue
 
-                # Check if it's been attempted recently (throttle to 1 hour even on failures)
+                # Check if it's been attempted recently (throttle to prevent spamming on failures)
+                # Throttle is either 1 hour, or half the update interval if the interval is short
+                throttle_seconds = min(3600, update_interval_seconds / 2.0)
                 last_attempt = state_data.get(name, {}).get('last_attempt', 0)
-                if time.time() - last_attempt < 3600:
+                if time.time() - last_attempt < throttle_seconds:
                     continue
                     
                 logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")

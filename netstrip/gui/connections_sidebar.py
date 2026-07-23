@@ -219,7 +219,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                     # Live re-evaluate category and action based on current mode and blocklist rules
                     domain_ip = conn_dict.get('domain') or conn_dict.get('ip')
                     if domain_ip:
-                        from netstrip.core.modes import ConnectionCategory
+                        from netstrip.core.modes import ConnectionCategory, ConnectionAction
                         
                         original_cat = conn_dict.get('category', 'unknown')
                         try:
@@ -227,7 +227,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         except ValueError:
                             cat = ConnectionCategory.UNKNOWN
                             
-                        # Run the domain through the mixer ONLY if we don't have a label yet
+                        # Run the domain through the classifier ONLY if we don't have a label yet
                         if cat == ConnectionCategory.UNKNOWN:
                             live_cat = self.engine.classifier.classify_domain(domain_ip, p_name)
                             if live_cat == ConnectionCategory.UNKNOWN:
@@ -235,21 +235,22 @@ class ConnectionsSidebar(ctk.CTkFrame):
                             if live_cat != ConnectionCategory.UNKNOWN:
                                 cat = live_cat
                         
+                        # Apply EXPLICIT user rule overrides only.
+                        # We check the whitelist/blacklist sets directly instead of calling
+                        # is_blocked() again, which would re-run the full classification cascade
+                        # and overwrite built-in categories (e.g. ESSENTIAL → USER_ALLOWED).
+                        domain_lower = domain_ip.lower().rstrip('.')
+                        bl = self.engine.classifier.blocklist
+                        if domain_lower in bl.whitelist or (p_name and p_name in bl.app_whitelist):
+                            cat = ConnectionCategory.USER_ALLOWED
+                        elif domain_lower in bl.blacklist or (p_name and p_name in bl.app_blacklist):
+                            cat = ConnectionCategory.USER_BLOCKED
+                        
                         action = self.engine.classifier.mode.get_action_for_category(cat, self.engine.db)
                         
-                        # Apply user rules override
-                        is_blocked, override_cat = self.engine.classifier.blocklist.is_blocked(domain_ip, p_name)
-                        if override_cat == ConnectionCategory.USER_ALLOWED:
-                            action = self.engine.classifier.mode.get_action_for_category(ConnectionCategory.USER_ALLOWED, self.engine.db)
-                            cat = ConnectionCategory.USER_ALLOWED
-                        elif override_cat == ConnectionCategory.USER_BLOCKED:
-                            action = self.engine.classifier.mode.get_action_for_category(ConnectionCategory.USER_BLOCKED, self.engine.db)
-                            cat = ConnectionCategory.USER_BLOCKED
-                            
                         if getattr(self.engine, 'killswitch_active', False):
-                            from netstrip.core.modes import ConnectionAction
                             action = ConnectionAction.BLOCK
-                            
+                        
                         conn_dict['action'] = action.value
                         conn_dict['category'] = cat.value if cat != ConnectionCategory.UNKNOWN else p_name
                         

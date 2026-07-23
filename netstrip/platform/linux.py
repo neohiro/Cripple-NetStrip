@@ -115,6 +115,21 @@ class LinuxPlatform(PlatformBase):
     def rule_exists(self, rule_name: str) -> bool:
         return rule_name in self._iptables_rules
 
+    def enable_killswitch(self) -> bool:
+        # Absolute ghost mode - block everything unconditionally
+        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
+        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
+        res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
+        res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
+        return res1 and res2
+
+    def disable_killswitch(self) -> bool:
+        res1 = self._run_cmd(["iptables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
+        res2 = self._run_cmd(["iptables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
+        res3 = self._run_cmd(["ip6tables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
+        res4 = self._run_cmd(["ip6tables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
+        return res1 and res2
+
     def block_lan_traffic(self) -> bool:
         lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         success = True

@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to attach binaries to (e.g., v2.0.2)'
+        description: 'Release tag to attach binaries to (e.g., v3.0.2)'
         required: true
-        default: 'v2.0.2'
+        default: 'v3.0.2'
 
 permissions:
   contents: write

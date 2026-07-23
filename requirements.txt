@@ -4,3 +4,4 @@ Pillow>=10.2.0
 plyer>=2.1.0
 dnslib>=0.9.24
 maxminddb>=2.5.2
+cryptography>=41.0.0

@@ -180,19 +180,14 @@ class WindowsPlatform(PlatformBase):
         return self.remove_firewall_rule("NetStrip_Block_LAN")
 
     def enable_killswitch(self) -> bool:
-        # Instead of modifying the OS default policy (which ruins user setups), we inject a master block rule
+        # Absolute ghost mode - block everything unconditionally (including loopback and IPC)
         res1 = self.add_firewall_rule("NetStrip_Killswitch_Block_In", "in", "block")
         res2 = self.add_firewall_rule("NetStrip_Killswitch_Block_Out", "out", "block")
-        # Allow loopback so NetStrip internal IPC doesn't break
-        res3 = self.add_firewall_rule("NetStrip_Killswitch_Loopback_In", "in", "allow", remote_ip="127.0.0.1")
-        res4 = self.add_firewall_rule("NetStrip_Killswitch_Loopback_Out", "out", "allow", remote_ip="127.0.0.1")
         return res1 and res2
 
     def disable_killswitch(self) -> bool:
         res1 = self.remove_firewall_rule("NetStrip_Killswitch_Block_In")
         res2 = self.remove_firewall_rule("NetStrip_Killswitch_Block_Out")
-        self.remove_firewall_rule("NetStrip_Killswitch_Loopback_In")
-        self.remove_firewall_rule("NetStrip_Killswitch_Loopback_Out")
         return res1 and res2
 
     def disable_ipv6(self) -> bool:

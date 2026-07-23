@@ -8,8 +8,8 @@
       "enabled": true
     },
     {
-      "name": "HaGeZi Multi",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/multi.txt",
+      "name": "HaGeZi Ultimate",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/ultimate.txt",
       "format": "hosts",
       "category": "ads",
       "enabled": true
@@ -75,7 +75,8 @@
       "url": "https://urlhaus.abuse.ch/downloads/hostfile/",
       "format": "hosts",
       "category": "malware",
-      "enabled": true
+      "enabled": true,
+      "update_interval_hours": 1
     },
     {
       "name": "WindowsSpyBlocker - Spy",
@@ -124,35 +125,35 @@
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_104.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "AdGuard French",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_106.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "AdGuard Japanese",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_107.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "AdGuard Turkish",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_112.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "AdGuard Chinese",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_224.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "Identity: Microsoft",
@@ -208,6 +209,65 @@
       "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/doh.txt",
       "format": "hosts",
       "category": "doh_providers",
+      "enabled": true
+    },
+    {
+      "name": "Feodo Tracker Botnet C2",
+      "url": "https://feodotracker.abuse.ch/downloads/ipblocklist.txt",
+      "format": "domains",
+      "category": "malware",
+      "enabled": true,
+      "update_interval_hours": 1
+    },
+    {
+      "name": "DShield Suspicious Domains",
+      "url": "https://www.dshield.org/feeds/suspiciousdomains_High.txt",
+      "format": "domains",
+      "category": "malware",
+      "enabled": true,
+      "update_interval_hours": 4
+    },
+    {
+      "name": "PhishTank",
+      "url": "https://phishing.army/download/phishing_army_blocklist_extended.txt",
+      "format": "domains",
+      "category": "malware",
+      "enabled": true,
+      "update_interval_hours": 4
+    },
+    {
+      "name": "EasyList Germany",
+      "url": "https://easylist.to/easylistgermany/easylistgermany.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "EasyList Italy",
+      "url": "https://easylist-downloads.adblockplus.org/easylistitaly.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "EasyList Dutch",
+      "url": "https://easylist-downloads.adblockplus.org/easylistdutch.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "Liste AR (Arabic)",
+      "url": "https://raw.githubusercontent.com/easylist/ListeAR/master/ListeAR.txt",
+      "format": "domains",
+      "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "YousList (Korean)",
+      "url": "https://raw.githubusercontent.com/yous/YousList/master/youslist.txt",
+      "format": "domains",
+      "category": "ads",
       "enabled": true
     }
   ]

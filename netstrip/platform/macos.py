@@ -84,7 +84,24 @@ class MacOSPlatform(PlatformBase):
         return True
 
     def rule_exists(self, rule_name: str) -> bool:
-        return rule_name in self._route_rules
+        return rule_name in self._pf_rules
+
+    def enable_killswitch(self) -> bool:
+        # Absolute ghost mode for macOS using pfctl
+        # -e enables pf, -q suppresses output
+        # echo "block drop all" | pfctl -a com.netstrip.killswitch -f -
+        cmd = ["pfctl", "-a", "com.netstrip.killswitch", "-f", "-"]
+        try:
+            import subprocess
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            proc.communicate(input=b"block drop all\n")
+            self._run_cmd(["pfctl", "-E"]) # Ensure PF is enabled
+            return proc.returncode == 0
+        except Exception:
+            return False
+
+    def disable_killswitch(self) -> bool:
+        return self._run_cmd(["pfctl", "-a", "com.netstrip.killswitch", "-F", "rules"]).returncode == 0
 
     def block_lan_traffic(self) -> bool:
         lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
