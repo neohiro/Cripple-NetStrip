@@ -135,7 +135,7 @@ sudo python3 main.py --service
 
 ## ⏰ Build Metrics
 
-This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL, system tray integrations, IPC layers, and security audits — was built in **~0.5 days** of pure active coding time.
+This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL, system tray integrations, IPC layers, and security audits — was built in **~2.5 days** of pure active coding time.
 
 ## 🚀 Release Notes
 
