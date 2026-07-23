@@ -33,6 +33,7 @@ pyinstaller ^
     --name "Cripple" ^
     --icon "assets/logo.ico" ^
     --paths "." ^
+    --hookspath "hooks" ^
     --collect-all "netstrip" ^
     --add-data "%CTK_PATH%;customtkinter/" ^
     --add-data "netstrip/data/lists;netstrip/data/lists" ^

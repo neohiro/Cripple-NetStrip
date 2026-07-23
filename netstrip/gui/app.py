@@ -327,9 +327,9 @@ class NetStripApp(ctk.CTk):
 
         # Version
         from netstrip import __version__
-        self.version_label = ctk.CTkLabel(self.sidebar, text=f"{__version__}",
-                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
-                     text_color=Colors.TEXT_TERTIARY,
+        self.version_label = ctk.CTkLabel(self.sidebar, text=f"v{__version__}",
+                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+                     text_color=Colors.ACCENT_CYAN,
                      cursor="hand2")
         self.version_label.grid(row=9, column=0, pady=(0, 16))
         
@@ -347,6 +347,9 @@ class NetStripApp(ctk.CTk):
             self.after(50, _scroll_to_top)
             
         self.version_label.bind("<Button-1>", _nav_to_settings)
+
+        # Start continuous desktop left pane glowing animation
+        self._start_version_glow_animation()
 
         # Register callback for engine events
         self.engine.gui_update_callback = self._on_engine_event
@@ -711,24 +714,34 @@ class NetStripApp(ctk.CTk):
     def _on_engine_event(self, event_name: str, *args, **kwargs):
         def _handle_event():
             if event_name == "UPDATE_AVAILABLE":
-                if not getattr(self, '_update_glow_active', False):
-                    self._update_glow_active = True
-                    self._animate_update_glow()
+                # Ensure update status refreshed if settings view is cached
+                from netstrip.gui.views.settings import SettingsView
+                settings_view = self._cached_views.get(SettingsView)
+                if settings_view and hasattr(settings_view, '_refresh_update_status'):
+                    settings_view._refresh_update_status()
             elif event_name == "MODE_CHANGE":
                 pass # Can add specific mode change logic here if needed
         self.after(0, _handle_event)
                 
-    def _animate_update_glow(self, step=0, increasing=True):
-        if not getattr(self, '_update_glow_active', False) or not self.winfo_exists():
+    def _start_version_glow_animation(self):
+        self._update_glow_active = True
+        self._animate_version_glow(step=0, increasing=True)
+
+    def _animate_version_glow(self, step=0, increasing=True):
+        if not hasattr(self, 'version_label') or not self.version_label.winfo_exists():
             return
             
-        # Pulse between TEXT_TERTIARY (#6b7280) and a glowing yellow (#facc15)
         try:
-            import colorsys
-            r1, g1, b1 = int('6b', 16), int('72', 16), int('80', 16)
-            r2, g2, b2 = int('fa', 16), int('cc', 16), int('15', 16)
+            # If an update is available: pulse yellow/gold (#6b7280 -> #facc15)
+            # Default desktop left pane glow: smooth cyber pulse between cyan (#06b6d4) and purple (#a78bfa)
+            if getattr(self.engine, 'update_available', False):
+                r1, g1, b1 = int('6b', 16), int('72', 16), int('80', 16)
+                r2, g2, b2 = int('fa', 16), int('cc', 16), int('15', 16)
+            else:
+                r1, g1, b1 = int('06', 16), int('b6', 16), int('d4', 16)
+                r2, g2, b2 = int('a7', 16), int('8b', 16), int('fa', 16)
             
-            ratio = step / 20.0
+            ratio = step / 25.0
             r = int(r1 + (r2 - r1) * ratio)
             g = int(g1 + (g2 - g1) * ratio)
             b = int(b1 + (b2 - b1) * ratio)
@@ -738,12 +751,12 @@ class NetStripApp(ctk.CTk):
             
             if increasing:
                 step += 1
-                if step >= 20: increasing = False
+                if step >= 25: increasing = False
             else:
                 step -= 1
                 if step <= 0: increasing = True
                 
-            self.after(50, lambda: self._animate_update_glow(step, increasing))
+            self.after(50, lambda: self._animate_version_glow(step, increasing))
         except Exception:
             pass
 

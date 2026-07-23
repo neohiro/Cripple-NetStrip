@@ -140,22 +140,8 @@ class NetStripApp(ctk.CTk):
         self.engine.set_status_callback(self._show_status)
 
     def _show_status(self, msg: str):
-        def _update():
-            try:
-                self.status_label.configure(text=msg)
-                if hasattr(self, '_status_timer'):
-                    self.after_cancel(self._status_timer)
-                self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
-                
-                # If app is hidden/minimized to tray, send a system notification
-                if getattr(self, 'icon', None) and getattr(self.engine, 'is_headless', False) is False:
-                    # Don't spam notifications for minor updates, only important ones
-                    if "blocked" in msg.lower() or "mode changed" in msg.lower() or "threat" in msg.lower() or "whitelist" in msg.lower() or "killswitch" in msg.lower():
-                        if not self.winfo_ismapped():
-                            self.icon.notify(msg, "NetStrip Status")
-            except Exception:
-                pass
-        self.after(0, _update)
+        # Android specific: No status updates row displayed
+        pass
 
     def _build_ui(self):
         # Mobile-First 3-row layout: Top App Bar | Main Content | Bottom Nav Bar
@@ -170,16 +156,12 @@ class NetStripApp(ctk.CTk):
         self.top_bar.grid_propagate(False)
         self.top_bar.grid_columnconfigure(1, weight=1)
         
-        # Title
+        # Title (Cripple in upper left corner)
         title_frame = ctk.CTkFrame(self.top_bar, fg_color="transparent")
         title_frame.grid(row=0, column=0, padx=16, sticky="w")
         ctk.CTkLabel(title_frame, text="CRIPPLE", font=("Segoe UI Black", 20, "bold"), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         self.lbl_geoip = ctk.CTkLabel(title_frame, text=" 🌐", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY)
         self.lbl_geoip.pack(side="left", padx=(8, 0))
-
-        # Status Label (Center)
-        self.status_label = ctk.CTkLabel(self.top_bar, text="", font=(Fonts.FAMILY_PRIMARY[0], 11), text_color=Colors.TEXT_TERTIARY)
-        self.status_label.grid(row=0, column=1, sticky="nsew")
 
         # Controls (Right)
         controls_frame = ctk.CTkFrame(self.top_bar, fg_color="transparent")
@@ -217,19 +199,26 @@ class NetStripApp(ctk.CTk):
         self.bottom_nav.grid(row=2, column=0, sticky="ew")
         self.bottom_nav.grid_propagate(False)
         
-        # Ensure evenly distributed 5 buttons
+        # Ensure 6 evenly distributed navigation buttons
         self.bottom_nav.grid_rowconfigure(0, weight=1)
-        for i in range(5):
+        for i in range(6):
             self.bottom_nav.grid_columnconfigure(i, weight=1, uniform="nav")
 
         self.nav_btns = []
         
         from netstrip.gui.views import AppRulesView, BlocklistView, LogView, SettingsView, ConnectionsView
-        self._add_bottom_nav_btn(0, "Dashboard", Icons.DASHBOARD, DashboardView)
-        self._add_bottom_nav_btn(1, "Connections", Icons.CONNECTIONS, ConnectionsView)
-        self._add_bottom_nav_btn(2, "Logs", Icons.LOGS, LogView)
+        # 1. Connections (Live App Connections prioritized as primary upper tab)
+        self._add_bottom_nav_btn(0, "Connections", Icons.CONNECTIONS, ConnectionsView)
+        # 2. Dashboard
+        self._add_bottom_nav_btn(1, "Dashboard", Icons.DASHBOARD, DashboardView)
+        # 3. App Rules
+        self._add_bottom_nav_btn(2, "App Rules", Icons.APPS, AppRulesView)
+        # 4. Filters (Blocklists)
         self._add_bottom_nav_btn(3, "Filters", Icons.BLOCKLIST, BlocklistView)
-        self._add_bottom_nav_btn(4, "Settings", Icons.SETTINGS, SettingsView)
+        # 5. Logs
+        self._add_bottom_nav_btn(4, "Logs", Icons.LOGS, LogView)
+        # 6. Settings
+        self._add_bottom_nav_btn(5, "Settings", Icons.SETTINGS, SettingsView)
 
         # Badge Label (for updates/notifications) attached to settings icon implicitly
         self.badge_label = ctk.CTkLabel(self.nav_btns[-1], text="1", width=18, height=18, corner_radius=9, 
@@ -246,6 +235,7 @@ class NetStripApp(ctk.CTk):
     def _deferred_init(self):
         self.current_view = None
         self._cached_views = {}
+        # Prioritize Live App Connections as initial view
         self._select_nav(self.nav_btns[0])
         
         self.after(1500, self._preload_next_view, 1)
@@ -536,39 +526,16 @@ class NetStripApp(ctk.CTk):
     def _on_engine_event(self, event_name: str, *args, **kwargs):
         def _handle_event():
             if event_name == "UPDATE_AVAILABLE":
-                if not getattr(self, '_update_glow_active', False):
-                    self._update_glow_active = True
-                    self._animate_update_glow()
+                # Ensure update status refreshed if settings view is cached
+                from netstrip.gui.views.settings import SettingsView
+                settings_view = self._cached_views.get(SettingsView)
+                if settings_view and hasattr(settings_view, '_refresh_update_status'):
+                    settings_view._refresh_update_status()
             elif event_name == "MODE_CHANGE":
                 pass # Can add specific mode change logic here if needed
         self.after(0, _handle_event)
                 
     def _animate_update_glow(self, step=0, increasing=True):
-        if not getattr(self, '_update_glow_active', False) or not self.winfo_exists():
-            return
-            
-        # Pulse between TEXT_TERTIARY (#6b7280) and a glowing yellow (#facc15)
-        try:
-            import colorsys
-            r1, g1, b1 = int('6b', 16), int('72', 16), int('80', 16)
-            r2, g2, b2 = int('fa', 16), int('cc', 16), int('15', 16)
-            
-            ratio = step / 20.0
-            r = int(r1 + (r2 - r1) * ratio)
-            g = int(g1 + (g2 - g1) * ratio)
-            b = int(b1 + (b2 - b1) * ratio)
-            color = f"#{r:02x}{g:02x}{b:02x}"
-            
-            self.version_label.configure(text_color=color)
-            
-            if increasing:
-                step += 1
-                if step >= 20: increasing = False
-            else:
-                step -= 1
-                if step <= 0: increasing = True
-                
-            self.after(50, lambda: self._animate_update_glow(step, increasing))
-        except Exception:
-            pass
+        # Android APK: No glowing animation per design requirement
+        pass
 

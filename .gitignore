@@ -13,7 +13,6 @@ venv.bak/
 .vscode/
 build/
 dist/
-*.spec
 *.db
 netstrip/data/NetStrip.db
 netstrip/data/lists/NetStrip_cache.json

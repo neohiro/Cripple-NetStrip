@@ -338,6 +338,14 @@ class AppGroupFrame(ctk.CTkFrame):
         )
         self.lbl_name.pack(side="left")
         self.lbl_name.bind("<Button-1>", self._toggle_expand)
+
+        # Flashing traffic light indicator (green for allowed traffic, red for blocked)
+        self.traffic_dot = ctk.CTkLabel(
+            self.header, text="●", font=(Fonts.FAMILY_PRIMARY[0], 11),
+            text_color=Colors.TEXT_TERTIARY
+        )
+        self.traffic_dot.pack(side="left", padx=(Spacing.XS, Spacing.XS))
+        self.traffic_dot.bind("<Button-1>", self._toggle_expand)
         
         self.btn_expand = ctk.CTkButton(
             self.header, text="Expand ▼", width=75, height=22,
@@ -526,7 +534,23 @@ class AppGroupFrame(ctk.CTkFrame):
                 self.after(200, fade)
             except Exception:
                 pass
-            
+
+    def _flash_traffic_light(self, action="allow"):
+        if not hasattr(self, 'traffic_dot') or not self.traffic_dot.winfo_exists():
+            return
+        
+        flash_color = Colors.SUCCESS if action == 'allow' else Colors.DANGER
+        self.traffic_dot.configure(text_color=flash_color)
+        
+        def reset():
+            try:
+                if self.winfo_exists() and hasattr(self, 'traffic_dot'):
+                    self.traffic_dot.configure(text_color=Colors.TEXT_TERTIARY)
+            except Exception:
+                pass
+                
+        self.after(400, reset)
+
     def add_connection(self, conn_data: dict, hide_inactive: bool):
         target = conn_data.get('domain') or conn_data.get('ip')
         is_new = False
@@ -550,6 +574,7 @@ class AppGroupFrame(ctk.CTkFrame):
         if is_new:
             action = conn_data.get('action', 'allow')
             self._trigger_pulse(action)
+            self._flash_traffic_light(action)
             self.rows[target]._trigger_pulse(action)
             
         # Update system block visual override

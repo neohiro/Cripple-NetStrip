@@ -166,12 +166,22 @@ class SettingsView(ctk.CTkFrame):
             
     def _manual_update_check(self):
         self.btn_check_update.configure(state="disabled", text="Checking...")
-        self.lbl_update_status.configure(text="Checking GitHub API...", text_color=Colors.TEXT_TERTIARY)
+        self.lbl_update_status.configure(text="Checking GitHub API & blocklists...", text_color=Colors.TEXT_TERTIARY)
         self.btn_download_update.pack_forget()
         
         def _check():
             import urllib.request, json
             from netstrip import __version__
+            check_failed = False
+
+            # Trigger blocklist auto-updater cycle
+            if hasattr(self.engine, 'updater') and self.engine.updater:
+                try:
+                    self.engine.updater.check_and_update()
+                except Exception:
+                    pass
+
+            # Check GitHub API for application release updates
             try:
                 req = urllib.request.Request(
                     "https://api.github.com/repos/neohiro/Cripple-NetStrip/releases/latest",
@@ -186,13 +196,18 @@ class SettingsView(ctk.CTkFrame):
                         if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
                             try: self.engine.gui_update_callback("UPDATE_AVAILABLE")
                             except: pass
+                    else:
+                        self.engine.update_available = False
             except Exception:
-                pass
+                check_failed = True
                 
             def _update_ui():
-                if not self._destroyed:
+                if not getattr(self, '_destroyed', False):
                     self.btn_check_update.configure(state="normal", text="Check for Updates")
-                    self._refresh_update_status()
+                    if check_failed and not getattr(self.engine, 'update_available', False):
+                        self.lbl_update_status.configure(text="Unable to check for updates", text_color=Colors.TEXT_TERTIARY)
+                    else:
+                        self._refresh_update_status()
                     
             self.after(0, _update_ui)
             
