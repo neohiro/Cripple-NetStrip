@@ -170,23 +170,30 @@ class ConnectionsSidebar(ctk.CTkFrame):
     def _on_sort_filter_change(self, choice=None):
         self._refresh_loop()
         
+    def _get_poll_interval(self):
+        """Adaptive polling: fast when GUI visible for live traffic feel, slow when headless."""
+        if getattr(self.engine, 'is_headless', False):
+            return 2000
+        return 250  # ~4 Hz visual refresh for smooth live traffic animations
+
     @safe_loop(delay_ms=1000)
     def _refresh_loop(self):
         if getattr(self, '_destroyed', False):
             return
+        poll_ms = self._get_poll_interval()
         if not self.winfo_ismapped():
-            # Not visible yet — reschedule so the loop doesn't die permanently
+            # Not visible yet — reschedule at slow rate so the loop doesn't die permanently
             if not self._destroyed:
-                self.after(1000, self._refresh_loop)
+                self.after(2000, self._refresh_loop)
             return
         # Skip heavy refresh during active window resize to prevent artifacts
         if getattr(self, '_resize_paused', False):
             if not self._destroyed:
-                self.after(500, self._refresh_loop)
+                self.after(poll_ms, self._refresh_loop)
             return
         if getattr(self, '_is_fetching', False):
             if not self._destroyed:
-                self.after(500, self._refresh_loop)
+                self.after(poll_ms, self._refresh_loop)
             return
             
         self._is_fetching = True
@@ -398,7 +405,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         if not self._destroyed:
             if hasattr(self, '_refresh_after_id'):
                 self.after_cancel(self._refresh_after_id)
-            self._refresh_after_id = self.after(500, self._refresh_loop)
+            self._refresh_after_id = self.after(self._get_poll_interval(), self._refresh_loop)
 
     def _reset_filters(self):
         self.sort_var.set("Sort by: Recent")

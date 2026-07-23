@@ -221,18 +221,19 @@ class ConnectionRow(ctk.CTkFrame):
     def _trigger_pulse(self, action="allow"):
         if not hasattr(self, '_is_pulsing') or not self._is_pulsing:
             self._is_pulsing = True
+            pulse_color = Colors.SUCCESS if action == 'allow' else Colors.DANGER
+            self.target_label.configure(text_color=pulse_color)
             
             steps = ["#143c22", "#102a18", "#0b1910", "transparent"] if action == 'allow' else ["#450a0a", "#300707", "#1a0404", "transparent"]
             
             self._bg_rect.configure(fg_color=steps[0])
-            self.target_label.configure(text_color=Colors.TEXT_PRIMARY)
             
             def fade(step_idx=1):
                 try:
                     if not self.winfo_exists(): return
                     if step_idx < len(steps):
                         self._bg_rect.configure(fg_color=steps[step_idx])
-                        self.after(120, lambda: fade(step_idx + 1))
+                        self.after(80, lambda: fade(step_idx + 1))
                     else:
                         self._is_pulsing = False
                         self.target_label.configure(text_color=Colors.TEXT_SECONDARY)
@@ -240,7 +241,7 @@ class ConnectionRow(ctk.CTkFrame):
                     pass
                     
             try:
-                self.after(200, fade)
+                self.after(100, fade)
             except Exception:
                 pass
 
@@ -524,14 +525,14 @@ class AppGroupFrame(ctk.CTkFrame):
                     if not self.winfo_exists(): return
                     if step_idx < len(steps):
                         self.header.configure(fg_color=steps[step_idx])
-                        self.after(120, lambda: fade(step_idx + 1))
+                        self.after(80, lambda: fade(step_idx + 1))
                     else:
                         self._is_pulsing = False
                 except Exception:
                     pass
                     
             try:
-                self.after(200, fade)
+                self.after(100, fade)
             except Exception:
                 pass
 
@@ -549,7 +550,7 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
                 
-        self.after(400, reset)
+        self.after(300, reset)
 
     def add_connection(self, conn_data: dict, hide_inactive: bool):
         target = conn_data.get('domain') or conn_data.get('ip')
