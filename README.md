@@ -59,15 +59,10 @@ DPI Smart Filters intercept HTTP/HTTPS headers via SNI extraction. Deep Connecti
 **VPN Pre-Cipher Interception** — Filters traffic before VPN encryption (WireGuard, OpenVPN compatible).
 **Multi-NIC / Gateway Mode** — Full support for dual-adapter NUCs acting as network-wide firewalls.
 
-## 📱 Android APK Feasibility Analysis
-
-Building NetStrip into a standalone `.apk` is possible but requires a hybrid architecture due to Android OS constraints. Android strictly prohibits reading system-wide socket connections or modifying `iptables` without a Rooted device.
-
-To run NetStrip non-root on Android:
-1. **Packet Parser Core**: The interception core must be completely rebuilt in Kotlin/Java using the native `VpnService` API to parse raw IP packets in user-space.
-2. **Python Backend**: The Python DNS sinkhole and Intelligence engine (Blocklist Trie, Anomaly Scanner, Webhooks) must run as a background service via **Chaquopy** (Python SDK for Android).
-3. **GUI Replacement**: `CustomTkinter` does not work on Android. The UI must be rebuilt in Jetpack Compose or Flutter for horizontal/vertical touch orientations.
-*Current Status*: Pending a native `VpnService` C/Kotlin module rewrite. For now, we recommend running NetStrip on a Raspberry Pi network gateway.
+### 📱 Mobile Architecture (Android)
+NetStrip supports Android dynamically through a Python-for-Android headless bridge:
+- **Cloud Build Pipeline**: The repository includes a `buildozer.spec` designed for GitHub Actions. Whenever a release is tagged, the `ubuntu-latest` cloud runner will automatically compile the Python backend, Kivy GUI wrapper, and JNI components into a standalone `.apk` artifact.
+- **VPN Loopback**: Because Android strictly restricts binding to privileged ports (like DNS port 53) without Root access, NetStrip automatically detects the Android environment (`hasattr(sys, 'getandroidapilevel')`) and binds its interceptor to the high loopback port `127.0.0.1:5353`. You can then pair this with any local Android VPN application (like RethinkDNS or AdGuard) pointed at `127.0.0.1:5353` to seamlessly filter traffic system-wide!
 
 ## 🛠️ Architecture
 
