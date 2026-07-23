@@ -36,68 +36,94 @@ class LANShield:
         return psk.encode('utf-8')
 
     def start(self):
+        """Start the LAN Shield broadcast listener. This listener is ALWAYS active,
+        even during killswitch or ghost mode, to ensure encrypted LAN commands
+        (ANOMALY, KILLSWITCH, RESTORE) from paired Cripple instances are received."""
         if self._running or not self._fernet: return
         self._running = True
-        self._listener_thread = threading.Thread(target=self._listen_for_broadcasts, daemon=True)
+        self._listener_thread = threading.Thread(target=self._listen_for_broadcasts, daemon=True, name="LANShield-Listener")
         self._listener_thread.start()
+        logger.info("LAN Shield E2E listener started (always-on, survives killswitch/ghost).")
 
     def stop(self):
+        """Stop the LAN Shield listener. Only called on full engine shutdown —
+        never during killswitch or ghost mode transitions."""
         self._running = False
-        # Thread will exit natively since it's a daemon or wait for timeout
 
     def _listen_for_broadcasts(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # Bind to 0.0.0.0 on port 54321
-        try:
-            sock.bind(("", 54321))
-            sock.settimeout(2.0)
-        except Exception as e:
-            logger.error(f"LAN Shield listener failed to bind: {e}")
-            return
-
+        """Resilient listener loop with auto-recovery. If the UDP socket dies
+        (e.g. interface down during killswitch), it rebinds after a delay."""
         seen_nonces = set()
-        while self._running:
-            try:
-                data, addr = sock.recvfrom(4096)
-                if data.startswith(b"NetStrip:ANOMALY:"):
-                    encrypted_payload = data[len(b"NetStrip:ANOMALY:"):]
-                    try:
-                        decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min Fernet TTL
-                        payload = json.loads(decrypted.decode('utf-8'))
-                        
-                        # Replay Attack Prevention Audit: Validate timestamp drift & nonce
-                        pkt_time = float(payload.get('timestamp', 0))
-                        nonce = payload.get('nonce') or f"{pkt_time}_{addr[0]}"
-                        if abs(time.time() - pkt_time) > 60:
-                            logger.warning(f"LAN Shield: Dropped expired broadcast from {addr[0]} (clock drift/replay attempt).")
-                            continue
-                        if nonce in seen_nonces:
-                            continue
-                        seen_nonces.add(nonce)
-                        if len(seen_nonces) > 200:
-                            seen_nonces.clear()
 
-                        # Validate the payload
-                        btype = payload.get('type')
-                        if btype == 'LAN_THREAT_BROADCAST':
-                            logger.critical(f"LAN SHIELD: Received Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown...")
-                            if self.engine:
-                                threading.Thread(target=self.engine.trigger_threat_escalation, args=({'process_name': 'LAN Shield Remote Broadcast', 'domain': 'LAN_THREAT', 'note': payload.get('note', 'Remote Host Compromised'), 'is_remote': True},)).start()
-                        elif btype == 'LAN_RESTORE_BROADCAST':
-                            logger.info(f"LAN SHIELD: Received Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch...")
-                            if self.engine:
-                                threading.Thread(target=self._handle_remote_restore).start()
-                        elif btype == 'LAN_KILLSWITCH_TRIGGER':
-                            logger.critical(f"LAN SHIELD: Received Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch...")
-                            if self.engine:
-                                threading.Thread(target=self.engine.set_killswitch, args=(True, False)).start()
-                    except Exception as e:
-                        logger.debug(f"LAN Shield dropped invalid/expired encrypted broadcast: {e}")
-            except socket.timeout:
-                continue
+        while self._running:
+            sock = None
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind(("", 54321))
+                sock.settimeout(2.0)
+                logger.debug("LAN Shield listener bound to UDP :54321")
             except Exception as e:
-                logger.debug(f"LAN Shield listener error: {e}")
+                logger.error(f"LAN Shield listener failed to bind: {e}, retrying in 3s...")
+                if sock:
+                    try: sock.close()
+                    except: pass
+                time.sleep(3)
+                continue
+
+            # Inner receive loop — stays in here until a fatal socket error
+            while self._running:
+                try:
+                    data, addr = sock.recvfrom(4096)
+                    if data.startswith(b"NetStrip:ANOMALY:"):
+                        encrypted_payload = data[len(b"NetStrip:ANOMALY:"):]
+                        try:
+                            decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min Fernet TTL
+                            payload = json.loads(decrypted.decode('utf-8'))
+                            
+                            # Replay Attack Prevention Audit: Validate timestamp drift & nonce
+                            pkt_time = float(payload.get('timestamp', 0))
+                            nonce = payload.get('nonce') or f"{pkt_time}_{addr[0]}"
+                            if abs(time.time() - pkt_time) > 60:
+                                logger.warning(f"LAN Shield: Dropped expired broadcast from {addr[0]} (clock drift/replay attempt).")
+                                continue
+                            if nonce in seen_nonces:
+                                continue
+                            seen_nonces.add(nonce)
+                            if len(seen_nonces) > 200:
+                                seen_nonces.clear()
+
+                            # Validate the payload
+                            btype = payload.get('type')
+                            if btype == 'LAN_THREAT_BROADCAST':
+                                logger.critical(f"LAN SHIELD: Received Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown...")
+                                if self.engine:
+                                    threading.Thread(target=self.engine.trigger_threat_escalation, args=({'process_name': 'LAN Shield Remote Broadcast', 'domain': 'LAN_THREAT', 'note': payload.get('note', 'Remote Host Compromised'), 'is_remote': True},)).start()
+                            elif btype == 'LAN_RESTORE_BROADCAST':
+                                logger.info(f"LAN SHIELD: Received Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch...")
+                                if self.engine:
+                                    threading.Thread(target=self._handle_remote_restore).start()
+                            elif btype == 'LAN_KILLSWITCH_TRIGGER':
+                                logger.critical(f"LAN SHIELD: Received Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch...")
+                                if self.engine:
+                                    threading.Thread(target=self.engine.set_killswitch, args=(True, False)).start()
+                        except Exception as e:
+                            logger.debug(f"LAN Shield dropped invalid/expired encrypted broadcast: {e}")
+                except socket.timeout:
+                    continue
+                except OSError as e:
+                    # Socket died (interface down, etc.) — break to outer loop for rebind
+                    logger.warning(f"LAN Shield socket error: {e}, rebinding in 3s...")
+                    break
+                except Exception as e:
+                    logger.debug(f"LAN Shield listener error: {e}")
+
+            # Clean up dead socket before rebind attempt
+            if sock:
+                try: sock.close()
+                except: pass
+            if self._running:
+                time.sleep(3)  # Backoff before rebind
 
     def _handle_remote_restore(self):
         # Drop back to Normal mode and disable killswitch without broadcasting back
