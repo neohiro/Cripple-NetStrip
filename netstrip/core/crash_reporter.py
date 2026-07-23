@@ -431,36 +431,59 @@ def send_crash_report(
     # Determine label: genuine crashes vs caught errors
     is_crash = context in ("unhandled_exception", "watchdog_crash_recovery", "mainloop")
     
-    # Send synchronously so we can report success/failure
+    # Send with retry + exponential backoff to survive network glitches during
+    # watchdog crash recovery. The network/firewall may still be restoring
+    # when this fires, so we retry to guarantee the report finds its way out.
     sent = False
+    max_retries = 5
+    backoff_base = 2  # seconds
     
-    # Channel 1: GitHub Issues (primary — goes to Cripple-Telemetry repo)
-    try:
-        from netstrip.core.github_telemetry import submit_crash, submit_error
+    for attempt in range(max_retries):
+        # Channel 1: GitHub Issues (primary — goes to Cripple-Telemetry repo)
+        try:
+            from netstrip.core.github_telemetry import submit_crash, submit_error
+            if is_crash:
+                if submit_crash(subject, report):
+                    sent = True
+            else:
+                if submit_error(subject, report):
+                    sent = True
+        except Exception:
+            pass
+        
+        # Channel 2: HTTPS endpoint (fallback)
+        if not sent:
+            if _send_via_https(subject, report):
+                sent = True
+        
+        # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
         if is_crash:
-            if submit_crash(subject, report):
-                sent = True
-        else:
-            if submit_error(subject, report):
-                sent = True
-    except Exception:
-        pass
-    
-    # Channel 2: HTTPS endpoint (fallback)
-    if _send_via_https(subject, report):
-        sent = True
-    
-    # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
-    if is_crash:
-        _send_email(subject, report)
-    elif not sent:
-        # For non-fatal errors, only email if GitHub delivery failed
-        _send_email(subject, report)
+            try:
+                _send_email(subject, report)
+            except Exception:
+                pass
+        elif not sent:
+            # For non-fatal errors, only email if GitHub delivery failed
+            try:
+                _send_email(subject, report)
+            except Exception:
+                pass
+        
+        if sent:
+            break
+        
+        # Not sent yet — wait with exponential backoff before retrying
+        # This gives the watchdog time to restore DNS/firewall/network
+        if attempt < max_retries - 1:
+            wait = backoff_base ** (attempt + 1)  # 2, 4, 8, 16 seconds
+            logger.info(f"Crash report delivery attempt {attempt + 1}/{max_retries} failed, "
+                        f"retrying in {wait}s (network may still be restoring)...")
+            time.sleep(wait)
     
     if sent:
         logger.info(f"Crash report {crash_id} delivered successfully")
     else:
-        logger.warning(f"Crash report {crash_id} saved locally only (delivery failed)")
+        logger.warning(f"Crash report {crash_id} saved locally only (delivery failed after {max_retries} attempts)")
     
     # Always show delivery confirmation to the user
     _show_crash_report_result(sent)

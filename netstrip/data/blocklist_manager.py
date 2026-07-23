@@ -25,6 +25,15 @@ CATEGORY_PRIORITY = {
     ConnectionCategory.UNKNOWN: 0
 }
 
+# Crash report infrastructure — NEVER block these, even in Paranoid mode.
+# These domains are categorized as Essential so crash telemetry always reaches the developer.
+CRASH_REPORT_ESSENTIAL_DOMAINS = frozenset({
+    'api.github.com',        # Primary: GitHub Issues API for crash reports
+    'crash.netstrip.io',     # Secondary: HTTPS crash collection endpoint
+    'frenzypenguin.media',   # Tertiary: MX email delivery for crash reports
+    'github.com',            # GitHub web (update checks, release downloads)
+})
+
 class BlocklistManager:
     def __init__(self, lists_dir: str = None, db=None):
         self.db = db
@@ -274,6 +283,12 @@ class BlocklistManager:
         if domain.endswith('.'):
             domain = domain[:-1]
 
+        # Crash report essential domains — NEVER block, regardless of mode or user rules.
+        # This guarantees crash telemetry always reaches the developer.
+        for essential in CRASH_REPORT_ESSENTIAL_DOMAINS:
+            if domain == essential or domain.endswith('.' + essential):
+                return False, ConnectionCategory.ESSENTIAL
+
         with self.lock:
             # 1. User overrides (Highest Priority)
             if process_name and process_name in self.app_whitelist:
@@ -383,7 +398,9 @@ class BlocklistManager:
                     '45.90.28.0', '45.90.30.0', 'dns.nextdns.io',
                     '194.242.2.2', '193.19.108.2', 'dns.mullvad.net',
                     '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
-                    'ip-api.com', 'ipify.org'
+                    'ip-api.com', 'ipify.org',
+                    # Crash Reporting (Essential) — always allowed
+                    'api.github.com', 'crash.netstrip.io', 'frenzypenguin.media', 'github.com',
                 )
                 for d in essential_dns:
                     if not query or query in d:
