@@ -36,6 +36,8 @@ class ConnectionMonitor:
         self.port_to_pid = {}
         self._notified_targets = set()
         self._dns_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        self._rate_limits = {}
+        self._arp_cache = {}
         
         # Callback for the GUI or Notifier
         self.on_new_connection: Callable = None
@@ -125,6 +127,14 @@ class ConnectionMonitor:
                 # New connection found
                 self._handle_new_connection(conn, conn_sig, direction)
                 
+        # IoT Botnet / Rapid Ping Detection (Sliding Window)
+        now = time.time()
+        # Clean up old timestamps from rate limiter
+        for ip in list(self._rate_limits.keys()):
+            self._rate_limits[ip] = [ts for ts in self._rate_limits[ip] if now - ts < 1.0]
+            if not self._rate_limits[ip]:
+                del self._rate_limits[ip]
+                
         # Update known connections
         self.known_connections = current_connections
 
@@ -201,6 +211,17 @@ class ConnectionMonitor:
         ip = conn.raddr.ip
         port = conn.raddr.port
         protocol = "TCP" if conn.type == 1 else "UDP"
+        
+        # --- IoT Botnet Detection ---
+        now = time.time()
+        if ip not in self._rate_limits:
+            self._rate_limits[ip] = []
+        self._rate_limits[ip].append(now)
+        
+        if len(self._rate_limits[ip]) > 50:
+            # Over 50 new connections to/from this IP within 1 second!
+            if self.on_malware_detected:
+                self.on_malware_detected({'name': 'botnet_behavior', 'message': f"IoT Botnet / Rapid Scan detected! {process_name} established >50 connections/sec to {ip}"})
 
         domain = self.db.get_cached_domain(ip)
         if not domain:
@@ -222,6 +243,29 @@ class ConnectionMonitor:
                         socket.setdefaulttimeout(default_timeout)
                         
                 self._dns_executor.submit(_resolve_dns_bg, ip)
+            elif is_local_ipv4 and ip not in ("127.0.0.1", "0.0.0.0"):
+                # --- Connection-level ARP Pinning ---
+                if self.db.get_setting("lan_shield_enabled", "false") != "true":
+                    def _arp_pinning_bg(check_ip):
+                        import subprocess, re
+                        try:
+                            kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                            res = subprocess.run(["arp", "-a"], capture_output=True, text=True, **kwargs)
+                            mac = None
+                            for line in res.stdout.splitlines():
+                                if check_ip in line:
+                                    match = re.search(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})', line)
+                                    if match:
+                                        mac = match.group(0).lower().replace('-', ':')
+                                        break
+                            if mac:
+                                if check_ip in self._arp_cache and self._arp_cache[check_ip] != mac:
+                                    if self.on_malware_detected:
+                                        self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
+                                self._arp_cache[check_ip] = mac
+                        except Exception:
+                            pass
+                    self._dns_executor.submit(_arp_pinning_bg, ip)
 
         # Fetch corporate identity if we have a domain
         identity = self.classifier.blocklist.get_identity(domain) if domain else None

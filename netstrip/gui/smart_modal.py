@@ -27,58 +27,43 @@ class SmartParanoidModal(ctk.CTkToplevel):
         self._build_ui()
         
     def _build_ui(self):
-        # Header Area
-        header = ctk.CTkFrame(self, fg_color=Colors.DANGER_DIM, corner_radius=0, height=80)
-        header.pack(fill="x")
-        header.pack_propagate(False)
+        # Outer container with a thin info/danger border
+        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.DANGER)
+        frame.pack(fill="both", expand=True, padx=2, pady=2)
         
-        ctk.CTkLabel(
-            header, text=f"{Icons.MALWARE} SMART SHIELD ACTIVATED",
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD),
-            text_color=Colors.DANGER
-        ).place(relx=0.5, rely=0.5, anchor="center")
-
-        # Content Area
-        content = ctk.CTkFrame(self, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=Spacing.XL, pady=Spacing.LG)
+        inner = ctk.CTkFrame(frame, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=24, pady=24)
+        
+        lbl_title = ctk.CTkLabel(inner, text="SMART SHIELD ACTIVATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title.pack(anchor="w", pady=(0, 10))
+        
+        ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
         target = self.conn_data.get('domain') or self.conn_data.get('ip', 'Unknown')
         process = self.conn_data.get('process_name', 'Unknown')
         
-        ctk.CTkLabel(
-            content, 
-            text="Cripple intercepted a critical security event and automatically locked down the machine into Paranoid Mode.",
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-            text_color=Colors.TEXT_PRIMARY,
-            wraplength=420,
-            justify="center"
-        ).pack(pady=(0, Spacing.LG))
+        lbl_desc = ctk.CTkLabel(inner, text=(
+            "CRITICAL SECURITY EVENT INTERCEPTED.\n\n"
+            "> Threat detected automatically.\n"
+            "> Forcing lock-down to PARANOID mode...\n\n"
+            f"Process: {process}\nTarget: {target}"
+        ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
+        lbl_desc.pack(anchor="w", pady=(0, 20))
         
-        # Details Box
-        details = ctk.CTkFrame(content, fg_color=Colors.BG_PANEL, corner_radius=Spacing.RADIUS_SM)
-        details.pack(fill="x", pady=(0, Spacing.LG))
+        btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(10, 0))
         
-        ctk.CTkLabel(details, text="Process:", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_SECONDARY).grid(row=0, column=0, sticky="w", padx=Spacing.MD, pady=(Spacing.SM, 0))
-        ctk.CTkLabel(details, text=process, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_PRIMARY).grid(row=0, column=1, sticky="w", padx=Spacing.SM, pady=(Spacing.SM, 0))
+        btn_disable = ctk.CTkButton(
+            btn_frame, text="DISABLE SMART SHIELD", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=0, command=self._disable_smart_shield
+        )
+        btn_disable.pack(side="left", expand=True, padx=(0, 5))
         
-        ctk.CTkLabel(details, text="Target:", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_SECONDARY).grid(row=1, column=0, sticky="w", padx=Spacing.MD, pady=(Spacing.XS, Spacing.SM))
-        ctk.CTkLabel(details, text=target, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.DANGER).grid(row=1, column=1, sticky="w", padx=Spacing.SM, pady=(Spacing.XS, Spacing.SM))
-        
-        # Buttons
-        btn_frame = ctk.CTkFrame(content, fg_color="transparent")
-        btn_frame.pack(fill="x")
-        
-        ctk.CTkButton(
-            btn_frame, text="Acknowledge & Disable Smart Shield",
-            command=self._disable_smart_shield,
-            **CTK_BUTTON_SECONDARY_STYLE
-        ).pack(side="left", expand=True, padx=(0, Spacing.SM))
-        
-        ctk.CTkButton(
-            btn_frame, text="Keep Device Locked Down",
-            command=self.destroy,
-            **CTK_BUTTON_DANGER_STYLE
-        ).pack(side="right", expand=True, padx=(Spacing.SM, 0))
+        btn_keep = ctk.CTkButton(
+            btn_frame, text="KEEP LOCKED DOWN", fg_color=Colors.DANGER, 
+            hover_color="#991b1b", text_color="white", corner_radius=0, command=self.destroy
+        )
+        btn_keep.pack(side="right", expand=True, padx=(5, 0))
 
     def _disable_smart_shield(self):
         from netstrip.core.modes import ProtectionLevel

@@ -30,7 +30,8 @@ from netstrip.platform.base import get_platform
 logger = logging.getLogger(__name__)
 
 class NetStripEngine:
-    def __init__(self):
+    def __init__(self, is_headless=False):
+        self.is_headless = is_headless
         self.is_running = False
         self._stop_event = threading.Event()
         
@@ -137,6 +138,9 @@ class NetStripEngine:
         
         anomaly_name = anomaly_data.get('name', 'unknown')
         
+        # 1.5. Persist the state for headless servers / system tray
+        self.db.set_setting("pending_kernel_threat", f"{anomaly_name}|{anomaly_data['message']}")
+        
         # 2. Fire OS / Headless Notifications
         if self.is_headless:
             from netstrip.core.notifier import NotificationManager
@@ -145,13 +149,14 @@ class NetStripEngine:
                 f"{anomaly_data['message']}\nTo whitelist, run: python main.py --allow-anomaly {anomaly_name}"
             )
             # Active neutralize
-            if 'adapter' in anomaly_data and self.anomaly_scanner:
+            if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
                 self.anomaly_scanner._neutralize_adapter(anomaly_name)
             elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
                 self.anomaly_scanner._neutralize_pcap()
         else:
             # GUI Popup
             def _handle_decision(decision):
+                self.db.set_setting("pending_kernel_threat", "")
                 if decision == 'neutralize':
                     logger.warning(f"User neutralized threat: {anomaly_name}")
                     if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
@@ -161,11 +166,13 @@ class NetStripEngine:
                 elif decision == 'whitelist':
                     logger.info(f"User whitelisted anomaly: {anomaly_name}")
                     self.db.whitelist_anomaly(anomaly_name)
+                    self.set_killswitch(False) # Restore network
                 elif decision == 'disable_scanner':
                     logger.warning("User disabled Kernel Anomaly Scanner.")
                     self.db.set_setting("kernel_anomaly_scanner", "false")
                     if self.anomaly_scanner:
                         self.anomaly_scanner.stop()
+                    self.set_killswitch(False) # Restore network
             
             try:
                 import tkinter as tk
@@ -432,19 +439,26 @@ class NetStripEngine:
         self.engine_ready = True
         
         # Start detached subprocess watchdog to ensure DNS is restored on hard crash
-        try:
-            import subprocess
-            import sys
-            import os
-            watchdog_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'watchdog.py')
+        import sys, os, subprocess
+        if not getattr(sys, 'frozen', False) and not self.is_headless:
+            # Start detached subprocess watchdog to ensure DNS is restored on hard crash
+            # Hardening: Use strictly absolute paths and wipe environment variables to block DLL/PATH sideloading
+            watchdog_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'watchdog.py'))
             if os.path.exists(watchdog_path):
+                import subprocess
                 is_frozen = getattr(sys, 'frozen', False)
                 launch_cmd = [sys.executable] + sys.argv if not is_frozen else sys.argv
                 cmd = [sys.executable, watchdog_path, str(os.getpid())] + launch_cmd
-                subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
-                logger.info("Spawned detached crash recovery watchdog with relaunch capability.")
-        except Exception as e:
-            logger.error(f"Failed to spawn watchdog: {e}")
+                try:
+                    kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                    self.watchdog_thread = subprocess.Popen(
+                        cmd, 
+                        env={'PATH': os.environ.get('PATH', ''), 'SYSTEMROOT': os.environ.get('SYSTEMROOT', '')}, 
+                        **kwargs
+                    )            
+                    logger.info("Spawned detached crash recovery watchdog with relaunch capability.")
+                except Exception as e:
+                    logger.error(f"Failed to spawn watchdog: {e}")
         
         self.route_monitor_thread = threading.Thread(target=self._fast_route_monitor_loop, daemon=True)
         self.route_monitor_thread.start()

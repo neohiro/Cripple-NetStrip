@@ -139,6 +139,14 @@ class DashboardView(ctk.CTkScrollableFrame):
         self.engine.set_mode(level)
         self.shield.set_state(self.engine.is_running, mode_name)
 
+    def _on_engine_event(self, event_name: str):
+        def _handle():
+            if event_name == "MODE_CHANGED":
+                mode_name = self.engine.classifier.mode.name
+                if hasattr(self, 'shield') and self.shield.winfo_exists():
+                    self.shield.set_state(self.engine.is_running, mode_name)
+        self.after(0, _handle)
+
     @safe_loop(delay_ms=200)
     def _update_stats(self):
         if getattr(self, '_destroyed', False):

@@ -154,17 +154,8 @@ class NetStripApp(ctk.CTk):
             
         if not getattr(self, '_is_resizing', False):
             self._is_resizing = True
-            # Temporarily unmap heavy scroll frames to bypass geometry manager lag
-            if hasattr(self, 'connections_list') and hasattr(self.connections_list, 'scroll_frame'):
-                self.connections_list.scroll_frame.pack_forget()
+            if hasattr(self, 'connections_list'):
                 self.connections_list._resize_paused = True
-                
-            # Same for active views with heavy scroll frames
-            if getattr(self, 'current_view', None):
-                if hasattr(self.current_view, '_log_scroll'):
-                    self.current_view._log_scroll.pack_forget()
-                if hasattr(self.current_view, 'scroll_frame'):
-                    self.current_view.scroll_frame.pack_forget()
                 
         # Debounce: cancel any pending resize-end callback and reset
         if self._resize_timer is not None:
@@ -176,15 +167,8 @@ class NetStripApp(ctk.CTk):
         self._is_resizing = False
         
         # Restore scroll frames
-        if hasattr(self, 'connections_list') and hasattr(self.connections_list, 'scroll_frame'):
-            self.connections_list.scroll_frame.pack(fill="both", expand=True)
+        if hasattr(self, 'connections_list'):
             self.connections_list._resize_paused = False
-            
-        if getattr(self, 'current_view', None):
-            if hasattr(self.current_view, '_log_scroll'):
-                self.current_view._log_scroll.pack(fill="both", expand=True)
-            if hasattr(self.current_view, 'scroll_frame'):
-                self.current_view.scroll_frame.pack(fill="both", expand=True)
 
     def build_ui(self, engine: NetStripEngine):
         self.engine = engine
@@ -203,14 +187,22 @@ class NetStripApp(ctk.CTk):
         self.engine.set_status_callback(self._show_status)
 
     def _show_status(self, msg: str):
-        try:
-            self.status_label.configure(text=msg)
-            # Clear status after 5 seconds
-            if hasattr(self, '_status_timer'):
-                self.after_cancel(self._status_timer)
-            self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
-        except Exception:
-            pass
+        def _update():
+            try:
+                self.status_label.configure(text=msg)
+                if hasattr(self, '_status_timer'):
+                    self.after_cancel(self._status_timer)
+                self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
+                
+                # If app is hidden/minimized to tray, send a system notification
+                if getattr(self, 'icon', None) and getattr(self.engine, 'is_headless', False) is False:
+                    # Don't spam notifications for minor updates, only important ones
+                    if "blocked" in msg.lower() or "mode changed" in msg.lower() or "threat" in msg.lower() or "whitelist" in msg.lower() or "killswitch" in msg.lower():
+                        if not self.winfo_ismapped():
+                            self.icon.notify(msg, "NetStrip Status")
+            except Exception:
+                pass
+        self.after(0, _update)
 
     def _build_ui(self):
         # 3-column layout, 3 rows: Top Bar | (Nav Sidebar | Main Content | Connections Sidebar) | Status Bar
@@ -327,7 +319,7 @@ class NetStripApp(ctk.CTk):
 
         # Version
         from netstrip import __version__
-        self.version_label = ctk.CTkLabel(self.sidebar, text=f"v{__version__}",
+        self.version_label = ctk.CTkLabel(self.sidebar, text=f"{__version__}",
                      font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
                      text_color=Colors.TEXT_TERTIARY,
                      cursor="hand2")
@@ -350,6 +342,8 @@ class NetStripApp(ctk.CTk):
 
         # Register callback for engine events
         self.engine.gui_update_callback = self._on_engine_event
+        if getattr(self.engine, 'update_available', False):
+            self._on_engine_event("UPDATE_AVAILABLE")
 
         # Main content (middle pane)
         self.main_frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARK, corner_radius=0)
@@ -657,24 +651,63 @@ class NetStripApp(ctk.CTk):
             else:
                 self.engine.platform.unblock_lan_traffic()
 
-        menu = pystray.Menu(
-            pystray.MenuItem('Show Cripple', on_show, default=True),
-            pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
-            pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
-            pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
-            pystray.MenuItem('Quit', on_quit)
-        )
+        def review_anomaly(icon, item):
+            threat = self.engine.db.get_setting("pending_kernel_threat")
+            if threat:
+                try:
+                    name, msg = threat.split('|', 1)
+                except ValueError:
+                    name, msg = "unknown", threat
+                anomaly_data = {'name': name, 'message': msg, 'type': 'adapter'}
+                
+                def _tray_decision(decision):
+                    self.engine.db.set_setting("pending_kernel_threat", "")
+                    if decision == 'neutralize':
+                        if self.engine.anomaly_scanner:
+                            self.engine.anomaly_scanner._neutralize_adapter(name)
+                            self.engine.anomaly_scanner._neutralize_pcap()
+                    elif decision == 'whitelist':
+                        self.engine.db.whitelist_anomaly(name)
+                    elif decision == 'disable_scanner':
+                        self.engine.db.set_setting("kernel_anomaly_scanner", "false")
+                        if self.engine.anomaly_scanner:
+                            self.engine.anomaly_scanner.stop()
+                
+                from netstrip.gui.views.anomaly_alert import CTkAnomalyAlert
+                self.after(0, lambda: CTkAnomalyAlert(self, self.engine, anomaly_data, _tray_decision))
+
+        def get_menu_items():
+            items = [pystray.MenuItem('Show Cripple', on_show, default=True)]
+            
+            # Dynamic Threat Button
+            threat = self.engine.db.get_setting("pending_kernel_threat")
+            if threat:
+                items.append(pystray.MenuItem('⚠️ Review Kernel Anomaly', review_anomaly))
+                
+            items.extend([
+                pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
+                pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
+                pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
+                pystray.MenuItem('Quit', on_quit)
+            ])
+            return items
+
+        menu = pystray.Menu(get_menu_items)
 
         self._tray_icon = pystray.Icon("NetStrip", getattr(self, '_icon_image'), "Cripple", menu)
         
         # pystray blocks, so run it in a thread
         threading.Thread(target=self._tray_icon.run, daemon=True).start()
 
-    def _on_engine_event(self, event_name: str):
-        if event_name == "UPDATE_AVAILABLE":
-            if not getattr(self, '_update_glow_active', False):
-                self._update_glow_active = True
-                self._animate_update_glow()
+    def _on_engine_event(self, event_name: str, *args, **kwargs):
+        def _handle_event():
+            if event_name == "UPDATE_AVAILABLE":
+                if not getattr(self, '_update_glow_active', False):
+                    self._update_glow_active = True
+                    self._animate_update_glow()
+            elif event_name == "MODE_CHANGE":
+                pass # Can add specific mode change logic here if needed
+        self.after(0, _handle_event)
                 
     def _animate_update_glow(self, step=0, increasing=True):
         if not getattr(self, '_update_glow_active', False) or not self.winfo_exists():

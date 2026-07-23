@@ -22,28 +22,41 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
-        frame = ctk.CTkFrame(self, fg_color=Colors.BG_ELEVATED, corner_radius=0)
+        # Outer container with a thin danger border for futuristic accent
+        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.DANGER)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
         
-        lbl_title = ctk.CTkLabel(frame, text="⚠️ INITIATING MASTER KILLSWITCH", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD), text_color=Colors.DANGER)
-        lbl_title.pack(pady=(20, 10))
+        inner = ctk.CTkFrame(frame, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=24, pady=24)
         
-        lbl_desc = ctk.CTkLabel(frame, text=(
-            "You are about to sever all OS network connections.\n"
-            "This will instantly drop all internet traffic.\n\n"
-            "It is highly advised to also physically unplug your ethernet\n"
-            "cable or disable your Wi-Fi adapter hardware."
-        ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="center")
-        lbl_desc.pack(pady=(0, 20))
+        lbl_title = ctk.CTkLabel(inner, text="SYSTEM LOCKDOWN INITIATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title.pack(anchor="w", pady=(0, 10))
         
-        btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=20)
+        # Subtle separator
+        ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
-        btn_cancel = ctk.CTkButton(btn_frame, text="Cancel", fg_color=Colors.BG_INPUT, hover_color=Colors.BORDER_HOVER, text_color=Colors.TEXT_PRIMARY, command=self.on_cancel)
-        btn_cancel.pack(side="left", expand=True, padx=5)
+        lbl_desc = ctk.CTkLabel(inner, text=(
+            "SEVERING ALL OS NETWORK CONNECTIONS.\n\n"
+            "> Dropping all internet traffic...\n"
+            "> Blocking all active ports...\n\n"
+            "Hardware intervention (unplugging ethernet) is recommended."
+        ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
+        lbl_desc.pack(anchor="w", pady=(0, 20))
         
-        btn_confirm = ctk.CTkButton(btn_frame, text="ENGAGE KILLSWITCH", fg_color=Colors.DANGER, hover_color="#991b1b", text_color="white", command=self.on_confirm)
-        btn_confirm.pack(side="right", expand=True, padx=5)
+        btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(10, 0))
+        
+        btn_cancel = ctk.CTkButton(
+            btn_frame, text="ABORT", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=0, command=self.on_cancel
+        )
+        btn_cancel.pack(side="left", expand=True, padx=(0, 5))
+        
+        btn_confirm = ctk.CTkButton(
+            btn_frame, text="ENGAGE", fg_color=Colors.DANGER, 
+            hover_color="#991b1b", text_color="#ffffff", corner_radius=0, command=self.on_confirm
+        )
+        btn_confirm.pack(side="right", expand=True, padx=(5, 0))
 
     def on_cancel(self):
         self.callback(False)
@@ -73,27 +86,35 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
-        frame = ctk.CTkFrame(self, fg_color=Colors.BG_ELEVATED, corner_radius=0)
+        # Outer container with a thin info/danger border
+        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.WARNING)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
         
-        lbl_title = ctk.CTkLabel(frame, text="🚨 AUTO-KILLSWITCH ENGAGED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD), text_color=Colors.DANGER)
-        lbl_title.pack(pady=(20, 10))
+        inner = ctk.CTkFrame(frame, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=24, pady=24)
         
-        lbl_desc = ctk.CTkLabel(frame, text=(
-            "Cripple detected a severe network anomaly while in Paranoid Mode:\n\n"
-            f"{self.message}\n\n"
-            "All network traffic has been blocked to protect your system."
-        ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="center")
-        lbl_desc.pack(pady=(0, 20), padx=20)
+        lbl_title = ctk.CTkLabel(inner, text="AUTO-KILLSWITCH ENGAGED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.WARNING)
+        lbl_title.pack(anchor="w", pady=(0, 10))
         
-        btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=20)
+        ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
-        btn_keep = ctk.CTkButton(btn_frame, text="Keep Engaged", fg_color=Colors.BG_INPUT, hover_color=Colors.BORDER_HOVER, text_color=Colors.TEXT_PRIMARY, command=self.on_keep)
-        btn_keep.pack(side="left", expand=True, padx=5)
+        lbl_msg = ctk.CTkLabel(inner, text=f"> Watchdog Event:\n{self.message}", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
+        lbl_msg.pack(anchor="w", pady=(0, 20))
         
-        btn_restore = ctk.CTkButton(btn_frame, text="Acknowledge & Restore Network", fg_color=Colors.WARNING, hover_color="#b45309", text_color="white", command=self.on_restore)
-        btn_restore.pack(side="right", expand=True, padx=5)
+        btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(10, 0))
+        
+        btn_keep = ctk.CTkButton(
+            btn_frame, text="MAINTAIN LOCKDOWN", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=0, command=self.on_keep
+        )
+        btn_keep.pack(side="left", expand=True, padx=(0, 5))
+        
+        btn_restore = ctk.CTkButton(
+            btn_frame, text="ACKNOWLEDGE", fg_color=Colors.WARNING, 
+            hover_color="#b45309", text_color="white", corner_radius=0, command=self.on_restore
+        )
+        btn_restore.pack(side="right", expand=True, padx=(5, 0))
 
     def on_keep(self):
         self.destroy()

@@ -317,6 +317,7 @@ class Database:
                     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
                     (key, str_value)
                 )
+                conn.commit()
 
     def delete_setting(self, key: str):
         if not hasattr(self, '_settings_cache'):
@@ -575,6 +576,7 @@ class Database:
         with self.lock:
             with self._get_connection() as conn:
                 conn.execute('INSERT OR IGNORE INTO whitelisted_anomalies (name) VALUES (?)', (name,))
+                conn.commit()
 
     def is_anomaly_whitelisted(self, name: str) -> bool:
         with self.lock:

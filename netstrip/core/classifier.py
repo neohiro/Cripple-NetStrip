@@ -22,6 +22,9 @@ class TrafficClassifier:
 
     def classify_domain(self, domain: str, process_name: Optional[str] = None) -> ConnectionCategory:
         """Classify a domain into a ConnectionCategory."""
+        if not domain:
+            return ConnectionCategory.UNKNOWN
+            
         cache_key = (domain, process_name)
         if cache_key in self._domain_cache:
             return self._domain_cache[cache_key]

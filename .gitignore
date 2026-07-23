@@ -31,3 +31,8 @@ restore.py
 install_service.py
 test_*.py
 scratch/
+.netstrip/
+.netstrip
+*.ico
+*.png
+changelog_utf8.md

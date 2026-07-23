@@ -64,8 +64,13 @@ class NetworkMonitor:
         return None
 
     def check_state(self):
+        # Polling Hierarchy: Suppress if LAN Shield is blocking all network layer 2 packets
+        if self.engine and self.engine.db.get_setting("lan_shield_enabled", "false") == "true":
+            return
+            
         gw_ip = self.platform.get_default_gateway()
         if not gw_ip:
+            # Polling Hierarchy: No IPv4 = No anomaly polling required
             return
             
         gw_mac = self._get_arp_mac(gw_ip)

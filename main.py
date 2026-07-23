@@ -106,6 +106,21 @@ def is_server_or_embedded():
     return False
 
 def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(f"\n{'='*50}\nCripple (NetStrip) V2 CLI / Daemon\n{'='*50}")
+        print("BOOT VARIABLES:")
+        print("  --service         Force headless/daemon mode (no UI).")
+        print("  --blockinbound    Strict isolation mode (blocks all inbound connections).")
+        print("  --allowlan        Permit LAN connections even in strict modes.\n")
+        print("CLI MANAGEMENT COMMANDS (Sent to running background daemon via IPC):")
+        print("  --block <domain>  Add a domain to the user blocklist dynamically.")
+        print("  --allow <domain>  Add a domain to the user allowlist dynamically.")
+        print("  --mode <MODE>     Switch the engine mode (LOOSE, STANDARD, STRICT, PARANOID).")
+        print("  --status          Print the current lockdown state & active kernel anomalies.")
+        print("  --allow-anomaly <name> Whitelist a specific kernel threat and unlock the system.")
+        print(f"{'='*50}\n")
+        sys.exit(0)
+
     is_fallback = "--fallback-admin" in sys.argv
     is_elevated_retry = "--elevated" in sys.argv
 
@@ -184,6 +199,13 @@ def main():
                 anomaly = sys.argv[sys.argv.index("--allow-anomaly") + 1]
                 client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
                 print(f"Sent whitelist command for anomaly '{anomaly}' to background daemon.")
+            elif "--status" in sys.argv:
+                client.sendall(b"STATUS\n")
+                response = client.recv(4096).decode()
+                print(response)
+            elif "--service" in sys.argv:
+                print("Daemon is already running in the background.")
+                sys.exit(0)
             else:
                 client.sendall(b"SHOW_GUI\n")
                 print("NetStrip is already running. Showing existing GUI.")
@@ -201,13 +223,23 @@ def main():
         while True:
             try:
                 conn, addr = ipc_socket.accept()
-                data = conn.recv(1024).decode()
+                
+                # Sanity check: Only accept local connections
+                if addr[0] not in ('127.0.0.1', '::1'):
+                    conn.close()
+                    continue
+                    
+                # Sanity check: Buffer limit to prevent memory exhaustion (local DoS)
+                data = conn.recv(1024)
+                if len(data) > 1000:
+                    conn.close()
+                    continue
+                    
+                data = data.decode()
                 
                 if "SHOW_GUI" in data and app:
                     app.after(0, app.deiconify)
-                    app.after(50, lambda: app.attributes('-topmost', True))
-                    app.after(100, lambda: app.attributes('-topmost', False))
-                    app.after(100, app.lift)
+                    app.after(50, app.lift)
                     app.after(100, app.focus_force)
                     
                 if engine_instance:
@@ -228,6 +260,19 @@ def main():
                         anomaly = data.split("ALLOWANOMALY:")[1].strip()
                         engine_instance.db.whitelist_anomaly(anomaly)
                         logger.info(f"Whitelisted anomaly via CLI IPC: {anomaly}")
+                        pending = engine_instance.db.get_setting("pending_kernel_threat", "")
+                        if pending.startswith(anomaly):
+                            engine_instance.db.set_setting("pending_kernel_threat", "")
+                            engine_instance.set_killswitch(False)
+                    elif data.startswith("STATUS"):
+                        status_str = f"NetStrip Daemon Status:\n"
+                        status_str += f"Mode: {engine_instance.classifier.mode.name}\n"
+                        pending = engine_instance.db.get_setting("pending_kernel_threat", "")
+                        if pending:
+                            status_str += f"CRITICAL SYSTEM LOCKDOWN ACTIVE: {pending}\n"
+                        else:
+                            status_str += "No active kernel threats detected\n"
+                        conn.sendall(status_str.encode())
                 conn.close()
             except Exception:
                 pass
@@ -275,6 +320,10 @@ def main():
     # Create hidden main app immediately
     app = NetStripApp()
     
+    # Suppress Tkinter's noisy callback exception reporting in headless/service mode
+    if is_headless:
+        app.report_callback_exception = lambda exc, val, tb: None
+        
     if not is_fallback and not is_headless:
         splash = SplashScreen(app)
         app.update() # Force draw the splash screen to the OS NOW!
@@ -336,8 +385,6 @@ def main():
                 def on_transition_done():
                     if not is_headless:
                         app.lift()
-                        app.attributes('-topmost', True)
-                        app.after(100, lambda: app.attributes('-topmost', False))
                         app.focus_force()
                         app.apply_icon() # Force it one more time just to be absolutely sure
                         
@@ -375,11 +422,12 @@ def main():
                         on_transition_done()
                         
                 if is_fallback or is_headless:
-                    if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading:
-                        app.attributes('-alpha', 1.0)
-                        on_transition_done()
-                    else:
-                        app.after(50, check_engine_ready)
+                    while engine_instance.is_running:
+                        try:
+                            app.update()
+                        except Exception:
+                            pass
+                        time.sleep(0.05)
                     return
     
                 if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading and elapsed > 2.0:

@@ -272,10 +272,11 @@ class SettingsView(ctk.CTkFrame):
         
         if tooltip_text:
             try:
-                from idlelib.tooltip import Hovertip
-                Hovertip(lbl, tooltip_text, hover_delay=300)
-            except Exception:
-                pass
+                from netstrip.gui.hovertip import FadingHovertip
+                FadingHovertip(lbl, tooltip_text, hover_delay=300)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to bind hovertip: {e}")
 
         try:
             if setting_key == 'inbound_lan_bypass':

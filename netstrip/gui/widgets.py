@@ -11,44 +11,47 @@ class StatCard(ctk.CTkFrame):
         super().__init__(master, **{**CTK_FRAME_STYLE, **kwargs})
         self.color = color
         
-        # Center container
+        # Left-aligned container to prevent horizontal shifting/glitching on value update
         self.inner = ctk.CTkFrame(self, fg_color="transparent")
-        self.inner.pack(expand=True, padx=Spacing.SM, pady=Spacing.SM)
+        self.inner.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.LG)
         
-        # Icon
+        # Grid layout for inner
+        self.inner.grid_columnconfigure(0, weight=0, minsize=50) # Fixed icon width
+        self.inner.grid_columnconfigure(1, weight=1) # Flexible text area
+        
+        # Icon (Futuristic accent)
         self.icon_label = ctk.CTkLabel(
             self.inner, text=icon, 
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL + 4),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL + 6),
             text_color=self.color,
-            width=32,
-            height=32,
             anchor="center"
         )
         rowspan = 3 if subtitle else 2
-        self.icon_label.grid(row=0, column=0, rowspan=rowspan, padx=(0, Spacing.SM), sticky="n")
+        self.icon_label.grid(row=0, column=0, rowspan=rowspan, sticky="nsw")
         
-        # Value
+        # Value (Larger, more minimal)
         self.value_label = ctk.CTkLabel(
             self.inner, text=value,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY
         )
-        self.value_label.grid(row=0, column=1, sticky="w")
+        self.value_label.grid(row=0, column=1, sticky="sw", pady=(0, 2))
         
         # Title
         self.title_label = ctk.CTkLabel(
-            self.inner, text=title,
-            **CTK_LABEL_MUTED_STYLE
+            self.inner, text=title.upper(),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "bold"),
+            text_color=Colors.TEXT_TERTIARY
         )
-        self.title_label.grid(row=1, column=1, sticky="w")
+        self.title_label.grid(row=1, column=1, sticky="nw")
         
         if subtitle:
             self.subtitle_label = ctk.CTkLabel(
                 self.inner, text=subtitle,
-                font=(Fonts.FAMILY_PRIMARY[0], 9),
-                text_color=Colors.TEXT_TERTIARY
+                font=(Fonts.FAMILY_PRIMARY[0], 10),
+                text_color=self.color
             )
-            self.subtitle_label.grid(row=2, column=1, sticky="w", pady=(2, 0))
+            self.subtitle_label.grid(row=2, column=1, sticky="w", pady=(4, 0))
             
         self._resize_timer = None
         self.bind("<Configure>", self._on_resize)
