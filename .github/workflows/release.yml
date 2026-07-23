@@ -46,7 +46,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           cmd.exe /c build.bat
-          Compress-Archive -Path "dist\Cripple\*" -DestinationPath "NetStrip-Windows.zip" -Force
+          Compress-Archive -Path "dist\Cripple" -DestinationPath "NetStrip-Windows.zip" -Force
 
       - name: Build macOS / Linux Executable
         if: matrix.os != 'windows-latest'
