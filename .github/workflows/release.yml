@@ -36,12 +36,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev
           sudo apt-get install -y zip unzip autoconf libtool libltdl-dev automake autotools-dev m4 pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
+          rustup target add aarch64-linux-android || true
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install Pillow pyinstaller buildozer "cython==0.29.33" virtualenv
+          pip install Pillow pyinstaller buildozer "cython==0.29.33" virtualenv maturin
 
       - name: Build Windows Executable
         if: matrix.os == 'windows-latest'
