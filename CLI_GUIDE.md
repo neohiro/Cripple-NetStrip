@@ -79,7 +79,7 @@ If the daemon is already running (e.g. in `tmux` or as a systemd service), these
 | `--unghost` | Disengage Ghost Mode. |
 | `--force` | Skip confirmation prompts (for scripts/automation). |
 
-> **⚠ Warning:** `--killswitch` and `--ghost` will sever ALL connections including SSH and remote terminals. If you are connected remotely, you will be locked out. Recovery requires physical access or a local `--unkillswitch` / `--unghost` command. The confirmation prompt defaults to cancel (just press Enter to abort).
+> **⚠ Warning:** `--killswitch` is the nuclear option — it drops ALL traffic unconditionally, ignores all whitelists, and disables loopback. Recovery requires **physical access** to the machine. `--ghost` is softer: it honors user whitelists/preferences, SSH may survive if explicitly whitelisted, and remote recovery via `--unghost` is still possible. Both prompts default to cancel (just press Enter to abort).
 
 ### Monitoring
 | Command | Action |
