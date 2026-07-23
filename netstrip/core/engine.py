@@ -115,7 +115,7 @@ class NetStripEngine:
                 except Exception:
                     pass
 
-    def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str) -> bool:
+    def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
         if self.killswitch_active:
             if dst_ip not in ("127.0.0.1", "127.127.127.127", "::1"):
@@ -127,6 +127,47 @@ class NetStripEngine:
             
         if not getattr(self, 'engine_ready', True):
             return False
+            
+        # ----------------------------------------------------
+        # INBOUND CONNECTION HANDLING
+        # ----------------------------------------------------
+        if is_inbound:
+            # For inbound connections, the "remote attacker" is the src_ip
+            remote_ip = src_ip
+            
+            strict_shield = self.db.get_setting('strict_inbound_shield', 'true') == 'true'
+            if strict_shield:
+                notify = self.db.get_setting('inbound_notifications', 'true') == 'true'
+                if notify:
+                    self.notifier.push({
+                        'process_name': 'Inbound Shield',
+                        'domain': remote_ip,
+                        'protocol': protocol,
+                        'category': 'security',
+                        'action': 'block',
+                        'ip': remote_ip,
+                        'port': dst_port
+                    })
+                return False # Silently drop the packet
+                
+            # If Strict Shield is disabled, we evaluate the inbound connection
+            # against our standard IP blocklists using the remote src_ip
+            cat, action = self.classifier.classify_ip(remote_ip, dst_port, "Inbound Connection")
+            if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
+                try:
+                    self.db.log_connection({
+                        'process_name': "Inbound Connection",
+                        'domain': remote_ip,
+                        'protocol': protocol,
+                        'category': cat.value,
+                        'action': action.value,
+                        'mode': self.classifier.mode.name
+                    })
+                except:
+                    pass
+                return False
+            return True
+        # ----------------------------------------------------
             
         pid = self.connection_monitor.port_to_pid.get(src_port)
         process_name = "Unknown"

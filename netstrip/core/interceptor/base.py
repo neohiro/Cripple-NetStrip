@@ -11,9 +11,9 @@ class PacketInterceptor(abc.ABC):
     evaluating them via a callback, and dropping or injecting them.
     """
     
-    def __init__(self, callback: Callable[[str, int, str, int, str], bool]):
+    def __init__(self, callback: Callable[[str, int, str, int, str, bool], bool]):
         """
-        callback: function(dst_ip, dst_port, protocol, src_port, src_ip) -> bool (True = Allow, False = Block)
+        callback: function(dst_ip, dst_port, protocol, src_port, src_ip, is_inbound) -> bool (True = Allow, False = Block)
         """
         self.callback = callback
         self.is_running = False

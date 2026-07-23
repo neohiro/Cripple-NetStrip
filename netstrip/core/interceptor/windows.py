@@ -43,9 +43,9 @@ class WinDivertInterceptor(PacketInterceptor):
         logger.info("WinDivert packet interception stopped.")
 
     def _run_loop(self):
-        # Intercept outbound TCP SYN (connection initialization) and outbound UDP.
+        # Intercept TCP SYN (connection initialization) and UDP.
         # We exclude local loopback to avoid intercepting our own DNS proxy traffic.
-        filter_str = "outbound and ip and not loopback and (tcp.Syn or udp)"
+        filter_str = "ip and not loopback and (tcp.Syn or udp)"
         
         try:
             with pydivert.WinDivert(filter_str) as w:
@@ -71,7 +71,7 @@ class WinDivertInterceptor(PacketInterceptor):
                             src_port = 0
                             
                         # Evaluate packet via callback
-                        allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip)
+                        allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip, packet.is_inbound)
                         
                         if allowed:
                             w.send(packet) # Re-inject packet into network stack

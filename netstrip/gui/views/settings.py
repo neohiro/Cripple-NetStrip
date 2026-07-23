@@ -263,11 +263,11 @@ class SettingsView(ctk.CTkFrame):
         ).pack(side="left")
 
         try:
-            default_val = 'true' if setting_key == 'smart_paranoid_mode' else 'false'
+            default_val = 'true' if setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications') else 'false'
             current_val = self.engine.db.get_setting(setting_key, default_val)
             current = str(current_val).lower() == 'true'
         except Exception:
-            current = setting_key == 'smart_paranoid_mode'
+            current = setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications')
 
         switch = ctk.CTkSwitch(
             row, text="",
@@ -345,6 +345,14 @@ class SettingsView(ctk.CTkFrame):
         # Disable IPv6 globally
         self._add_switch_row(card, "Disable IPv6 Globally", 'disable_ipv6_globally')
         self._add_subtitle(card, "Force all traffic onto IPv4 where NetStrip can cleanly intercept it without bypass leaks. Persistent across reboots.")
+
+        # Strict Inbound Shield
+        self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield')
+        self._add_subtitle(card, "Overrides OS exceptions and hard-drops all unsolicited inbound connections (silently). May break local file sharing or game servers.")
+
+        # Inbound Notifications
+        self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications')
+        self._add_subtitle(card, "Show a popup notification when an inbound connection attempt is dropped.")
 
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
