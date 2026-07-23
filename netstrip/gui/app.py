@@ -334,14 +334,18 @@ class NetStripApp(ctk.CTk):
         self.version_label.grid(row=9, column=0, pady=(0, 16))
         
         def _nav_to_settings(e):
-            self.show_view(5)
-            # Find the settings view and scroll it to the top (which is where Updates card will be)
-            settings_view = self.views.get(5)
-            if hasattr(settings_view, 'scroll_frame') and hasattr(settings_view.scroll_frame, '_parent_canvas'):
-                try:
-                    settings_view.scroll_frame._parent_canvas.yview_moveto(0)
-                except: pass
-                
+            self._select_nav_by_text("Settings")
+            
+            def _scroll_to_top():
+                from netstrip.gui.views.settings import SettingsView
+                settings_view = self._cached_views.get(SettingsView)
+                if settings_view and hasattr(settings_view, 'scroll_frame') and hasattr(settings_view.scroll_frame, '_parent_canvas'):
+                    try:
+                        settings_view.scroll_frame._parent_canvas.yview_moveto(0)
+                    except: pass
+                    
+            self.after(50, _scroll_to_top)
+            
         self.version_label.bind("<Button-1>", _nav_to_settings)
 
         # Register callback for engine events
