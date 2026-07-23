@@ -157,19 +157,35 @@ class DashboardView(ctk.CTkScrollableFrame):
             return
             
         self._update_stats_id = self.after(500, self._update_stats)
-        try:
-            today_stats = self.engine.db.get_24h_statistics()
-            if today_stats:
-                try:
-                    unique_allowed = self.engine.db.get_unique_allowed_today()
-                except AttributeError:
-                    unique_allowed = today_stats['total_allowed']
-                self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
-                self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
-            else:
-                self.stat_traffic.set_value("0  |  0")
-                self.stat_queries.set_value("0")
+        
+        # Run DB queries in background thread to prevent UI micro-stutters
+        def fetch():
+            try:
+                today_stats = self.engine.db.get_24h_statistics()
+                if today_stats:
+                    try:
+                        unique_allowed = self.engine.db.get_unique_allowed_today()
+                    except AttributeError:
+                        unique_allowed = today_stats['total_allowed']
+                        
+                    def update_ui():
+                        if not getattr(self, '_destroyed', False) and self.winfo_exists():
+                            self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
+                            self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
+                    self.after(0, update_ui)
+                else:
+                    def update_empty():
+                        if not getattr(self, '_destroyed', False) and self.winfo_exists():
+                            self.stat_traffic.set_value("0  |  0")
+                            self.stat_queries.set_value("0")
+                    self.after(0, update_empty)
+            except Exception:
+                pass
                 
+        import threading
+        threading.Thread(target=fetch, daemon=True).start()
+        
+        try:
             # Active connections
             recent = getattr(self.engine, '_cached_recent', None)
             if recent is None:

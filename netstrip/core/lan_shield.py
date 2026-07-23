@@ -62,7 +62,7 @@ class LANShield:
                 if data.startswith(b"NetStrip:ANOMALY:"):
                     encrypted_payload = data[len(b"NetStrip:ANOMALY:"):]
                     try:
-                        decrypted = self._fernet.decrypt(encrypted_payload, ttl=60) # 60 sec TTL replay prevention
+                        decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min TTL for clock drift
                         payload = json.loads(decrypted.decode('utf-8'))
                         # Validate the payload
                         btype = payload.get('type')

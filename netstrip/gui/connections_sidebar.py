@@ -177,13 +177,26 @@ class ConnectionsSidebar(ctk.CTkFrame):
         if getattr(self, '_resize_paused', False):
             return
             
+        # Fetch recent connections in background thread to prevent UI micro-stutters
+        def fetch():
+            try:
+                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
+                sys_val = self.engine.db.get_setting("block_system_connections", "false")
+                
+                def process_ui():
+                    if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                        return
+                    self.engine._cached_recent = conns
+                    self._process_connections(conns, sys_val)
+                self.after(0, process_ui)
+            except Exception:
+                pass
+                
+        import threading
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def _process_connections(self, conns, sys_val):
         try:
-            # Fetch recent connections - increased limit to 500 to prevent active apps falling off 
-            # during high traffic bursts (like initial load)
-            conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
-            self.engine._cached_recent = conns
-            
-            sys_val = self.engine.db.get_setting("block_system_connections", "false")
             db_cache = {"block_system_connections": sys_val}
             
             if len(conns) > 0:

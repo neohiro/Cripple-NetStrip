@@ -435,8 +435,17 @@ class SettingsView(ctk.CTkFrame):
         ).pack(side="left")
         
         psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
+        
+        btn_copy = ctk.CTkButton(
+            psk_row, text="Copy", width=60, height=28,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
+            command=lambda: self.clipboard_clear() or self.clipboard_append(psk_entry.get())
+        )
+        btn_copy.pack(side="right")
+        
         psk_entry = ctk.CTkEntry(psk_row, width=350, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
-        psk_entry.pack(side="right", padx=(Spacing.MD, 0))
+        psk_entry.pack(side="right", padx=(Spacing.MD, Spacing.SM))
         psk_entry.insert(0, psk_val)
         
         # Debounce save
