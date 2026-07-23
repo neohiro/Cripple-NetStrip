@@ -56,13 +56,20 @@ jobs:
           cd dist
           zip -r ../NetStrip-${{ runner.os }}.zip ./*
 
-      - name: Upload Release Asset
-        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+      - name: Upload Release Asset (Windows)
+        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: |
-            NetStrip-Windows.zip
-            NetStrip-${{ runner.os }}.zip
+          files: NetStrip-Windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset (macOS / Linux)
+        if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os != 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: NetStrip-${{ runner.os }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
