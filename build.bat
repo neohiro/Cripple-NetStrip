@@ -21,6 +21,10 @@ rmdir /S /Q dist 2>nul
 
 echo [4] Building Cripple executable...
 echo    This will take a few minutes. Please wait...
+
+echo [4.5] Generating high-resolution Windows icon...
+python -c "from PIL import Image; img=Image.open('assets/cripple_logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (32, 32), (16, 16)])"
+
 pyinstaller ^
     --noconfirm ^
     --onedir ^
@@ -42,4 +46,4 @@ echo [5] Build Complete!
 echo You can find the compiled executable in the 'dist\Cripple' folder.
 echo You should compress the 'Cripple' folder into a .zip file for distribution.
 echo.
-pause
+echo.

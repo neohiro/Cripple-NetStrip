@@ -33,13 +33,28 @@ echo "   This will take a few minutes. Please wait..."
 # Detect OS to handle sudo/admin flags
 OS="$(uname -s)"
 if [ "$OS" = "Darwin" ]; then
+    echo "[5.5] Generating macOS .icns icon..."
+    mkdir -p assets/logo.iconset
+    sips -z 16 16     assets/cripple_logo.png --out assets/logo.iconset/icon_16x16.png >/dev/null
+    sips -z 32 32     assets/cripple_logo.png --out assets/logo.iconset/icon_16x16@2x.png >/dev/null
+    sips -z 32 32     assets/cripple_logo.png --out assets/logo.iconset/icon_32x32.png >/dev/null
+    sips -z 64 64     assets/cripple_logo.png --out assets/logo.iconset/icon_32x32@2x.png >/dev/null
+    sips -z 128 128   assets/cripple_logo.png --out assets/logo.iconset/icon_128x128.png >/dev/null
+    sips -z 256 256   assets/cripple_logo.png --out assets/logo.iconset/icon_128x128@2x.png >/dev/null
+    sips -z 256 256   assets/cripple_logo.png --out assets/logo.iconset/icon_256x256.png >/dev/null
+    sips -z 512 512   assets/cripple_logo.png --out assets/logo.iconset/icon_256x256@2x.png >/dev/null
+    sips -z 512 512   assets/cripple_logo.png --out assets/logo.iconset/icon_512x512.png >/dev/null
+    sips -z 1024 1024 assets/cripple_logo.png --out assets/logo.iconset/icon_512x512@2x.png >/dev/null
+    iconutil -c icns assets/logo.iconset
+    rm -rf assets/logo.iconset
+
     # macOS
     pyinstaller \
         --noconfirm \
         --onedir \
         --windowed \
         --name "NetStrip" \
-        --icon "assets/logo.png" \
+        --icon "assets/logo.icns" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
@@ -53,7 +68,6 @@ else
         --onedir \
         --windowed \
         --name "NetStrip" \
-        --icon "assets/logo.png" \
         --add-data "$CTK_PATH:customtkinter/" \
         --add-data "netstrip/data/lists:netstrip/data/lists" \
         --add-data "netstrip/data/updater_sources.json:netstrip/data" \
