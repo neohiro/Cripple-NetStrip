@@ -72,9 +72,26 @@ def check_dependencies():
             print(f"Missing Dependencies: {', '.join(missing)}")
         sys.exit(1)
 
-def is_embedded_system():
-    """Detects if we are running on a low-resource embedded system like a Raspberry Pi."""
+def is_server_or_embedded():
+    """Detects if we are running on a server OS, or a low-resource embedded system like a Raspberry Pi."""
     import platform
+    import os
+    
+    # Check Windows Server
+    if platform.system() == 'Windows':
+        if 'Server' in platform.win32_ver()[0]:
+            return True
+            
+    # Check Linux Server (Ubuntu Server, Debian headless, etc.)
+    if platform.system() == 'Linux':
+        try:
+            with open('/etc/os-release', 'r') as f:
+                os_release = f.read().lower()
+                if 'server' in os_release:
+                    return True
+        except Exception:
+            pass
+            
     machine = platform.machine().lower()
     if machine in ('armv7l', 'aarch64', 'armv6l'):
         try:
@@ -124,8 +141,16 @@ def main():
 
     check_dependencies()
 
-    is_embedded = is_embedded_system()
+    is_embedded = is_server_or_embedded()
     is_headless = "--service" in sys.argv or is_embedded
+    
+    # --- CLI Boot Overrides ---
+    if "--blockinbound" in sys.argv:
+        # Force strict isolation (overrides auto-server detection)
+        # We don't have the engine loaded yet, so we'll pass this as a flag to engine
+        pass
+    if "--allowlan" in sys.argv:
+        pass
 
     # --- IPC Single-Instance Check ---
     import socket
@@ -141,17 +166,77 @@ def main():
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(('127.0.0.1', IPC_PORT))
-            client.sendall(b"SHOW_GUI\n")
+            
+            # CLI Management Commands
+            if "--block" in sys.argv:
+                domain = sys.argv[sys.argv.index("--block") + 1]
+                client.sendall(f"BLOCK:{domain}\n".encode())
+                print(f"Sent block command for {domain} to background daemon.")
+            elif "--allow" in sys.argv:
+                domain = sys.argv[sys.argv.index("--allow") + 1]
+                client.sendall(f"ALLOW:{domain}\n".encode())
+                print(f"Sent allow command for {domain} to background daemon.")
+            elif "--mode" in sys.argv:
+                mode = sys.argv[sys.argv.index("--mode") + 1]
+                client.sendall(f"MODE:{mode}\n".encode())
+                print(f"Sent mode change command ({mode}) to background daemon.")
+            else:
+                client.sendall(b"SHOW_GUI\n")
+                print("NetStrip is already running. Showing existing GUI.")
             client.close()
-        except Exception:
-            pass
-        print("NetStrip is already running. Showing existing GUI.")
+        except Exception as e:
+            print(f"Failed to communicate with running daemon: {e}")
         sys.exit(0)
+
+    import threading
+    engine_instance = None
+    app = None
+
+    # --- IPC Listener Thread ---
+    def ipc_listener():
+        while True:
+            try:
+                conn, addr = ipc_socket.accept()
+                data = conn.recv(1024).decode()
+                
+                if "SHOW_GUI" in data and app:
+                    app.after(0, app.deiconify)
+                    app.after(50, lambda: app.attributes('-topmost', True))
+                    app.after(100, lambda: app.attributes('-topmost', False))
+                    app.after(100, app.lift)
+                    app.after(100, app.focus_force)
+                    
+                if engine_instance:
+                    if data.startswith("BLOCK:"):
+                        domain = data.split("BLOCK:")[1].strip()
+                        engine_instance.db.add_user_rule(domain, "block", "global", "Added via CLI")
+                        engine_instance.classifier.user_rules[domain] = "block"
+                    elif data.startswith("ALLOW:"):
+                        domain = data.split("ALLOW:")[1].strip()
+                        engine_instance.db.add_user_rule(domain, "allow", "global", "Added via CLI")
+                        engine_instance.classifier.user_rules[domain] = "allow"
+                    elif data.startswith("MODE:"):
+                        mode_str = data.split("MODE:")[1].strip().upper()
+                        from netstrip.core.modes import ProtectionLevel
+                        if hasattr(ProtectionLevel, mode_str):
+                            engine_instance.set_mode(ProtectionLevel[mode_str])
+                conn.close()
+            except Exception:
+                pass
+                
+    threading.Thread(target=ipc_listener, daemon=True).start()
 
     if is_embedded:
         logger.info("Embedded system mode active. GUI will not be initialized.")
         from netstrip.core.engine import NetStripEngine
         engine_instance = NetStripEngine(is_headless=is_headless)
+        
+        # Apply CLI Boot Overrides natively
+        if "--blockinbound" in sys.argv:
+            engine_instance.db.set_setting("strict_inbound_shield", "true")
+            engine_instance.db.set_setting("inbound_lan_bypass", "false")
+        if "--allowlan" in sys.argv:
+            engine_instance.db.set_setting("inbound_lan_bypass", "true")
         
         try:
             from netstrip.core.sound import sound_manager
@@ -182,25 +267,6 @@ def main():
     # Create hidden main app immediately
     app = NetStripApp()
     
-    # --- IPC Listener Thread ---
-    def ipc_listener():
-        while True:
-            try:
-                conn, addr = ipc_socket.accept()
-                data = conn.recv(1024)
-                if b"SHOW_GUI" in data:
-                    app.after(0, app.deiconify)
-                    app.after(50, lambda: app.attributes('-topmost', True))
-                    app.after(100, lambda: app.attributes('-topmost', False))
-                    app.after(100, app.lift)
-                    app.after(100, app.focus_force)
-                conn.close()
-            except Exception:
-                pass
-                
-    import threading
-    threading.Thread(target=ipc_listener, daemon=True).start()
-    
     if not is_fallback and not is_headless:
         splash = SplashScreen(app)
         app.update() # Force draw the splash screen to the OS NOW!
@@ -218,6 +284,13 @@ def main():
             # Initialize Engine exactly ONCE in the correct privilege context
             engine_instance = NetStripEngine(is_headless=is_headless)
             
+            # Apply CLI Boot Overrides natively
+            if "--blockinbound" in sys.argv:
+                engine_instance.db.set_setting("strict_inbound_shield", "true")
+                engine_instance.db.set_setting("inbound_lan_bypass", "false")
+            if "--allowlan" in sys.argv:
+                engine_instance.db.set_setting("inbound_lan_bypass", "true")
+                
             from netstrip.core.sound import sound_manager
             
             # Mute sounds during boot

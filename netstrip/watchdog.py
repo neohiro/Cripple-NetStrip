@@ -115,8 +115,9 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-            # Fail-open: Always re-enable IPv6 bindings if the engine crashes, so the user has internet
+            # Fail-open: Always re-enable IPv6/IPv4 bindings if the engine crashes, so the user has internet
             subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
         elif sys_plat == "Darwin": # macOS
             res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)
@@ -138,6 +139,12 @@ def restore_network():
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0"])
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
+            
+            # Flush any IPv4 drops
+            while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
+                subprocess.run(["iptables", "-D", "INPUT", "!", "-i", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+            while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
+                subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
             
         logging.info("Emergency restore completed successfully.")
     except Exception as e:

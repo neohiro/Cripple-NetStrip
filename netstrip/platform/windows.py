@@ -210,6 +210,21 @@ class WindowsPlatform(PlatformBase):
         res = self._run_cmd(cmd)
         return "True" in res.stdout
 
+    def disable_ipv4(self) -> bool:
+        cmd = ["powershell", "-Command", "Disable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"]
+        res = self._run_cmd(cmd)
+        return res.returncode == 0
+        
+    def enable_ipv4(self) -> bool:
+        cmd = ["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"]
+        res = self._run_cmd(cmd)
+        return res.returncode == 0
+        
+    def is_ipv4_enabled(self) -> bool:
+        cmd = ["powershell", "-Command", "Get-NetAdapterBinding -ComponentID ms_tcpip | Select-Object -ExpandProperty Enabled"]
+        res = self._run_cmd(cmd)
+        return "True" in res.stdout
+
     def install_autostart(self) -> bool:
         # Use schtasks to create a task running as SYSTEM on boot
         exe_path = sys.executable

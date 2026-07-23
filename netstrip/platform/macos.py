@@ -117,11 +117,17 @@ class MacOSPlatform(PlatformBase):
         return success
 
     def is_ipv6_enabled(self) -> bool:
-        for interface in self.get_active_interfaces():
-            res = self._run_cmd(["networksetup", "-getinfo", interface])
-            if "IPv6: Off" not in res.stdout:
-                return True
-        return False
+        res = self._run_cmd(["networksetup", "-getinfo", "Wi-Fi"])
+        return "IPv6: Automatic" in res.stdout
+        
+    def disable_ipv4(self) -> bool:
+        return False # Experimental
+        
+    def enable_ipv4(self) -> bool:
+        return True
+        
+    def is_ipv4_enabled(self) -> bool:
+        return True
 
     def install_autostart(self) -> bool:
         if not self.is_admin():

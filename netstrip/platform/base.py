@@ -126,6 +126,21 @@ class PlatformBase(ABC):
         pass
 
     @abstractmethod
+    def disable_ipv4(self) -> bool:
+        """Disable IPv4 globally on the system."""
+        pass
+        
+    @abstractmethod
+    def enable_ipv4(self) -> bool:
+        """Enable IPv4 globally on the system."""
+        pass
+        
+    @abstractmethod
+    def is_ipv4_enabled(self) -> bool:
+        """Check if IPv4 is globally enabled on the system."""
+        pass
+
+    @abstractmethod
     def install_autostart(self) -> bool:
         """Register as a system startup service."""
         pass

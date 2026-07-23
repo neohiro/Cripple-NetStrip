@@ -339,6 +339,14 @@ class SettingsView(ctk.CTkFrame):
                 else:
                     api.enable_ipv6()
                     
+            if setting_key == 'disable_ipv4_globally':
+                from netstrip.platform.base import get_platform
+                api = get_platform()
+                if value == 'true':
+                    api.disable_ipv4()
+                else:
+                    api.enable_ipv4()
+                    
             readable_name = setting_key.replace('_', ' ').title()
             status = "Enabled" if value == 'true' else "Disabled"
             if hasattr(self.engine, 'on_status') and self.engine.on_status:
@@ -356,9 +364,13 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
         
-        # Disable IPv6 globally
+        # Disable IPv6 Globally
         self._add_switch_row(card, "Disable IPv6 Globally", 'disable_ipv6_globally')
         self._add_subtitle(card, "Force all traffic onto IPv4 where NetStrip can cleanly intercept it without bypass leaks. Persistent across reboots.")
+
+        # Disable IPv4 Globally
+        self._add_switch_row(card, "Disable IPv4 Globally", 'disable_ipv4_globally')
+        self._add_subtitle(card, "EXPERIMENTAL: Rips IPv4 completely out of the OS network stack. Forces the machine to run exclusively on IPv6. Will break most standard LAN/WAN connections.")
 
         # Strict Inbound Shield
         self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield')

@@ -320,7 +320,14 @@ class NetStripEngine:
                 self.platform.disable_ipv6()
             except Exception as e:
                 logger.error(f"Failed to re-apply global IPv6 block: {e}")
-            
+                
+        # Re-apply global IPv4 block if user had it enabled in settings
+        if self.db.get_setting("disable_ipv4_globally", "false") == "true":
+            try:
+                self.platform.disable_ipv4()
+            except Exception as e:
+                logger.error(f"Failed to re-apply global IPv4 block: {e}")
+
             # If the current upstream is corrupted/looping to itself, clear it
             if current_upstream == "127.127.127.127":
                 current_upstream = None
@@ -445,6 +452,13 @@ class NetStripEngine:
                 self.platform.enable_ipv6()
             except Exception as e:
                 logger.error(f"Failed to restore global IPv6: {e}")
+                
+        # Re-enable global IPv4
+        if self.db.get_setting("disable_ipv4_globally", "false") == "true":
+            try:
+                self.platform.enable_ipv4()
+            except Exception as e:
+                logger.error(f"Failed to restore global IPv4: {e}")
             
         if self.watchdog_thread:
             self.watchdog_thread.join(timeout=1.0)

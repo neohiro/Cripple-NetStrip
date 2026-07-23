@@ -24,6 +24,9 @@ Your operating system and applications are constantly phoning home. Cripple inte
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss—blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
+### 🛠️ Headless & Remote Management
+Running on a server or embedded device without a GUI? You can fully manage Cripple remotely via SSH using live IPC commands. Read the **[CLI Guide](CLI_GUIDE.md)** for a full list of boot variables and live blocklist management commands.
+
 ## ✨ Key Features
 
 ### 🚧 Absolute Zero-Leak Packet Interception
