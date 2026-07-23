@@ -124,6 +124,13 @@ def main():
     is_fallback = "--fallback-admin" in sys.argv
     is_elevated_retry = "--elevated" in sys.argv
 
+    # Install global crash reporter hook
+    try:
+        from netstrip.core.crash_reporter import install_global_exception_hook
+        install_global_exception_hook()
+    except Exception:
+        pass
+
     from netstrip.platform.base import get_platform
     platform = get_platform()
 
@@ -447,6 +454,11 @@ def main():
         app.mainloop()
     except Exception as e:
         logger.error(f"Mainloop Error: {e}")
+        try:
+            from netstrip.core.crash_reporter import send_crash_report
+            send_crash_report(exception=e, context="mainloop")
+        except Exception:
+            pass
     finally:
         if engine_instance:
             engine_instance.stop()

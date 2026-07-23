@@ -158,7 +158,10 @@ class AnalyticsReporter:
         return payload
 
     def _send_report(self, payload: dict) -> bool:
-        """Send the analytics payload via HTTPS POST. Returns True on success."""
+        """Send the analytics payload. Tries HTTPS endpoint first, then email fallback."""
+        sent = False
+        
+        # Channel 1: HTTPS POST to analytics endpoint
         try:
             import urllib.request
             import ssl
@@ -170,15 +173,56 @@ class AnalyticsReporter:
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            
-            # Use default SSL context for HTTPS verification
             ctx = ssl.create_default_context()
-            
             with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
-                return resp.status == 200
+                if resp.status == 200:
+                    sent = True
         except Exception as e:
-            logger.debug(f"Analytics report failed (non-critical): {e}")
-            return False
+            logger.debug(f"HTTPS analytics delivery failed (non-critical): {e}")
+        
+        # Channel 2: Email fallback to developer
+        if not sent:
+            try:
+                from email.mime.text import MIMEText
+                import smtplib
+
+                body = "NetStrip Anonymous Analytics Report\n"
+                body += "=" * 50 + "\n\n"
+                for k, v in payload.items():
+                    body += f"  {k}: {v}\n"
+                body += "\n" + "=" * 50 + "\n"
+
+                msg = MIMEText(body, "plain", "utf-8")
+                msg["From"] = "analytics@netstrip.local"
+                msg["To"] = "cripple@frenzypenguin.media"
+                msg["Subject"] = f"[NetStrip Analytics] v{payload.get('version', '?')} on {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
+
+                # Try direct MX delivery
+                try:
+                    import dns.resolver  # type: ignore
+                    mx_records = dns.resolver.resolve("frenzypenguin.media", "MX")
+                    mx_host = str(sorted(mx_records, key=lambda r: r.preference)[0].exchange).rstrip(".")
+                    with smtplib.SMTP(mx_host, 25, timeout=15) as smtp:
+                        smtp.ehlo("netstrip.local")
+                        smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
+                    sent = True
+                    logger.debug("Analytics sent via MX email delivery")
+                except Exception:
+                    pass
+                
+                # Try local MTA
+                if not sent:
+                    try:
+                        with smtplib.SMTP("localhost", 25, timeout=5) as smtp:
+                            smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
+                        sent = True
+                        logger.debug("Analytics sent via local MTA")
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.debug(f"Email analytics delivery failed (non-critical): {e}")
+        
+        return sent
 
     def _run_loop(self):
         """
