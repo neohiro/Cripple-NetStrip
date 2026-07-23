@@ -58,6 +58,10 @@ class NetStripEngine:
         self.anomaly_scanner = AnomalyScanner(engine=self)
         self.anomaly_scanner.set_callback(self._handle_anomaly)
         
+        from netstrip.core.analytics import AnalyticsReporter
+        self.analytics = AnalyticsReporter(engine=self)
+        self._start_time = time.time()
+        
         self.ebpf_manager = None
         if os.name != 'nt' and os.uname().sysname == 'Linux':
             from netstrip.platform.linux_ebpf import EBPFManager
@@ -341,6 +345,9 @@ class NetStripEngine:
         self.anomaly_scanner.start()
         if self.ebpf_manager and self.db.get_setting("linux_ebpf_mode", "false") == "true":
             self.ebpf_manager.start()
+        
+        # Start analytics reporter (opt-in only, off by default)
+        self.analytics.start()
         
         # Start background updater
         threading.Thread(target=self._update_checker_loop, daemon=True).start()

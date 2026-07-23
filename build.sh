@@ -41,6 +41,7 @@ HIDDEN_IMPORTS=(
     --hidden-import "netstrip.core.connection_monitor"
     --hidden-import "netstrip.core.dns_proxy"
     --hidden-import "netstrip.core.anomaly_scanner"
+    --hidden-import "netstrip.core.analytics"
     --hidden-import "netstrip.core.geoip"
     --hidden-import "netstrip.core.lan_shield"
     --hidden-import "netstrip.core.linux_ebpf_monitor"

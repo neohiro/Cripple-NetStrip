@@ -201,6 +201,7 @@ class SettingsView(ctk.CTkFrame):
         self._build_network_card()
         self._build_scheduler_card()
         self._build_migration_card()
+        self._build_analytics_card()
         self._build_about_card()
 
     def _build_general_card(self):
@@ -683,6 +684,21 @@ class SettingsView(ctk.CTkFrame):
         
         # Kill current process forcefully to ensure clean restart without hanging threads
         os._exit(0)
+    def _build_analytics_card(self):
+        card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
+        card.pack(fill="x", pady=(0, Spacing.MD))
+
+        ctk.CTkLabel(
+            card, text="Analytics",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
+
+        self._add_switch_row(card, "Send Anonymous Usage Statistics", 'analytics_opt_in', tooltip_text="Opt-in only. Sends minimal, non-identifying data (version, OS type, aggregate block counts) to help improve NetStrip. No IPs, domains, or personal data is ever collected.")
+        self._add_subtitle(card, "Disabled by default. When enabled, sends anonymous aggregate statistics (app version, OS type, total block/allow counts) once every 24 hours. No IP addresses, domain names, DNS queries, or personally identifiable information is ever collected or transmitted.")
+
+        # Bottom padding
+        ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()
 
     def _build_about_card(self):
         from netstrip import __version__
