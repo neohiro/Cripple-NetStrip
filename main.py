@@ -151,7 +151,7 @@ def main():
     if is_embedded:
         logger.info("Embedded system mode active. GUI will not be initialized.")
         from netstrip.core.engine import NetStripEngine
-        engine_instance = NetStripEngine()
+        engine_instance = NetStripEngine(is_headless=is_headless)
         
         try:
             from netstrip.core.sound import sound_manager
@@ -216,7 +216,7 @@ def main():
         nonlocal engine_instance
         try:
             # Initialize Engine exactly ONCE in the correct privilege context
-            engine_instance = NetStripEngine()
+            engine_instance = NetStripEngine(is_headless=is_headless)
             
             from netstrip.core.sound import sound_manager
             

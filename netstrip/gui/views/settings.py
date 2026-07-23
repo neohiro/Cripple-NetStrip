@@ -263,11 +263,17 @@ class SettingsView(ctk.CTkFrame):
         ).pack(side="left")
 
         try:
-            default_val = 'true' if setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications') else 'false'
+            if setting_key == 'inbound_lan_bypass':
+                default_val = 'true' if self.engine.is_headless else 'false'
+            else:
+                default_val = 'true' if setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications') else 'false'
+            
             current_val = self.engine.db.get_setting(setting_key, default_val)
             current = str(current_val).lower() == 'true'
         except Exception:
             current = setting_key in ('smart_paranoid_mode', 'strict_inbound_shield', 'inbound_notifications')
+            if setting_key == 'inbound_lan_bypass' and hasattr(self, 'engine') and self.engine.is_headless:
+                current = True
 
         switch = ctk.CTkSwitch(
             row, text="",
@@ -349,6 +355,10 @@ class SettingsView(ctk.CTkFrame):
         # Strict Inbound Shield
         self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield')
         self._add_subtitle(card, "Overrides OS exceptions and hard-drops all unsolicited inbound connections (silently). May break local file sharing or game servers.")
+
+        # Allow Local LAN Inbound
+        self._add_switch_row(card, "↳ Allow Local Subnet (LAN) Inbound", 'inbound_lan_bypass')
+        self._add_subtitle(card, "Bypasses the Inbound Shield for local network IPs only. Allows remote admin (SSH/RDP) without opening to WAN.")
 
         # Inbound Notifications
         self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications')

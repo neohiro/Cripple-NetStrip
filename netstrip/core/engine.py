@@ -137,6 +137,19 @@ class NetStripEngine:
             
             strict_shield = self.db.get_setting('strict_inbound_shield', 'true') == 'true'
             if strict_shield:
+                
+                # Headless Admin Bypass / LAN Shield Bypass
+                default_bypass = 'true' if self.is_headless else 'false'
+                inbound_lan_bypass = self.db.get_setting('inbound_lan_bypass', default_bypass) == 'true'
+                
+                if inbound_lan_bypass:
+                    import ipaddress
+                    try:
+                        if ipaddress.ip_address(remote_ip).is_private:
+                            return True
+                    except:
+                        pass
+                
                 notify = self.db.get_setting('inbound_notifications', 'true') == 'true'
                 if notify:
                     self.notifier.push({
