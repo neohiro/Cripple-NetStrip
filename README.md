@@ -137,10 +137,16 @@ Most blockers rely on DNS filtering, which fails when applications hardcode IP a
 
 ## 📱 Mobile (Android)
 
-NetStrip supports Android through a Python-for-Android headless bridge:
+NetStrip supports Android through a Python-for-Android headless bridge with **dual VPN mode**:
 
-- **Cloud Build Pipeline** — GitHub Actions compiles the Python backend, Kivy GUI, and JNI components into a standalone `.apk` on every tagged release
-- **VPN Loopback** — Android restricts binding to privileged ports without root, so NetStrip binds to `127.0.0.1:5353` and pairs with any local VPN app (RethinkDNS, AdGuard) pointed at that address for system-wide filtering
+### Native VPN Mode (Default)
+NetStrip occupies Android's VPN slot directly — **all traffic** (DNS, TCP, UDP) routes through NetStrip's TUN interface for complete packet filtering. No other VPN app needed. Blocked connections are silently dropped at the packet level.
+
+### Companion Mode
+DNS-only filtering at `127.0.0.1:5353`. Designed to work **alongside another VPN app** (RethinkDNS, AdGuard, WireGuard, etc.) that handles the actual encrypted tunnel. Point your VPN app's DNS server to `127.0.0.1:5353` for seamless filtering.
+
+### Build Pipeline
+GitHub Actions compiles the Python backend, Kivy GUI, Java VPN service, and JNI components into a standalone `.apk` on every tagged release.
 
 ---
 
