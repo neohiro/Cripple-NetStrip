@@ -36,6 +36,34 @@
       "enabled": true
     },
     {
+      "name": "HaGeZi Xiaomi Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.xiaomi.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Huawei Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.huawei.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Vivo Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.vivo.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Oppo/Realme Telemetry",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.oppo-realme.txt",
+      "format": "hosts",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
       "name": "OISD Big",
       "url": "https://big.oisd.nl/domainswild",
       "format": "domains",

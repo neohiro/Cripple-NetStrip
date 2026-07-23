@@ -157,6 +157,8 @@ class BlocklistManager:
                             if sys_name == "darwin": is_native_os = True
                         elif "linux" in fname or "ubuntu" in fname:
                             if sys_name == "linux": is_native_os = True
+                        elif "android" in fname:
+                            if os.environ.get('NETSTRIP_ANDROID') == '1': is_native_os = True
                         else:
                             is_native_os = True
                             
