@@ -16,8 +16,6 @@
 
 </div>
 
----
-
 ## Overview
 
 **NetStrip (Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
@@ -25,13 +23,11 @@
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss — blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#credits">Credits</a>
+  <a href="#-key-features">Key Features</a> •
+  <a href="#%EF%B8%8F-architecture">Architecture</a> •
+  <a href="#-installation">Installation</a> •
+  <a href="#-credits">Credits</a>
 </p>
-
----
 
 ## ✨ Key Features
 
@@ -52,18 +48,14 @@ DPI Smart Filters intercept HTTP/HTTPS headers via SNI extraction. Deep Connecti
 
 ### 🔧 Network Capabilities
 
-| Feature | Description |
-|---|---|
-| **DoH Sinkhole** | Force-routes 30+ DNS-over-HTTPS providers into the sinkhole |
-| **IPv6 SLAAC Lockdown** | Disables IPv6 Router Advertisements across all platforms |
-| **Global IPv6 Killswitch** | 1-click brutal disable of IPv6 system-wide |
-| **LAN Shield** | Instantly block/allow all private subnet communications |
-| **App-Specific Policies** | Per-executable domain rules |
-| **Time Bombs** | 15-minute temporary allow-rules for quick troubleshooting |
-| **VPN Pre-Cipher Interception** | Filters traffic before VPN encryption (WireGuard, OpenVPN compatible) |
-| **Multi-NIC / Gateway Mode** | Full support for dual-adapter NUCs acting as network-wide firewalls |
-
----
+**DoH Sinkhole** — Force-routes 30+ DNS-over-HTTPS providers into the sinkhole.
+**IPv6 SLAAC Lockdown** — Disables IPv6 Router Advertisements across all platforms.
+**Global IPv6 Killswitch** — 1-click brutal disable of IPv6 system-wide.
+**LAN Shield** — Instantly block/allow all private subnet communications.
+**App-Specific Policies** — Per-executable domain rules.
+**Time Bombs** — 15-minute temporary allow-rules for quick troubleshooting.
+**VPN Pre-Cipher Interception** — Filters traffic before VPN encryption (WireGuard, OpenVPN compatible).
+**Multi-NIC / Gateway Mode** — Full support for dual-adapter NUCs acting as network-wide firewalls.
 
 ## 🛠️ Architecture
 
@@ -77,39 +69,29 @@ Run completely silently via `--service` for Raspberry Pi, NUCs, or ARM embedded 
 
 ### GUI & UX Optimizations
 
-| Optimization | Detail |
-|---|---|
-| **Ghost-Line Sash** | Lightweight ghost indicator during drag instead of real-time panel resizes |
-| **Debounced Resize** | Batched window resize events with deferred layout flush |
-| **Lazy Tab Preloading** | Staggered 300ms pre-instantiation for zero-delay tab switching |
-| **View Caching** | Tabs hidden via `grid_remove()` — O(1) swap, never destroyed |
-| **3× Scroll Speed** | Framework-level mouse wheel patching |
-| **Splash Progressive Loading** | Animated splash masks ~2s cold-start initialization |
-| **Flicker-Free Dashboard** | Pre-allocated widget pool with in-place `configure()` updates |
-
----
+**Ghost-Line Sash** — Lightweight ghost indicator during drag instead of real-time panel resizes.
+**Debounced Resize** — Batched window resize events with deferred layout flush.
+**Lazy Tab Preloading** — Staggered 300ms pre-instantiation for zero-delay tab switching.
+**View Caching** — Tabs hidden via `grid_remove()` — O(1) swap, never destroyed.
+**3× Scroll Speed** — Framework-level mouse wheel patching.
+**Splash Progressive Loading** — Animated splash masks ~2s cold-start initialization.
+**Flicker-Free Dashboard** — Pre-allocated widget pool with in-place `configure()` updates.
 
 ## 🔒 Security & Tamper Defenses
 
 NetStrip integrates deep defense-in-depth mechanisms to protect its runtime environment:
 
-| Defense | Description |
-|---|---|
-| **Runtime Tamper Verification** | SHA-256 validation of core engine files at runtime |
-| **Fail-Open Recovery** | Watchdog restores original DNS and removes firewall hooks on crash |
-| **Strict Pathing** | Absolute path enforcement prevents DLL sideloading and PATH hijacking |
-| **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
-| **IPC Authorization** | Structured JSON payload validation on the single-instance socket |
-| **PowerShell Hardening** | Base64-encoded paths neutralize command injection via crafted filenames |
-| **Shell Sandboxing** | All system commands use `shell=False` with isolated list arguments |
-
----
+**Runtime Tamper Verification** — SHA-256 validation of core engine files at runtime.
+**Fail-Open Recovery** — Watchdog restores original DNS and removes firewall hooks on crash.
+**Strict Pathing** — Absolute path enforcement prevents DLL sideloading and PATH hijacking.
+**Anti-Corruption DB** — SQLite WAL mode with thread-safe isolation.
+**IPC Authorization** — Structured JSON payload validation on the single-instance socket.
+**PowerShell Hardening** — Base64-encoded paths neutralize command injection via crafted filenames.
+**Shell Sandboxing** — All system commands use `shell=False` with isolated list arguments.
 
 ## 💾 Backup & Import
 
 Full profile backup and import via JSON. Exports capture all user settings, app rules, custom blocklist URLs, and classifications into a single portable `.json` file. Importing merges cleanly with de-duplication by name, enabling easy migration between machines or identical headless deployments.
-
----
 
 ## 📖 Installation
 
@@ -143,21 +125,15 @@ sudo python3 main.py --service
 
 > *NetStrip requires administrative/root privileges to bind to system-level network interfaces and inject kernel rules.*
 
----
-
 ## ⏰ Build Metrics
 
 This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL, system tray integrations, IPC layers, and security audits — was built in **~0.5 days** of pure active coding time.
-
----
 
 ## 🚀 Release Notes
 
 **v3.0.0** — Rebuilt zero-leak kernel interception engine. Multi-platform IPC daemon architecture. Futuristic-minimalist UI theme. CPU stability improvements. Enhanced anomaly whitelisting logic.
 
 **v2.0.0** — System Classification Engine. Auto-Updater rate limits. GUI rebrand and memory leak optimizations.
-
----
 
 ## 🙏 Credits
 
@@ -179,8 +155,6 @@ This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL,
 [Dan Pollock](https://someonewhocares.org/hosts/) •
 [AdAway](https://adaway.org/) •
 [Energized Protection](https://energized.pro/)
-
----
 
 ## 📄 License
 
