@@ -180,6 +180,10 @@ def main():
                 mode = sys.argv[sys.argv.index("--mode") + 1]
                 client.sendall(f"MODE:{mode}\n".encode())
                 print(f"Sent mode change command ({mode}) to background daemon.")
+            elif "--allow-anomaly" in sys.argv:
+                anomaly = sys.argv[sys.argv.index("--allow-anomaly") + 1]
+                client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
+                print(f"Sent whitelist command for anomaly '{anomaly}' to background daemon.")
             else:
                 client.sendall(b"SHOW_GUI\n")
                 print("NetStrip is already running. Showing existing GUI.")
@@ -220,6 +224,10 @@ def main():
                         from netstrip.core.modes import ProtectionLevel
                         if hasattr(ProtectionLevel, mode_str):
                             engine_instance.set_mode(ProtectionLevel[mode_str])
+                    elif data.startswith("ALLOWANOMALY:"):
+                        anomaly = data.split("ALLOWANOMALY:")[1].strip()
+                        engine_instance.db.whitelist_anomaly(anomaly)
+                        logger.info(f"Whitelisted anomaly via CLI IPC: {anomaly}")
                 conn.close()
             except Exception:
                 pass

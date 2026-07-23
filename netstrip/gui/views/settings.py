@@ -214,31 +214,30 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
 
         # Privacy Stream Mode
-        self._add_switch_row(card, "Privacy Stream Mode", 'privacy_stream_mode')
+        self._add_switch_row(card, "Privacy Stream Mode", 'privacy_stream_mode', tooltip_text="Use Case: Streamers who want to hide their IP addresses on screen. Masks all IPs in the GUI logs.")
         self._add_subtitle(card, "Hides all IP addresses in the GUI (useful for streamers to prevent IP leaks).")
 
         # Autostart toggle
-        self._add_switch_row(card, "Start on Boot", 'autostart')
-
+        self._add_switch_row(card, "Start on Boot", 'autostart', tooltip_text="Use Case: Set-and-forget security. Ensures the firewall is running the moment the computer boots.")
 
         # Run as Service Only
-        self._add_switch_row(card, "Run as Service Only (Headless)", 'run_as_service')
+        self._add_switch_row(card, "Run as Service Only (Headless)", 'run_as_service', tooltip_text="Use Case: Servers and non-GUI devices. Runs NetStrip silently in the background without spawning the desktop GUI.")
         self._add_subtitle(card, "Do not show GUI at login. App runs silently in the background (accessible via tray or manual start).")
 
         # IP Flux Tolerance
-        self._add_switch_row(card, "IP Flux Tolerance", 'ip_flux_tolerance')
+        self._add_switch_row(card, "IP Flux Tolerance", 'ip_flux_tolerance', tooltip_text="Use Case: VPN users. Prevents the firewall from panicking and locking down when your VPN changes your public IP.")
         self._add_subtitle(card, "Ignore Public IP changes for Auto-Killswitch (useful if using a VPN).")
 
         # Smart Shield
-        self._add_switch_row(card, "Smart Shield", 'smart_paranoid_mode')
+        self._add_switch_row(card, "Smart Shield", 'smart_paranoid_mode', tooltip_text="Use Case: Essential endpoint protection. Automatically escalates security levels when an intrusion is detected.")
         self._add_subtitle(card, "Auto-escalates to Paranoid mode on malware detection, and instantly engages the Master Killswitch upon sudden VPN drops or kernel route shifts.")
         
         # Block System Connections
-        self._add_switch_row(card, "Block System Connections", 'block_system_connections')
+        self._add_switch_row(card, "Block System Connections", 'block_system_connections', tooltip_text="Use Case: Ultimate privacy. Kills Microsoft/Apple telemetry, but breaks Windows Update and OS synchronization.")
         self._add_subtitle(card, "Disable all non-vital background OS services globally (can disrupt updates).")
         
         # Allow in-browser DNS
-        self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns')
+        self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns', tooltip_text="Use Case: If you use Chrome/Firefox DoH features and don't want NetStrip filtering your web browsing.")
         self._add_subtitle(card, "Allows browsers to use their own DoH settings (bypasses NetStrip filtering).")
 
         # Bottom padding
@@ -260,15 +259,23 @@ class SettingsView(ctk.CTkFrame):
                 
         lbl.bind('<Configure>', on_resize)
 
-    def _add_switch_row(self, parent, label_text, setting_key):
+    def _add_switch_row(self, parent, label_text, setting_key, tooltip_text=None):
         row = ctk.CTkFrame(parent, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
 
-        ctk.CTkLabel(
+        lbl = ctk.CTkLabel(
             row, text=label_text,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
             text_color=Colors.TEXT_PRIMARY,
-        ).pack(side="left")
+        )
+        lbl.pack(side="left")
+        
+        if tooltip_text:
+            try:
+                from idlelib.tooltip import Hovertip
+                Hovertip(lbl, tooltip_text, hover_delay=300)
+            except Exception:
+                pass
 
         try:
             if setting_key == 'inbound_lan_bypass':
@@ -368,37 +375,37 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
         
         # Disable IPv6 Globally
-        self._add_switch_row(card, "Disable IPv6 Globally", 'disable_ipv6_globally')
+        self._add_switch_row(card, "Disable IPv6 Globally", 'disable_ipv6_globally', tooltip_text="Use Case: Strict IPv4 control. Forces your machine to drop complex IPv6 routing entirely so NetStrip can cleanly intercept all traffic.")
         self._add_subtitle(card, "Force all traffic onto IPv4 where NetStrip can cleanly intercept it without bypass leaks. Persistent across reboots.")
 
         # Disable IPv4 Globally
-        self._add_switch_row(card, "Disable IPv4 Globally", 'disable_ipv4_globally')
+        self._add_switch_row(card, "Disable IPv4 Globally", 'disable_ipv4_globally', tooltip_text="Use Case: Advanced IPv6 networks. Rips IPv4 out of the OS network stack. Warning: Will break most legacy LAN connections.")
         self._add_subtitle(card, "EXPERIMENTAL: Rips IPv4 completely out of the OS network stack. Forces the machine to run exclusively on IPv6. Will break most standard LAN/WAN connections.")
 
         # Kernel Anomaly Scanner
-        self._add_switch_row(card, "Kernel Anomaly Scanner", 'kernel_anomaly_scanner')
+        self._add_switch_row(card, "Kernel Anomaly Scanner", 'kernel_anomaly_scanner', tooltip_text="Use Case: EDR-level Security. Triggers Paranoid lockdown if a rogue VPN or rootkit Pcap driver spins up. Can whitelist known VPNs upon popup.")
         self._add_subtitle(card, "Actively scans for unauthorized NDIS filter drivers, WinPcap/libpcap raw sockets, and rogue VPN adapters that could bypass NetStrip's firewall. Escalates to Smart Shield upon detection.")
 
         # Layer 2 ARP Lockdown
-        self._add_switch_row(card, "Layer 2 ARP Lockdown", 'layer2_arp_lockdown')
+        self._add_switch_row(card, "Layer 2 ARP Lockdown", 'layer2_arp_lockdown', tooltip_text="Use Case: Public Wi-Fi / Corporate Networks. Prevents hackers from spoofing your router's MAC address and redirecting your packets to them.")
         self._add_subtitle(card, "Enforces static MAC-to-IP pinning for your default gateway at the OS level. Mathematically prevents ARP Spoofing and Layer 2 redirection attacks without needing a custom kernel driver.")
 
         # Linux Deep Kernel XDP Mode
         import os
         if os.name != 'nt' and os.uname().sysname == 'Linux':
-            self._add_switch_row(card, "Deep Kernel XDP Mode (eBPF)", 'linux_ebpf_mode')
+            self._add_switch_row(card, "Deep Kernel XDP Mode (eBPF)", 'linux_ebpf_mode', tooltip_text="Use Case: Ultimate Linux Security. Hooks into the physical NIC to drop raw socket bypasses before the Linux kernel even sees them.")
             self._add_subtitle(card, "Hooks a custom eBPF/XDP program directly into the physical Network Interface Card (NIC) driver to drop rogue Layer 2 and raw socket traffic before the Linux Kernel processes it.")
 
         # Strict Inbound Shield
-        self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield')
+        self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield', tooltip_text="Use Case: Unsafe networks. Hard-drops all incoming connections, rendering your device invisible to network scanners.")
         self._add_subtitle(card, "Overrides OS exceptions and hard-drops all unsolicited inbound connections (silently). May break local file sharing or game servers.")
 
         # Allow Local LAN Inbound
-        self._add_switch_row(card, "↳ Allow Local Subnet (LAN) Inbound", 'inbound_lan_bypass')
+        self._add_switch_row(card, "↳ Allow Local Subnet (LAN) Inbound", 'inbound_lan_bypass', tooltip_text="Use Case: Servers & Embedded systems. Lets you SSH in from your local network while still dropping inbound connections from the outside internet.")
         self._add_subtitle(card, "Bypasses the Inbound Shield for local network IPs only. Allows remote admin (SSH/RDP) without opening to WAN. Automatically defaults to ON for embedded systems/servers, but you can strictly enforce OFF to isolate them completely.")
 
         # Inbound Notifications
-        self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications')
+        self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications', tooltip_text="Use Case: Auditing. Visually tells you when someone is trying to port-scan or connect to your machine.")
         self._add_subtitle(card, "Show a popup notification when an inbound connection attempt is dropped.")
 
         row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)

@@ -108,6 +108,11 @@ class Database:
                         bytes_recv INTEGER DEFAULT 0
                     );
                     
+                    CREATE TABLE IF NOT EXISTS whitelisted_anomalies (
+                        name TEXT PRIMARY KEY,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                    
                     CREATE INDEX IF NOT EXISTS idx_conn_log_timestamp ON connection_log(timestamp);
                 ''')
                 # Initialize today's stats if not exists
@@ -565,3 +570,14 @@ class Database:
                 cursor = conn.execute('SELECT domain FROM dns_cache WHERE ip = ?', (ip,))
                 row = cursor.fetchone()
                 return row['domain'] if row else None
+
+    def whitelist_anomaly(self, name: str):
+        with self.lock:
+            with self._get_connection() as conn:
+                conn.execute('INSERT OR IGNORE INTO whitelisted_anomalies (name) VALUES (?)', (name,))
+
+    def is_anomaly_whitelisted(self, name: str) -> bool:
+        with self.lock:
+            with self._get_connection() as conn:
+                cursor = conn.execute('SELECT 1 FROM whitelisted_anomalies WHERE name = ?', (name,))
+                return cursor.fetchone() is not None

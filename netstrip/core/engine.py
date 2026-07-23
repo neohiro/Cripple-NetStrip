@@ -125,23 +125,63 @@ class NetStripEngine:
                     pass
                     
     def _handle_anomaly(self, anomaly_data: dict):
-        # We actively neutralized it, so we don't need to force the whole engine into Paranoid mode
-        # which would kill local printers/LAN. We just log it and update the UI securely.
-        logger.warning(f"Kernel Anomaly Detected & Neutralized: {anomaly_data['message']}")
+        logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
         
-        try:
-            self.db.log_connection({
-                'process_name': 'Active Neutralizer',
-                'domain': 'SYSTEM ANOMALY',
-                'protocol': 'SYS',
-                'category': 'malware', # Treat kernel anomalies as malware
-                'action': 'block',
-                'mode': self.classifier.mode.name
-            })
-        except: pass
+        # 1. Instantly trigger CRITICAL threat escalation (Paranoid Mode + Killswitch)
+        self.trigger_threat_escalation({
+            'process_name': 'Kernel Bypass Scanner',
+            'domain': 'SYSTEM ANOMALY',
+            'threat_level': 'CRITICAL',
+            'note': anomaly_data['message']
+        })
         
-        # Flash the UI status
-        self.on_status(f"🛡️ Shield Active: {anomaly_data['message']}")
+        anomaly_name = anomaly_data.get('name', 'unknown')
+        
+        # 2. Fire OS / Headless Notifications
+        if self.is_headless:
+            from netstrip.core.notifier import NotificationManager
+            NotificationManager.send_critical_os_notification(
+                "NetStrip KERNEL INTRUSION", 
+                f"{anomaly_data['message']}\nTo whitelist, run: python main.py --allow-anomaly {anomaly_name}"
+            )
+            # Active neutralize
+            if 'adapter' in anomaly_data and self.anomaly_scanner:
+                self.anomaly_scanner._neutralize_adapter(anomaly_name)
+            elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
+                self.anomaly_scanner._neutralize_pcap()
+        else:
+            # GUI Popup
+            def _handle_decision(decision):
+                if decision == 'neutralize':
+                    logger.warning(f"User neutralized threat: {anomaly_name}")
+                    if 'adapter' in anomaly_data.get('type', '') and self.anomaly_scanner:
+                        self.anomaly_scanner._neutralize_adapter(anomaly_name)
+                    elif 'software' in anomaly_data.get('type', '') and self.anomaly_scanner:
+                        self.anomaly_scanner._neutralize_pcap()
+                elif decision == 'whitelist':
+                    logger.info(f"User whitelisted anomaly: {anomaly_name}")
+                    self.db.whitelist_anomaly(anomaly_name)
+                elif decision == 'disable_scanner':
+                    logger.warning("User disabled Kernel Anomaly Scanner.")
+                    self.db.set_setting("kernel_anomaly_scanner", "false")
+                    if self.anomaly_scanner:
+                        self.anomaly_scanner.stop()
+            
+            try:
+                import tkinter as tk
+                from netstrip.gui.views.anomaly_alert import CTkAnomalyAlert
+                
+                # Get the root window from the App
+                # We need to find the main root to attach the toplevel
+                # The engine has access to the app or root via callbacks, but easiest is to just use tk._default_root
+                root = tk._default_root
+                if root:
+                    root.after(0, lambda: CTkAnomalyAlert(root, self, anomaly_data, _handle_decision))
+                else:
+                    _handle_decision('neutralize')
+            except Exception as e:
+                logger.error(f"Failed to show Anomaly Alert GUI: {e}")
+                _handle_decision('neutralize')
 
     def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
