@@ -12,9 +12,26 @@
 
   *Strip away the noise. Take back control of your network.*
 
-  > **🚀 v3.0.0** — Rebuilt zero-leak kernel interception engine, multi-platform IPC daemon architecture, and more!
+  > **🚀 v3.1.0** — Guaranteed crash report delivery, adaptive live traffic polling, HMAC integrity watchdog, LAN Shield PSK management, and hardened security audit across all engines.
 
 </div>
+
+---
+
+## 📑 Table of Contents
+
+- [Overview](#overview)
+- [Core Features](#-core-features)
+- [Network Capabilities](#-network-capabilities)
+- [Security & Tamper Defenses](#-security--tamper-defenses)
+- [GUI & UX](#-gui--ux)
+- [Mobile (Android)](#-mobile-android)
+- [Architecture](#%EF%B8%8F-architecture)
+- [Installation](#-installation)
+- [Release Notes](#-release-notes)
+- [Credits](#-credits)
+
+---
 
 ## Overview
 
@@ -22,83 +39,127 @@
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss — blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
-<p align="center">
-  <a href="#-key-features">Key Features</a> •
-  <a href="#%EF%B8%8F-architecture">Architecture</a> •
-  <a href="#-installation">Installation</a> •
-  <a href="#-credits">Credits</a>
-</p>
+---
 
-## ✨ Key Features
+## ✨ Core Features
 
 ### 🚧 Zero-Leak Packet Interception
 Most blockers rely on DNS filtering, which fails when applications hardcode IP addresses. NetStrip uses OS-level hooking (`WinDivert` on Windows, `NFQueue` on Linux, `PF` on macOS) to intercept traffic at the IP packet layer, destroying telemetry that bypasses traditional DNS.
 
-### 🛡️ Smart Shield & Deep Kernel Integrity
-Monitors live processes to detect malicious behavioral anomalies in real-time with active neutralization. Deep Kernel XDP Mode injects fileless eBPF programs into the physical NIC on Linux. Layer 2 ARP Lockdown natively pins your gateway MAC address to prevent ARP Spoofing and MITM attacks. The Kernel Bypass Scanner actively neutralizes rogue virtual VPN adapters and stops Pcap packet-injection tools on sight.
-
 ### 📊 Multi-Layered DNS Sinkhole
-Evaluates queries asynchronously against over **1.5 million** blocked domains in `O(1)` time. Online blocklists auto-refresh every 24 hours with staggered network throttling. Paste any raw `.txt` URL into the Filter Manager — the engine uses dual-layer heuristic scanning to auto-classify lists into Trackers, Telemetry, Malware, or System categories. Resolves upstream queries via DoT, native DoH, or UDP fallback (auto-detects third-party local DNS proxies).
+- Evaluates queries asynchronously against **1.5M+ blocked domains** in `O(1)` time
+- Online blocklists auto-refresh every 24 hours with staggered network throttling
+- Paste any raw `.txt` URL — the engine auto-classifies lists into Trackers, Telemetry, Malware, or System categories
+- Upstream resolution via DoT, native DoH, or UDP fallback (auto-detects local DNS proxies)
 
-### 🎨 High-Performance GUI
-Built on `CustomTkinter`, the GUI is completely detached from the core engine. All heavy network routing, packet interception, and IPC management runs asynchronously on multi-threaded C-based backends, ensuring a lag-free UI even at 10,000+ queries per second.
+### 🛡️ Smart Shield & Deep Kernel Integrity
+- Real-time malicious behavioral anomaly detection with active neutralization
+- **Deep Kernel XDP Mode** — fileless eBPF programs injected into the physical NIC on Linux
+- **Layer 2 ARP Lockdown** — pins gateway MAC address to prevent ARP Spoofing / MITM
+- **Kernel Bypass Scanner** — neutralizes rogue virtual VPN adapters and Pcap packet-injection tools
 
-### 🧠 Smart Shield & Streamer Privacy
-DPI Smart Filters intercept HTTP/HTTPS headers via SNI extraction. Deep Connection ARP Pinning enforces per-connection MAC-address validation — if an active connection swaps MAC addresses, NetStrip terminates it immediately. IoT Botnet detection identifies rapid-fire scanning (>50 outbound spikes/sec) using sliding rate windows. Privacy Stream Mode masks all IP addresses in the dashboard for safe live streaming.
+### 🧠 DPI & Privacy Filters
+- **SNI Extraction** — intercepts HTTP/HTTPS headers via deep packet inspection
+- **Deep Connection ARP Pinning** — per-connection MAC validation; terminates on MAC swap
+- **IoT Botnet Detection** — identifies rapid-fire scanning (>50 outbound spikes/sec) via sliding rate windows
+- **Privacy Stream Mode** — masks all IP addresses in the dashboard for safe live streaming
 
-### 🔧 Network Capabilities
+### 🔑 LAN Shield E2E Mesh
+- Cryptographically paired LAN clients via Fernet (AES-128-CBC) pre-shared keys
+- Broadcasts encrypted UDP `ANOMALY`, `KILLSWITCH`, and `RESTORE` commands
+- One client's anomaly locks down your entire local network grid
+- **Easy PSK management** — Copy / Paste / Regenerate buttons with Fernet validation and hot-reload
+- PSK persists in `~/.netstrip/netstrip.db` — survives app updates
 
-**DoH Sinkhole** — Force-routes 30+ DNS-over-HTTPS providers into the sinkhole.
-**IPv6 SLAAC Lockdown** — Disables IPv6 Router Advertisements across all platforms.
-**Global IPv6 Killswitch** — 1-click brutal disable of IPv6 system-wide.
-**LAN Shield E2E Mesh** — Cryptographically paired LAN clients broadcast AES-128-GCM encrypted UDP `ANOMALY`, `KILLSWITCH`, and `RESTORE` commands. One client's anomaly locks down your entire local grid.
-**Home Assistant IoT Webhooks** — Seamlessly pushes network threat events via JSON POST webhooks to Home Assistant, Node-RED, or Zigbee/Thread monitors. Flash your smart lights red if a device on your network is compromised.
-**WMI Antivirus Integration** — Automatically queries `SecurityCenter2` (Windows) or process lists (Linux) to flawlessly whitelist third-party Anti-Malware (BitDefender, Kaspersky) telemetry/definition servers and NDIS drivers.
-**App-Specific Policies** — Per-executable domain rules.
-**Time Bombs** — 15-minute temporary allow-rules for quick troubleshooting.
-**VPN Pre-Cipher Interception** — Filters traffic before VPN encryption (WireGuard, OpenVPN compatible).
-**Multi-NIC / Gateway Mode** — Full support for dual-adapter NUCs acting as network-wide firewalls.
+---
 
-### 📱 Mobile Architecture (Android)
-NetStrip supports Android dynamically through a Python-for-Android headless bridge:
-- **Cloud Build Pipeline**: The repository includes a `buildozer.spec` designed for GitHub Actions. Whenever a release is tagged, the `ubuntu-latest` cloud runner will automatically compile the Python backend, Kivy GUI wrapper, and JNI components into a standalone `.apk` artifact.
-- **VPN Loopback**: Because Android strictly restricts binding to privileged ports (like DNS port 53) without Root access, NetStrip automatically detects the Android environment (`hasattr(sys, 'getandroidapilevel')`) and binds its interceptor to the high loopback port `127.0.0.1:5353`. You can then pair this with any local Android VPN application (like RethinkDNS or AdGuard) pointed at `127.0.0.1:5353` to seamlessly filter traffic system-wide!
+## 🌐 Network Capabilities
+
+| Feature | Description |
+|---|---|
+| **DoH Sinkhole** | Force-routes 30+ DNS-over-HTTPS providers into the sinkhole |
+| **IPv6 SLAAC Lockdown** | Disables IPv6 Router Advertisements across all platforms |
+| **Global IPv6 Killswitch** | 1-click brutal disable of IPv6 system-wide |
+| **Ghost Mode Killswitch** | Drops ALL traffic across all NICs and protocols — true network ghost |
+| **Home Assistant IoT** | Pushes threat events via JSON POST webhooks to Home Assistant, Node-RED, Zigbee/Thread |
+| **WMI AV Integration** | Auto-whitelists third-party antivirus (BitDefender, Kaspersky, etc.) via SecurityCenter2 |
+| **App-Specific Policies** | Per-executable domain rules |
+| **Time Bombs** | 15-minute temporary allow-rules for quick troubleshooting |
+| **VPN Pre-Cipher** | Filters traffic before VPN encryption (WireGuard, OpenVPN compatible) |
+| **Multi-NIC Gateway** | Full support for dual-adapter NUCs acting as network-wide firewalls |
+
+---
+
+## 🔒 Security & Tamper Defenses
+
+| Defense Layer | Implementation |
+|---|---|
+| **HMAC-SHA256 Watchdog** | Periodic live integrity scanning of all engine files with keyed hashes |
+| **Crash Report Guarantee** | Essential domain whitelist + 5× retry with exponential backoff; reports always get out |
+| **DLL Sideloading Mitigation** | `SetDefaultDllDirectories` restricts DLL search paths at startup |
+| **IPC Command Validation** | Regex-validated ALLOW/BLOCK commands on the single-instance IPC socket |
+| **Fail-Open Recovery** | Watchdog restores DNS, firewall rules, IPv4/IPv6 protocols, and killswitch state on crash |
+| **Runtime Tamper Check** | SHA-256 validation of core engine files at runtime |
+| **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
+| **PowerShell Hardening** | Base64-encoded paths neutralize command injection via crafted filenames |
+| **Shell Sandboxing** | All system commands use `shell=False` with isolated list arguments |
+| **Anti-Replay Nonces** | LAN Shield broadcasts include nonces to prevent replay attacks |
+| **API Bind & Auth** | IoT Local API binds to localhost only with optional token authentication |
+
+---
+
+## 🎨 GUI & UX
+
+### Desktop (CustomTkinter)
+- Fully detached from the core engine — all heavy work runs on multi-threaded C-based backends
+- Lag-free UI even at 10,000+ queries per second
+- **Live App Connections Sidebar** — real-time process traffic with flashing red/green traffic lights
+- **Adaptive polling** — 250ms when GUI visible (smooth live feel), 2000ms when headless (CPU saver)
+- Conditional version glow animation — only pulses when an update is available
+
+### UX Optimizations
+
+| Optimization | Detail |
+|---|---|
+| Ghost-Line Sash | Lightweight ghost indicator during drag instead of real-time panel resizes |
+| Debounced Resize | Batched window resize events with deferred layout flush |
+| Lazy Tab Preloading | Staggered 300ms pre-instantiation for zero-delay tab switching |
+| View Caching | Tabs via `grid_remove()` — O(1) swap, never destroyed |
+| 3× Scroll Speed | Framework-level mouse wheel patching |
+| Splash Loading | Animated splash masks ~2s cold-start initialization |
+| Flicker-Free Dashboard | Pre-allocated widget pool with in-place `configure()` updates |
+
+### Android (Kivy)
+- Live App Connections as priority tab with flashing traffic lights and blinking connection rows
+- Tab layout matches desktop order with connections as index 0
+- Cripple branding in upper bar
+- Built via GitHub Actions → `buildozer.spec` → standalone `.apk`
+
+---
+
+## 📱 Mobile (Android)
+
+NetStrip supports Android through a Python-for-Android headless bridge:
+
+- **Cloud Build Pipeline** — GitHub Actions compiles the Python backend, Kivy GUI, and JNI components into a standalone `.apk` on every tagged release
+- **VPN Loopback** — Android restricts binding to privileged ports without root, so NetStrip binds to `127.0.0.1:5353` and pairs with any local VPN app (RethinkDNS, AdGuard) pointed at that address for system-wide filtering
+
+---
 
 ## 🛠️ Architecture
 
 NetStrip is divided into two independent layers:
 
-1. **Core Engine** — A multi-threaded daemon handling packet evaluation, SQLite logging, DNS proxying, and kernel route monitoring.
-2. **GUI App** — A hardware-accelerated visualizer powered by `CustomTkinter`, fully independent from the engine. Can be minimized to tray or closed entirely for headless operation.
+1. **Core Engine** — Multi-threaded daemon handling packet evaluation, SQLite logging, DNS proxying, and kernel route monitoring
+2. **GUI App** — Hardware-accelerated visualizer powered by CustomTkinter, fully independent from the engine. Can be minimized to tray or closed entirely for headless operation
 
 ### Headless & Remote Management
 Run completely silently via `--service` for Raspberry Pi, NUCs, or ARM embedded systems. Fully manageable remotely via SSH using live IPC commands. See the **[CLI Guide](CLI_GUIDE.md)** for boot variables and live management commands.
 
-### GUI & UX Optimizations
+### Backup & Import
+Full profile backup and import via JSON. Exports capture all user settings, app rules, custom blocklist URLs, and classifications into a single portable `.json` file. Importing merges cleanly with de-duplication by name.
 
-**Ghost-Line Sash** — Lightweight ghost indicator during drag instead of real-time panel resizes.
-**Debounced Resize** — Batched window resize events with deferred layout flush.
-**Lazy Tab Preloading** — Staggered 300ms pre-instantiation for zero-delay tab switching.
-**View Caching** — Tabs hidden via `grid_remove()` — O(1) swap, never destroyed.
-**3× Scroll Speed** — Framework-level mouse wheel patching.
-**Splash Progressive Loading** — Animated splash masks ~2s cold-start initialization.
-**Flicker-Free Dashboard** — Pre-allocated widget pool with in-place `configure()` updates.
-
-## 🔒 Security & Tamper Defenses
-
-NetStrip integrates deep defense-in-depth mechanisms to protect its runtime environment:
-
-**Runtime Tamper Verification** — SHA-256 validation of core engine files at runtime.
-**Fail-Open Recovery** — Watchdog restores original DNS and removes firewall hooks on crash.
-**Strict Pathing** — Absolute path enforcement prevents DLL sideloading and PATH hijacking.
-**Anti-Corruption DB** — SQLite WAL mode with thread-safe isolation.
-**IPC Authorization** — Structured JSON payload validation on the single-instance socket.
-**PowerShell Hardening** — Base64-encoded paths neutralize command injection via crafted filenames.
-**Shell Sandboxing** — All system commands use `shell=False` with isolated list arguments.
-
-## 💾 Backup & Import
-
-Full profile backup and import via JSON. Exports capture all user settings, app rules, custom blocklist URLs, and classifications into a single portable `.json` file. Importing merges cleanly with de-duplication by name, enabling easy migration between machines or identical headless deployments.
+---
 
 ## 📖 Installation
 
@@ -113,7 +174,7 @@ cd Cripple-NetStrip
 pip install -r requirements.txt
 ```
 
-### Running NetStrip
+### Running
 
 **Windows:**
 ```powershell
@@ -130,26 +191,56 @@ sudo python3 main.py
 sudo python3 main.py --service
 ```
 
-*   **Operating System:** Windows 10/11, macOS, Linux, and Android
-*   **Permissions:** Administrator/Root privileges required for core interception (except on Android where VPN Service is used)
+### Requirements
+- **OS:** Windows 10/11, macOS, Linux, Android
+- **Python:** 3.10+
+- **Permissions:** Administrator/Root required for core interception (Android uses VPN Service)
+
+---
+
+## 🚀 Release Notes
+
+### v3.1.0 — Security Hardening & Live Traffic Polish
+- **Crash Report Delivery Guarantee** — essential domain whitelist (`api.github.com`, `frenzypenguin.media`, `github.com`) + 5× retry with exponential backoff
+- **HMAC-SHA256 Watchdog** — periodic live integrity scanning of all engine files
+- **Adaptive Live Traffic Polling** — 250ms GUI / 2000ms headless for real-time connection feel without CPU waste
+- **LAN Shield PSK Management** — copy/paste/regenerate with Fernet validation and hot-reload
+- **Conditional Version Glow** — RGB animation only when an update is actually available
+- **Watchdog Crash Recovery** — full firewall reset, IPv4/IPv6 re-enable, killswitch DB state clear
+- **DLL Sideloading Mitigation** — `SetDefaultDllDirectories` at startup
+- **IPC Command Sanitization** — regex-validated ALLOW/BLOCK domains
+- **Anti-Replay Nonces** — LAN Shield broadcast replay protection
+- **Build Pipeline Fix** — PyInstaller `--additional-hooks-dir` compat, fallback zip bundles
+
+### v3.0.0 — Zero-Leak Engine
+- Rebuilt zero-leak kernel interception engine
+- Multi-platform IPC daemon architecture
+- Futuristic-minimalist UI theme
+- CPU stability improvements
+- Enhanced anomaly whitelisting logic
+
+### v2.0.0 — System Classification Engine
+- System Classification Engine
+- Auto-Updater rate limits
+- GUI rebrand and memory leak optimizations
+
+---
 
 ## ⏰ Build Metrics
 
 This entire ecosystem — GUI, Windows packet hooking, eBPF routing, SQLite WAL, system tray integrations, IPC layers, and security audits — was built in **~2.5 days** of pure active coding time.
 
-## 🚀 Release Notes
-
-**v3.0.0** — Rebuilt zero-leak kernel interception engine. Multi-platform IPC daemon architecture. Futuristic-minimalist UI theme. CPU stability improvements. Enhanced anomaly whitelisting logic.
-
-**v2.0.0** — System Classification Engine. Auto-Updater rate limits. GUI rebrand and memory leak optimizations.
+---
 
 ## 🙏 Credits
 
 **Core Technologies:**  
-[CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) • [dnslib](https://github.com/paulc/dnslib) • [psutil](https://github.com/giampaolo/psutil) • [WinDivert](https://github.com/basil00/Divert)
+[CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) • [dnslib](https://github.com/paulc/dnslib) • [psutil](https://github.com/giampaolo/psutil) • [WinDivert](https://github.com/basil00/Divert) • [cryptography](https://github.com/pyca/cryptography)
 
 **Blocklists & Identity Providers:**  
-[AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html) • [oisd](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [HaGeZi](https://github.com/hagezi/dns-blocklists) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [URLHaus](https://urlhaus.abuse.ch/) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [Energized Protection](https://energized.pro/) • [AdGuard Mobile Filters](https://adguard.com/en/blog/adguard-dns-filter.html) • [HaGeZi Mobile Telemetry](https://github.com/hagezi/dns-blocklists)
+[AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html) • [oisd](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [HaGeZi](https://github.com/hagezi/dns-blocklists) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [URLHaus](https://urlhaus.abuse.ch/) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [Energized Protection](https://energized.pro/)
+
+---
 
 ## 📄 License
 

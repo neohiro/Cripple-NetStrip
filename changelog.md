@@ -1,3 +1,29 @@
+## [v3.1.0] - Security Hardening & Live Traffic Polish
+### Added
+- **Crash Report Delivery Guarantee**: Essential domain whitelist (`api.github.com`, `frenzypenguin.media`, `github.com`) bypasses all blocking. Crash reporter retries 5× with exponential backoff (2s→4s→8s→16s) to survive network restoration glitches.
+- **HMAC-SHA256 Watchdog**: Periodic live integrity scanning of all engine files with keyed hashes. Detects tampering at runtime.
+- **Adaptive Live Traffic Polling**: 250ms refresh when GUI is visible for real-time connection feel, 2000ms when headless to preserve CPU.
+- **LAN Shield PSK Management**: Redesigned settings panel with Copy (visual feedback), Paste (Fernet validation), and Regenerate buttons. Hot-reloads LAN Shield without restart. PSK persists across app updates.
+- **Conditional Version Glow**: RGB animation on version label only activates when an update is actually available.
+- **DLL Sideloading Mitigation**: `SetDefaultDllDirectories` restricts DLL search paths at startup.
+- **IPC Command Sanitization**: Regex-validated ALLOW/BLOCK domain commands on the IPC socket.
+- **Anti-Replay Nonces**: LAN Shield broadcast messages include nonces to prevent replay attacks.
+- **IoT Local API Auth**: API binds to localhost only with optional token authentication.
+
+### Changed
+- **Watchdog Crash Recovery**: Now performs full cleanup on crash — resets firewall rules, re-enables IPv4/IPv6 protocols, clears killswitch DB state.
+- **Build Pipeline**: Replaced deprecated PyInstaller `--hookspath` with `--additional-hooks-dir`. Added fallback source zip bundles for CI resilience.
+- **Analytics Delivery**: Removed placeholder `netstrip.io` domains. All telemetry now routes through GitHub Issues API.
+- **Animation Timings**: Tightened pulse/flash animations (340ms total cycle vs 680ms) for snappier live traffic feel.
+
+### Fixed
+- Desktop connections sidebar polling loop dying when window not mapped
+- Right pane connections list not showing in desktop GUI
+- Firewall reset not completing gracefully on app close
+- Watchdog leaving orphaned IPv6/IPv4 protocol bindings disabled after hard crash
+
+---
+
 ## [v3.0.2] - The Ghost Mode Update
 ### Added
 - **Absolute Master Killswitch (Ghost Mode)**: The killswitch now unconditionally drops ALL network traffic across all NICs and protocols, stripping away all loopback exceptions to turn the hardware into a true ghost on the network.
