@@ -403,7 +403,7 @@ class BlocklistView(ctk.CTkScrollableFrame):
                 widget.bind("<Button-1>", on_click)
 
     def _build_results_area(self):
-        self._results_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._results_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self._results_container.pack(fill="both", expand=True)
         self._restore_empty_state()
         
@@ -413,14 +413,14 @@ class BlocklistView(ctk.CTkScrollableFrame):
         self._page_size = 50
         
         # Bind mouse wheel to check scroll position
-        if hasattr(self, '_parent_canvas'):
-            self.bind_all("<MouseWheel>", self._check_scroll, add="+")
+        if hasattr(self._results_container, '_parent_canvas'):
+            self._results_container.bind_all("<MouseWheel>", self._check_scroll, add="+")
 
     def _check_scroll(self, event=None):
-        if self._destroyed or not getattr(self, '_parent_canvas', None) or not self.winfo_ismapped():
+        if self._destroyed or not getattr(self._results_container, '_parent_canvas', None) or not self.winfo_ismapped():
             return
         
-        yview = self._parent_canvas.yview()
+        yview = self._results_container._parent_canvas.yview()
         # yview[1] is the bottom fractional position of the scrollbar (1.0 is bottom)
         if yview[1] >= 0.98:
             self._render_next_chunk()

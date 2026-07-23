@@ -29,6 +29,11 @@ class TrafficClassifier:
         # Check blocklist manager (whitelist, blacklist, trie)
         is_blocked, category = self.blocklist.is_blocked(domain, process_name)
         
+        # Check loopback specifically (local DNS resolvers)
+        if domain.startswith("127.") or domain == "::1":
+            self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
+            return ConnectionCategory.ESSENTIAL
+        
         # If the target is actually an IP and it's a LAN IP, prioritize LAN classification
         if self._is_lan_ip(domain):
             self._domain_cache[cache_key] = ConnectionCategory.LAN

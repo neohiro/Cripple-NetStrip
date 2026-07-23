@@ -387,7 +387,23 @@ class BlocklistManager:
                         if len(results) >= limit: break
 
             if not category_filter or category_filter == 'essential':
-                for d in ('ip-api.com', 'cloudflare-dns.com', '1.1.1.1', '8.8.8.8', '9.9.9.9'):
+                essential_dns = (
+                    '127.0.0.1', '127.0.0.53', '::1',
+                    '1.1.1.1', '1.0.0.1', 'cloudflare-dns.com', 'one.one.one.one',
+                    '1.1.1.2', '1.0.0.2', 'security.cloudflare-dns.com',
+                    '1.1.1.3', '1.0.0.3', 'family.cloudflare-dns.com',
+                    '8.8.8.8', '8.8.4.4', 'dns.google',
+                    '9.9.9.9', '149.112.112.112', 'dns.quad9.net',
+                    '9.9.9.11', '149.112.112.11', 'dns11.quad9.net',
+                    '94.140.14.14', '94.140.15.15', 'dns.adguard-dns.com',
+                    '76.76.2.0', '76.76.10.0', 'freedns.controld.com',
+                    '208.67.222.222', '208.67.220.220', 'dns.opendns.com',
+                    '45.90.28.0', '45.90.30.0', 'dns.nextdns.io',
+                    '194.242.2.2', '193.19.108.2', 'dns.mullvad.net',
+                    '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
+                    'ip-api.com', 'ipify.org'
+                )
+                for d in essential_dns:
                     if not query or query in d:
                         results.append({'domain': d, 'category': 'essential'})
                         if len(results) >= limit: break
