@@ -12,8 +12,6 @@
 
   *Strip away the noise. Take back control of your network.*
 
-  > **🚀 v3.1.0** — Guaranteed crash report delivery, adaptive live traffic polling, HMAC integrity watchdog, LAN Shield PSK management, and hardened security audit across all engines.
-
 </div>
 
 ---
