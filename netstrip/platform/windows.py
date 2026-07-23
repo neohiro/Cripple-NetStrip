@@ -124,14 +124,24 @@ class WindowsPlatform(PlatformBase):
         return interfaces if interfaces else ["Wi-Fi", "Ethernet"]
 
     def get_default_gateway(self) -> Optional[str]:
-        res = self._run_cmd(["netsh", "interface", "ip", "show", "config"])
-        for line in res.stdout.splitlines():
-            if "Default Gateway" in line:
-                parts = line.split(":")
-                if len(parts) > 1:
-                    ip = parts[1].strip()
-                    if ip: return ip
+        # Simplistic default gateway fetch using route print
+        try:
+            output = subprocess.check_output(["route", "print", "0.0.0.0"], text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            for line in output.split('\n'):
+                if "0.0.0.0" in line:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        return parts[2]
+        except:
+            pass
         return None
+
+    def get_current_ssid(self) -> str:
+        res = self._run_cmd(["netsh", "wlan", "show", "interfaces"])
+        for line in res.stdout.splitlines():
+            if "SSID" in line and "BSSID" not in line:
+                return line.split(":", 1)[1].strip()
+        return ""
 
     def add_firewall_rule(self, rule_name: str, direction: str, action: str, 
                           remote_ip: Optional[str] = None, remote_port: Optional[int] = None, 

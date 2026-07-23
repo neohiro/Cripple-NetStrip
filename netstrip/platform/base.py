@@ -46,6 +46,11 @@ class PlatformBase(ABC):
         pass
 
     @abstractmethod
+    def get_current_ssid(self) -> str:
+        """Get the current WiFi SSID, if applicable and available."""
+        pass
+
+    @abstractmethod
     def add_firewall_rule(self, rule_name: str, direction: str, action: str, 
                           remote_ip: Optional[str] = None, 
                           remote_port: Optional[int] = None, 

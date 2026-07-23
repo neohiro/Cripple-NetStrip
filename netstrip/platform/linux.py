@@ -63,7 +63,16 @@ class LinuxPlatform(PlatformBase):
         return ["eth0", "wlan0"]
 
     def get_default_gateway(self) -> Optional[str]:
-        return "192.168.1.1"
+        res = self._run_cmd(["ip", "route", "show", "default"])
+        if res.stdout:
+            parts = res.stdout.split()
+            if len(parts) >= 3:
+                return parts[2]
+        return None
+
+    def get_current_ssid(self) -> str:
+        # Simplistic default for Linux (can be expanded with iwgetid)
+        return ""
 
     def add_firewall_rule(self, rule_name: str, direction: str, action: str, 
                           remote_ip: Optional[str] = None, remote_port: Optional[int] = None, 

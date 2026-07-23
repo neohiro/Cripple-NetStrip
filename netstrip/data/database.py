@@ -583,3 +583,22 @@ class Database:
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT 1 FROM whitelisted_anomalies WHERE name = ?', (name,))
                 return cursor.fetchone() is not None
+
+    def get_trusted_wifis(self) -> List[str]:
+        raw = self.get_setting("trusted_wifis", "[]")
+        try:
+            return json.loads(raw)
+        except Exception:
+            return []
+
+    def add_trusted_wifi(self, ssid: str):
+        wifis = self.get_trusted_wifis()
+        if ssid not in wifis:
+            wifis.append(ssid)
+            self.set_setting("trusted_wifis", json.dumps(wifis))
+
+    def remove_trusted_wifi(self, ssid: str):
+        wifis = self.get_trusted_wifis()
+        if ssid in wifis:
+            wifis.remove(ssid)
+            self.set_setting("trusted_wifis", json.dumps(wifis))

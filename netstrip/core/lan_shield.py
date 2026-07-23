@@ -8,6 +8,8 @@ import socket
 import threading
 import json
 import time
+import os
+import sys
 from cryptography.fernet import Fernet
 from netstrip.platform.base import get_platform
 from netstrip.core.modes import ProtectionLevel, get_mode
@@ -90,6 +92,16 @@ class LANShield:
 
     def _send_encrypted_broadcast(self, btype: str, note: str = ""):
         if not self._fernet: return
+        
+        # Enforce Android Passive Mode (Listener Only) if not on Trusted WiFi
+        is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
+        if is_android and self.engine:
+            current_ssid = self.platform.get_current_ssid()
+            trusted_wifis = self.engine.db.get_trusted_wifis()
+            if current_ssid not in trusted_wifis:
+                logger.warning(f"LAN Shield Passive Mode: Dropping '{btype}' broadcast. Untrusted WiFi: {current_ssid or '<unknown>'}")
+                return
+                
         try:
             payload = {
                 'type': btype,

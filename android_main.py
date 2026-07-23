@@ -56,10 +56,53 @@ class NetStripAndroidUI(BoxLayout):
         self.status_label.text = "NetStrip Core Engine is Running in Background."
         self.btn.disabled = True
         
+        # Add a button to trust the current WiFi
+        self.trust_btn = Button(text="Trust Current WiFi", size_hint=(1, 0.2))
+        self.trust_btn.bind(on_press=self.toggle_trust_wifi)
+        self.add_widget(self.trust_btn)
+        
         # Start Engine in background thread
         import main
         sys.argv = ["main.py", "--service", "--blockinbound"] # Run headless
-        threading.Thread(target=main.main, daemon=True).start()
+        threading.Thread(target=self._run_main, daemon=True).start()
+        
+        # Periodically update the trust button text
+        Clock.schedule_interval(self.update_trust_btn, 5.0)
+
+    def _run_main(self):
+        import main
+        self._engine = main.main()
+
+    def update_trust_btn(self, dt):
+        if not hasattr(self, '_engine') or not self._engine: return
+        try:
+            ssid = self._engine.platform.get_current_ssid()
+            if not ssid:
+                self.trust_btn.text = "No WiFi connected"
+                self.trust_btn.disabled = True
+                return
+                
+            self.trust_btn.disabled = False
+            trusted = self._engine.db.get_trusted_wifis()
+            if ssid in trusted:
+                self.trust_btn.text = f"Untrust WiFi ({ssid})"
+            else:
+                self.trust_btn.text = f"Trust WiFi ({ssid})"
+        except Exception:
+            pass
+
+    def toggle_trust_wifi(self, instance):
+        if not hasattr(self, '_engine') or not self._engine: return
+        ssid = self._engine.platform.get_current_ssid()
+        if not ssid: return
+        
+        trusted = self._engine.db.get_trusted_wifis()
+        if ssid in trusted:
+            self._engine.db.remove_trusted_wifi(ssid)
+            self.trust_btn.text = f"Trust WiFi ({ssid})"
+        else:
+            self._engine.db.add_trusted_wifi(ssid)
+            self.trust_btn.text = f"Untrust WiFi ({ssid})"
 
 class NetStripAndroidApp(App):
     def build(self):

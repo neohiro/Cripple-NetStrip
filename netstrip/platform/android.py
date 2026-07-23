@@ -61,6 +61,21 @@ class AndroidPlatform(PlatformBase):
         # Android handles the fallback upstream DNS automatically when VPN is off
         return "8.8.8.8"
 
+    def get_current_ssid(self) -> str:
+        if not getattr(self, 'Context', None):
+            return ""
+        try:
+            wifi_manager = self.PythonActivity.mActivity.getSystemService(self.Context.WIFI_SERVICE)
+            if wifi_manager:
+                info = wifi_manager.getConnectionInfo()
+                if info:
+                    ssid = info.getSSID()
+                    if ssid and ssid != "<unknown ssid>":
+                        return ssid.strip('"')
+        except Exception as e:
+            logger.debug(f"Failed to get Android SSID: {e}")
+        return ""
+
     def get_active_interfaces(self) -> List[str]:
         return ["wlan0", "rmnet0"]
 
