@@ -49,8 +49,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
-          Compress-Archive -Path "dist\Cripple.exe" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows-Binaries.zip" -Force
-          Compress-Archive -Path "netstrip", "main.py", "run.bat", "requirements.txt", "assets" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows-Runfiles.zip" -Force
+          Move-Item -Path "dist\Cripple.exe" -Destination "NetStrip-${env:RELEASE_TAG}-Windows.exe" -Force
 
       - name: Build macOS / Linux Executable
         if: matrix.os != 'windows-latest'
@@ -59,15 +58,21 @@ jobs:
         run: |
           chmod +x build.sh run.sh
           bash build.sh
-          cd dist
-          zip -r ../NetStrip-${RELEASE_TAG}-${{ runner.os }}-Binaries.zip ./*
-          cd ..
-          zip -r NetStrip-${RELEASE_TAG}-${{ runner.os }}-Runfiles.zip netstrip/ main.py run.sh requirements.txt assets/
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip NetStrip.app
+            cd ..
+          else
+            mv dist/NetStrip NetStrip-${RELEASE_TAG}-Linux
+          fi
 
       - name: Build Android APK
         if: matrix.os == 'ubuntu-latest'
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           yes | buildozer android debug || true
+          mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk || true
           
       - name: Upload Release Asset (Windows Binaries)
         if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && matrix.os == 'windows-latest'
@@ -75,8 +80,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            NetStrip-*-Windows-Binaries.zip
-            NetStrip-*-Windows-Runfiles.zip
+            NetStrip-*-Windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -86,8 +90,8 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            NetStrip-*-${{ runner.os }}-Binaries.zip
-            NetStrip-*-${{ runner.os }}-Runfiles.zip
+            NetStrip-*-macOS.zip
+            NetStrip-*-Linux
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -130,7 +130,8 @@ sudo python3 main.py
 sudo python3 main.py --service
 ```
 
-> *NetStrip requires administrative/root privileges to bind to system-level network interfaces and inject kernel rules.*
+*   **Operating System:** Windows 10/11, macOS, Linux, and Android
+*   **Permissions:** Administrator/Root privileges required for core interception (except on Android where VPN Service is used)
 
 ## ⏰ Build Metrics
 
