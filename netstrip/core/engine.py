@@ -14,7 +14,6 @@ import psutil
 
 from netstrip.core.modes import ProtectionLevel, get_mode, ConnectionAction
 from netstrip.data.database import Database
-from netstrip.data.database import Database
 from netstrip.data.blocklist_manager import BlocklistManager
 from netstrip.core.classifier import TrafficClassifier
 from netstrip.core.dns_proxy import DNSProxyService
@@ -27,6 +26,8 @@ from netstrip.core.geoip import GeoIPService
 from netstrip.core.network_monitor import NetworkMonitor
 from netstrip.core.interceptor import get_interceptor
 from netstrip.platform.base import get_platform
+from netstrip.core.iot_local_api import IoTLocalAPI
+from netstrip.core.iot_sync import IoTTelemetrySync
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,10 @@ class NetStripEngine:
         
         # Zero-leak interceptor
         self.interceptor = get_interceptor(self._evaluate_packet, engine=self)
+        
+        self.iot_sync = IoTTelemetrySync(self)
+        self.iot_local_api = IoTLocalAPI(self)
+        
         self.engine_ready = False
         self.interceptor.start() # Start immediately to catch early boot connections
         
@@ -381,6 +386,7 @@ class NetStripEngine:
         self.dns_proxy.start()
         self.connection_monitor.start()
         self.iot_sync.start()
+        self.iot_local_api.start()
         self.geoip.start()
         self.network_monitor.start()
         self.anomaly_scanner.start()
@@ -571,6 +577,7 @@ class NetStripEngine:
         self.dns_proxy.stop()
         self.connection_monitor.stop()
         self.iot_sync.stop()
+        self.iot_local_api.stop()
         self.geoip.stop()
         self.network_monitor.stop()
         self.anomaly_scanner.stop()

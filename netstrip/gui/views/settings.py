@@ -519,6 +519,34 @@ class SettingsView(ctk.CTkFrame):
             self._wh_int_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_telemetry_interval", interval_entry.get()))
         interval_entry.bind("<KeyRelease>", save_interval)
         
+        # Local IoT API Sensor
+        local_api_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        local_api_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(local_api_row, text="Local Native Sensor (mDNS/REST API for HAOS)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        
+        local_api_var = ctk.StringVar(value=getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_local_sensor_enabled", "false"))
+        def toggle_local_api():
+            val = local_api_var.get()
+            self.engine.db.set_setting("iot_local_sensor_enabled", val)
+            
+        local_api_switch = ctk.CTkSwitch(local_api_row, text="", variable=local_api_var, onvalue="true", offvalue="false", command=toggle_local_api, progress_color=Colors.SUCCESS_DIM)
+        local_api_switch.pack(side="right")
+        
+        # Local IoT API Port
+        local_port_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
+        local_port_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
+        ctk.CTkLabel(local_port_row, text="Local API Port (Default: 8080)", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY).pack(side="left")
+        
+        local_port_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("iot_local_sensor_port", "8080")
+        local_port_entry = ctk.CTkEntry(local_port_row, width=80, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM))
+        local_port_entry.pack(side="right", padx=(Spacing.MD, 28))
+        local_port_entry.insert(0, local_port_val)
+        
+        def save_local_port(e):
+            if hasattr(self, '_local_port_timer'): self.after_cancel(self._local_port_timer)
+            self._local_port_timer = self.after(1000, lambda: self.engine.db.set_setting("iot_local_sensor_port", local_port_entry.get()))
+        local_port_entry.bind("<KeyRelease>", save_local_port)
+        
         # Google Nest Home
         nest_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         nest_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))

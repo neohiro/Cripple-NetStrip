@@ -113,7 +113,7 @@ if [ "$OS" = "Darwin" ]; then
     # macOS
     pyinstaller \
         --noconfirm \
-        --onedir \
+        --onefile \
         --windowed \
         --name "NetStrip" \
         --icon "assets/logo.icns" \
@@ -127,7 +127,7 @@ else
     # Linux
     pyinstaller \
         --noconfirm \
-        --onedir \
+        --onefile \
         --windowed \
         --name "NetStrip" \
         --add-data "$CTK_PATH:customtkinter/" \

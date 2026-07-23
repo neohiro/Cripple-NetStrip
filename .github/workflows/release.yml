@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to attach binaries to (e.g., v3.0.2)'
+        description: 'Release tag to attach binaries to (e.g., v3.0.4)'
         required: true
-        default: 'v3.0.2'
+        default: 'v3.0.4'
 
 permissions:
   contents: write
@@ -45,20 +45,24 @@ jobs:
 
       - name: Build Windows Executable
         if: matrix.os == 'windows-latest'
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
-          Compress-Archive -Path "dist\Cripple" -DestinationPath "NetStrip-Windows-Binaries.zip" -Force
-          Compress-Archive -Path "netstrip", "main.py", "run.bat", "requirements.txt", "assets" -DestinationPath "NetStrip-Windows-Runfiles.zip" -Force
+          Compress-Archive -Path "dist\Cripple.exe" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows-Binaries.zip" -Force
+          Compress-Archive -Path "netstrip", "main.py", "run.bat", "requirements.txt", "assets" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows-Runfiles.zip" -Force
 
       - name: Build macOS / Linux Executable
         if: matrix.os != 'windows-latest'
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
           bash build.sh
           cd dist
-          zip -r ../NetStrip-${{ runner.os }}-Binaries.zip ./*
+          zip -r ../NetStrip-${RELEASE_TAG}-${{ runner.os }}-Binaries.zip ./*
           cd ..
-          zip -r NetStrip-${{ runner.os }}-Runfiles.zip netstrip/ main.py run.sh requirements.txt assets/
+          zip -r NetStrip-${RELEASE_TAG}-${{ runner.os }}-Runfiles.zip netstrip/ main.py run.sh requirements.txt assets/
 
       - name: Build Android APK
         if: matrix.os == 'ubuntu-latest'
@@ -71,8 +75,8 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            NetStrip-Windows-Binaries.zip
-            NetStrip-Windows-Runfiles.zip
+            NetStrip-*-Windows-Binaries.zip
+            NetStrip-*-Windows-Runfiles.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -82,8 +86,8 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            NetStrip-${{ runner.os }}-Binaries.zip
-            NetStrip-${{ runner.os }}-Runfiles.zip
+            NetStrip-*-${{ runner.os }}-Binaries.zip
+            NetStrip-*-${{ runner.os }}-Runfiles.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

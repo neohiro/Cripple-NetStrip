@@ -63,23 +63,38 @@ def submit_issue(title: str, body: str, label: str) -> bool:
     Create a GitHub Issue on the Cripple-Telemetry repo.
 
     Args:
-        title: Issue title (e.g., "[NetStrip Crash] TypeError on Windows")
+        title: Issue title (e.g., "[Crash] TypeError")
         body:  Issue body (full report text, will be wrapped in a code block)
         label: One of 'analytics', 'error', 'crash'
 
     Returns:
         True if the issue was created successfully, False otherwise.
     """
+    import platform
+    import sys
+    
     token = _get_token()
     if not token:
         logger.debug("No telemetry token configured, skipping GitHub delivery")
         return False
+        
+    os_name = "windows"
+    if hasattr(sys, 'getandroidapilevel') or os.environ.get('NETSTRIP_ANDROID') == '1':
+        os_name = "android"
+    else:
+        os_name = platform.system().lower()
+        
+    os_label = f"os-{os_name}"
+    os_title_prefix = f"[{os_name.capitalize()}] "
+    
+    if not title.startswith(os_title_prefix):
+        title = f"{os_title_prefix}{title}"
 
     try:
         payload = json.dumps({
             "title": title,
             "body": body,
-            "labels": [label],
+            "labels": [label, os_label],
         }).encode("utf-8")
 
         req = urllib.request.Request(
@@ -98,7 +113,7 @@ def submit_issue(title: str, body: str, label: str) -> bool:
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
             if resp.status == 201:
-                logger.debug(f"Telemetry issue created on GitHub ({label})")
+                logger.debug(f"Telemetry issue created on GitHub ({label}, {os_label})")
                 return True
             else:
                 logger.debug(f"GitHub API returned status {resp.status}")

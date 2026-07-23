@@ -102,6 +102,47 @@ class DashboardView(ctk.CTkScrollableFrame):
         # Initialize UI state deferred to prevent startup freeze
         if hasattr(self, '_update_stats_id'): self.after_cancel(self._update_stats_id)
         self._update_stats_id = self.after(50, self._update_stats)
+        
+        # Bind resize event for responsive layout
+        self.bind("<Configure>", self._on_resize)
+        self._is_mobile_layout = None
+
+    def _on_resize(self, event):
+        # We check the width to toggle between 1-column and 2-column layout
+        is_mobile = event.width < 600
+        if self._is_mobile_layout == is_mobile:
+            return
+        self._is_mobile_layout = is_mobile
+        
+        if is_mobile:
+            # Stack cards vertically
+            self.inner.grid_columnconfigure((0, 1), weight=1, uniform="")
+            self.stat_traffic.grid(row=1, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
+            self.stat_queries.grid(row=2, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
+            self.stat_active.grid(row=3, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
+            self.stat_bandwidth.grid(row=4, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
+            self.activity_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0))
+            self.inner.grid_rowconfigure(3, weight=0)
+            self.inner.grid_rowconfigure(5, weight=1)
+            
+            # Stack header items if very narrow
+            if event.width < 400:
+                self.shield.pack(side="top", pady=(0, Spacing.MD))
+                self.mode_frame.pack(side="top", fill="x", padx=0)
+        else:
+            # 2x2 Grid
+            self.inner.grid_columnconfigure((0, 1), weight=1, uniform="stat_cols")
+            self.stat_traffic.grid(row=1, column=0, columnspan=1, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
+            self.stat_queries.grid(row=1, column=1, columnspan=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
+            self.stat_active.grid(row=2, column=0, columnspan=1, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
+            self.stat_bandwidth.grid(row=2, column=1, columnspan=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
+            self.activity_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0))
+            self.inner.grid_rowconfigure(5, weight=0)
+            self.inner.grid_rowconfigure(3, weight=1)
+            
+            # Restore header layout
+            self.shield.pack(side="left", padx=Spacing.MD, pady=0)
+            self.mode_frame.pack(side="right", padx=Spacing.MD, pady=Spacing.MD, fill="none")
 
     def _on_smart_toggle(self):
         def proceed():

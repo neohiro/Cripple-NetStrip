@@ -117,8 +117,9 @@ def main():
         print("BOOT VARIABLES:")
         print("  --service         Force headless/daemon mode (no UI).")
         print("  --blockinbound    Strict isolation mode (blocks all inbound connections).")
-        print("  --allowlan        Permit LAN connections even in strict modes.\n")
-        print("CLI MANAGEMENT COMMANDS (Sent to running background daemon via IPC):")
+        print("  --allowlan        Permit LAN connections even in strict modes.")
+        print("  --android         Force Android/Mobile layout for UI testing.")
+        print("\nCLI MANAGEMENT COMMANDS (Sent to running background daemon via IPC):")
         print("  --block <domain>  Add a domain to the user blocklist dynamically.")
         print("  --allow <domain>  Add a domain to the user allowlist dynamically.")
         print("  --mode <MODE>     Switch the engine mode (LOOSE, STANDARD, STRICT, PARANOID).")
@@ -345,7 +346,13 @@ def main():
             sys.exit(0)
 
     # Standard GUI Boot Path (used for both desktop AND --service to get tray icon)
-    from netstrip.gui.app import NetStripApp
+    is_android_mode = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel') or '--android' in sys.argv
+    
+    if is_android_mode:
+        from netstrip.gui.app_android import NetStripApp
+    else:
+        from netstrip.gui.app import NetStripApp
+        
     from netstrip.gui.splash import SplashScreen
     from netstrip.core.engine import NetStripEngine
     
