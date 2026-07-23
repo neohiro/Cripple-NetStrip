@@ -89,8 +89,11 @@ class ConnectionMonitor:
         try:
             # Requires root/admin on some OSes to see all connections
             connections = psutil.net_connections(kind='all')
-        except psutil.AccessDenied:
-            logger.warning("Access Denied when getting net_connections. Need admin privileges.")
+        except (psutil.AccessDenied, PermissionError):
+            logger.warning("Access Denied when getting net_connections. Need admin privileges or unsupported on this OS (e.g., Android).")
+            return
+        except Exception as e:
+            logger.debug(f"psutil net_connections error: {e}")
             return
 
         current_connections = set()

@@ -158,7 +158,15 @@ class PlatformBase(ABC):
 
 def get_platform() -> PlatformBase:
     """Factory function to get the correct platform implementation."""
+    import os
+    import sys
     system = platform.system()
+    
+    # Check for Android via Chaquopy or buildozer
+    if os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel'):
+        from netstrip.platform.android import AndroidPlatform
+        return AndroidPlatform()
+        
     if system == "Windows":
         from netstrip.platform.windows import WindowsPlatform
         return WindowsPlatform()

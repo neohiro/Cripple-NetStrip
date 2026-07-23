@@ -41,20 +41,23 @@ def setup_logging():
 
 def check_dependencies():
     missing = []
-    try:
-        import customtkinter
-    except ImportError:
-        missing.append("customtkinter")
-        
+    is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
+    
+    if not is_android:
+        try:
+            import customtkinter
+        except ImportError:
+            missing.append("customtkinter")
+            
+        try:
+            import PIL
+        except ImportError:
+            missing.append("Pillow")
+            
     try:
         import psutil
     except ImportError:
         missing.append("psutil")
-        
-    try:
-        import PIL
-    except ImportError:
-        missing.append("Pillow")
         
     try:
         import dnslib
@@ -101,8 +104,11 @@ def is_server_or_embedded():
                     return True
         except FileNotFoundError:
             pass
-        # Fallback for generic ARM linux
+            
+    # Android check
+    if os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel'):
         return True
+        
     return False
 
 def main():
