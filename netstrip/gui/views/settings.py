@@ -245,12 +245,20 @@ class SettingsView(ctk.CTkFrame):
         ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()
 
     def _add_subtitle(self, parent, text):
-        ctk.CTkLabel(
+        lbl = ctk.CTkLabel(
             parent, text=text,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
             text_color=Colors.TEXT_TERTIARY,
             justify="left"
-        ).pack(anchor="w", padx=Spacing.LG, pady=(2, Spacing.MD))
+        )
+        lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=(2, Spacing.MD))
+        
+        def on_resize(event):
+            if abs(getattr(lbl, '_last_wrap_width', 0) - event.width) > 10:
+                lbl._last_wrap_width = event.width
+                lbl.configure(wraplength=max(100, event.width - 10))
+                
+        lbl.bind('<Configure>', on_resize)
 
     def _add_switch_row(self, parent, label_text, setting_key):
         row = ctk.CTkFrame(parent, fg_color=Colors.BG_PANEL)
@@ -358,7 +366,7 @@ class SettingsView(ctk.CTkFrame):
 
         # Allow Local LAN Inbound
         self._add_switch_row(card, "↳ Allow Local Subnet (LAN) Inbound", 'inbound_lan_bypass')
-        self._add_subtitle(card, "Bypasses the Inbound Shield for local network IPs only. Allows remote admin (SSH/RDP) without opening to WAN.")
+        self._add_subtitle(card, "Bypasses the Inbound Shield for local network IPs only. Allows remote admin (SSH/RDP) without opening to WAN. Automatically defaults to ON for embedded systems/servers, but you can strictly enforce OFF to isolate them completely.")
 
         # Inbound Notifications
         self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications')

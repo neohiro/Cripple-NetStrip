@@ -12,16 +12,15 @@
   
   *Strip away the noise. Take back control of your network.*
   
-  **NetStrip (also known as Cripple)** is a cross-platform desktop FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound and inbound network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
-
-  *Fully compatible with VPNs, Torifier, TOR Router, YogaDNS, NextDNS, dnscrypt-proxy and more.*
+  **NetStrip (also known as Cripple)** is a cross-platform FOSS application that acts as a local DNS sinkhole, intelligent firewall, and live connection monitor. It provides absolute visibility into every outbound and inbound network request your system makes and receives, allowing you to instantly sever invasive telemetry, ads, and background tracking with surgical precision.
+  
+  *Fully compatible with Windows, macOS, Linux Desktop, and Headless Servers/Embedded Devices (Raspberry Pi, NUCs).*
 </div>
 
----
+### 🛡️ Why Cripple?
+Your operating system and applications are constantly phoning home. Cripple intercepts this traffic at the kernel/OS level using WinDivert/NFQueue and DNS sinkholing, completely blocking domains and IPs associated with tracking, advertising, and malware without breaking your essential functionality. 
 
-## 🛡️ What is NetStrip?
-
-NetStrip is a next-generation network traffic analyzer. Operating securely at the OS-level, it drops ads, telemetry, trackers, and malware packets before they ever leave your network interface.
+**Server & Embedded Support**: When installed on servers, Raspberry Pis, or headless instances, Cripple automatically secures your inbound traffic while intelligently maintaining a "Headless Admin Bypass" for local subnet connections, ensuring you are never locked out of SSH, RDP, or VNC (though you can strictly enforce isolation if desired).
 
 Designed for absolute privacy and network hygiene, NetStrip prevents bypasses that standard DNS blockers miss—blocking hardcoded telemetry IPs, mitigating DNS-over-HTTPS (DoH) browser leaks, and clamping down on stealthy IPv6 Router Advertisements (SLAAC).
 
