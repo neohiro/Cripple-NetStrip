@@ -78,9 +78,32 @@ class TrafficClassifier:
                 # macOS
                 'mdnsresponder', 'kernel_task', 'configd', 'syspolicyd', 'networkd', 'nsurlsessiond', 'apsd', 'softwareupdated', 'trustd', 'rapportd'
             )
+            
+            av_processes = (
+                # Kaspersky
+                'avp.exe', 'avpui.exe', 'kavfs.exe',
+                # BitDefender
+                'bdservicehost.exe', 'bdagent.exe', 'vsserv.exe', 'bdredline.exe',
+                # AVG / Avast
+                'avgui.exe', 'avgsvc.exe', 'avastui.exe', 'avastsvc.exe',
+                # McAfee
+                'mcshield.exe', 'mfevtps.exe', 'mcods.exe', 'mfefire.exe',
+                # Norton / Symantec
+                'nortonsecurity.exe', 'ccsvchst.exe', 'symcorpui.exe',
+                # Malwarebytes
+                'mbamservice.exe', 'mbamtray.exe', 'mbam.exe',
+                # ESET
+                'egui.exe', 'ekrn.exe',
+                # Sophos
+                'savservice.exe', 'sophosui.exe', 'sedservice.exe'
+            )
+            
             if p_lower in system_processes:
                 self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
                 return ConnectionCategory.SYSTEM
+            if p_lower in av_processes:
+                self._domain_cache[cache_key] = ConnectionCategory.SECURITY
+                return ConnectionCategory.SECURITY
                 
             # If the PID could not be inferred (it's just a DNS query proxy request), 
             # we check the identity to label OS-level connections appropriately.
