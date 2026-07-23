@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach binaries to (e.g., v2.0.2)'
+        required: true
+        default: 'v2.0.2'
 
 jobs:
   build:
@@ -49,9 +54,10 @@ jobs:
           zip -r ../NetStrip-${{ runner.os }}.zip ./*
 
       - name: Upload Release Asset
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             NetStrip-Windows.zip
             NetStrip-${{ runner.os }}.zip
