@@ -185,7 +185,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         if not self.winfo_ismapped():
             # Not visible yet — reschedule at slow rate so the loop doesn't die permanently
             if not self._destroyed:
-                self.after(2000, self._refresh_loop)
+                self.after(500, self._refresh_loop)
             return
         # Skip heavy refresh during active window resize to prevent artifacts
         if getattr(self, '_resize_paused', False):
@@ -331,8 +331,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
                     self.app_groups[p_name].add_connection(conn_dict, self.hide_inactive)
                     
             if not conns and not hasattr(self, 'lbl_empty'):
-                self.lbl_empty = ctk.CTkLabel(self.scroll_frame, text="No app connections tracked yet.\n\nWaiting for traffic...", text_color=Colors.TEXT_TERTIARY)
-                self.lbl_empty.grid(row=0, column=0, pady=40)
+                self.lbl_empty = ctk.CTkLabel(self.scroll_frame, text="No app connections tracked yet.\n\nLoading connections...", text_color=Colors.TEXT_TERTIARY)
+                self.lbl_empty.place(relx=0.5, rely=0.5, anchor="center")
             elif conns and hasattr(self, 'lbl_empty'):
                 self.lbl_empty.destroy()
                 delattr(self, 'lbl_empty')

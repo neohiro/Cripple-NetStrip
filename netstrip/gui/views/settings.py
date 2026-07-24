@@ -362,6 +362,29 @@ class SettingsView(ctk.CTkFrame):
                         pass
                 threading.Thread(target=reload_task, daemon=True).start()
 
+            if setting_key == 'kernel_anomaly_scanner':
+                if value == 'true':
+                    if hasattr(self.engine, 'anomaly_scanner') and self.engine.anomaly_scanner:
+                        self.engine.anomaly_scanner.start()
+                else:
+                    if hasattr(self.engine, 'anomaly_scanner') and self.engine.anomaly_scanner:
+                        self.engine.anomaly_scanner.stop()
+                        
+            if setting_key == 'linux_ebpf_mode':
+                if value == 'true':
+                    if hasattr(self.engine, 'ebpf_manager') and self.engine.ebpf_manager:
+                        self.engine.ebpf_manager.start()
+                else:
+                    if hasattr(self.engine, 'ebpf_manager') and self.engine.ebpf_manager:
+                        self.engine.ebpf_manager.stop()
+                        
+            if setting_key == 'layer2_arp_lockdown':
+                if value == 'false':
+                    if hasattr(self.engine, 'network_monitor') and hasattr(self.engine.network_monitor, 'current_state'):
+                        gw_ip = self.engine.network_monitor.current_state.get('gateway_ip')
+                        if gw_ip:
+                            self.engine.platform.unlock_arp(gw_ip)
+
             if setting_key == 'disable_ipv6_globally':
                 from netstrip.platform.base import get_platform
                 api = get_platform()
