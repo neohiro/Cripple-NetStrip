@@ -83,7 +83,6 @@ class NetStripEngine:
         self.iot_local_api = IoTLocalAPI(self)
         
         self.engine_ready = False
-        self.interceptor.start() # Start immediately to catch early boot connections
         
         # Boost process priority to ensure GUI responsiveness and low-latency packet inspection
         try:
@@ -401,8 +400,103 @@ class NetStripEngine:
         # Start analytics reporter (opt-in only, off by default)
         self.analytics.start()
         
-        # Start background updater
+        # Hard-coded IP Kernel Blocking
+        try:
+            import os as _os
+            ip_blacklist_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'data', 'lists', 'ip_blacklist.txt')
+            if _os.path.exists(ip_blacklist_path):
+                with open(ip_blacklist_path, "r", encoding="utf-8") as f:
+                    ips = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                if ips:
+                    self.firewall.sync_ip_blocklist(ips)
+                    logger.info(f"Injected {len(ips)} high-risk IPs into Windows Kernel Firewall.")
+        except Exception as e:
+            logger.error(f"Failed to inject IP blocklist: {e}")
+        
+        # Check for active local third-party DNS listeners (e.g. dnscrypt-proxy)
+        detected_local_dns = self._detect_local_dns()
+        
+        # Set system DNS to local proxy for active interfaces
+        for interface in self.platform.get_active_interfaces():
+            current_upstream = self.db.get_setting("dns_upstream")
+            
+            # If the current upstream is corrupted/looping to itself, clear it
+            if current_upstream == "127.127.127.127":
+                current_upstream = None
+                
+            if detected_local_dns:
+                ip, tool_name = detected_local_dns
+                self.db.set_setting("local_dns_tool", tool_name)
+                self.db.set_setting("local_dns_ip", ip)
+                # If upstream is unset, default to the detected local proxy
+                if not current_upstream:
+                    self.db.set_setting("dns_upstream", ip)
+            else:
+                self.db.delete_setting("local_dns_tool") # Clear if no longer detected
+                self.db.delete_setting("local_dns_ip")
+                orig_dns = self.platform.get_original_dns(interface)
+                if orig_dns and orig_dns not in ("127.127.127.127", "127.0.0.2"):
+                    self.db.set_setting(f"backup_dns_{interface}", orig_dns)
+                    if not current_upstream:
+                        self.db.set_setting("dns_upstream", orig_dns)
+                else:
+                    self.db.set_setting(f"backup_dns_{interface}", "dhcp")
+                    if not current_upstream:
+                        self.db.set_setting("dns_upstream", "1.1.1.1") # Safe default
+                
+            self.platform.set_system_dns(interface, "127.127.127.127")
+            
+        # Re-apply global IPv6 block if user had it enabled in settings
+        if self.db.get_setting("disable_ipv6_globally", "false") == "true":
+            try:
+                self.platform.disable_ipv6()
+            except Exception as e:
+                logger.error(f"Failed to re-apply global IPv6 block: {e}")
+                
+        # Re-apply global IPv4 block if user had it enabled in settings
+        if self.db.get_setting("disable_ipv4_globally", "false") == "true":
+            try:
+                self.platform.disable_ipv4()
+            except Exception as e:
+                logger.error(f"Failed to re-apply global IPv4 block: {e}")
+
+        # Mark engine as running and ready BEFORE starting the interceptor
+        # so _evaluate_packet doesn't block everything
+        self.is_running = True
+        self.engine_ready = True
+        
+        # NOW start the packet interceptor — engine is ready to evaluate packets
+        self.interceptor.start()
+        
+        # Start detached subprocess watchdog to ensure DNS is restored on hard crash
+        import subprocess as _subprocess
+        if not getattr(sys, 'frozen', False) and not self.is_headless:
+            watchdog_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'watchdog.py'))
+            if os.path.exists(watchdog_path):
+                is_frozen = getattr(sys, 'frozen', False)
+                launch_cmd = [sys.executable] + sys.argv if not is_frozen else sys.argv
+                cmd = [sys.executable, watchdog_path, str(os.getpid())] + launch_cmd
+                try:
+                    kwargs = {'creationflags': _subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                    self.watchdog_thread = _subprocess.Popen(
+                        cmd, 
+                        env={'PATH': os.environ.get('PATH', ''), 'SYSTEMROOT': os.environ.get('SYSTEMROOT', '')}, 
+                        **kwargs
+                    )            
+                    logger.info("Spawned detached crash recovery watchdog with relaunch capability.")
+                except Exception as e:
+                    logger.error(f"Failed to spawn watchdog: {e}")
+        
+        self.route_monitor_thread = threading.Thread(target=self._fast_route_monitor_loop, daemon=True)
+        self.route_monitor_thread.start()
+        
+        # Start background updater and update checker
+        threading.Thread(target=self._blocklist_updater_loop, daemon=True).start()
         threading.Thread(target=self._update_checker_loop, daemon=True).start()
+        
+        logger.info("Cripple Engine started successfully.")
+        self.broadcast_status("✅ Core Engine Initialized")
+        return True
         
     def _update_checker_loop(self):
         import urllib.request
@@ -432,109 +526,17 @@ class NetStripEngine:
                 time.sleep(1)
                 
     def _blocklist_updater_loop(self):
+        """Periodically check for blocklist updates every hour."""
         while self.is_running:
-            self.updater.check_and_update()
+            try:
+                self.updater.check_and_update()
+            except Exception as e:
+                logger.error(f"Blocklist update check failed: {e}")
             # Sleep for 1 hour between checks
             for _ in range(3600):
                 if not self.is_running:
                     break
                 time.sleep(1)
-        
-        # Hard-coded IP Kernel Blocking
-        try:
-            import os
-            ip_blacklist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'lists', 'ip_blacklist.txt')
-            if os.path.exists(ip_blacklist_path):
-                with open(ip_blacklist_path, "r", encoding="utf-8") as f:
-                    ips = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                if ips:
-                    self.firewall.sync_ip_blocklist(ips)
-                    logger.info(f"Injected {len(ips)} high-risk IPs into Windows Kernel Firewall.")
-        except Exception as e:
-            logger.error(f"Failed to inject IP blocklist: {e}")
-        
-        # Check for active local third-party DNS listeners (e.g. dnscrypt-proxy)
-        detected_local_dns = self._detect_local_dns()
-        
-        # Set system DNS to local proxy for active interfaces
-        for interface in self.platform.get_active_interfaces():
-            current_upstream = self.db.get_setting("dns_upstream")
-            
-        # Re-apply global IPv6 block if user had it enabled in settings
-        if self.db.get_setting("disable_ipv6_globally", "false") == "true":
-            try:
-                self.platform.disable_ipv6()
-            except Exception as e:
-                logger.error(f"Failed to re-apply global IPv6 block: {e}")
-                
-        # Re-apply global IPv4 block if user had it enabled in settings
-        if self.db.get_setting("disable_ipv4_globally", "false") == "true":
-            try:
-                self.platform.disable_ipv4()
-            except Exception as e:
-                logger.error(f"Failed to re-apply global IPv4 block: {e}")
-
-            # If the current upstream is corrupted/looping to itself, clear it
-            if current_upstream == "127.127.127.127":
-                current_upstream = None
-                
-            if detected_local_dns:
-                ip, tool_name = detected_local_dns
-                self.db.set_setting("local_dns_tool", tool_name)
-                self.db.set_setting("local_dns_ip", ip)
-                # If upstream is unset, default to the detected local proxy
-                if not current_upstream:
-                    self.db.set_setting("dns_upstream", ip)
-            else:
-                self.db.delete_setting("local_dns_tool") # Clear if no longer detected
-                self.db.delete_setting("local_dns_ip")
-                orig_dns = self.platform.get_original_dns(interface)
-                if orig_dns and orig_dns not in ("127.127.127.127", "127.0.0.2"):
-                    self.db.set_setting(f"backup_dns_{interface}", orig_dns)
-                    if not current_upstream:
-                        self.db.set_setting("dns_upstream", orig_dns)
-                else:
-                    self.db.set_setting(f"backup_dns_{interface}", "dhcp")
-                    if not current_upstream:
-                        self.db.set_setting("dns_upstream", "1.1.1.1") # Safe default
-                
-            self.platform.set_system_dns(interface, "127.127.127.127")
-            
-        # Trigger auto-update in background to prevent UI freeze
-        # Now runs in a 1-hour loop for fast-updating threat lists
-        threading.Thread(target=self._blocklist_updater_loop, daemon=True).start()
-        
-        self.is_running = True
-        self.engine_ready = True
-        
-        # Start detached subprocess watchdog to ensure DNS is restored on hard crash
-        import sys, os, subprocess
-        if not getattr(sys, 'frozen', False) and not self.is_headless:
-            # Start detached subprocess watchdog to ensure DNS is restored on hard crash
-            # Hardening: Use strictly absolute paths and wipe environment variables to block DLL/PATH sideloading
-            watchdog_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'watchdog.py'))
-            if os.path.exists(watchdog_path):
-                import subprocess
-                is_frozen = getattr(sys, 'frozen', False)
-                launch_cmd = [sys.executable] + sys.argv if not is_frozen else sys.argv
-                cmd = [sys.executable, watchdog_path, str(os.getpid())] + launch_cmd
-                try:
-                    kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
-                    self.watchdog_thread = subprocess.Popen(
-                        cmd, 
-                        env={'PATH': os.environ.get('PATH', ''), 'SYSTEMROOT': os.environ.get('SYSTEMROOT', '')}, 
-                        **kwargs
-                    )            
-                    logger.info("Spawned detached crash recovery watchdog with relaunch capability.")
-                except Exception as e:
-                    logger.error(f"Failed to spawn watchdog: {e}")
-        
-        self.route_monitor_thread = threading.Thread(target=self._fast_route_monitor_loop, daemon=True)
-        self.route_monitor_thread.start()
-        
-        logger.info("Cripple Engine started successfully.")
-        self.broadcast_status("✅ Core Engine Initialized")
-        return True
 
     def _detect_local_dns(self):
         """Scans loopback interfaces for active third-party UDP/TCP 53 listeners. Returns (ip, tool_name)"""

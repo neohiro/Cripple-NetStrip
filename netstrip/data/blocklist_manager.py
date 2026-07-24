@@ -417,12 +417,13 @@ class BlocklistManager:
                 
             # Iterate domain_map directly instead of a duplicate searchable_domains list
             for domain, category in self.domain_map.items():
-                if category_filter and category.value != category_filter:
+                cat_val = getattr(category, 'value', category)
+                if category_filter and cat_val != category_filter:
                     continue
                 if not query or query in domain:
                     results.append({
                         'domain': domain,
-                        'category': category.value
+                        'category': cat_val
                     })
                     if len(results) >= limit:
                         break

@@ -315,6 +315,8 @@ class SettingsView(ctk.CTkFrame):
         switch.pack(side="right")
         if current:
             switch.select()
+        else:
+            switch.deselect()
 
     def _on_switch_toggle(self, switch, setting_key):
         try:
