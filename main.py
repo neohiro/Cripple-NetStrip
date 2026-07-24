@@ -759,6 +759,11 @@ def main():
                         app.after(10, lambda: cross_fade(splash_alpha, app_alpha))
                     else:
                         if splash: splash.withdraw()
+                        app.attributes('-topmost', True)
+                        app.update()
+                        app.attributes('-topmost', False)
+                        app.lift()
+                        app.focus_force()
                         on_transition_done()
                         
                 if is_fallback or is_headless:

@@ -7,6 +7,8 @@ class SplashScreen(ctk.CTkToplevel):
         super().__init__(master, *args, **kwargs)
         self.overrideredirect(True)
         self.attributes('-topmost', True)
+        # Remove topmost after a short delay so that firewall prompts can be visible
+        self.after(1000, lambda: self.attributes('-topmost', False))
         self.configure(fg_color=Colors.BG_DARKEST)
         
         # Center the splash screen

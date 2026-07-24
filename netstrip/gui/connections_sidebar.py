@@ -203,17 +203,31 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
-                def process_ui():
+                def process_ui_batch(index=0, current_counts=None):
                     try:
                         if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                            self._is_fetching = False
                             return
-                        self.engine._cached_recent = conns
-                        self._process_connections(conns, sys_val)
+                        
+                        if current_counts is None:
+                            current_counts = {}
+                            
+                        batch_size = 25
+                        batch_conns = conns[index:index + batch_size]
+                        
+                        if batch_conns:
+                            if index == 0:
+                                self.engine._cached_recent = conns
+                            self._process_connections(batch_conns, sys_val, current_counts)
+                            
+                        if index + batch_size < len(conns):
+                            self.after(20, lambda: process_ui_batch(index + batch_size, current_counts))
+                        else:
+                            self._is_fetching = False
                     except Exception:
-                        pass
-                    finally:
                         self._is_fetching = False
-                self.after(0, process_ui)
+                        
+                self.after(0, process_ui_batch)
             except Exception:
                 self._is_fetching = False
                 # Reschedule even on fetch failure so the loop survives
@@ -223,13 +237,15 @@ class ConnectionsSidebar(ctk.CTkFrame):
         import threading
         threading.Thread(target=fetch, daemon=True).start()
 
-    def _process_connections(self, conns, sys_val):
+    def _process_connections(self, conns, sys_val, app_conn_counts=None):
         try:
             db_cache = {"block_system_connections": sys_val}
             
+            if app_conn_counts is None:
+                app_conn_counts = {}
+            
             if len(conns) > 0:
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
-                app_conn_counts = {}
                 for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
                     p_name = conn_dict.get('process_name', 'Unknown')
