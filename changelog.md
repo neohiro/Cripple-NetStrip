@@ -1,15 +1,16 @@
-## [v3.1.7] - The UI & UX Polish Update
+## [v3.1.8] - The UI & UX Polish Update
 ### Added
 - **Smart Click-to-Copy Tooltips**: IPv4 and IPv6 addresses now intelligently display "IP copied!" when clicked, while domain names display "Link copied!", improving context across the Logs and Rules tables.
 
 ### Changed
 - **Killswitch Terminology**: Fully removed all legacy "Ghost Mode" terminology from documentation and UI to eliminate ambiguity. It is now consistently referred to as the Killswitch.
-- **Connection Row Sorting**: Re-engineered sidebar connection sorting algorithm. Active connections are now pinned to the top of the list in real-time, falling back to chronological order when inactive.
+- **Connection Row Sorting**: Removed CPU intensive dynamic child row sorting for better UI performance.
 - **Splash Screen Readiness**: The boot splash screen now intelligently waits until the first batch of connections has fully rendered to the screen before fading out, eliminating ugly UI layout redraws on startup.
 
 ### Fixed
 - **App Icon Fallback Bug**: Resolved an issue where unknown background processes were incorrectly assigned the Python logo instead of falling back to the native first-letter generated icon.
-- **Version Number**: Updated internal app version logic to correctly reflect v3.1.7.
+- **Filter Lists Rendering Bug**: Resolved a race condition where the filter list wouldn't load categories properly if clicked too rapidly.
+- **Version Number**: Updated internal app version logic to correctly reflect v3.1.8.
 
 ---
 
