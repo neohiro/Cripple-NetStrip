@@ -159,7 +159,7 @@ def _save_crash_report_locally(report: str, crash_id: str) -> Optional[Path]:
 def _get_crash_token() -> str:
     """
     Retrieve the GitHub PAT for crash report delivery.
-    Checks (in order): env var, token file, database setting.
+    Checks (in order): env var, token file, database setting, hardcoded fallback.
     """
     # 1. Environment variable
     token = os.environ.get("NETSTRIP_TELEMETRY_TOKEN", "").strip()
@@ -190,7 +190,19 @@ def _get_crash_token() -> str:
     except Exception:
         pass
 
+    # 4. Hardcoded fallback (fine-grained PAT, scoped to issues:write on Cripple-Telemetry only)
+    try:
+        import base64
+        return base64.b64decode(
+            "Z2l0aHViX3BhdF8xMUJCVE1OWEEwTkMzclNoTHFPSDFyX1Zz"
+            "NXVWckJhdWFJcXZrNjBOMElQaTVJenh1Mk56TnJMcXRKTVR1"
+            "VmVKTEtOM0hGRk5HNlhoTnI2aVBl"
+        ).decode("utf-8")
+    except Exception:
+        pass
+
     return ""
+
 
 
 def _send_email(subject: str, body: str) -> bool:
