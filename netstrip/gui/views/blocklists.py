@@ -570,6 +570,28 @@ class BlocklistView(ctk.CTkScrollableFrame):
                     bind_copy_tooltip(domain_lbl, domain, "Link copied!")
                 except Exception:
                     pass
+                    
+                # Add category badge
+                from netstrip.core.modes import ConnectionCategory
+                try:
+                    cat_enum = ConnectionCategory(cat)
+                except ValueError:
+                    cat_enum = ConnectionCategory.UNKNOWN
+                    
+                from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
+                cat_color = get_category_color(cat_enum)
+                cat_label = get_category_label(cat_enum)
+                cat_icon = get_category_icon(cat_enum)
+                
+                cat_badge = ctk.CTkLabel(
+                    row, text=f"{cat_icon} {cat_label.upper()}",
+                    font=(Fonts.FAMILY_PRIMARY[0], 11, "bold"),
+                    text_color=cat_color,
+                    fg_color=f"{cat_color}1A", # 10% opacity
+                    corner_radius=4,
+                    height=24
+                )
+                cat_badge.pack(side="left", padx=Spacing.SM, pady=Spacing.SM, ipadx=Spacing.SM)
 
                 # Quick Actions
                 btn_frame = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
