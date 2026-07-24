@@ -58,6 +58,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install --retries 3 --timeout 60 -r requirements.txt
           pip install --retries 3 --timeout 60 Pillow pyinstaller buildozer "cython==0.29.33" virtualenv maturin
+          pip install -e .
 
       - name: Build Windows Executable
         if: matrix.target == 'windows'
