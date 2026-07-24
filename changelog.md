@@ -1,3 +1,7 @@
+## [v3.1.11] - System Block Visual Fix
+
+- **UI**: Fixed a bug where the "Block All" red indicator for system processes would flicker off during live traffic updates when "Block System Connections" was enabled.
+
 ## [v3.1.10] - UI Performance Polish
 
 - **UI**: Massively improved performance of the App Connections list by optimizing the UI poll loop.
