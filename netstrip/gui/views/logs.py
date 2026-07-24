@@ -72,7 +72,8 @@ class LogView(ctk.CTkFrame):
                 hdr, text=label,
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
                 text_color=Colors.TEXT_TERTIARY,
-            ).grid(row=0, column=i, sticky="w", padx=Spacing.SM, pady=Spacing.XS)
+                anchor="w"
+            ).grid(row=0, column=i, sticky="we", padx=Spacing.SM, pady=Spacing.XS)
 
         # Scrollable body
         self._log_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
@@ -195,24 +196,24 @@ class LogView(ctk.CTkFrame):
         for i, cfg in enumerate(self.COL_CONFIGS):
             frame.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
 
-        lbl_time = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_TERTIARY)
-        lbl_time.grid(row=0, column=0, sticky="w", padx=(Spacing.LG, Spacing.SM), pady=Spacing.SM)
+        lbl_time = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_TERTIARY, anchor="w")
+        lbl_time.grid(row=0, column=0, sticky="we", padx=Spacing.SM, pady=Spacing.SM)
 
         proc_frame = ctk.CTkFrame(frame, fg_color=Colors.BG_PANEL)
-        proc_frame.grid(row=0, column=1, sticky="w", padx=Spacing.XS, pady=Spacing.SM)
+        proc_frame.grid(row=0, column=1, sticky="we", padx=Spacing.SM, pady=Spacing.SM)
         lbl_dot = ctk.CTkLabel(proc_frame, text="● ", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS))
-        lbl_dot.pack(side="left", padx=(0, Spacing.XS))
-        lbl_proc = ctk.CTkLabel(proc_frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY)
-        lbl_proc.pack(side="left")
+        lbl_dot.pack(side="left")
+        lbl_proc = ctk.CTkLabel(proc_frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY, anchor="w")
+        lbl_proc.pack(side="left", fill="x", expand=True)
 
-        lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY)
-        lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
+        lbl_domain.grid(row=0, column=2, sticky="we", padx=Spacing.SM, pady=Spacing.SM)
 
         lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6)
         lbl_cat.grid(row=0, column=3, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD))
-        lbl_act.grid(row=0, column=4, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), anchor="w")
+        lbl_act.grid(row=0, column=4, sticky="we", padx=Spacing.SM, pady=Spacing.SM)
 
         return frame, {
             'time': lbl_time,
