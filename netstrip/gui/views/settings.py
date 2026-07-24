@@ -268,6 +268,14 @@ class SettingsView(ctk.CTkFrame):
             wraplength=650
         )
         lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=pady)
+        
+    def _add_title(self, parent, text, icon=None, pady=(Spacing.LG, Spacing.SM)):
+        display_text = f"{icon}  {text}" if icon else text
+        ctk.CTkLabel(
+            parent, text=display_text,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(anchor="w", padx=Spacing.LG, pady=pady)
 
     def _add_switch_row(self, parent, label_text, setting_key, tooltip_text=None):
         row = ctk.CTkFrame(parent, fg_color=Colors.BG_PANEL)

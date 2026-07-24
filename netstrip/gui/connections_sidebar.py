@@ -286,13 +286,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         except ValueError:
                             cat = ConnectionCategory.UNKNOWN
                             
-                        # Run the domain through the classifier ONLY if we don't have a label yet
-                        if cat == ConnectionCategory.UNKNOWN:
-                            live_cat = self.engine.classifier.classify_domain(domain_ip, p_name)
-                            if live_cat == ConnectionCategory.UNKNOWN:
-                                live_cat, _ = self.engine.classifier.classify_ip(conn_dict.get('ip'), 0, p_name)
-                            if live_cat != ConnectionCategory.UNKNOWN:
-                                cat = live_cat
+                        # Always run the domain through the live classifier to sync categories
+                        # (e.g. if a user changed mode or updated lists in the background)
+                        live_cat = self.engine.classifier.classify_domain(domain_ip, p_name)
+                        if live_cat == ConnectionCategory.UNKNOWN:
+                            live_cat, _ = self.engine.classifier.classify_ip(conn_dict.get('ip'), 0, p_name)
+                        if live_cat != ConnectionCategory.UNKNOWN:
+                            cat = live_cat
                         
                         # Apply EXPLICIT user rule overrides only.
                         # We check the whitelist/blacklist sets directly instead of calling

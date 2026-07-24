@@ -1,3 +1,8 @@
+## [v3.1.14] - Autolabeling Sync & Settings View Fix
+
+- **Core**: Fixed an issue where the Settings tab failed to load entirely and triggered a silent UI freeze due to a missing method attribute.
+- **UI**: Fixed the 'App Connections' list to instantly sync categories via the live classifier cascade when connection labels change in the background (e.g. updating domains to ESSENTIAL).
+
 ## [v3.1.13] - Flicker-Free UI Rendering
 
 - **UI**: Completely eliminated screen flickering in the App Connections list when sorting or refreshing active connections by porting the dynamic layout manager from `pack` to `grid` geometry, providing an ultra-smooth, native-feeling scrolling experience.
