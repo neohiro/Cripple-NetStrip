@@ -103,6 +103,11 @@ class SettingsView(ctk.CTkFrame):
 
         self._build_updates_card()
         self._build_general_card()
+        self._build_network_card()
+        self._build_scheduler_card()
+        self._build_migration_card()
+        self._build_analytics_card()
+        self._build_about_card()
         
     def _build_updates_card(self):
         from netstrip import __version__
@@ -213,11 +218,6 @@ class SettingsView(ctk.CTkFrame):
             
         import threading
         threading.Thread(target=_check, daemon=True).start()
-        self._build_network_card()
-        self._build_scheduler_card()
-        self._build_migration_card()
-        self._build_analytics_card()
-        self._build_about_card()
 
     def _build_general_card(self):
         card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)

@@ -57,6 +57,7 @@ class BlocklistManager:
     def _get_lists_hash(self):
         """Generate a hash of the current lists directory to detect changes."""
         h = hashlib.md5()
+        h.update(b"v2_race_fix")
         if not os.path.exists(self.lists_dir):
             return h.hexdigest()
         for filename in sorted(os.listdir(self.lists_dir)):

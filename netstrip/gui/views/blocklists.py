@@ -500,6 +500,8 @@ class BlocklistView(ctk.CTkScrollableFrame):
         self._current_results = results
         self._rendered_count = 0
         self._current_query = query
+        self._is_loading_chunk = False
+        self._current_search_id = getattr(self, '_current_search_id', 0) + 1
         
         for w in self._results_container.winfo_children():
             w.destroy()
@@ -542,9 +544,11 @@ class BlocklistView(ctk.CTkScrollableFrame):
         self._rendered_count += len(chunk)
 
         # Process the chunk in smaller batches to keep UI responsive
+        search_id = self._current_search_id
         def _render_batch(items, index=0):
-            if self._destroyed or index >= len(items):
-                self._is_loading_chunk = False
+            if self._destroyed or index >= len(items) or getattr(self, '_current_search_id', None) != search_id:
+                if getattr(self, '_current_search_id', None) == search_id:
+                    self._is_loading_chunk = False
                 return
                 
             batch_size = 5

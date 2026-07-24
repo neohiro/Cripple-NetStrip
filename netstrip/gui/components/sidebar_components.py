@@ -740,17 +740,12 @@ class AppGroupFrame(ctk.CTkFrame):
             status = row.conn_data.get('status', 'UNKNOWN')
             is_active = status in ('ESTABLISHED', 'SYN_SENT', 'LISTEN', 'ACTIVE', 'NONE', 'UNKNOWN')
             
-            # Sort keys: (not is_active, -last_updated, target)
-            sort_key = (0 if is_active else 1, -getattr(row, 'last_updated', 0), target)
-            valid_rows.append((sort_key, row, is_active))
+            valid_rows.append((row, is_active))
             
-        # Sort rows
-        valid_rows.sort(key=lambda x: x[0])
-        
         current_packed = [c for c in self.rows_container.winfo_children() if getattr(c, '_is_packed', False)]
         
         visible_rows = []
-        for _, row, is_active in valid_rows:
+        for row, is_active in valid_rows:
             action = row.conn_data.get('action', 'allow')
             category = row.conn_data.get('category', 'unknown')
             
