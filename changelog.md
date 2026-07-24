@@ -1,3 +1,9 @@
+## [v3.1.15] - GUI Performance & Exploit Protections
+
+- **Performance**: Improved "App Connections" list loading speed by reducing initial data poll delay.
+- **UI**: Added a dynamic "Loading connections..." background placeholder to prevent layout jumping when traffic first connects.
+- **Core**: Integrated live dynamic toggles for Exploit Protection settings (Kernel Anomaly Scanner, eBPF Mode, Layer 2 ARP Lockdown). These now take effect immediately when toggled without requiring a restart.
+
 ## [v3.1.14] - Autolabeling Sync & Settings View Fix
 
 - **Core**: Fixed an issue where the Settings tab failed to load entirely and triggered a silent UI freeze due to a missing method attribute.
