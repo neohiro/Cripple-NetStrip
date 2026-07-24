@@ -53,7 +53,8 @@ class FirewallController:
 
     def allow_process(self, process_path: str, rule_name: Optional[str] = None) -> bool:
         """Allow a specific executable full network access (Windows specific mostly)."""
-        name = rule_name or f"NetStrip_Allow_{process_path.replace('\\', '_').replace('/', '_')}"
+        safe_path = process_path.replace('\\', '_').replace('/', '_')
+        name = rule_name or f"NetStrip_Allow_{safe_path}"
         success_out = self.platform.add_firewall_rule(f"{name}_OUT", "out", "allow", program=process_path)
         success_in = self.platform.add_firewall_rule(f"{name}_IN", "in", "allow", program=process_path)
         
@@ -64,7 +65,8 @@ class FirewallController:
 
     def block_process(self, process_path: str, rule_name: Optional[str] = None) -> bool:
         """Block a specific executable from network access."""
-        name = rule_name or f"NetStrip_Block_{process_path.replace('\\', '_').replace('/', '_')}"
+        safe_path = process_path.replace('\\', '_').replace('/', '_')
+        name = rule_name or f"NetStrip_Block_{safe_path}"
         success_out = self.platform.add_firewall_rule(f"{name}_OUT", "out", "block", program=process_path)
         success_in = self.platform.add_firewall_rule(f"{name}_IN", "in", "block", program=process_path)
         
