@@ -419,6 +419,7 @@ class AppGroupFrame(ctk.CTkFrame):
         
         # Container for connection rows
         self.rows_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.rows_container.grid_columnconfigure(0, weight=1)
         
         self.rows = {} # target -> ConnectionRow
         self.is_expanded = False
@@ -761,15 +762,16 @@ class AppGroupFrame(ctk.CTkFrame):
                 
         # Now sync packed state
         if current_packed != visible_rows:
-            # Unpack all old rows
+            # Unpack all old rows that are no longer visible
             for row in current_packed:
-                row.pack_forget()
-                row._is_packed = False
+                if row not in visible_rows:
+                    row.grid_forget()
+                    row._is_packed = False
                     
             # Repack seamlessly in new order
             for idx, row in enumerate(visible_rows):
                 row.set_zebra(idx % 2 == 0)
-                row.pack(fill="x", pady=0)
+                row.grid(row=idx, column=0, sticky="ew", pady=0)
                 row._is_packed = True
                 
         else:

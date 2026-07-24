@@ -1,3 +1,7 @@
+## [v3.1.13] - Flicker-Free UI Rendering
+
+- **UI**: Completely eliminated screen flickering in the App Connections list when sorting or refreshing active connections by porting the dynamic layout manager from `pack` to `grid` geometry, providing an ultra-smooth, native-feeling scrolling experience.
+
 ## [v3.1.12] - UI Repacking Fix
 
 - **UI**: Fixed a thread clogging issue where the App Connections list would redundantly sort and repack the UI for every small data batch, leading to massive freezes during traffic spikes.

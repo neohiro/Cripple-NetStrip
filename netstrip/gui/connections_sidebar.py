@@ -111,6 +111,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
             corner_radius=0
         )
         self.scroll_frame.grid(row=3, column=0, sticky="nsew", padx=Spacing.SM)
+        self.scroll_frame.grid_columnconfigure(0, weight=1)
         
         self.app_groups = {} # process_name -> AppGroupFrame
         self.last_update_id = 0
@@ -331,7 +332,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                     
             if not conns and not hasattr(self, 'lbl_empty'):
                 self.lbl_empty = ctk.CTkLabel(self.scroll_frame, text="No app connections tracked yet.\n\nWaiting for traffic...", text_color=Colors.TEXT_TERTIARY)
-                self.lbl_empty.pack(pady=40)
+                self.lbl_empty.grid(row=0, column=0, pady=40)
             elif conns and hasattr(self, 'lbl_empty'):
                 self.lbl_empty.destroy()
                 delattr(self, 'lbl_empty')
@@ -384,12 +385,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
             if current_packed != visible_groups:
                 # Unpack groups that are no longer visible or out of order
                 for group in current_packed:
-                    group.pack_forget()
-                    group._is_packed = False
+                    if group not in visible_groups:
+                        group.grid_forget()
+                        group._is_packed = False
                 
                 # Seamlessly repack in correct order
-                for group in visible_groups:
-                    group.pack(fill="x", padx=Spacing.XS, pady=Spacing.SM)
+                for idx, group in enumerate(visible_groups):
+                    group.grid(row=idx, column=0, sticky="ew", padx=Spacing.XS, pady=Spacing.SM)
                     group._is_packed = True
                         
             # Export active apps for dashboard to avoid redundant classification
