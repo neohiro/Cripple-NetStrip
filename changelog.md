@@ -1,4 +1,4 @@
-## [v3.1.15] - GUI Performance & Exploit Protections
+## [v3.1.16] - GUI Performance & Exploit Protections
 
 - **Performance**: Improved "App Connections" list loading speed by reducing initial data poll delay.
 - **UI**: Added a dynamic "Loading connections..." background placeholder to prevent layout jumping when traffic first connects.
