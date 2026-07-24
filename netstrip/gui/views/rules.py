@@ -195,7 +195,7 @@ class AppRulesView(ctk.CTkFrame):
         )
         target_lbl.grid(row=0, column=2, rowspan=2, padx=Spacing.MD)
         if target:
-            bind_copy_tooltip(target_lbl, target, "Link copied!")
+            bind_copy_tooltip(target_lbl, target)
 
         # Allow button (Hide for Malware/Tracker to enforce strict block)
         if cat not in ['malware', 'tracker']:
@@ -310,7 +310,7 @@ class AppRulesView(ctk.CTkFrame):
         )
         pattern_lbl.grid(row=0, column=0, sticky="w")
         if pattern:
-            bind_copy_tooltip(pattern_lbl, pattern, "Link copied!")
+            bind_copy_tooltip(pattern_lbl, pattern)
 
         # App + scope info
         try:

@@ -407,6 +407,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self.after_cancel(self._refresh_after_id)
             self._refresh_after_id = self.after(self._get_poll_interval(), self._refresh_loop)
 
+        self._first_render_done = True
+
     def _reset_filters(self):
         self.sort_var.set("Sort by: Recent")
         self.filter_var.set("Filter: All")

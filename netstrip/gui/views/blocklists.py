@@ -567,7 +567,8 @@ class BlocklistView(ctk.CTkScrollableFrame):
                 
                 try:
                     from netstrip.gui.utils import bind_copy_tooltip
-                    bind_copy_tooltip(domain_lbl, domain, "Link copied!")
+                    if domain:
+                        bind_copy_tooltip(domain_lbl, domain)
                 except Exception:
                     pass
                     

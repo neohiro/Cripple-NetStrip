@@ -15,8 +15,7 @@ OS_ICONS = {
     'windows': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'linux': 'https://www.google.com/s2/favicons?domain=kernel.org&sz=64',
     'macos': 'https://www.google.com/s2/favicons?domain=apple.com&sz=64',
-    'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'user_app': 'https://www.google.com/s2/favicons?domain=python.org&sz=64' # Fallback for unknown python apps
+    'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64'
 }
 
 APP_ICONS = {

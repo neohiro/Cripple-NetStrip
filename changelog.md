@@ -1,5 +1,19 @@
-## [v3.1.0] - Security Hardening & Live Traffic Polish
+## [v3.1.7] - The UI & UX Polish Update
 ### Added
+- **Smart Click-to-Copy Tooltips**: IPv4 and IPv6 addresses now intelligently display "IP copied!" when clicked, while domain names display "Link copied!", improving context across the Logs and Rules tables.
+
+### Changed
+- **Killswitch Terminology**: Fully removed all legacy "Ghost Mode" terminology from documentation and UI to eliminate ambiguity. It is now consistently referred to as the Killswitch.
+- **Connection Row Sorting**: Re-engineered sidebar connection sorting algorithm. Active connections are now pinned to the top of the list in real-time, falling back to chronological order when inactive.
+- **Splash Screen Readiness**: The boot splash screen now intelligently waits until the first batch of connections has fully rendered to the screen before fading out, eliminating ugly UI layout redraws on startup.
+
+### Fixed
+- **App Icon Fallback Bug**: Resolved an issue where unknown background processes were incorrectly assigned the Python logo instead of falling back to the native first-letter generated icon.
+- **Version Number**: Updated internal app version logic to correctly reflect v3.1.7.
+
+---
+
+## [v3.1.0] - Security Hardening & Live Traffic Polish
 - **Crash Report Delivery Guarantee**: Essential domain whitelist (`api.github.com`, `frenzypenguin.media`, `github.com`) bypasses all blocking. Crash reporter retries 5× with exponential backoff (2s→4s→8s→16s) to survive network restoration glitches.
 - **HMAC-SHA256 Watchdog**: Periodic live integrity scanning of all engine files with keyed hashes. Detects tampering at runtime.
 - **Adaptive Live Traffic Polling**: 250ms refresh when GUI is visible for real-time connection feel, 2000ms when headless to preserve CPU.
@@ -24,9 +38,9 @@
 
 ---
 
-## [v3.0.2] - The Ghost Mode Update
+## [v3.0.2] - The Killswitch Update
 ### Added
-- **Absolute Master Killswitch (Ghost Mode)**: The killswitch now unconditionally drops ALL network traffic across all NICs and protocols, stripping away all loopback exceptions to turn the hardware into a true ghost on the network.
+- **Absolute Master Killswitch**: The killswitch now unconditionally drops ALL network traffic across all NICs and protocols, stripping away all loopback exceptions to turn the hardware into a true ghost on the network.
 - **Fast-Updating Threat Intel**: Implemented custom update cycles per blocklist, allowing botnet and malware C2 lists (like Feodo Tracker and URLhaus) to update every 1-4 hours while ads remain on a 24-hour cycle.
 - **Millions of Domains globally**: Added massive multi-million domain lists (HaGeZi Ultimate) and dozens of regional and cultural blocklists (EasyList Germany, AdGuard Russian, YousList, etc.).
 

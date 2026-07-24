@@ -529,7 +529,11 @@ class NetStripEngine:
         """Periodically check for blocklist updates every hour."""
         while self.is_running:
             try:
-                self.updater.check_and_update()
+                # Run update synchronously (we're already in a background thread)
+                self.updater._perform_update()
+                # Reload blocklists so newly downloaded lists populate domain_map
+                self.blocklist.load_all()
+                logger.info("Blocklist update + reload complete.")
             except Exception as e:
                 logger.error(f"Blocklist update check failed: {e}")
             # Sleep for 1 hour between checks

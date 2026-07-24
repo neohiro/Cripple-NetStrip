@@ -160,17 +160,17 @@ class BlocklistManager:
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
                         self._load_list(filepath, None, identity_name=identity_name)
                         
-        try:
-            with open(cache_file, "w", encoding="utf-8") as f:
-                json.dump({
-                    "hash": current_hash,
-                    "domain_map": {k: v.value for k, v in self.domain_map.items()},
-                    "identity_map": self.identity_map,
-                    "stats": {k.value: v for k, v in self.stats.items()},
-                    "sources_metadata": {k.value: v for k, v in self.sources_metadata.items()}
-                }, f)
-        except Exception:
-            pass
+            try:
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "hash": current_hash,
+                        "domain_map": {k: v.value for k, v in self.domain_map.items()},
+                        "identity_map": self.identity_map,
+                        "stats": {k.value: v for k, v in self.stats.items()},
+                        "sources_metadata": {k.value: v for k, v in self.sources_metadata.items()}
+                    }, f)
+            except Exception:
+                pass
 
     def _load_list(self, filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
         """Parse a hosts or domain list file and add it to the map."""

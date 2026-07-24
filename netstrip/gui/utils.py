@@ -36,10 +36,22 @@ def safe_loop(delay_ms=None):
         return wrapper
     return decorator
 
-def bind_copy_tooltip(widget, text_to_copy, message="IP copied!"):
+def is_ip(text: str) -> bool:
+    if not text: return False
+    text = str(text)
+    # Basic IPv4
+    if re.match(r'^(?:\d{1,3}\.){3}\d{1,3}$', text): return True
+    # Basic IPv6
+    if re.match(r'^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$', text): return True
+    return False
+
+def bind_copy_tooltip(widget, text_to_copy, message=None):
     """Binds a click event to copy text and show a floating tooltip."""
     import customtkinter as ctk
     
+    if message is None:
+        message = "IP copied!" if is_ip(text_to_copy) else "Link copied!"
+        
     widget.configure(cursor="hand2")
     
     def on_click(event):

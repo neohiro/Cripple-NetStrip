@@ -56,7 +56,7 @@ class ConnectionRow(ctk.CTkFrame):
         try:
             from netstrip.gui.utils import bind_copy_tooltip
             raw_target = conn_data.get('domain') or conn_data.get('ip', 'Unknown')
-            bind_copy_tooltip(self.target_label, raw_target, "Link copied!")
+            bind_copy_tooltip(self.target_label, raw_target)
         except Exception:
             pass
         
@@ -714,12 +714,8 @@ class AppGroupFrame(ctk.CTkFrame):
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
 
     def apply_filter(self, hide_inactive: bool, active_filter: str = "All"):
-        self.visible_count = 0
         import time
         now = time.time()
-        
-        # We need a list to safely delete during iteration
-        targets = list(self.rows.keys())
         
         # Calculate inactive time
         if self.rows:
@@ -732,23 +728,32 @@ class AppGroupFrame(ctk.CTkFrame):
         else:
             self.lbl_inactive.configure(text="")
             
-        for target in targets:
-            row = self.rows[target]
-            
+        # Get and prune rows
+        valid_rows = []
+        for target, row in list(self.rows.items()):
             # Prune if inactive for 2 minutes (120 seconds) to save Tkinter memory
             if now - getattr(row, 'last_updated', now) > 120:
                 old_row = self.rows.pop(target)
                 old_row.destroy()
                 continue
-                
+            
             status = row.conn_data.get('status', 'UNKNOWN')
+            is_active = status in ('ESTABLISHED', 'SYN_SENT', 'LISTEN', 'ACTIVE', 'NONE', 'UNKNOWN')
+            
+            # Sort keys: (not is_active, -last_updated, target)
+            sort_key = (0 if is_active else 1, -getattr(row, 'last_updated', 0), target)
+            valid_rows.append((sort_key, row, is_active))
+            
+        # Sort rows
+        valid_rows.sort(key=lambda x: x[0])
+        
+        current_packed = [c for c in self.rows_container.winfo_children() if getattr(c, '_is_packed', False)]
+        
+        visible_rows = []
+        for _, row, is_active in valid_rows:
             action = row.conn_data.get('action', 'allow')
             category = row.conn_data.get('category', 'unknown')
             
-            # For UDP, status is often NONE or UNKNOWN in psutil
-            is_active = status in ('ESTABLISHED', 'SYN_SENT', 'LISTEN', 'ACTIVE', 'NONE', 'UNKNOWN')
-            
-            # Check filter category
             filter_hidden = False
             if active_filter == "Filter: Allowed" and action != 'allow':
                 filter_hidden = True
@@ -757,19 +762,38 @@ class AppGroupFrame(ctk.CTkFrame):
             elif active_filter == "Filter: DNS/Local" and category not in ('dns', 'lan'):
                 filter_hidden = True
                 
-            if filter_hidden or (hide_inactive and not is_active):
-                if getattr(row, '_is_packed', True): # Assume packed initially if unknown
+            if not filter_hidden and not (hide_inactive and not is_active):
+                visible_rows.append(row)
+                
+        # Now sync packed state
+        if current_packed != visible_rows:
+            for row in current_packed:
+                if row not in visible_rows:
                     row.pack_forget()
                     row._is_packed = False
-            else:
-                row.set_zebra(self.visible_count % 2 == 0)
+                    
+            prev = None
+            for idx, row in enumerate(visible_rows):
+                row.set_zebra(idx % 2 == 0)
                 if not getattr(row, '_is_packed', False):
                     row.pack(fill="x", pady=0)
                     row._is_packed = True
-                self.visible_count += 1
                 
-        # Remove the self.pack() / pack_forget() logic from here.
-        # It is now strictly managed by connections_sidebar.py to guarantee proper sorting.
+                # Re-order
+                if prev:
+                    row.pack(after=prev)
+                else:
+                    others = [r for r in visible_rows if r != row and getattr(r, '_is_packed', False)]
+                    if others:
+                        row.pack(before=others[0])
+                prev = row
+                
+        else:
+            # Update zebras if order is same but maybe some colors were reset
+            for idx, row in enumerate(visible_rows):
+                row.set_zebra(idx % 2 == 0)
+                
+        self.visible_count = len(visible_rows)
 
     def set_expanded(self, expanded: bool):
         self.is_expanded_ui = expanded
