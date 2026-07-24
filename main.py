@@ -760,10 +760,10 @@ def main():
                     else:
                         if splash: splash.withdraw()
                         app.attributes('-topmost', True)
-                        app.update()
-                        app.attributes('-topmost', False)
                         app.lift()
                         app.focus_force()
+                        # Drop topmost after a brief moment to allow other apps to be focused later
+                        app.after(500, lambda: app.attributes('-topmost', False))
                         on_transition_done()
                         
                 if is_fallback or is_headless:
