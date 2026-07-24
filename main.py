@@ -118,7 +118,7 @@ def is_server_or_embedded():
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         print(f"\n{'='*60}")
-        print(f"  Cripple (NetStrip) v3.1.0 — CLI / Daemon")
+        print(f"  Cripple (NetStrip) v3.1.9 — CLI / Daemon")
         print(f"{'='*60}")
         print("\nBOOT VARIABLES:")
         print("  --service              Headless/daemon mode (no GUI).")

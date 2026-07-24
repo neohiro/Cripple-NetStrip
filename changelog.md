@@ -1,3 +1,8 @@
+## [v3.1.9] - Hotfix & UI Polish
+
+- **UI**: Added short delay before reverting `-topmost` to ensure main window surfaces properly.
+- **System**: Updated version numbers across all files to trigger pipeline properly.
+
 ## [v3.1.8] - The UI & UX Polish Update
 ### Added
 - **Smart Click-to-Copy Tooltips**: IPv4 and IPv6 addresses now intelligently display "IP copied!" when clicked, while domain names display "Link copied!", improving context across the Logs and Rules tables.
