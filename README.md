@@ -18,7 +18,7 @@
 
 ## Why Cripple?
 
-Every second your computer is online, dozens of applications are silently phoning home. Your browser leaks DNS queries through encrypted side channels. Your operating system broadcasts telemetry you never consented to. Smart devices on your network talk to servers in countries you've never heard of. And traditional firewalls? They can't even see most of it.
+Every second your devices are online, dozens of applications are silently phoning home. Your browser leaks DNS queries through encrypted side channels. Your operating system broadcasts telemetry you never consented to. Smart devices on your network talk to servers in countries you've never heard of. And traditional firewalls? They can't even see most of it.
 
 **Cripple strips all of that away.**
 
