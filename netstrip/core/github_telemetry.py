@@ -33,14 +33,25 @@ ISSUES_ENDPOINT = f"{GITHUB_API_BASE}/repos/{TELEMETRY_REPO}/issues"
 def _get_token() -> Optional[str]:
     """
     Retrieve the GitHub PAT for telemetry submission.
-    Checks environment variable first, then database, then fallback.
+    Checks environment variable first, then token file, then database.
     """
     # 1. Environment variable (highest priority)
     token = os.environ.get("NETSTRIP_TELEMETRY_TOKEN")
     if token:
         return token
 
-    # 2. Database setting
+    # 2. Token file (~/.netstrip/telemetry_token)
+    try:
+        from pathlib import Path
+        token_file = Path.home() / ".netstrip" / "telemetry_token"
+        if token_file.exists():
+            token = token_file.read_text(encoding="utf-8").strip()
+            if token:
+                return token
+    except Exception:
+        pass
+
+    # 3. Database setting
     try:
         from netstrip.data.database import Database
         from pathlib import Path
@@ -54,8 +65,9 @@ def _get_token() -> Optional[str]:
     except Exception:
         pass
 
-    # 3. No token available
+    # 4. No token available
     return None
+
 
 
 def submit_issue(title: str, body: str, label: str) -> bool:

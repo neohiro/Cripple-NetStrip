@@ -27,9 +27,10 @@ logger = logging.getLogger(__name__)
 
 CRASH_EMAIL = "cripple@frenzypenguin.media"
 CRASH_REPORT_DIR = Path.home() / ".netstrip" / "crash_reports"
+TELEMETRY_TOKEN_FILE = Path.home() / ".netstrip" / "telemetry_token"
 
-# GitHub Issues API for crash reports (public repo)
-GITHUB_CRASH_ENDPOINT = "https://api.github.com/repos/neohiro/Cripple-NetStrip/issues"
+# GitHub Issues API for crash reports (telemetry repo, requires auth)
+GITHUB_CRASH_ENDPOINT = "https://api.github.com/repos/neohiro/Cripple-Telemetry/issues"
 
 
 def _get_system_info() -> dict:
@@ -155,17 +156,53 @@ def _save_crash_report_locally(report: str, crash_id: str) -> Optional[Path]:
         return None
 
 
+def _get_crash_token() -> str:
+    """
+    Retrieve the GitHub PAT for crash report delivery.
+    Checks (in order): env var, token file, database setting.
+    """
+    # 1. Environment variable
+    token = os.environ.get("NETSTRIP_TELEMETRY_TOKEN", "").strip()
+    if token:
+        return token
+
+    # 2. Token file (~/.netstrip/telemetry_token)
+    try:
+        if TELEMETRY_TOKEN_FILE.exists():
+            token = TELEMETRY_TOKEN_FILE.read_text(encoding="utf-8").strip()
+            if token:
+                return token
+    except Exception:
+        pass
+
+    # 3. Database setting
+    try:
+        import sqlite3
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        if db_path.exists():
+            conn = sqlite3.connect(str(db_path), timeout=2)
+            c = conn.cursor()
+            c.execute("SELECT value FROM settings WHERE key='telemetry_github_token'")
+            row = c.fetchone()
+            conn.close()
+            if row and row[0]:
+                return str(row[0]).strip()
+    except Exception:
+        pass
+
+    return ""
+
+
 def _send_email(subject: str, body: str) -> bool:
     """
     Send crash report via email using SMTP.
-    Attempts multiple free SMTP relay strategies:
-    1. Direct MX delivery to the recipient's mail server
+    Attempts direct MX delivery, then localhost MTA.
     """
+    import smtplib
+
+    # Strategy 1: Direct MX delivery (try dnspython if available)
     try:
-        import smtplib
         import dns.resolver  # type: ignore
-        
-        # Resolve MX record for frenzypenguin.media
         mx_records = dns.resolver.resolve("frenzypenguin.media", "MX")
         mx_host = str(sorted(mx_records, key=lambda r: r.preference)[0].exchange).rstrip(".")
         
@@ -186,9 +223,8 @@ def _send_email(subject: str, body: str) -> bool:
     except Exception as e:
         logger.debug(f"MX delivery failed: {e}")
     
-    # Fallback: Try using localhost SMTP (if a local MTA is running)
+    # Strategy 2: localhost MTA
     try:
-        import smtplib
         msg = MIMEMultipart()
         msg["From"] = "crashreporter@netstrip.local"
         msg["To"] = CRASH_EMAIL
@@ -208,39 +244,54 @@ def _send_email(subject: str, body: str) -> bool:
 
 def _send_via_https(subject: str, body: str) -> bool:
     """
-    Send crash report via HTTPS POST to the GitHub API crash endpoint.
-    This is a secondary delivery method backing up the primary GitHub telemetry module.
+    Send crash report via authenticated HTTPS POST to the GitHub Issues API.
+    Posts to the Cripple-Telemetry repo using a PAT for authentication.
     """
+    token = _get_crash_token()
+    if not token:
+        logger.warning(
+            "No telemetry token found. Crash report cannot be sent via HTTPS. "
+            "Set NETSTRIP_TELEMETRY_TOKEN env var or create ~/.netstrip/telemetry_token"
+        )
+        return False
+
     try:
         import urllib.request
         import ssl
-        
+        import platform as plat
+
+        os_name = plat.system().lower()
+        os_label = f"os-{os_name}"
+
         payload = json.dumps({
-            "title": subject,
-            "body": f"```\n{body}\n```",
-            "labels": ["crash-report", "automated"]
+            "title": f"[{os_name.capitalize()}] {subject}",
+            "body": f"## Crash Report\n\n```\n{body}\n```",
+            "labels": ["crash", os_label]
         }).encode("utf-8")
-        
-        # Direct GitHub Issues API (public repo)
-        try:
-            req = urllib.request.Request(
-                GITHUB_CRASH_ENDPOINT,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
-                if resp.status in (200, 201):
-                    logger.info("Crash report sent via GitHub Issues API")
-                    return True
-        except Exception:
-            pass
-        
-        return False
+
+        req = urllib.request.Request(
+            GITHUB_CRASH_ENDPOINT,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "NetStrip-CrashReporter/1.0",
+            },
+            method="POST",
+        )
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            if resp.status in (200, 201):
+                logger.info("Crash report sent via GitHub Issues API (authenticated)")
+                return True
+            else:
+                logger.debug(f"GitHub API returned status {resp.status}")
     except Exception as e:
         logger.debug(f"HTTPS crash report failed: {e}")
-        return False
+
+    return False
 
 
 def _is_analytics_opted_in() -> bool:
