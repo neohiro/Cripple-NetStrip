@@ -36,6 +36,11 @@ class TrafficClassifier:
         if domain.startswith("127.") or domain == "::1":
             self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
             return ConnectionCategory.ESSENTIAL
+            
+        # Check NetStrip internal domains (Updates, Telemetry, GeoIP)
+        if domain.lower() in ('api.github.com', 'raw.githubusercontent.com', 'api.ipify.org', 'ip-api.com'):
+            self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
+            return ConnectionCategory.ESSENTIAL
         
         # If the target is actually an IP and it's a LAN IP, prioritize LAN classification
         if self._is_lan_ip(domain):

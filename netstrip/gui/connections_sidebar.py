@@ -174,7 +174,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         """Adaptive polling: fast when GUI visible for live traffic feel, slow when headless."""
         if getattr(self.engine, 'is_headless', False):
             return 2000
-        return 250  # ~4 Hz visual refresh for smooth live traffic animations
+        return 1000  # 1Hz visual refresh to balance live feel and UI performance
 
     @safe_loop(delay_ms=1000)
     def _refresh_loop(self):

@@ -45,10 +45,47 @@ def is_ip(text: str) -> bool:
     if re.match(r'^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$', text): return True
     return False
 
+class ClipboardTooltipManager:
+    _instance = None
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        self.tip = None
+        self.lbl = None
+        self.hide_id = None
+
+    def show(self, widget, message, x, y):
+        import customtkinter as ctk
+        if self.tip is None or not self.tip.winfo_exists():
+            self.tip = ctk.CTkToplevel()
+            self.tip.overrideredirect(True)
+            self.tip.attributes("-topmost", True)
+            self.tip.configure(fg_color=Colors.SUCCESS_DIM if hasattr(Colors, 'SUCCESS_DIM') else "#166534")
+            
+            self.lbl = ctk.CTkLabel(
+                self.tip, text=message,
+                text_color="white",
+                font=("Inter", 11, "bold"),
+                padx=8, pady=4
+            )
+            self.lbl.pack()
+        else:
+            self.lbl.configure(text=message)
+            
+        self.tip.geometry(f"+{x}+{y}")
+        self.tip.deiconify()
+
+        if self.hide_id:
+            self.tip.after_cancel(self.hide_id)
+        self.hide_id = self.tip.after(1500, self.tip.withdraw)
+
 def bind_copy_tooltip(widget, text_to_copy, message=None):
     """Binds a click event to copy text and show a floating tooltip."""
-    import customtkinter as ctk
-    
     if message is None:
         message = "IP copied!" if is_ip(text_to_copy) else "Link copied!"
         
@@ -58,32 +95,9 @@ def bind_copy_tooltip(widget, text_to_copy, message=None):
         widget.clipboard_clear()
         widget.clipboard_append(str(text_to_copy))
         
-        # Debounce: Destroy existing tooltip if one exists for this widget
-        if hasattr(widget, '_active_tooltip') and widget._active_tooltip.winfo_exists():
-            widget._active_tooltip.destroy()
-            
-        # Create a tiny floating toplevel without window decorations
-        tip = ctk.CTkToplevel()
-        widget._active_tooltip = tip
-        tip.overrideredirect(True)
-        tip.attributes("-topmost", True)
-        # Some OS need transparent color key to remove background, but we'll just style it
-        tip.configure(fg_color=Colors.SUCCESS_DIM if hasattr(Colors, 'SUCCESS_DIM') else "#166534")
-        
         x = event.x_root + 10
         y = event.y_root + 10
-        tip.geometry(f"+{x}+{y}")
-        
-        lbl = ctk.CTkLabel(
-            tip, text=message,
-            text_color="white",
-            font=("Inter", 11, "bold"),
-            padx=8, pady=4
-        )
-        lbl.pack()
-        
-        # Destroy after 1.5s
-        tip.after(1500, tip.destroy)
+        ClipboardTooltipManager.get_instance().show(widget, message, x, y)
         
     widget.bind("<Button-1>", on_click)
 

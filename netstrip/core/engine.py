@@ -378,11 +378,8 @@ class NetStripEngine:
         except KeyError:
             self.set_mode(ProtectionLevel.NORMAL)
 
-        # Wait for blocklists to finish loading (Splash screen runs concurrently)
-        import time
-        while hasattr(self, 'blocklist') and self.blocklist.is_loading:
-            time.sleep(0.1)
-
+        # We no longer block engine startup waiting for blocklists to load.
+        # The blocklists will load in the background, and the classifier will use cached/live data until then.
         # Start subsystems
         self.interceptor.start()
         self.dns_proxy.start()

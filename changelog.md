@@ -1,3 +1,10 @@
+## [v3.1.10] - UI Performance Polish
+
+- **UI**: Massively improved performance of the App Connections list by optimizing the UI poll loop.
+- **UI**: Re-wrote the click-to-copy tooltip to use a high-performance singleton, eliminating the stutter.
+- **System**: De-coupled blocklist loading from the engine startup sequence, resulting in an instant boot.
+- **System**: Hardcoded internal API domains into the ESSENTIAL category.
+
 ## [v3.1.9] - Hotfix & UI Polish
 
 - **UI**: Added short delay before reverting `-topmost` to ensure main window surfaces properly.
