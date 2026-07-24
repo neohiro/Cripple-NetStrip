@@ -1,3 +1,8 @@
+## [v3.1.12] - UI Repacking Fix
+
+- **UI**: Fixed a thread clogging issue where the App Connections list would redundantly sort and repack the UI for every small data batch, leading to massive freezes during traffic spikes.
+- **UI**: Fixed an issue where the Tkinter geometry manager would incorrectly overlap rows when scrolling, caused by dynamic widget shifting. Replaced with clean repacking.
+
 ## [v3.1.11] - System Block Visual Fix
 
 - **UI**: Fixed a bug where the "Block All" red indicator for system processes would flicker off during live traffic updates when "Block System Connections" was enabled.

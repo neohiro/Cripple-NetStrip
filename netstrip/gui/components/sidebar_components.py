@@ -761,26 +761,16 @@ class AppGroupFrame(ctk.CTkFrame):
                 
         # Now sync packed state
         if current_packed != visible_rows:
+            # Unpack all old rows
             for row in current_packed:
-                if row not in visible_rows:
-                    row.pack_forget()
-                    row._is_packed = False
+                row.pack_forget()
+                row._is_packed = False
                     
-            prev = None
+            # Repack seamlessly in new order
             for idx, row in enumerate(visible_rows):
                 row.set_zebra(idx % 2 == 0)
-                if not getattr(row, '_is_packed', False):
-                    row.pack(fill="x", pady=0)
-                    row._is_packed = True
-                
-                # Re-order
-                if prev:
-                    row.pack(after=prev)
-                else:
-                    others = [r for r in visible_rows if r != row and getattr(r, '_is_packed', False)]
-                    if others:
-                        row.pack(before=others[0])
-                prev = row
+                row.pack(fill="x", pady=0)
+                row._is_packed = True
                 
         else:
             # Update zebras if order is same but maybe some colors were reset

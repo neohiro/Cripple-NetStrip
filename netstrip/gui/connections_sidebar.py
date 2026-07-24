@@ -218,9 +218,10 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         if batch_conns:
                             if index == 0:
                                 self.engine._cached_recent = conns
-                            self._process_connections(batch_conns, sys_val, current_counts)
+                            is_final_batch = (index + batch_size >= len(conns))
+                            self._process_connections(batch_conns, sys_val, current_counts, is_final_batch=is_final_batch)
                             
-                        if index + batch_size < len(conns):
+                        if not is_final_batch:
                             self.after(20, lambda: process_ui_batch(index + batch_size, current_counts))
                         else:
                             self._is_fetching = False
@@ -237,7 +238,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         import threading
         threading.Thread(target=fetch, daemon=True).start()
 
-    def _process_connections(self, conns, sys_val, app_conn_counts=None):
+    def _process_connections(self, conns, sys_val, app_conn_counts=None, is_final_batch=True):
         try:
             db_cache = {"block_system_connections": sys_val}
             
@@ -334,6 +335,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
             elif conns and hasattr(self, 'lbl_empty'):
                 self.lbl_empty.destroy()
                 delattr(self, 'lbl_empty')
+
+            if not is_final_batch:
+                return
                     
             # Sorting logic
             sort_val = self.sort_var.get()
@@ -378,27 +382,15 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 visible_groups.append(dns_group)
                 
             if current_packed != visible_groups:
-                # Unpack groups that are no longer visible
+                # Unpack groups that are no longer visible or out of order
                 for group in current_packed:
-                    if group not in visible_groups:
-                        group.pack_forget()
-                        group._is_packed = False
+                    group.pack_forget()
+                    group._is_packed = False
                 
-                # Seamlessly re-order the remaining groups without flickering
-                prev = None
+                # Seamlessly repack in correct order
                 for group in visible_groups:
-                    if not getattr(group, '_is_packed', False):
-                        group.pack(fill="x", padx=Spacing.XS, pady=Spacing.SM)
-                        group._is_packed = True
-                        
-                    if prev:
-                        group.pack(after=prev)
-                    else:
-                        others = [g for g in visible_groups if g != group and getattr(g, '_is_packed', False)]
-                        if others:
-                            group.pack(before=others[0])
-                            
-                    prev = group
+                    group.pack(fill="x", padx=Spacing.XS, pady=Spacing.SM)
+                    group._is_packed = True
                         
             # Export active apps for dashboard to avoid redundant classification
             active_apps = set()
