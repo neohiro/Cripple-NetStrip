@@ -726,8 +726,12 @@ class NetStripApp(ctk.CTk):
                 settings_view = self._cached_views.get(SettingsView)
                 if settings_view and hasattr(settings_view, '_refresh_update_status'):
                     settings_view._refresh_update_status()
-            elif event_name == "MODE_CHANGE":
-                pass # Can add specific mode change logic here if needed
+            elif event_name == "MODE_CHANGE" or event_name == "MODE_CHANGED":
+                if hasattr(self, 'connections_list'):
+                    for group in self.connections_list.app_groups.values():
+                        if hasattr(group, 'refresh_global_state'):
+                            group.refresh_global_state()
+                    self.connections_list._refresh_loop()
         self.after(0, _handle_event)
                 
     def _start_version_glow_animation(self):

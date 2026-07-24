@@ -182,8 +182,12 @@ class ConnectionsSidebar(ctk.CTkFrame):
         if getattr(self, '_destroyed', False):
             return
         poll_ms = self._get_poll_interval()
-        if not self.winfo_ismapped():
-            # Not visible yet — reschedule at slow rate so the loop doesn't die permanently
+        top = self.winfo_toplevel()
+        is_tray = top and str(top.state()) == "withdrawn"
+        is_hidden_tab = not self.winfo_ismapped() and top and str(top.state()) == "normal"
+        
+        if is_tray or is_hidden_tab:
+            # Not visible yet or fully hidden - reschedule at slow rate so the loop doesn't die permanently
             if not self._destroyed:
                 self.after(500, self._refresh_loop)
             return
