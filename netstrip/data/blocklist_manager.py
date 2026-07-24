@@ -25,12 +25,28 @@ CATEGORY_PRIORITY = {
     ConnectionCategory.UNKNOWN: 0
 }
 
-# Crash report infrastructure — NEVER block these, even in Paranoid mode.
-# These domains are categorized as Essential so crash telemetry always reaches the developer.
-CRASH_REPORT_ESSENTIAL_DOMAINS = frozenset({
-    'api.github.com',        # Primary: GitHub Issues API for crash reports & telemetry
-    'frenzypenguin.media',   # Secondary: MX email delivery for crash reports
-    'github.com',            # GitHub web (update checks, release downloads)
+# Essential domains - NEVER block, regardless of mode or user rules.
+# This guarantees updates, crash telemetry, and core networking functions work.
+ESSENTIAL_DOMAINS = frozenset({
+    # Telemetry / Updates
+    'api.github.com',
+    'frenzypenguin.media',
+    'github.com',
+    # GeoIP / Network utilities
+    'ip-api.com',
+    'ipify.org',
+    # Default DNS resolvers (DoH/DoT endpoints)
+    '1.1.1.1', '1.0.0.1', 'cloudflare-dns.com', 'one.one.one.one',
+    '1.1.1.2', '1.0.0.2', 'security.cloudflare-dns.com',
+    '8.8.8.8', '8.8.4.4', 'dns.google',
+    '9.9.9.9', '149.112.112.112', 'dns.quad9.net', 'dns9.quad9.net',
+    '208.67.222.222', '208.67.220.220', 'doh.opendns.com',
+    '94.140.14.14', '94.140.15.15', 'dns.adguard-dns.com',
+    '76.76.2.0', '76.76.10.0', 'freedns.controld.com',
+    '194.242.2.2', '193.19.108.2', 'dns.mullvad.net',
+    '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
+    # Local loopbacks
+    '127.0.0.1', '127.0.0.53', '::1',
 })
 
 class BlocklistManager:
@@ -78,50 +94,67 @@ class BlocklistManager:
 
     def load_all(self):
         """Load all default blocklists, using JSON cache if available."""
-        cache_file = os.path.join(self.lists_dir, "NetStrip_cache.json")
-        current_hash = self._get_lists_hash()
-        
-        # Remove old pickle cache if it exists (one-time migration)
-        old_pkl = os.path.join(self.lists_dir, "NetStrip_cache.pkl")
-        if os.path.exists(old_pkl):
-            try:
-                os.remove(old_pkl)
-            except Exception:
-                pass
-        
-        if os.path.exists(cache_file):
-            try:
-                import time
-                with open(cache_file, "r", encoding="utf-8") as f:
-                    cache_data = json.load(f)
-                if cache_data.get("hash") == current_hash:
-                    # Chunk reconstruction to prevent GIL lock
-                    items = list(cache_data["domain_map"].items())
-                    new_domain_map = {}
-                    chunk_size = 25000
-                    for i in range(0, len(items), chunk_size):
-                        chunk = items[i:i + chunk_size]
-                        for k, v in chunk:
-                            new_domain_map[k] = ConnectionCategory(v)
-                        time.sleep(0.005) # Yield GIL
+        self.is_loading = True
+        try:
+            cache_file = os.path.join(self.lists_dir, "NetStrip_cache.json")
+            current_hash = self._get_lists_hash()
+            
+            # Remove old pickle cache if it exists (one-time migration)
+            old_pkl = os.path.join(self.lists_dir, "NetStrip_cache.pkl")
+            if os.path.exists(old_pkl):
+                try:
+                    os.remove(old_pkl)
+                except Exception:
+                    pass
+            
+            if os.path.exists(cache_file):
+                try:
+                    import time
+                    with open(cache_file, "r", encoding="utf-8") as f:
+                        cache_data = json.load(f)
+                    
+                    if cache_data.get("hash") == current_hash:
+                        # Load from cache
+                        self.domain_map.clear()
+                        # Because JSON keys are strings, we need to convert them back to integers
+                        # for the Enum to work properly. No wait, the keys are written as string values ('ad', etc.)
+                        # We used `k.value: v` when saving, so `cache_data["domain_map"]` has string keys and string values.
+                        # We must map them back safely.
                         
-                    with self.lock:
+                        # Optimization: Avoid function calls in the loop
+                        ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
+                        
+                        items = list(cache_data["domain_map"].items())
+                        new_domain_map = {}
+                        chunk_size = 25000
+                        for i in range(0, len(items), chunk_size):
+                            chunk = items[i:i + chunk_size]
+                            for k, v in chunk:
+                                new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
+                            time.sleep(0.005) # Yield GIL
+                            
                         self.domain_map = new_domain_map
                         self.identity_map = cache_data["identity_map"]
                         self.stats = {
-                            ConnectionCategory(k): v for k, v in cache_data["stats"].items()
+                            ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["stats"].items()
                         }
                         self.sources_metadata = {
-                            ConnectionCategory(k): v for k, v in cache_data["sources_metadata"].items()
+                            ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["sources_metadata"].items()
                         }
-                    return
-            except Exception as e:
-                logger.debug(f"Cache load failed, rebuilding: {e}")
-                
-        with self.lock:
+                        return
+                except Exception as e:
+                    logger.warning(f"Failed to load cache: {e}. Rebuilding...")
+                    
+            # Full reload
             self.domain_map.clear()
             self.identity_map.clear()
             self.stats = {cat: 0 for cat in ConnectionCategory}
+            
+            # Inject hardcoded essential domains
+            for domain in ESSENTIAL_DOMAINS:
+                self.domain_map[domain] = ConnectionCategory.ESSENTIAL
+            self.stats[ConnectionCategory.ESSENTIAL] = len(ESSENTIAL_DOMAINS)
+            
             self.sources_metadata.clear()
             
             if os.path.exists(self.lists_dir):
@@ -139,7 +172,7 @@ class BlocklistManager:
                         self._load_list(filepath, ConnectionCategory.TRACKER)
                     elif filename.startswith('doh_providers'):
                         block_doh = True
-                        if self.db:
+                        if hasattr(self, 'db') and self.db:
                             allow_doh = str(self.db.get_setting("allow_in_browser_dns", "false")).lower() == "true"
                             block_doh = not allow_doh
                         if block_doh:
@@ -172,6 +205,8 @@ class BlocklistManager:
                     }, f)
             except Exception:
                 pass
+        finally:
+            self.is_loading = False
 
     def _load_list(self, filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
         """Parse a hosts or domain list file and add it to the map."""
@@ -283,9 +318,8 @@ class BlocklistManager:
         if domain.endswith('.'):
             domain = domain[:-1]
 
-        # Crash report essential domains — NEVER block, regardless of mode or user rules.
-        # This guarantees crash telemetry always reaches the developer.
-        for essential in CRASH_REPORT_ESSENTIAL_DOMAINS:
+        # Essential domains - NEVER block, regardless of mode or user rules.
+        for essential in ESSENTIAL_DOMAINS:
             if domain == essential or domain.endswith('.' + essential):
                 return False, ConnectionCategory.ESSENTIAL
 
@@ -384,25 +418,7 @@ class BlocklistManager:
                         if len(results) >= limit: break
 
             if not category_filter or category_filter == 'essential':
-                essential_dns = (
-                    '127.0.0.1', '127.0.0.53', '::1',
-                    '1.1.1.1', '1.0.0.1', 'cloudflare-dns.com', 'one.one.one.one',
-                    '1.1.1.2', '1.0.0.2', 'security.cloudflare-dns.com',
-                    '1.1.1.3', '1.0.0.3', 'family.cloudflare-dns.com',
-                    '8.8.8.8', '8.8.4.4', 'dns.google',
-                    '9.9.9.9', '149.112.112.112', 'dns.quad9.net',
-                    '9.9.9.11', '149.112.112.11', 'dns11.quad9.net',
-                    '94.140.14.14', '94.140.15.15', 'dns.adguard-dns.com',
-                    '76.76.2.0', '76.76.10.0', 'freedns.controld.com',
-                    '208.67.222.222', '208.67.220.220', 'dns.opendns.com',
-                    '45.90.28.0', '45.90.30.0', 'dns.nextdns.io',
-                    '194.242.2.2', '193.19.108.2', 'dns.mullvad.net',
-                    '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
-                    'ip-api.com', 'ipify.org',
-                    # Crash Reporting (Essential) — always allowed
-                    'api.github.com', 'frenzypenguin.media', 'github.com',
-                )
-                for d in essential_dns:
+                for d in ESSENTIAL_DOMAINS:
                     if not query or query in d:
                         results.append({'domain': d, 'category': 'essential'})
                         if len(results) >= limit: break

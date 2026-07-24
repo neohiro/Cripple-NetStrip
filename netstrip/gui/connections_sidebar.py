@@ -382,15 +382,17 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 visible_groups.remove(dns_group)
                 visible_groups.append(dns_group)
                 
-            if current_packed != visible_groups:
-                # Unpack groups that are no longer visible or out of order
-                for group in current_packed:
-                    if group not in visible_groups:
-                        group.grid_forget()
-                        group._is_packed = False
-                
-                # Seamlessly repack in correct order
-                for idx, group in enumerate(visible_groups):
+            # Intelligent packing to eliminate flicker
+            # Unpack groups that are no longer visible
+            for group in current_packed:
+                if group not in visible_groups:
+                    group.grid_forget()
+                    group._is_packed = False
+            
+            # Seamlessly repack only those whose row index actually changed
+            for idx, group in enumerate(visible_groups):
+                info = group.grid_info() if getattr(group, '_is_packed', False) else {}
+                if not getattr(group, '_is_packed', False) or info.get('row') != idx:
                     group.grid(row=idx, column=0, sticky="ew", padx=Spacing.XS, pady=Spacing.SM)
                     group._is_packed = True
                         
