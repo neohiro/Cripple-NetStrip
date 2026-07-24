@@ -10,7 +10,7 @@
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
   [![Build Status](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/release.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions)
 
-  > **Compatibility Notice:** Cripple is designed to work seamlessly alongside your existing network and security tools—including dnscrypt-proxy, torifier, YogaDNS, NextDNS, AVG, and Kaspersky Antivirus. It intelligently detects local proxies and security suites to operate cooperatively without creating network conflicts or infinite DNS loops.
+  > **Compatibility :** Cripple is designed to work seamlessly alongside your existing network and security tools—including dnscrypt-proxy, torifier, YogaDNS, NextDNS, AVG and other antivirus programs. It intelligently detects local proxies and security suites to operate cooperatively without creating network conflicts or infinite DNS loops.
 </div>
 
 ---
