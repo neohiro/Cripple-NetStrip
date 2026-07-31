@@ -704,6 +704,7 @@ class AppGroupFrame(ctk.CTkFrame):
             self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
 
+
         # Update system block visual override (so it isn't erased on UI poll)
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
         if sys_blocked and self._global_action_state != 'allow':
@@ -711,7 +712,7 @@ class AppGroupFrame(ctk.CTkFrame):
             p_lower = self.process_name.lower()
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe'):
                 is_system = True
-            elif len(self.rows) > 0 and all(r.conn_data.get('category') == 'system' for r in self.rows.values()):
+            elif len(self.rows) > 2 and all(r.conn_data.get('category') == 'system' for r in self.rows.values()):
                 is_system = True
                 
             if is_system:

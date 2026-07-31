@@ -77,6 +77,9 @@ class GeoIPService:
                     if old_ip != 'Loading...':
                         for cb in self.callbacks:
                             cb(old_ip, self.current_data)
+                    else:
+                        for cb in self.callbacks:
+                            cb('Loading...', self.current_data)
             except Exception as e:
                 logger.debug(f"Fast IP fetch failed: {e}")
                 

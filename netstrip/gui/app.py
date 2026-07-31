@@ -99,8 +99,14 @@ class NetStripApp(ctk.CTk):
         self.withdraw() # Hide immediately to prevent white window flash during init
 
         # Setup Window
-        self.title("NetStrip — Intelligent Network Debloater")
-        self.geometry("1500x800")
+        self.title("NetStrip - Intelligent Network Debloater")
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        win_w = min(1500, screen_w - 100)
+        win_h = min(800, screen_h - 100)
+        x = max(0, (screen_w - win_w) // 2)
+        y = max(0, (screen_h - win_h) // 2)
+        self.geometry(f"{win_w}x{win_h}+{x}+{y}")
         self.configure(fg_color=Colors.BG_DARKEST)
         
         # Fix Taskbar icon grouping on Windows globally for this process

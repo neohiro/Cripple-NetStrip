@@ -13,7 +13,7 @@ class SplashScreen(ctk.CTkToplevel):
         
         # Center the splash screen
         width = 400
-        height = 300
+        height = 400
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         x = (screen_width // 2) - (width // 2)

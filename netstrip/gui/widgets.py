@@ -62,8 +62,8 @@ class StatCard(ctk.CTkFrame):
         self._resize_timer = self.after(50, lambda: self._apply_resize(event.width))
 
     def _apply_resize(self, width):
-        # Scale between 0.8x and 2.0x based on 250px baseline
-        scale = max(0.8, min(2.0, width / 250.0))
+        # Scale between 0.8x and 1.2x based on 250px baseline to prevent giant text
+        scale = max(0.8, min(1.2, width / 250.0))
         self._current_scale = scale
         
         # Re-apply value to calculate correct font size with new scale

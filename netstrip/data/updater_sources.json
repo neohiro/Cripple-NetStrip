@@ -110,7 +110,7 @@
       "name": "WindowsSpyBlocker - Spy",
       "url": "https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/spy.txt",
       "format": "hosts",
-      "category": "system",
+      "category": "telemetry",
       "enabled": true
     },
     {
@@ -138,7 +138,7 @@
       "name": "AdGuard Tracking Protection",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt",
       "format": "domains",
-      "category": "telemetry",
+      "category": "tracker",
       "enabled": true
     },
     {

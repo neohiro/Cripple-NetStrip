@@ -14,10 +14,11 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 class BlocklistUpdater:
-    def __init__(self, lists_dir: str):
+    def __init__(self, lists_dir: str, on_update_callback: callable = None):
         self.lists_dir = lists_dir
         self.sources_file = os.path.join(lists_dir, '..', 'updater_sources.json')
         self.is_updating = False
+        self.on_update_callback = on_update_callback
 
     def check_and_update(self):
         """Run the update in a background thread."""
@@ -49,6 +50,7 @@ class BlocklistUpdater:
                     pass
 
             sources_modified = False
+            any_updated = False
             
             for source in sources:
                 if not source.get('enabled', False):
@@ -61,6 +63,7 @@ class BlocklistUpdater:
                 if not url or not category:
                     continue
                     
+                name = str(name) if name else f"unknown_{category}_{int(time.time())}"
                 safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
                 temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
                 target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
@@ -96,6 +99,7 @@ class BlocklistUpdater:
                         
                     logger.info(f"Successfully updated '{name}'")
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
+                    any_updated = True
                     
                     # Prevent network/CPU spike by delaying between downloads
                     time.sleep(3)
@@ -133,6 +137,10 @@ class BlocklistUpdater:
                 except Exception as e:
                     logger.error(f"Failed to save updated sources: {e}")
                     
+            # Trigger blocklist reload if any updates were made
+            if any_updated and self.on_update_callback:
+                self.on_update_callback()
+                
             # Fetch DNSCrypt resolvers to build dynamic upstream options
             self._fetch_dnscrypt_resolvers()
                         

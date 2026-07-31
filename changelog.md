@@ -1,3 +1,10 @@
+## [v3.1.17] - Bug Fixes & Dashboard Tweaks
+
+- **Dashboard**: Fixed an illusion issue where 'Allowed | Blocked' would abruptly display '0 | 0' after midnight. Unified both queries to use a reliable 24-hour rolling window instead of a hard midnight reset.
+- **UI**: Massively improved Filter Lists search results scrolling by implementing strict input debouncing (100ms), eliminating Tkinter canvas geometry recalculation tears and glitches.
+- **UI**: Moved the static 'Indexed Categories' box into the main scrollable frame, fully opening up screen space for search results.
+- **Logs**: Re-engineered internal layout scaling to prevent long Domains/IPs from being forcefully truncated visually on smaller window sizes.
+
 ## [v3.1.16] - GUI Performance & Exploit Protections
 
 - **Performance**: Improved "App Connections" list loading speed by reducing initial data poll delay.

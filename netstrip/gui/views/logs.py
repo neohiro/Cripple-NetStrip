@@ -24,9 +24,9 @@ class LogView(ctk.CTkFrame):
     COL_CONFIGS = [
         {"weight": 0, "minsize": 100},  # Time
         {"weight": 0, "minsize": 180},  # Process
-        {"weight": 0, "minsize": 250},  # Domain (fixed to prevent pushing)
+        {"weight": 1, "minsize": 250},  # Domain (takes up available slack)
         {"weight": 0, "minsize": 120},  # Category
-        {"weight": 1, "minsize": 80},   # Action (absorbs the scrollbar slack)
+        {"weight": 0, "minsize": 80},   # Action
     ]
 
     def __init__(self, master, engine, **kwargs):
@@ -210,10 +210,10 @@ class LogView(ctk.CTkFrame):
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
         lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6)
-        lbl_cat.grid(row=0, column=3, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_cat.grid(row=0, column=3, sticky="e", padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), anchor="w")
-        lbl_act.grid(row=0, column=4, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), anchor="e")
+        lbl_act.grid(row=0, column=4, sticky="e", padx=Spacing.SM, pady=Spacing.SM)
 
         return frame, {
             'time': lbl_time,
@@ -266,8 +266,8 @@ class LogView(ctk.CTkFrame):
             raw_domain = mask_ip_string(raw_domain)
             
         domain_text = raw_domain
-        if len(domain_text) > 24:
-            domain_text = domain_text[:21] + "..."
+        if len(domain_text) > 80:
+            domain_text = domain_text[:77] + "..."
             
         if getattr(lbls['domain'], '_last_val', None) != domain_text:
             lbls['domain'].configure(text=domain_text)

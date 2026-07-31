@@ -82,7 +82,53 @@ def restore_network():
     logging.info("NetStrip crash detected! Initiating emergency DNS and network restore...")
     
     import platform
+    import sqlite3
+    import re
     sys_plat = platform.system()
+    
+    def get_backup_dns(interface_name):
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
+                row = c.fetchone()
+                conn.close()
+                if row and row[0] and row[0] != "dhcp":
+                    ip = row[0]
+                    if re.match(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$', ip):
+                        return ip
+            except Exception as e:
+                logging.error(f"Failed to read backup DNS from DB: {e}")
+        return None
+
+    def get_db_setting(key, default="false"):
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute("SELECT value FROM settings WHERE key=?", (key,))
+                row = c.fetchone()
+                conn.close()
+                if row and row[0]:
+                    return row[0]
+            except Exception:
+                pass
+        return default
+
+    def clear_db_setting(key):
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(db_path)
+                c = conn.cursor()
+                c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
     
     try:
         if sys_plat == "Windows":
@@ -96,25 +142,6 @@ def restore_network():
             if not interfaces:
                 interfaces = ["Wi-Fi", "Ethernet"]
                 
-            def get_backup_dns(interface_name):
-                import sqlite3
-                import re
-                db_path = Path.home() / ".netstrip" / "netstrip.db"
-                if db_path.exists():
-                    try:
-                        conn = sqlite3.connect(db_path)
-                        c = conn.cursor()
-                        c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
-                        row = c.fetchone()
-                        conn.close()
-                        if row and row[0] and row[0] != "dhcp":
-                            ip = row[0]
-                            if re.match(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$', ip):
-                                return ip
-                    except Exception as e:
-                        logging.error(f"Failed to read backup DNS from DB: {e}")
-                return None
-                
             for interface in interfaces:
                 backup_dns = get_backup_dns(interface)
                 if backup_dns:
@@ -127,45 +154,13 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-            # Fail-open: Fast batch PowerShell command to re-enable bindings, wipe all NetStrip firewall rules,
-            # and restore IPv6/IPv4 protocol bindings that may have been disabled by the engine.
-            logging.info("Removing NetStrip firewall rules, re-enabling adapters & protocol bindings...")
+            # Fail-open: Fast batch PowerShell command to wipe all NetStrip firewall rules.
+            # IPv6/IPv4 protocol bindings are restored below based on the database state.
+            logging.info("Removing NetStrip firewall rules...")
             ps_script = (
-                "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'; "
-                "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'; "
                 "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"
             )
             subprocess.run(["powershell", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
-            
-            # Restore IPv6/IPv4 global settings from DB if they were disabled by the engine
-            def get_db_setting(key, default="false"):
-                import sqlite3
-                db_path = Path.home() / ".netstrip" / "netstrip.db"
-                if db_path.exists():
-                    try:
-                        conn = sqlite3.connect(db_path)
-                        c = conn.cursor()
-                        c.execute("SELECT value FROM settings WHERE key=?", (key,))
-                        row = c.fetchone()
-                        conn.close()
-                        if row and row[0]:
-                            return row[0]
-                    except Exception:
-                        pass
-                return default
-            
-            def clear_db_setting(key):
-                import sqlite3
-                db_path = Path.home() / ".netstrip" / "netstrip.db"
-                if db_path.exists():
-                    try:
-                        conn = sqlite3.connect(db_path)
-                        c = conn.cursor()
-                        c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
-                        conn.commit()
-                        conn.close()
-                    except Exception:
-                        pass
             
             if get_db_setting("disable_ipv6_globally") == "true":
                 logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
@@ -188,19 +183,35 @@ def restore_network():
                 interfaces = ["Wi-Fi", "Ethernet"]
             
             for interface in interfaces:
-                logging.info(f"Restoring DNS for interface: {interface}")
-                subprocess.run(["networksetup", "-setdnsservers", interface, "Empty"])
-                subprocess.run(["networksetup", "-setv6automatic", interface])
+                backup_dns = get_backup_dns(interface)
+                if backup_dns:
+                    logging.info(f"Restoring STATIC DNS for interface: {interface} -> {backup_dns}")
+                    subprocess.run(["networksetup", "-setdnsservers", interface, backup_dns])
+                else:
+                    logging.info(f"Restoring DHCP DNS for interface: {interface}")
+                    subprocess.run(["networksetup", "-setdnsservers", interface, "Empty"])
+                    
+                if get_db_setting("disable_ipv6_globally") == "true":
+                    subprocess.run(["networksetup", "-setv6automatic", interface])
                 
             subprocess.run(["sysctl", "-w", "net.inet6.ip6.accept_rtadv=1"])
+            
+            clear_db_setting("disable_ipv6_globally")
+            clear_db_setting("killswitch_active")
             
         elif sys_plat == "Linux":
             logging.info("Restoring DNS for Linux (iptables)")
             for proto in ["udp", "tcp"]:
                 subprocess.run(["iptables", "-t", "nat", "-D", "OUTPUT", "-p", proto, "--dport", "53", "-j", "REDIRECT", "--to-ports", "53"])
+            
+            if get_db_setting("disable_ipv6_globally") == "true":
+                subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0"])
+                subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
+            
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
-            subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0"])
-            subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
+            
+            clear_db_setting("disable_ipv6_globally")
+            clear_db_setting("killswitch_active")
             
             # Flush any IPv4 drops
             while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:

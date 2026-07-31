@@ -58,7 +58,7 @@ class NetStripEngine:
         self.firewall = FirewallController()
         self.lan_shield = LANShield(engine=self)
         self.notifier = NotificationManager(self.db)
-        self.updater = BlocklistUpdater(self.blocklist.lists_dir)
+        self.updater = BlocklistUpdater(self.blocklist.lists_dir, on_update_callback=self.blocklist.load_all)
         
         self.geoip = GeoIPService(self._handle_geoip_change, engine=self)
         self.network_monitor = NetworkMonitor(self._handle_network_change, engine=self)

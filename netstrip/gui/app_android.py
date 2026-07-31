@@ -175,7 +175,7 @@ class NetStripApp(ctk.CTk):
         self.btn_sound_toggle.pack(side="left", padx=(0, 8))
         
         self.btn_killswitch = ctk.CTkButton(
-            controls_frame, text="🛡️ ON", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+            controls_frame, text="CRIPPLE: ON", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
             fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS, text_color="white", corner_radius=8, width=80, height=32,
             command=self._manual_killswitch_click
         )

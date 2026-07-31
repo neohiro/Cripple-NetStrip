@@ -22,6 +22,7 @@ class SoundManager:
         self._notification_wav = self._generate_sine_wave(freq=600, duration_ms=150, volume=0.3, envelope_ms=20)
         self._alert_wav = self._generate_sine_wave(freq=150, duration_ms=200, volume=0.4, envelope_ms=50)
         self._click_wav = self._generate_sine_wave(freq=1200, duration_ms=10, volume=0.1, envelope_ms=2)
+        self._intro_wav = self._generate_sine_wave(freq=784, duration_ms=400, volume=0.3, envelope_ms=50)
 
     def set_muted(self, muted: bool):
         self.muted = muted
@@ -40,19 +41,7 @@ class SoundManager:
 
     def play_intro(self):
         """Bright complex sound for startup."""
-        if self.muted or not winsound:
-            return
-            
-        def _play():
-            try:
-                winsound.Beep(523, 150) # C5
-                winsound.Beep(659, 150) # E5
-                winsound.Beep(784, 150) # G5
-                winsound.Beep(1046, 400) # C6
-            except Exception as e:
-                logger.error(f"Error playing intro sound: {e}")
-                
-        threading.Thread(target=_play, daemon=True).start()
+        self._play_async(self._intro_wav)
 
     def _play_async(self, wav_data: bytes):
         if self.muted or not winsound or not wav_data:

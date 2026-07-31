@@ -263,8 +263,8 @@ class Database:
                     cursor = conn.execute('SELECT * FROM connection_log ORDER BY id DESC LIMIT ?', (limit,))
                 return cursor.fetchall()
 
-    def get_unique_allowed_today(self) -> int:
-        """Returns the number of unique allowed connections (process + destination) for today."""
+    def get_unique_allowed_24h(self) -> int:
+        """Returns the number of unique allowed connections (process + destination) for the last 24 hours."""
         with self.lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('''
@@ -272,7 +272,7 @@ class Database:
                         SELECT DISTINCT process_name, coalesce(domain, ip) 
                         FROM connection_log 
                         WHERE action='allow' 
-                        AND timestamp >= date('now', 'localtime')
+                        AND timestamp >= datetime('now', '-24 hours')
                     )
                 ''')
                 row = cursor.fetchone()

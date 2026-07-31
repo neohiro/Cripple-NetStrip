@@ -115,13 +115,6 @@ class BlocklistManager:
                     
                     if cache_data.get("hash") == current_hash:
                         # Load from cache
-                        self.domain_map.clear()
-                        # Because JSON keys are strings, we need to convert them back to integers
-                        # for the Enum to work properly. No wait, the keys are written as string values ('ad', etc.)
-                        # We used `k.value: v` when saving, so `cache_data["domain_map"]` has string keys and string values.
-                        # We must map them back safely.
-                        
-                        # Optimization: Avoid function calls in the loop
                         ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
                         
                         items = list(cache_data["domain_map"].items())
@@ -133,66 +126,130 @@ class BlocklistManager:
                                 new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
                             time.sleep(0.005) # Yield GIL
                             
-                        self.domain_map = new_domain_map
-                        self.identity_map = cache_data["identity_map"]
-                        self.stats = {
+                        new_stats = {
                             ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["stats"].items()
                         }
-                        self.sources_metadata = {
+                        new_sources_metadata = {
                             ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["sources_metadata"].items()
                         }
+                        
+                        # Atomic swap inside lock
+                        with self.lock:
+                            self.domain_map = new_domain_map
+                            self.identity_map = cache_data["identity_map"]
+                            self.stats = new_stats
+                            self.sources_metadata = new_sources_metadata
                         return
                 except Exception as e:
                     logger.warning(f"Failed to load cache: {e}. Rebuilding...")
                     
-            # Full reload
-            self.domain_map.clear()
-            self.identity_map.clear()
-            self.stats = {cat: 0 for cat in ConnectionCategory}
+            # Full reload - Build into temporary structures to avoid zero-leak window and lock contention
+            new_domain_map = {}
+            new_identity_map = {}
+            new_stats = {cat: 0 for cat in ConnectionCategory}
+            new_sources_metadata = {}
             
             # Inject hardcoded essential domains
             for domain in ESSENTIAL_DOMAINS:
-                self.domain_map[domain] = ConnectionCategory.ESSENTIAL
-            self.stats[ConnectionCategory.ESSENTIAL] = len(ESSENTIAL_DOMAINS)
+                new_domain_map[domain] = ConnectionCategory.ESSENTIAL
+            new_stats[ConnectionCategory.ESSENTIAL] = len(ESSENTIAL_DOMAINS)
             
-            self.sources_metadata.clear()
-            
+            # Internal helper to parse list without locking
+            def load_into_temp(filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
+                if not os.path.exists(filepath):
+                    return
+                import datetime
+                filename = os.path.basename(filepath)
+                dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
+                
+                if category:
+                    if category not in new_sources_metadata:
+                        new_sources_metadata[category] = []
+                    new_sources_metadata[category].append({'filename': filename, 'updated': dt, 'size': 0})
+                    
+                domains = set()
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#') or line.startswith('include:'): continue
+                        if '@' in line: line = line.split('@')[0]
+                        if line.startswith('full:'): line = line[5:]
+                            
+                        parts = line.split()
+                        if not parts: continue
+                        domain = parts[1] if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1') else parts[0]
+                        
+                        if domain.startswith('domain:'): domain = domain[7:]
+                        if domain.startswith('||'): domain = domain[2:]
+                        if domain.endswith('^'): domain = domain[:-1]
+                        if domain.startswith('*.'): domain = domain[2:]
+                        if domain.startswith('^'): domain = domain[1:]
+                        if '/' in domain or '*' in domain or '=' in domain or domain.startswith('!'): continue
+                        if domain != '0.0.0.0' and domain != 'localhost' and '.' in domain:
+                            domains.add(domain)
+                            
+                if category and new_sources_metadata.get(category):
+                    new_sources_metadata[category][-1]['size'] = len(domains)
+                    
+                # Add to temporary maps directly without locks
+                for domain in domains:
+                    d = domain.lower()
+                    if category:
+                        if d not in new_domain_map:
+                            new_domain_map[d] = category
+                            new_stats[category] += 1
+                        else:
+                            existing_cat = new_domain_map[d]
+                            if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+                                new_domain_map[d] = category
+                                new_stats[existing_cat] -= 1
+                                new_stats[category] += 1
+                    if identity_name:
+                        new_identity_map[d] = identity_name
+
             if os.path.exists(self.lists_dir):
                 for filename in os.listdir(self.lists_dir):
                     if not filename.endswith('.txt'): continue
                     filepath = os.path.join(self.lists_dir, filename)
                     
                     if filename.startswith('ads_') or filename == 'ads.txt':
-                        self._load_list(filepath, ConnectionCategory.AD)
+                        load_into_temp(filepath, ConnectionCategory.AD)
                     elif filename.startswith('telemetry_') or filename == 'telemetry.txt':
-                        self._load_list(filepath, ConnectionCategory.TELEMETRY)
+                        load_into_temp(filepath, ConnectionCategory.TELEMETRY)
                     elif filename.startswith('malware_') or filename == 'malware.txt':
-                        self._load_list(filepath, ConnectionCategory.MALWARE)
+                        load_into_temp(filepath, ConnectionCategory.MALWARE)
                     elif filename.startswith('tracker') or filename == 'trackers.txt':
-                        self._load_list(filepath, ConnectionCategory.TRACKER)
+                        load_into_temp(filepath, ConnectionCategory.TRACKER)
                     elif filename.startswith('doh_providers'):
                         block_doh = True
                         if hasattr(self, 'db') and self.db:
                             allow_doh = str(self.db.get_setting("allow_in_browser_dns", "false")).lower() == "true"
                             block_doh = not allow_doh
                         if block_doh:
-                            self._load_list(filepath, ConnectionCategory.TRACKER)
+                            load_into_temp(filepath, ConnectionCategory.TRACKER)
                     elif filename.startswith('security_'):
-                        self._load_list(filepath, ConnectionCategory.SECURITY)
+                        load_into_temp(filepath, ConnectionCategory.SECURITY)
                     elif filename.startswith('update_'):
-                        self._load_list(filepath, ConnectionCategory.UPDATE)
+                        load_into_temp(filepath, ConnectionCategory.UPDATE)
                     elif filename.startswith('safe_') or filename.startswith('essential_'):
-                        self._load_list(filepath, ConnectionCategory.ESSENTIAL)
+                        load_into_temp(filepath, ConnectionCategory.ESSENTIAL)
                     elif filename.startswith('whitelist_'):
-                        self._load_list(filepath, ConnectionCategory.USER_ALLOWED)
+                        load_into_temp(filepath, ConnectionCategory.USER_ALLOWED)
                     elif filename.startswith('user_blocked_') or filename.startswith('blocked_'):
-                        self._load_list(filepath, ConnectionCategory.USER_BLOCKED)
+                        load_into_temp(filepath, ConnectionCategory.USER_BLOCKED)
                     elif filename.startswith('system_'):
-                        self._load_list(filepath, ConnectionCategory.SYSTEM)
+                        load_into_temp(filepath, ConnectionCategory.SYSTEM)
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
-                        self._load_list(filepath, None, identity_name=identity_name)
+                        load_into_temp(filepath, None, identity_name=identity_name)
+
+            # Atomic swap inside lock
+            with self.lock:
+                self.domain_map = new_domain_map
+                self.identity_map = new_identity_map
+                self.stats = new_stats
+                self.sources_metadata = new_sources_metadata
                         
             try:
                 with open(cache_file, "w", encoding="utf-8") as f:
@@ -396,52 +453,91 @@ class BlocklistManager:
         with self.lock:
             return dict(self.stats)
 
-    def search(self, query: str = "", limit: int = 50, category_filter=None) -> List[dict]:
-        """Search domains using partial match, returns up to `limit` results."""
+    def search(self, query: str = "", limit: int = 50, category_filter=None, offset: int = 0) -> List[dict]:
+        """Search domains using partial match, returns up to `limit` results after skipping `offset`. Lock-free to prevent network hangs."""
         if not query and not category_filter:
             return []
             
         query = query.lower() if query else ""
         results = []
-        with self.lock:
-            # First add dynamic user rules if they match
-            if not category_filter or category_filter == ConnectionCategory.USER_ALLOWED.value:
-                for domain in self.whitelist:
-                    if not query or query in domain:
-                        results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
-                        if len(results) >= limit: break
-            
-            if not category_filter or category_filter == 'user_blocked':
-                for domain in self.blacklist:
-                    if not query or query in domain:
-                        results.append({'domain': domain, 'category': 'user_blocked'})
-                        if len(results) >= limit: break
-
-            if not category_filter or category_filter == 'essential':
-                for d in ESSENTIAL_DOMAINS:
-                    if not query or query in d:
-                        results.append({'domain': d, 'category': 'essential'})
-                        if len(results) >= limit: break
-
-            if not category_filter or category_filter == 'system':
-                for d in ('microsoft.com', 'windowsupdate.com', 'msftconnecttest.com', 'apple.com', 'ubuntu.com', 'debian.org'):
-                    if not query or query in d:
-                        results.append({'domain': d, 'category': 'system'})
-                        if len(results) >= limit: break
-
-            if len(results) >= limit:
-                return results
-                
-            # Iterate domain_map directly instead of a duplicate searchable_domains list
-            for domain, category in self.domain_map.items():
-                cat_val = getattr(category, 'value', category)
-                if category_filter and cat_val != category_filter:
-                    continue
+        
+        skipped = 0
+        
+        # We can read user rules without a lock safely enough for search purposes
+        if not category_filter or category_filter == ConnectionCategory.USER_ALLOWED.value:
+            for domain in list(self.whitelist):
                 if not query or query in domain:
-                    results.append({
-                        'domain': domain,
-                        'category': cat_val
-                    })
-                    if len(results) >= limit:
-                        break
+                    if skipped < offset:
+                        skipped += 1
+                        continue
+                    results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
+                    if len(results) >= limit: break
+        
+        if len(results) < limit and (not category_filter or category_filter == 'user_blocked'):
+            # Convert dictionary keys to list to avoid RuntimeError during concurrent mutation
+            for domain in list(self.blacklist.keys()):
+                if not query or query in domain:
+                    if skipped < offset:
+                        skipped += 1
+                        continue
+                    results.append({'domain': domain, 'category': 'user_blocked'})
+                    if len(results) >= limit: break
+
+        if len(results) < limit and (not category_filter or category_filter == 'essential'):
+            for d in ESSENTIAL_DOMAINS:
+                if not query or query in d:
+                    if skipped < offset:
+                        skipped += 1
+                        continue
+                    results.append({'domain': d, 'category': 'essential'})
+                    if len(results) >= limit: break
+
+        if len(results) < limit and (not category_filter or category_filter == 'system'):
+            for d in ('microsoft.com', 'windowsupdate.com', 'msftconnecttest.com', 'apple.com', 'ubuntu.com', 'debian.org'):
+                if not query or query in d:
+                    if skipped < offset:
+                        skipped += 1
+                        continue
+                    results.append({'domain': d, 'category': 'system'})
+                    if len(results) >= limit: break
+
+        if len(results) >= limit:
+            return results
+            
+        # Lock-free iteration of domain_map. 
+        # Python dictionaries are thread-safe for reading. If the dict changes size, it raises RuntimeError.
+        initial_skipped = skipped
+        retry_count = 0
+        while retry_count < 5:
+            try:
+                skipped = initial_skipped
+                for domain, category in self.domain_map.items():
+                    cat_val = getattr(category, 'value', category)
+                    if category_filter and cat_val != category_filter:
+                        continue
+                    if not query or query in domain:
+                        # If we haven't reached our global offset yet
+                        if skipped < offset:
+                            skipped += 1
+                            continue
+                            
+                        # Avoid duplicates
+                        if not any(r['domain'] == domain for r in results):
+                            results.append({
+                                'domain': domain,
+                                'category': cat_val
+                            })
+                        if len(results) >= limit:
+                            return results
+                break # Iteration completed successfully
+            except RuntimeError:
+                # Dictionary changed size during iteration, just retry.
+                retry_count += 1
+                # We don't truncate results, we just let the while loop start over for domain_map
+                # But we must clear results added FROM domain_map, which is tricky.
+                # Actually, if we just clear results and start the WHOLE method over it's easier.
+                return self.search(query, limit, category_filter, offset)
+                import time
+                time.sleep(0.01)
+                
         return results

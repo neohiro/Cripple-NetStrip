@@ -216,9 +216,11 @@ class DashboardView(ctk.CTkScrollableFrame):
             try:
                 today_stats = self.engine.db.get_24h_statistics()
                 db_sent, db_recv = self.engine.db.get_24h_bandwidth()
+                recent_conns = self.engine.db.get_recent_connections(limit=300)
+                
                 if today_stats:
                     try:
-                        unique_allowed = self.engine.db.get_unique_allowed_today()
+                        unique_allowed = self.engine.db.get_unique_allowed_24h()
                     except AttributeError:
                         unique_allowed = today_stats['total_allowed']
                         
@@ -227,6 +229,8 @@ class DashboardView(ctk.CTkScrollableFrame):
                             if not getattr(self, '_destroyed', False) and self.winfo_exists():
                                 self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
                                 self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
+                                self.engine._cached_recent = recent_conns
+                                self._update_recent_blocks(recent_conns)
                         except Exception:
                             pass
                         finally:
@@ -238,6 +242,8 @@ class DashboardView(ctk.CTkScrollableFrame):
                             if not getattr(self, '_destroyed', False) and self.winfo_exists():
                                 self.stat_traffic.set_value("0  |  0")
                                 self.stat_queries.set_value("0")
+                                self.engine._cached_recent = recent_conns
+                                self._update_recent_blocks(recent_conns)
                         except Exception:
                             pass
                         finally:
@@ -250,11 +256,6 @@ class DashboardView(ctk.CTkScrollableFrame):
         threading.Thread(target=fetch, daemon=True).start()
         
         try:
-            # Active connections
-            recent = getattr(self.engine, '_cached_recent', None)
-            if recent is None:
-                recent = self.engine.db.get_recent_connections(limit=500)
-                
             is_killswitch = getattr(self.engine, 'killswitch_active', False)
             
             if is_killswitch:
@@ -304,70 +305,73 @@ class DashboardView(ctk.CTkScrollableFrame):
                 self._last_io = current_io
                 self._last_io_time = current_time
             
-            # Flicker-Free Static Pool Activity List
-            if not hasattr(self, '_activity_pool'):
-                self._activity_pool = []
-                
-            blocked_only = [r for r in recent if r['action'] in ('block', 'sinkhole')][:15]
+        except Exception as e:
+            pass
             
-            if not blocked_only and not self._activity_pool:
-                if not hasattr(self, 'lbl_no_blocks'):
-                    self.lbl_no_blocks = ctk.CTkLabel(self.activity_list, text="No recent blocks", text_color=Colors.TEXT_TERTIARY, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM))
-                    self.lbl_no_blocks.pack(pady=Spacing.LG)
-            else:
-                if hasattr(self, 'lbl_no_blocks'):
-                    self.lbl_no_blocks.destroy()
-                    delattr(self, 'lbl_no_blocks')
+    def _update_recent_blocks(self, recent):
+        if not recent:
+            return
+            
+        # Flicker-Free Static Pool Activity List
+        if not hasattr(self, '_activity_pool'):
+            self._activity_pool = []
+            
+        blocked_only = [r for r in recent if r['action'] in ('block', 'sinkhole')][:15]
+        
+        if not blocked_only and not self._activity_pool:
+            if not hasattr(self, 'lbl_no_blocks'):
+                self.lbl_no_blocks = ctk.CTkLabel(self.activity_list, text="No recent blocks", text_color=Colors.TEXT_TERTIARY, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM))
+                self.lbl_no_blocks.pack(pady=Spacing.LG)
+        else:
+            if hasattr(self, 'lbl_no_blocks'):
+                self.lbl_no_blocks.destroy()
+                delattr(self, 'lbl_no_blocks')
+            
+            from netstrip.gui.theme import get_category_color
+            
+            # Ensure pool has enough rows (max 15)
+            while len(self._activity_pool) < len(blocked_only):
+                row = ctk.CTkFrame(self.activity_list, fg_color=Colors.BG_DARK, corner_radius=0, border_width=0)
+                lbl_dot = ctk.CTkLabel(row, text="●", font=(Fonts.FAMILY_PRIMARY[0], 12))
+                lbl_dot.pack(side="left", padx=(0, Spacing.SM))
+                lbl_proc = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"), text_color=Colors.TEXT_PRIMARY)
+                lbl_proc.pack(side="left")
+                lbl_domain = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY)
+                lbl_domain.pack(side="right")
+                self._activity_pool.append((row, lbl_dot, lbl_proc, lbl_domain))
+                row.pack(fill="x", pady=2, side="top")
                 
-                from netstrip.gui.theme import get_category_color
-                
-                # Ensure pool has enough rows (max 15)
-                while len(self._activity_pool) < len(blocked_only):
-                    row = ctk.CTkFrame(self.activity_list, fg_color=Colors.BG_DARK, corner_radius=0, border_width=0)
-                    lbl_dot = ctk.CTkLabel(row, text="●", font=(Fonts.FAMILY_PRIMARY[0], 12))
-                    lbl_dot.pack(side="left", padx=(0, Spacing.SM))
-                    lbl_proc = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"), text_color=Colors.TEXT_PRIMARY)
-                    lbl_proc.pack(side="left")
-                    lbl_domain = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY)
-                    lbl_domain.pack(side="right")
-                    self._activity_pool.append((row, lbl_dot, lbl_proc, lbl_domain))
+            # Update visible rows
+            for i, r in enumerate(blocked_only):
+                row, lbl_dot, lbl_proc, lbl_domain = self._activity_pool[i]
+                if not row.winfo_ismapped():
                     row.pack(fill="x", pady=2, side="top")
                     
-                # Update visible rows
-                for i, r in enumerate(blocked_only):
-                    row, lbl_dot, lbl_proc, lbl_domain = self._activity_pool[i]
-                    if not row.winfo_ismapped():
-                        row.pack(fill="x", pady=2, side="top")
-                        
-                    cat = r['category'] or 'unknown'
-                    c_color = get_category_color(cat)
-                    if lbl_dot.cget("text_color") != c_color:
-                        lbl_dot.configure(text_color=c_color)
-                        
-                    p_name = r['process_name'] or "Unknown"
-                    if lbl_proc.cget("text") != p_name:
-                        lbl_proc.configure(text=p_name)
-                        
-                    d_text = r['domain'] or r['ip'] or ""
+                cat = r['category'] or 'unknown'
+                c_color = get_category_color(cat)
+                if lbl_dot.cget("text_color") != c_color:
+                    lbl_dot.configure(text_color=c_color)
                     
-                    privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
-                    if privacy_on:
-                        from netstrip.gui.utils import mask_ip_string
-                        d_text = mask_ip_string(d_text)
+                p_name = r['process_name'] or "Unknown"
+                if lbl_proc.cget("text") != p_name:
+                    lbl_proc.configure(text=p_name)
                     
-                    if lbl_domain.cget("text") != d_text:
-                        lbl_domain.configure(text=d_text)
-                        
-                # Hide unused rows
-                for i in range(len(blocked_only), len(self._activity_pool)):
-                    row = self._activity_pool[i][0]
-                    if row.winfo_ismapped():
-                        row.pack_forget()
+                d_text = r['domain'] or r['ip'] or ""
+                
+                privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
+                if privacy_on:
+                    from netstrip.gui.utils import mask_ip_string
+                    d_text = mask_ip_string(d_text)
+                
+                if lbl_domain.cget("text") != d_text:
+                    lbl_domain.configure(text=d_text)
                     
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Dashboard loop exception: {e}", exc_info=True)
-            
+            # Hide unused rows
+            for i in range(len(blocked_only), len(self._activity_pool)):
+                row = self._activity_pool[i][0]
+                if row.winfo_ismapped():
+                    row.pack_forget()
+                    
         # Update shield and toggles
         try:
             current_mode = self.engine.db.get_setting("protection_mode", "NORMAL")
