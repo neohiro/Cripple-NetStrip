@@ -590,6 +590,7 @@ class NetStripEngine:
             ("geoip", self.geoip.stop),
             ("network_monitor", self.network_monitor.stop),
             ("anomaly_scanner", self.anomaly_scanner.stop),
+            ("lan_shield", self.lan_shield.stop),
         ]:
             try:
                 subsystem_stop()
@@ -614,7 +615,7 @@ class NetStripEngine:
             logger.error(f"Error disabling LAN shield: {e}")
         
         try:
-            self.set_killswitch(False)
+            self.set_killswitch(False, broadcast_lan=False)
         except Exception as e:
             logger.error(f"Error disabling killswitch: {e}")
         
