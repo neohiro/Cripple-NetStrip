@@ -424,11 +424,16 @@ class NetStripApp(ctk.CTk):
             self.connections_list.set_expanded(True)
             self.btn_expand.configure(text="Collapse Sidebar ▶", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"))
         else:
-            self.right_sidebar.grid(row=1, column=3, columnspan=1, sticky="nsew")
+            self.main_frame.grid(row=1, column=1, sticky="nsew")
             self.sash.grid(row=1, column=2, sticky="ns")
-            self.main_frame.grid()
+            self.right_sidebar.grid(row=1, column=3, columnspan=1, sticky="nsew")
             self.connections_list.set_expanded(False)
             self.btn_expand.configure(text="◀ Expand Sidebar", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"))
+            
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
 
     def _add_nav_btn(self, row, text, icon, view_class):
         btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=40)

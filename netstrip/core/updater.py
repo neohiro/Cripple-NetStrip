@@ -114,8 +114,8 @@ class BlocklistUpdater:
                     failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
                     
-                    if failures >= 3:
-                        logger.warning(f"Auto-disabling dead blocklist '{name}' after {failures} consecutive failures.")
+                    if failures >= 10 and name.startswith("Custom:"):
+                        logger.warning(f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures.")
                         source['enabled'] = False
                         sources_modified = True
                         

@@ -502,18 +502,25 @@ class BlocklistView(ctk.CTkFrame):
         query = self._search_entry.get().strip()
         cat_filter = getattr(self, '_active_category_filter', None)
 
+        self._current_search_id = getattr(self, '_current_search_id', 0) + 1
+        current_search_id = self._current_search_id
+
         if not hasattr(self, '_result_widgets'):
             self._result_widgets = []
-        for w in self._result_widgets:
+        for w in list(self._result_widgets):
             try:
                 w.destroy()
             except:
                 pass
         self._result_widgets.clear()
         
-        if getattr(self, '_loading_label', None):
-            self._loading_label.destroy()
-            self._loading_label = None
+        container = getattr(self, '_results_container', getattr(self, '_results_scroll', None))
+        if container:
+            for w in container.winfo_children():
+                try:
+                    w.destroy()
+                except:
+                    pass
 
         if not query and not cat_filter:
             self._restore_empty_state() # Restore empty state
@@ -536,23 +543,24 @@ class BlocklistView(ctk.CTkFrame):
         import threading
         def search_task():
             try:
-                # Up to 2000 results so we can scroll a lot
-                results = self.engine.blocklist.search(query, limit=2000, category_filter=cat_filter)
-            except Exception as e:
+                # Cap to 200 results for fast response
+                results = self.engine.blocklist.search(query, limit=200, category_filter=cat_filter)
+            except Exception:
                 results = []
             
             # Update UI on main thread safely
-            if not self._destroyed:
-                self.after(0, lambda: self._init_render(results, query))
+            if not self._destroyed and getattr(self, '_current_search_id', 0) == current_search_id:
+                self.after(0, lambda: self._init_render(results, query, current_search_id))
                 
         threading.Thread(target=search_task, daemon=True).start()
 
-    def _init_render(self, results, query):
-        if self._destroyed:
+    def _init_render(self, results, query, search_id):
+        if self._destroyed or getattr(self, '_current_search_id', 0) != search_id:
             return
             
         try:
-            self._loading_label.destroy()
+            if hasattr(self, '_loading_label') and self._loading_label:
+                self._loading_label.destroy()
         except Exception:
             pass
 
@@ -560,7 +568,6 @@ class BlocklistView(ctk.CTkFrame):
         self._rendered_count = 0
         self._current_query = query
         self._is_loading_chunk = False
-        self._current_search_id = getattr(self, '_current_search_id', 0) + 1
         
         for w in self._result_widgets:
             try:
@@ -603,6 +610,7 @@ class BlocklistView(ctk.CTkFrame):
             return # Done rendering current chunk
             
         self._is_loading_chunk = True
+        self._page_size = 30
             
         chunk = self._current_results[self._rendered_count : self._rendered_count + self._page_size]
         if not chunk:
@@ -611,21 +619,27 @@ class BlocklistView(ctk.CTkFrame):
             
         self._rendered_count += len(chunk)
 
-        # Process the chunk in smaller batches to keep UI responsive
-        search_id = self._current_search_id
-        def _render_batch(items):
-            if getattr(self, '_destroyed', False) or getattr(self, '_current_search_id', None) != search_id:
-                if getattr(self, '_current_search_id', None) == search_id:
+        search_id = getattr(self, '_current_search_id', 0)
+        from netstrip.core.modes import ConnectionCategory
+        from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
+
+        def _render_batch(items, index=0):
+            if getattr(self, '_destroyed', False) or index >= len(items) or getattr(self, '_current_search_id', 0) != search_id:
+                if getattr(self, '_current_search_id', 0) == search_id:
                     self._is_loading_chunk = False
                 return
                 
-            for r in items:
+            batch_size = 10
+            for r in items[index : index + batch_size]:
+                parent_container = getattr(self, '_results_container', getattr(self, '_results_scroll', None))
                 row = ctk.CTkFrame(
-                    self._results_scroll,
-                    fg_color=Colors.BG_ELEVATED, corner_radius=0,
+                    parent_container,
+                    fg_color=Colors.BG_ELEVATED, corner_radius=4, height=32
                 )
                 row.pack(fill="x", pady=2, padx=4)
-                self._result_widgets.append(row)
+                row.pack_propagate(False)
+                if hasattr(self, '_result_widgets'):
+                    self._result_widgets.append(row)
 
                 domain = r.get('domain', 'Unknown')
                 cat = r.get('category', 'unknown')
@@ -634,54 +648,36 @@ class BlocklistView(ctk.CTkFrame):
                     row, text=domain,
                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
                     text_color=Colors.TEXT_PRIMARY,
+                    anchor="w"
                 )
-                domain_lbl.pack(side="left", padx=Spacing.MD, pady=Spacing.SM)
-                
-                try:
-                    from netstrip.gui.utils import bind_copy_tooltip
-                    if domain:
-                        bind_copy_tooltip(domain_lbl, domain)
-                except Exception:
-                    pass
-                    
-                # Add category badge
-                from netstrip.core.modes import ConnectionCategory
+                domain_lbl.pack(side="left", padx=Spacing.MD)
+
                 try:
                     cat_enum = ConnectionCategory(cat)
                 except ValueError:
                     cat_enum = ConnectionCategory.UNKNOWN
                     
-                from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
                 cat_color = get_category_color(cat_enum)
                 cat_label = get_category_label(cat_enum)
                 cat_icon = get_category_icon(cat_enum)
                 
                 cat_badge = ctk.CTkLabel(
                     row, text=f"{cat_icon} {cat_label.upper()}",
-                    font=(Fonts.FAMILY_PRIMARY[0], 11, "bold"),
+                    font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
                     text_color=cat_color,
-                    fg_color=Colors.BG_ELEVATED, # Replaced invalid opacity
+                    fg_color=Colors.BG_ELEVATED,
                     corner_radius=4,
-                    height=24
+                    height=22
                 )
-                cat_badge.pack(side="left", padx=Spacing.SM, pady=Spacing.SM, ipadx=Spacing.SM)
+                cat_badge.pack(side="left", padx=Spacing.SM)
 
-                # Quick Actions
-                btn_frame = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
-                btn_frame.pack(side="right", padx=Spacing.SM, pady=Spacing.SM)
-                
-                btn = ctk.CTkButton(btn_frame, width=60, height=22, corner_radius=4, font=(Fonts.FAMILY_PRIMARY[0], 10))
-                btn.pack(side="left", padx=(0, 4))
-                
-                lbl = ctk.CTkLabel(btn_frame, corner_radius=4, text_color="white", font=(Fonts.FAMILY_PRIMARY[0], 9, "bold"), height=22, width=80)
-                lbl.pack(side="right")
-                
-                def make_action(d=domain, current_cat=cat_enum):
-                    from netstrip.core.modes import ConnectionAction
-                    current_action = self.engine.classifier.mode.get_action_for_category(current_cat, self.engine.db)
-                    is_currently_allowed = current_action == ConnectionAction.ALLOW
-                    act = 'block' if is_currently_allowed else 'allow'
-                    
+                is_allowed = cat in ('user_allowed', 'essential')
+                btn_text = "Block" if is_allowed else "Whitelist"
+                btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
+                btn_hover = "#be123c" if is_allowed else Colors.SUCCESS
+                act_val = 'block' if is_allowed else 'allow'
+
+                def make_action(d=domain, act=act_val):
                     mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
                     self.engine.db.add_user_rule({
                         'pattern': d,
@@ -692,53 +688,22 @@ class BlocklistView(ctk.CTkFrame):
                         'note': f"Manual {act} from search",
                         'mode_scope': mode_scope
                     })
-                    # Refresh blocklist memory
                     rules = self.engine.db.get_user_rules(mode_scope=mode_scope)
                     if hasattr(self.engine.blocklist, 'sync_user_rules'):
                         self.engine.blocklist.sync_user_rules(rules)
-                    
-                    # Visual feedback
                     if hasattr(self.engine, 'on_status') and self.engine.on_status:
                         self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
-                        
                     self._refresh_stats_grid()
-                    
-                    # Inline update UI
-                    from netstrip.core.modes import ConnectionCategory
-                    new_cat_enum = ConnectionCategory.USER_ALLOWED if act == 'allow' else ConnectionCategory.USER_BLOCKED
-                    
-                    cat_badge.configure(
-                        text=f"{get_category_icon(new_cat_enum)} {get_category_label(new_cat_enum).upper()}",
-                        text_color=get_category_color(new_cat_enum),
-                        fg_color=Colors.BG_ELEVATED
-                    )
-                    
-                    update_button_state(d, new_cat_enum)
-                    
-                def update_button_state(d, c_enum):
-                    from netstrip.core.modes import ConnectionAction
-                    act_state = self.engine.classifier.mode.get_action_for_category(c_enum, self.engine.db)
-                    allowed = act_state == ConnectionAction.ALLOW
-                    
-                    btn.configure(
-                        text="Block" if allowed else "Whitelist",
-                        fg_color=Colors.DANGER if allowed else Colors.SUCCESS_DIM,
-                        hover_color="#be123c" if allowed else Colors.SUCCESS,
-                        command=lambda dom=d, ce=c_enum: make_action(dom, ce)
-                    )
-                    lbl.configure(
-                        text=get_category_label(c_enum).upper(),
-                        fg_color=get_category_color(c_enum)
-                    )
-                    
-                update_button_state(domain, cat_enum)
+                    self._do_search()
+
+                ctk.CTkButton(
+                    row, text=btn_text, width=70, height=22, corner_radius=4,
+                    fg_color=btn_color, hover_color=btn_hover, text_color=Colors.TEXT_PRIMARY,
+                    font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"), command=make_action
+                ).pack(side="right", padx=Spacing.MD)
                 
-                self._result_widgets.append(row)
-                
-            if getattr(self, '_current_search_id', None) == search_id:
-                self._is_loading_chunk = False
+            self.after(2, lambda: _render_batch(items, index + batch_size))
             
-        print(f"_render_batch called with {len(chunk)} items in chunk. current_results len: {len(self._current_results)}")
         _render_batch(chunk)
 
     def destroy(self):

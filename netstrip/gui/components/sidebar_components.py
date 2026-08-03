@@ -789,25 +789,24 @@ class AppGroupFrame(ctk.CTkFrame):
     def set_expanded(self, expanded: bool):
         self.is_expanded_ui = expanded
         if expanded:
-            # Add full process path
-            self.lbl_path = ctk.CTkButton(
-                self.header, text=self.process_path, 
-                font=(Fonts.FAMILY_PRIMARY[0], 9), text_color=Colors.TEXT_TERTIARY,
-                fg_color="transparent", hover_color=Colors.BG_DARK,
-                height=20, corner_radius=4, anchor="w",
-                command=self._copy_path
-            )
+            if not hasattr(self, 'lbl_path') or not getattr(self.lbl_path, 'winfo_exists', lambda: False)():
+                self.lbl_path = ctk.CTkButton(
+                    self.header, text=self.process_path, 
+                    font=(Fonts.FAMILY_PRIMARY[0], 9), text_color=Colors.TEXT_TERTIARY,
+                    fg_color="transparent", hover_color=Colors.BG_DARK,
+                    height=20, corner_radius=4, anchor="w",
+                    command=self._copy_path
+                )
             self.lbl_path.pack(side="left", padx=Spacing.MD)
-            
-            # Show 15 min button when sidebar is expanded
             self.btn_timebomb.pack(side="right", padx=(0, Spacing.SM))
         else:
-            if hasattr(self, 'lbl_path'):
-                self.lbl_path.destroy()
+            if hasattr(self, 'lbl_path') and getattr(self.lbl_path, 'winfo_exists', lambda: False)():
+                self.lbl_path.pack_forget()
             self.btn_timebomb.pack_forget()
                 
         for row in self.rows.values():
-            row.set_expanded(expanded)
+            if hasattr(row, 'set_expanded'):
+                row.set_expanded(expanded)
 
     def _copy_path(self):
         if not self.process_path:

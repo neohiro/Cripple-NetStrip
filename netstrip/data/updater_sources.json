@@ -9,56 +9,56 @@
     },
     {
       "name": "HaGeZi Ultimate",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/ultimate.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/ultimate.txt",
       "format": "hosts",
       "category": "ads",
       "enabled": true
     },
     {
       "name": "HaGeZi Windows Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.winoffice.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.winoffice.txt",
       "format": "hosts",
       "category": "system",
       "enabled": true
     },
     {
       "name": "HaGeZi Apple Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.apple.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.apple.txt",
       "format": "hosts",
       "category": "system",
       "enabled": true
     },
     {
       "name": "HaGeZi Amazon Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.amazon.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.amazon.txt",
       "format": "hosts",
       "category": "telemetry",
       "enabled": true
     },
     {
       "name": "HaGeZi Xiaomi Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.xiaomi.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.xiaomi.txt",
       "format": "hosts",
       "category": "telemetry",
       "enabled": true
     },
     {
       "name": "HaGeZi Huawei Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.huawei.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.huawei.txt",
       "format": "hosts",
       "category": "telemetry",
       "enabled": true
     },
     {
       "name": "HaGeZi Vivo Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.vivo.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.vivo.txt",
       "format": "hosts",
       "category": "telemetry",
       "enabled": true
     },
     {
       "name": "HaGeZi Oppo/Realme Telemetry",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/native.oppo-realme.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/native.oppo-realme.txt",
       "format": "hosts",
       "category": "telemetry",
       "enabled": true
@@ -96,7 +96,7 @@
       "url": "https://block.energized.pro/blu/formats/domains.txt",
       "format": "domains",
       "category": "ads",
-      "enabled": false
+      "enabled": true
     },
     {
       "name": "URLhaus Malware",
@@ -150,35 +150,35 @@
     },
     {
       "name": "AdGuard Russian",
-      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_104.txt",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_26.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true
     },
     {
       "name": "AdGuard French",
-      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_106.txt",
+      "url": "https://easylist-downloads.adblockplus.org/liste_fr.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true
     },
     {
       "name": "AdGuard Japanese",
-      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_107.txt",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true
     },
     {
       "name": "AdGuard Turkish",
-      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_112.txt",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_26.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true
     },
     {
       "name": "AdGuard Chinese",
-      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_224.txt",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true
@@ -234,7 +234,7 @@
     },
     {
       "name": "HaGeZi DoH DoT",
-      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/doh.txt",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/doh.txt",
       "format": "hosts",
       "category": "doh_providers",
       "enabled": true
@@ -249,7 +249,7 @@
     },
     {
       "name": "DShield Suspicious Domains",
-      "url": "https://www.dshield.org/feeds/suspiciousdomains_High.txt",
+      "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_12.txt",
       "format": "domains",
       "category": "malware",
       "enabled": true,
@@ -286,7 +286,7 @@
     },
     {
       "name": "Liste AR (Arabic)",
-      "url": "https://raw.githubusercontent.com/easylist/ListeAR/master/ListeAR.txt",
+      "url": "https://easylist-downloads.adblockplus.org/liste_ar.txt",
       "format": "domains",
       "category": "ads",
       "enabled": true

@@ -35,18 +35,8 @@ ESSENTIAL_DOMAINS = frozenset({
     # GeoIP / Network utilities
     'ip-api.com',
     'ipify.org',
-    # Default DNS resolvers (DoH/DoT endpoints)
-    '1.1.1.1', '1.0.0.1', 'cloudflare-dns.com', 'one.one.one.one',
-    '1.1.1.2', '1.0.0.2', 'security.cloudflare-dns.com',
-    '8.8.8.8', '8.8.4.4', 'dns.google',
-    '9.9.9.9', '149.112.112.112', 'dns.quad9.net', 'dns9.quad9.net',
-    '208.67.222.222', '208.67.220.220', 'doh.opendns.com',
-    '94.140.14.14', '94.140.15.15', 'dns.adguard-dns.com',
-    '76.76.2.0', '76.76.10.0', 'freedns.controld.com',
-    '194.242.2.2', '193.19.108.2', 'dns.mullvad.net',
-    '185.228.168.9', '185.228.169.9', 'security-filter-dns.cleanbrowsing.org',
     # Local loopbacks
-    '127.0.0.1', '127.0.0.53', '::1',
+    '127.0.0.1', '127.0.0.53', '::1', 'localhost',
 })
 
 class BlocklistManager:
@@ -287,44 +277,54 @@ class BlocklistManager:
             })
             
         domains = set()
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith('#') or line.startswith('!') or line.startswith('['):
                     continue
                 if line.startswith('include:'):
                     continue
+                if line.startswith('@@'):
+                    continue
                 if '@' in line:
-                    line = line.split('@')[0]
+                    line = line.split('@')[0].strip()
                 if line.startswith('full:'):
-                    line = line[5:]
+                    line = line[5:].strip()
                     
                 parts = line.split()
                 if not parts:
                     continue
                     
-                if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1'):
+                if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53'):
                     domain = parts[1]
                 else:
                     domain = parts[0]
                 
                 if domain.startswith('domain:'):
                     domain = domain[7:]
-                    
                 if domain.startswith('||'):
                     domain = domain[2:]
-                if domain.endswith('^'):
-                    domain = domain[:-1]
+                    
+                if '^' in domain:
+                    domain = domain.split('^')[0]
+                if '$' in domain:
+                    domain = domain.split('$')[0]
+                if '/' in domain:
+                    domain = domain.split('/')[0]
+                if '#' in domain:
+                    domain = domain.split('#')[0]
                 if domain.startswith('*.'):
                     domain = domain[2:]
-                if domain.startswith('^'):
+                if domain.startswith('.'):
                     domain = domain[1:]
                     
-                if '/' in domain or '*' in domain or '=' in domain or domain.startswith('!'):
+                domain = domain.strip().lower()
+                if not domain or '*' in domain or '=' in domain or domain.startswith('!') or domain.startswith('?'):
                     continue
                 
-                if domain != '0.0.0.0' and domain != 'localhost' and '.' in domain:
-                    domains.add(domain)
+                if domain not in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost') and '.' in domain and len(domain) <= 253:
+                    if all(c.isalnum() or c in '.-' for c in domain):
+                        domains.add(domain)
                     
         if category and self.sources_metadata.get(category):
             self.sources_metadata[category][-1]['size'] = len(domains)
