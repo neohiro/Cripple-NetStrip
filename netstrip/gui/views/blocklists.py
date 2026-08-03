@@ -40,11 +40,11 @@ class BlocklistView(ctk.CTkFrame):
         # Add Custom Rule Bar
         self._build_add_rule_bar()
 
-        # Search Results Area (now contains stats grid)
-        self._build_results_area()
-        
-        # Compact Stats Grid (inside results area)
+        # Compact Stats Grid (Indexed Categories)
         self._build_stats_grid()
+
+        # Search Results Area
+        self._build_results_area()
         
         # Start periodic poll to update counts as background blocklist loading completes
         self._poll_loading()
@@ -259,12 +259,13 @@ class BlocklistView(ctk.CTkFrame):
                 elif cat_enum == ConnectionCategory.USER_BLOCKED:
                     cnt = blacklist_size + app_blacklist_size
                 else:
-                    sources = metadata.get(cat_enum, [])
+                    sources = metadata.get(cat_enum, metadata.get(cat_enum.value, []))
                     cnt = sum(s.get('size', 0) for s in sources)
                     if cnt == 0 and stats:
-                        cnt = stats.get(cat_enum, 0)
+                        cnt = stats.get(cat_enum, stats.get(cat_enum.value, 0))
                     if cnt == 0 and domain_map:
-                        cnt = sum(1 for c in domain_map.values() if c == cat_enum)
+                        cat_val = getattr(cat_enum, 'value', str(cat_enum))
+                        cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
                         
                 lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:
@@ -294,8 +295,7 @@ class BlocklistView(ctk.CTkFrame):
         btn_search.pack(side="right")
 
     def _build_stats_grid(self):
-        # We place this inside the scrollable frame so it scrolls out of the way to give results more height
-        self._stats_container = ctk.CTkFrame(self._results_scroll, fg_color="transparent")
+        self._stats_container = ctk.CTkFrame(self, fg_color="transparent")
         self._stats_container.pack(fill="x", pady=0)
         
         ctk.CTkLabel(
