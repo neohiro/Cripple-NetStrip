@@ -736,37 +736,43 @@ def main():
                 else:
                     app._show_tray_icon()
                     
-            def cross_fade(splash_alpha=1.0, app_alpha=0.0):
+            def cross_fade(frame=0, total_frames=25):
                 if is_headless:
                     on_transition_done()
                     return
                     
-                step = 0.1
-                splash_done = True
-                app_done = True
+                import math
+                progress = min(1.0, float(frame) / float(total_frames))
+                # Cosine ease-in-out curve: 0.0 -> 1.0
+                eased = (1.0 - math.cos(progress * math.pi)) / 2.0
                 
-                if splash and splash.winfo_exists() and splash_alpha > 0.0:
-                    splash_alpha -= step
-                    try: splash.attributes('-alpha', max(0.0, splash_alpha))
-                    except Exception: pass
-                    splash_done = False
+                splash_alpha = max(0.0, 1.0 - eased)
+                app_alpha = min(1.0, eased)
+                
+                if splash and splash.winfo_exists():
+                    try:
+                        splash.attributes('-alpha', splash_alpha)
+                    except Exception:
+                        pass
+                        
+                try:
+                    app.attributes('-alpha', app_alpha)
+                except Exception:
+                    pass
                     
-                if app_alpha < 1.0:
-                    app_alpha += step
-                    try: app.attributes('-alpha', min(1.0, app_alpha))
-                    except Exception: pass
-                    app_done = False
-                    
-                if not splash_done or not app_done:
-                    app.after(10, lambda: cross_fade(splash_alpha, app_alpha))
+                if frame < total_frames:
+                    app.after(16, lambda: cross_fade(frame + 1, total_frames))
                 else:
                     if splash and splash.winfo_exists():
-                        try: splash.withdraw()
-                        except Exception: pass
+                        try:
+                            splash.withdraw()
+                        except Exception:
+                            pass
+                    app.attributes('-alpha', 1.0)
                     app.attributes('-topmost', True)
                     app.lift()
                     app.focus_force()
-                    app.after(500, lambda: app.attributes('-topmost', False))
+                    app.after(300, lambda: app.attributes('-topmost', False))
                     on_transition_done()
 
             def check_engine_ready():
@@ -782,11 +788,19 @@ def main():
                     on_transition_done()
                     return
     
-                # Cross-fade when blocklist finishes loading or after at most 3 seconds timeout
-                if (hasattr(engine, 'blocklist') and not engine.blocklist.is_loading) or elapsed > 3.0:
+                # Enforce minimum 1.5s display duration and wait for blocklist ready (or 4.0s safety timeout)
+                is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
+                if (is_blocklist_ready and elapsed >= 1.5) or elapsed >= 4.0:
+                    if splash and splash.winfo_exists():
+                        try:
+                            splash.progress.set(1.0)
+                            splash.status_label.configure(text="Starting NetStrip...")
+                            splash.update_idletasks()
+                        except Exception:
+                            pass
                     cross_fade()
                 else:
-                    app.after(25, check_engine_ready)
+                    app.after(30, check_engine_ready)
                     
             check_engine_ready()
         except Exception as e:

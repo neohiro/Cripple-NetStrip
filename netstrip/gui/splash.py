@@ -117,20 +117,30 @@ class SplashScreen(ctk.CTkToplevel):
             
         self.after(1500, self._cycle_loading_text)
 
-    def fade_out(self, callback=None):
+    def fade_out(self, callback=None, step=0, total_steps=20):
         """Fade out the splash screen before destroying it."""
         if not self.winfo_exists():
             if callback:
                 callback()
             return
             
-        alpha = self.attributes('-alpha')
-        if alpha > 0.05:
-            alpha -= 0.05
+        import math
+        progress = min(1.0, float(step) / float(total_steps))
+        eased = (1.0 - math.cos(progress * math.pi)) / 2.0
+        alpha = max(0.0, 1.0 - eased)
+        
+        try:
             self.attributes('-alpha', alpha)
-            self.after(20, self.fade_out, callback)
+        except Exception:
+            pass
+            
+        if step < total_steps:
+            self.after(16, lambda: self.fade_out(callback, step + 1, total_steps))
         else:
-            self.withdraw()
+            try:
+                self.withdraw()
+            except Exception:
+                pass
             if callback:
                 callback()
 

@@ -182,8 +182,13 @@ class ConnectionMonitor:
         
         # --- IoT Botnet Detection ---
         now = time.time()
+        if len(self._rate_limits) > 1000:
+            # Periodic cleanup of idle IPs
+            self._rate_limits = {k: v for k, v in self._rate_limits.items() if v and (now - v[-1]) < 5.0}
+            
         if ip not in self._rate_limits:
             self._rate_limits[ip] = []
+        self._rate_limits[ip] = [t for t in self._rate_limits[ip] if (now - t) < 2.0]
         self._rate_limits[ip].append(now)
         
         if len(self._rate_limits[ip]) > 50:

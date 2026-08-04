@@ -5,12 +5,17 @@ Provides canonical process name normalization and deep parent tree resolution (h
 
 import os
 import sys
+import time
+import threading
 from typing import Tuple, Optional
 
 try:
     import psutil
 except ImportError:
     psutil = None
+
+_PID_CACHE = {}
+_PID_CACHE_LOCK = threading.Lock()
 
 # Intermediate console windows / shell wrappers
 CONSOLE_WRAPPERS = {
@@ -145,6 +150,14 @@ def resolve_process_identity(proc) -> Tuple[str, str, any, str]:
     if not proc or not psutil:
         return "Unknown", "", None, "Unknown"
         
+    proc_pid = getattr(proc, 'pid', None)
+    now = time.time()
+    if proc_pid is not None:
+        with _PID_CACHE_LOCK:
+            cached = _PID_CACHE.get(proc_pid)
+            if cached and (now - cached[4]) < 30.0:
+                return cached[0], cached[1], cached[2], cached[3]
+
     original_exe = "Unknown"
     try:
         original_exe = proc.name()
@@ -215,4 +228,12 @@ def resolve_process_identity(proc) -> Tuple[str, str, any, str]:
         pid_val = None
         
     canonical_name = normalize_process_name(raw_name, cmdline=cmdline, pid=pid_val)
+    
+    if proc_pid is not None:
+        with _PID_CACHE_LOCK:
+            # Clean old entries if cache grows beyond 2000
+            if len(_PID_CACHE) > 2000:
+                _PID_CACHE.clear()
+            _PID_CACHE[proc_pid] = (canonical_name, process_path, root_proc, original_exe, now)
+            
     return canonical_name, process_path, root_proc, original_exe

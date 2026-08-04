@@ -1,3 +1,18 @@
+## [v3.2.4] - 60FPS Eased Splash Transition, SQLite Lock-Free In-Memory Caching & Process Tree Acceleration
+
+- **Silky-Smooth 60FPS Splash Transition**:
+  - Implemented a 1.5-second minimum display readiness barrier and full background UI render prior to reveal.
+  - Replaced linear fade with a 60fps cosine-eased cross-fade between splash screen and main window, eliminating startup stutter and premature window reveal.
+- **SQLite Concurrency & Async Statistics Loop**:
+  - Offloaded `Database.update_daily_stats()` to the asynchronous worker queue (`write_queue`), eliminating disk write locks on the network interception path.
+  - Added fast in-memory caching for `get_setting()` and `get_user_rules()`, removing synchronous SQLite read contention during live UI updates.
+- **Process Identity Resolution Cache**:
+  - Added a thread-safe 30s TTL PID resolution cache to `resolve_process_identity()`, eliminating redundant 10-level process tree walks across high-frequency connection events.
+- **Memory & Rate Limit Pruning**:
+  - Added proactive 2-second timestamp pruning and size-bounding for IoT botnet rate limits in `ConnectionMonitor`.
+- **UI Non-Blocking Refresh Loop**:
+  - Refactored `DashboardView._update_stats()` to execute all database aggregations in background threads and prevent concurrent fetch stampedes.
+
 ## [v3.2.3] - Intelligent Process Merging, Direct DNS Leak Protection & Concurrency Hardening
 
 - **Intelligent Process Tree Canonicalization**:

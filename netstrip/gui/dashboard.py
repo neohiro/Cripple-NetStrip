@@ -191,38 +191,33 @@ class DashboardView(ctk.CTkScrollableFrame):
                 pass
         self.after(0, _handle)
 
-    @safe_loop(delay_ms=200)
+    @safe_loop(delay_ms=1000)
     def _update_stats(self):
         if getattr(self, '_destroyed', False):
-            return
-            
-        if not self.winfo_ismapped():
-            self._update_stats_id = self.after(500, self._update_stats)
             return
             
         if not self.winfo_ismapped():
             self._update_stats_id = self.after(1000, self._update_stats)
             return
 
+        self._update_stats_id = self.after(1000, self._update_stats)
+
         if getattr(self, '_is_fetching_stats', False):
-            self._update_stats_id = self.after(500, self._update_stats)
             return
 
-        self._update_stats_id = self.after(1000, self._update_stats)
         self._is_fetching_stats = True
         
         # Run DB queries in background thread to prevent UI micro-stutters
         def fetch():
             try:
                 today_stats = self.engine.db.get_24h_statistics()
-                db_sent, db_recv = self.engine.db.get_24h_bandwidth()
                 recent_conns = self.engine.db.get_recent_connections(limit=300)
                 
                 if today_stats:
                     try:
                         unique_allowed = self.engine.db.get_unique_allowed_24h()
                     except AttributeError:
-                        unique_allowed = today_stats['total_allowed']
+                        unique_allowed = today_stats.get('total_allowed', 0)
                         
                     def update_ui():
                         try:

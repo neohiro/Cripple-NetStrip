@@ -142,6 +142,18 @@ class Database:
                 except sqlite3.OperationalError:
                     pass # Column already exists
 
+                # Pre-load settings cache
+                self._settings_cache = {}
+                try:
+                    cursor = conn.execute("SELECT key, value FROM settings")
+                    for r in cursor.fetchall():
+                        try:
+                            self._settings_cache[r['key']] = json.loads(r['value'])
+                        except (json.JSONDecodeError, TypeError):
+                            self._settings_cache[r['key']] = r['value']
+                except Exception:
+                    pass
+
 
     def flush(self, timeout: float = 5.0):
         """Wait for the async write queue to drain completely to SQLite."""
@@ -310,13 +322,11 @@ class Database:
                 return row[0] if row else 0
 
     def get_setting(self, key: str, default: Any = None) -> Any:
-        if not hasattr(self, '_settings_cache'):
-            self._settings_cache = {}
-            
         with self.lock:
-            cached = self._settings_cache.get(key)
-            if cached and (time.time() - cached[1]) < 2.0:
-                return cached[0]
+            if not hasattr(self, '_settings_cache'):
+                self._settings_cache = {}
+            if key in self._settings_cache:
+                return self._settings_cache[key]
                 
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT value FROM settings WHERE key = ?', (key,))
@@ -326,10 +336,10 @@ class Database:
                         val = json.loads(row['value'])
                     except json.JSONDecodeError:
                         val = row['value']
-                    self._settings_cache[key] = (val, time.time())
+                    self._settings_cache[key] = val
                     return val
                 
-                self._settings_cache[key] = (default, time.time())
+                self._settings_cache[key] = default
                 return default
 
     def set_setting(self, key: str, value: Any):
@@ -342,7 +352,7 @@ class Database:
             str_value = str(value)
             
         with self.lock:
-            self._settings_cache[key] = (value, time.time())
+            self._settings_cache[key] = value
             with self._get_connection() as conn:
                 conn.execute(
                     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
@@ -361,31 +371,15 @@ class Database:
                 conn.execute('DELETE FROM settings WHERE key = ?', (key,))
 
     def update_daily_stats(self, action: str, category: str):
-        with self.lock:
-            today = datetime.now().strftime('%Y-%m-%d')
-            with self._get_connection() as conn:
-                conn.execute('INSERT OR IGNORE INTO statistics (date) VALUES (?)', (today,))
-                
-                updates = ['total_queries = total_queries + 1']
-                if action == 'block' or action == 'sinkhole':
-                    updates.append('total_blocked = total_blocked + 1')
-                    if category == 'ad':
-                        updates.append('blocked_ads = blocked_ads + 1')
-                    elif category == 'tracker':
-                        updates.append('blocked_trackers = blocked_trackers + 1')
-                    elif category == 'telemetry':
-                        updates.append('blocked_telemetry = blocked_telemetry + 1')
-                    elif category == 'malware':
-                        updates.append('blocked_malware = blocked_malware + 1')
-                else:
-                    updates.append('total_allowed = total_allowed + 1')
-                    
-                query = f"UPDATE statistics SET {', '.join(updates)} WHERE date = ?"
-                conn.execute(query, (today,))
+        """Non-blocking update of daily statistics via async writer queue."""
+        if hasattr(self, 'write_queue'):
+            self.write_queue.put({'type': 'stat', 'data': (action, category)})
 
     def add_user_rule(self, rule_data: Dict[str, Any]):
         """Add a custom user rule (allow/block)"""
         with self.lock:
+            if hasattr(self, '_rules_cache'):
+                self._rules_cache.clear()
             with self._get_connection() as conn:
                 app_name = rule_data.get('app_name')
                 if app_name is None:
@@ -413,6 +407,11 @@ class Database:
     def get_user_rules(self, mode_scope: Optional[str] = None) -> List[sqlite3.Row]:
         """Get user rules filtered by mode_scope (or ALL/STANDARD defaults)"""
         with self.lock:
+            if not hasattr(self, '_rules_cache'):
+                self._rules_cache = {}
+            if mode_scope in self._rules_cache:
+                return self._rules_cache[mode_scope]
+                
             with self._get_connection() as conn:
                 if mode_scope:
                     cursor = conn.execute(
@@ -421,17 +420,23 @@ class Database:
                     )
                 else:
                     cursor = conn.execute('SELECT * FROM user_rules ORDER BY id DESC')
-                return cursor.fetchall()
+                rules = cursor.fetchall()
+                self._rules_cache[mode_scope] = rules
+                return rules
 
     def delete_user_rule(self, rule_id: int):
         """Delete a user rule by ID"""
         with self.lock:
+            if hasattr(self, '_rules_cache'):
+                self._rules_cache.clear()
             with self._get_connection() as conn:
                 conn.execute('DELETE FROM user_rules WHERE id = ?', (rule_id,))
 
     def cleanup_expired_rules(self) -> int:
         """Delete time bomb rules that have expired and return count."""
         with self.lock:
+            if hasattr(self, '_rules_cache'):
+                self._rules_cache.clear()
             with self._get_connection() as conn:
                 cursor = conn.execute("DELETE FROM user_rules WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP")
                 conn.commit()
