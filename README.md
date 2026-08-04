@@ -317,11 +317,8 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.24 — Hardened GeoIP, AWS False Positive Fix & Smooth Sidebar UX
-- **Multi-Provider HTTPS GeoIP Engine**: Added `ipapi.co`, `ipinfo.io`, `ipwho.is`, `ip-api.com` with robust SSL contexts.
-- **Zero False Positives**: AWS (`amazonaws.com`), Second Life (`lindenlab.com`), and Steam endpoints marked essential.
-- **Clean Process Cleanup**: Inactive processes vanish automatically when closed.
-- **Smooth 60FPS Sidebar Scrolling**: Optimized widget repacking to eliminate scroll stuttering.
+### v3.1.25 — Major Cloud Provider & Global CDN Whitelist Hardening
+- **Azure, GCP, Fastly & Akamai Overrides**: Added essential whitelist rules for all major cloud providers and edge CDNs to prevent false positives.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

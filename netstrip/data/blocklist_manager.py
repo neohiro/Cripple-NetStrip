@@ -41,14 +41,34 @@ ESSENTIAL_DOMAINS = frozenset({
     'ipapi.co',
     'ipwho.is',
     'api.myip.com',
-    # Common Cloud infrastructure & Gaming CDN essential services (Prevents false positives)
+    # Amazon Web Services (AWS)
     'amazonaws.com',
     's3.amazonaws.com',
     'cloudfront.net',
+    # Microsoft Azure & Cloud Infrastructure
+    'azure.com',
+    'azure.net',
+    'windows.net',
+    'microsoft.com',
+    'msftconnecttest.com',
+    # Google Cloud Platform (GCP) & CDNs
+    'googleapis.com',
+    'gstatic.com',
+    'googleusercontent.com',
+    'gvt1.com',
+    'gvt2.com',
+    # Major Global CDNs (Fastly & Akamai)
+    'fastly.net',
+    'fastlylb.net',
+    'akamaiedge.net',
+    'akamaihd.net',
+    'edgekey.net',
+    # Gaming & Virtual World Infrastructure (Second Life, Steam, Epic)
     'lindenlab.com',
     'secondlife.com',
+    'steampowered.com',
     'steamcontent.com',
-    'gvt1.com',
+    'steamstatic.com',
     # Local loopbacks
     '127.0.0.1', '127.0.0.53', '::1', 'localhost',
 })

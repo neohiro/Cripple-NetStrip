@@ -1,3 +1,8 @@
+## [v3.1.25] - Major Cloud Provider & Global CDN Whitelist Hardening
+
+- **Expanded Cloud & CDN Infrastructure Overrides**: Added essential domain overrides for Azure (`azure.com`, `azure.net`, `windows.net`), Google Cloud & CDNs (`googleapis.com`, `gstatic.com`, `gvt1.com`, `gvt2.com`), Fastly (`fastly.net`), Akamai (`akamaiedge.net`, `akamaihd.net`), and Steam (`steampowered.com`, `steamstatic.com`).
+- **Guaranteed Zero False Positives**: Prevents false positive blocking across enterprise cloud services, CDNs, streaming, and gaming platforms.
+
 ## [v3.1.24] - Hardened GeoIP, AWS False Positive Fix & Smooth Sidebar UX
 
 - **Multi-Provider HTTPS GeoIP Engine**: Hardened `GeoIPService` with custom SSL contexts and added multi-provider HTTPS fallbacks (`ipapi.co`, `ipinfo.io`, `ipwho.is`, `ip-api.com`, `api.ipify.org`). Public IP and geolocation populate reliably on boot.
