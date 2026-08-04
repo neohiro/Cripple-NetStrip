@@ -92,10 +92,17 @@
       "enabled": true
     },
     {
-      "name": "Energized Blu",
-      "url": "https://block.energized.pro/blu/formats/domains.txt",
-      "format": "domains",
+      "name": "HaGeZi Pro Plus",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/pro.plus.txt",
+      "format": "hosts",
       "category": "ads",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi TIF (Threat Intelligence Feeds)",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/tif.txt",
+      "format": "hosts",
+      "category": "malware",
       "enabled": true
     },
     {
