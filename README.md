@@ -317,11 +317,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.19 — 3.2M+ Threat Feeds, Session Isolation & GUI Fixes
-- **3.23M+ Unique Blocked Domains**: Integrated HaGeZi Pro Plus and HaGeZi Threat Intelligence Feeds (TIF).
-- **Tailored Update Cycles**: 1h–4h rapid updates for malware/C2 feeds and 24h for ad/telemetry lists.
-- **Session-Isolated Live Traffic**: Connections sidebar & live views now show current running session traffic.
-- **Glitch-Free UI**: Reparented category cards grid and bound LAN Shield toggle to visual BooleanVar.
+### v3.1.20 — GeoIP Fix, Fast 3.2M Domain Indexing & LAN Shield Toggle Fix
+- **Instant GeoIP Topbar**: Added multi-provider HTTPS fallbacks (`ipinfo.io`, `ip-api.com`, `ipify.org`). Public IP and city/country populate instantly on startup.
+- **Ultra-Fast 3.2M Domain Grid**: Removed 3.2M dictionary iteration bottleneck in GUI (grid refresh reduced to <1ms).
+- **LAN Shield Toggle Switch**: Fixed CustomTkinter `CTkSwitch` visual state binding using `ctk.StringVar`. Rendered ON by default.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

@@ -259,13 +259,11 @@ class BlocklistView(ctk.CTkFrame):
                 elif cat_enum == ConnectionCategory.USER_BLOCKED:
                     cnt = blacklist_size + app_blacklist_size
                 else:
-                    sources = metadata.get(cat_enum, metadata.get(cat_enum.value, []))
+                    cat_val = getattr(cat_enum, 'value', str(cat_enum))
+                    sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
                     cnt = sum(s.get('size', 0) for s in sources)
                     if cnt == 0 and stats:
-                        cnt = stats.get(cat_enum, stats.get(cat_enum.value, 0))
-                    if cnt == 0 and domain_map:
-                        cat_val = getattr(cat_enum, 'value', str(cat_enum))
-                        cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
+                        cnt = stats.get(cat_enum) or stats.get(cat_val) or 0
                         
                 lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:

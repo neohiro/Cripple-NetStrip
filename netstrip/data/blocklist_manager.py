@@ -84,6 +84,7 @@ class BlocklistManager:
 
     def _parse_domains_from_file(self, filepath: str) -> Set[str]:
         domains = set()
+        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789.-_")
         if not os.path.exists(filepath):
             return domains
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
@@ -132,7 +133,7 @@ class BlocklistManager:
                     continue
                 
                 if domain not in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost') and '.' in domain and len(domain) <= 253:
-                    if all(c.isalnum() or c in '.-' for c in domain):
+                    if set(domain).issubset(allowed):
                         domains.add(domain)
         return domains
 

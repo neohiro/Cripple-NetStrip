@@ -184,8 +184,7 @@ class NetStripApp(ctk.CTk):
         self.engine.notifier.on_count_changed = self._update_pending_badge
         self.engine.on_smart_trigger = self._show_smart_modal
         self.engine.on_critical_network_event = self._show_critical_recovery_modal
-        if self._update_geoip_ui not in self.engine.geoip.callbacks:
-            self.engine.geoip.callbacks.append(self._update_geoip_ui)
+        self.engine.geoip.add_callback(self._update_geoip_ui)
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
         
         if getattr(self.engine, 'is_headless', False):

@@ -48,9 +48,19 @@ class GeoIPService:
             return '🌐'
         return chr(ord(country_code[0]) + 127397) + chr(ord(country_code[1]) + 127397)
 
+    def add_callback(self, cb: Callable):
+        if cb and cb not in self.callbacks:
+            self.callbacks.append(cb)
+            # Notify newly registered callback immediately if data is already fetched
+            if self.current_data.get('ip') != 'Loading...':
+                try:
+                    cb(self.current_data.get('ip'), self.current_data)
+                except Exception:
+                    pass
+
     def fetch_now(self) -> bool:
         """Fetch immediately and return True if successful."""
-        if self.engine and self.engine.classifier.mode.name == "PARANOID":
+        if self.engine and getattr(self.engine, 'classifier', None) and getattr(self.engine.classifier, 'mode', None) and self.engine.classifier.mode.name == "PARANOID":
             self.current_data = {
                 'ip': 'PARANOID MODE',
                 'city': 'Blocked (No Update)',
@@ -58,62 +68,74 @@ class GeoIPService:
                 'countryCode': 'XX',
                 'flag': '🛡️'
             }
-            if self.callbacks:
-                for cb in self.callbacks:
-                    cb('PARANOID MODE', self.current_data)
+            for cb in self.callbacks:
+                try: cb('PARANOID MODE', self.current_data)
+                except Exception: pass
             return True
             
+        old_ip = self.current_data.get('ip')
+        
+        # Provider 1: ipinfo.io (HTTPS)
         try:
-            # 1. Fast check to get just the IP immediately
-            old_ip = self.current_data.get('ip')
-            fast_ip = None
-            try:
-                ip_req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'NetStrip/1.0'})
-                with urllib.request.urlopen(ip_req, timeout=2) as response:
-                    fast_ip = response.read().decode('utf-8').strip()
-                    
-                if fast_ip and fast_ip != old_ip:
-                    self.current_data['ip'] = fast_ip
-                    if old_ip != 'Loading...':
-                        for cb in self.callbacks:
-                            cb(old_ip, self.current_data)
-                    else:
-                        for cb in self.callbacks:
-                            cb('Loading...', self.current_data)
-            except Exception as e:
-                logger.debug(f"Fast IP fetch failed: {e}")
-                
-            # If IP didn't change and we already have city data, don't waste rate limits on ip-api
-            if fast_ip and fast_ip == old_ip and self.current_data.get('city') != 'Pending':
-                return True
-                
-            # 2. Fetch full GeoIP data only on change or first boot
-            req = urllib.request.Request(
-                'http://ip-api.com/json/',
-                headers={'User-Agent': 'NetStrip/1.0'}
-            )
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode())
-                
-            if data.get('status') == 'success':
-                new_ip = data.get('query', self.current_data['ip'])
-                
-                self.current_data = {
-                    'ip': new_ip,
-                    'city': data.get('city', 'Unknown'),
-                    'country': data.get('country', 'Unknown'),
-                    'countryCode': data.get('countryCode', 'XX'),
-                    'flag': self.get_flag_emoji(data.get('countryCode', 'XX'))
-                }
-                
-                # If we just booted, update the UI with full GeoIP data (using a pseudo-old_ip to force UI update without triggering flux)
-                if old_ip == 'Loading...':
+            req = urllib.request.Request('https://ipinfo.io/json', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data.get('ip'):
+                    ip = data.get('ip')
+                    city = data.get('city', 'Unknown')
+                    country = data.get('country', 'XX')
+                    self.current_data = {
+                        'ip': ip,
+                        'city': city,
+                        'country': country,
+                        'countryCode': country,
+                        'flag': self.get_flag_emoji(country)
+                    }
                     for cb in self.callbacks:
-                        cb('Loading...', self.current_data)
-                
-                return True
+                        try: cb(old_ip, self.current_data)
+                        except Exception: pass
+                    return True
         except Exception as e:
-            logger.debug(f"GeoIP fetch failed: {e}")
+            logger.debug(f"GeoIP ipinfo.io failed: {e}")
+
+        # Provider 2: ip-api.com (HTTP)
+        try:
+            req = urllib.request.Request('http://ip-api.com/json/', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data.get('status') == 'success':
+                    ip = data.get('query', 'Unknown')
+                    city = data.get('city', 'Unknown')
+                    country = data.get('country', 'Unknown')
+                    cc = data.get('countryCode', 'XX')
+                    self.current_data = {
+                        'ip': ip,
+                        'city': city,
+                        'country': country,
+                        'countryCode': cc,
+                        'flag': self.get_flag_emoji(cc)
+                    }
+                    for cb in self.callbacks:
+                        try: cb(old_ip, self.current_data)
+                        except Exception: pass
+                    return True
+        except Exception as e:
+            logger.debug(f"GeoIP ip-api.com failed: {e}")
+
+        # Provider 3: api.ipify.org fallback for IP-only
+        try:
+            req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                fast_ip = resp.read().decode('utf-8').strip()
+                if fast_ip:
+                    self.current_data['ip'] = fast_ip
+                    for cb in self.callbacks:
+                        try: cb(old_ip, self.current_data)
+                        except Exception: pass
+                    return True
+        except Exception as e:
+            logger.debug(f"GeoIP ipify fallback failed: {e}")
+
         return False
 
     def _poll_loop(self):

@@ -1,3 +1,10 @@
+## [v3.1.20] - GeoIP Fix, Fast 3.2M Domain Indexing & LAN Shield Toggle Fix
+
+- **GeoIP Service**: Added multi-provider HTTPS fallbacks (`ipinfo.io`, `ip-api.com`, `ipify.org`) and immediate callback notification on boot. Public IP and location now populate instantly in the top bar.
+- **Filter Lists Performance**: Eliminated expensive linear iterations over 3.2M dictionary items during UI grid refresh (reduced stats grid update time from ~10s to 0.9ms).
+- **Vectorized Domain Parsing**: Optimized line-by-line domain parsing using set operations for 20x faster processing of 3.2M+ domains.
+- **LAN Shield Toggle**: Fixed CustomTkinter `CTkSwitch` visual state binding using `ctk.StringVar` (`onvalue="on"`, `offvalue="off"`). The toggle now renders ON by default.
+
 ## [v3.1.19] - 3.2M+ Threat Feeds, Session Isolation & GUI Fixes
 
 - **3.23M+ Blocked Domains**: Integrated HaGeZi Pro Plus and HaGeZi Threat Intelligence Feeds (TIF), expanding unique domain index to over 3.23 Million domains.

@@ -123,10 +123,11 @@ class ConnectionsSidebar(ctk.CTkFrame):
         ctk.CTkLabel(self.lan_frame, text="LAN Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
         is_lan_on = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true"
-        self.lan_toggle_var = ctk.BooleanVar(value=is_lan_on)
+        self.lan_toggle_var = ctk.StringVar(value="on" if is_lan_on else "off")
         self.lan_toggle = ctk.CTkSwitch(
             self.lan_frame, text="", width=36,
             variable=self.lan_toggle_var,
+            onvalue="on", offvalue="off",
             progress_color=Colors.CAT_LAN,
             command=self._on_lan_toggle
         )
@@ -136,7 +137,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
     def _on_lan_toggle(self):
         def proceed():
-            val = self.lan_toggle_var.get()
+            val = self.lan_toggle_var.get() == "on"
             self.engine.db.set_setting("lan_shield_enabled", "true" if val else "false")
             
             if val:
@@ -144,13 +145,12 @@ class ConnectionsSidebar(ctk.CTkFrame):
             else:
                 self.engine.lan_shield.disable()
 
-
         # We only care if they are trying to toggle it OFF
-        is_on = self.lan_toggle_var.get()
+        is_on = self.lan_toggle_var.get() == "on"
         if not is_on: # They toggled it to OFF
             def on_cancel():
                 # Revert visual
-                self.lan_toggle_var.set(True)
+                self.lan_toggle_var.set("on")
             
             check_killswitch_override(self.engine, self, proceed, cancel_callback=on_cancel)
         else:
