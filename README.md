@@ -317,11 +317,9 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.21 — Smooth List Rendering & Extended Viewport
-- **Eliminated UI Freezes**: Removed global mousewheel listener leaks.
-- **50-Row Widget Pool**: In-place row updates in Filter Lists and Logs views eliminate lag and rendering glitches.
-- **Extended Full-Height Viewport**: `_stats_container` auto-collapses during searches to show 25+ results at once.
-- **Async DB Logging**: Background thread SQLite log fetches eliminate micro-stutters.
+### v3.1.22 — Zero-Freeze Splash Screen & Boot Pump
+- **Zero-Freeze Splash Screen**: Continuous main loop event pumping during startup prevents OS window freeze.
+- **Smooth Cross-Fade**: Rapid 30ms window alpha interpolation for clean transition into main application window.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

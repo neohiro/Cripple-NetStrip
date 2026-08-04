@@ -1,3 +1,8 @@
+## [v3.1.22] - Zero-Freeze Splash Screen Animation & Boot Pump
+
+- **Zero-Freeze Splash Screen**: Updated `check_engine_ready()` loop in `main.py` to yield to `splash.update()` and `app.update_idletasks()` every 30ms, ensuring canvas logo animations and progress bar text cycle continuously without micro-freezing during startup.
+- **Fast Transition Handshake**: Reduced minimum splash display threshold to 1.2s and smoothed cross-fade window alpha interpolation.
+
 ## [v3.1.21] - Smooth List Rendering & Extended Viewport
 
 - **Eliminated Freezes & Memory Leaks**: Removed global `bind_all("<MouseWheel>")` handlers in `BlocklistView` that accumulated event listener leaks and froze the app after extended use.

@@ -118,7 +118,7 @@ def is_server_or_embedded():
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         print(f"\n{'='*60}")
-        print(f"  Cripple (NetStrip) v3.1.21 - CLI / Daemon")
+        print(f"  Cripple (NetStrip) v3.1.22 - CLI / Daemon")
         print(f"{'='*60}")
         print("\nBOOT VARIABLES:")
         print("  --service              Headless/daemon mode (no GUI).")
@@ -719,53 +719,62 @@ def main():
             app.apply_icon()
             app.update() 
             
+            def on_transition_done():
+                if not is_headless:
+                    app.lift()
+                    app.focus_force()
+                    app.apply_icon()
+                    
+                    from netstrip.core.sound import sound_manager
+                    sound_manager.set_muted(initial_mute_state)
+                    if not initial_mute_state:
+                        sound_manager.play_intro()
+                else:
+                    app._show_tray_icon()
+                    
+            def cross_fade(splash_alpha=1.0, app_alpha=0.0):
+                if is_headless:
+                    on_transition_done()
+                    return
+                    
+                step = 0.1
+                splash_done = True
+                app_done = True
+                
+                if splash and splash.winfo_exists() and splash_alpha > 0.0:
+                    splash_alpha -= step
+                    try: splash.attributes('-alpha', max(0.0, splash_alpha))
+                    except Exception: pass
+                    splash_done = False
+                    
+                if app_alpha < 1.0:
+                    app_alpha += step
+                    try: app.attributes('-alpha', min(1.0, app_alpha))
+                    except Exception: pass
+                    app_done = False
+                    
+                if not splash_done or not app_done:
+                    app.after(10, lambda: cross_fade(splash_alpha, app_alpha))
+                else:
+                    if splash and splash.winfo_exists():
+                        try: splash.withdraw()
+                        except Exception: pass
+                    app.attributes('-topmost', True)
+                    app.lift()
+                    app.focus_force()
+                    app.after(500, lambda: app.attributes('-topmost', False))
+                    on_transition_done()
+
             def check_engine_ready():
                 elapsed = time.time() - start_time
-                
-                def on_transition_done():
-                    if not is_headless:
-                        app.lift()
-                        app.focus_force()
-                        app.apply_icon() # Force it one more time just to be absolutely sure
-                        
-                        from netstrip.core.sound import sound_manager
-                        sound_manager.set_muted(initial_mute_state)
-                        if not initial_mute_state:
-                            sound_manager.play_intro()
-                    else:
-                        app._show_tray_icon()
-                        
-                def cross_fade(splash_alpha=1.0, app_alpha=0.0):
-                    if is_headless:
-                        on_transition_done()
-                        return
-                        
-                    # Faster, smoother cross-fade (step 0.1 every 10ms = ~100ms total)
-                    step = 0.1
-                    splash_done = True
-                    app_done = True
-                    
-                    if splash and splash_alpha > 0.0:
-                        splash_alpha -= step
-                        splash.attributes('-alpha', max(0.0, splash_alpha))
-                        splash_done = False
-                        
-                    if app_alpha < 1.0:
-                        app_alpha += step
-                        app.attributes('-alpha', min(1.0, app_alpha))
-                        app_done = False
-                        
-                    if not splash_done or not app_done:
-                        app.after(10, lambda: cross_fade(splash_alpha, app_alpha))
-                    else:
-                        if splash: splash.withdraw()
-                        app.attributes('-topmost', True)
-                        app.lift()
-                        app.focus_force()
-                        # Drop topmost after a brief moment to allow other apps to be focused later
-                        app.after(500, lambda: app.attributes('-topmost', False))
-                        on_transition_done()
-                        
+                try:
+                    if splash and splash.winfo_exists():
+                        splash.update_idletasks()
+                        splash.update()
+                    app.update_idletasks()
+                except Exception:
+                    pass
+
                 if is_fallback or is_headless:
                     while engine_instance.is_running:
                         try:
@@ -775,11 +784,11 @@ def main():
                         time.sleep(0.05)
                     return
     
-                if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading and elapsed > 2.0:
+                if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading and elapsed > 1.2:
                     # Trigger the smooth cross-fade
                     cross_fade()
                 else:
-                    app.after(50, check_engine_ready)
+                    app.after(30, check_engine_ready)
                     
             check_engine_ready()
         except Exception as e:
