@@ -317,11 +317,11 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.18 — Expanded Threat Feeds & Session Isolation
+### v3.1.19 — 3.2M+ Threat Feeds, Session Isolation & GUI Fixes
 - **3.23M+ Unique Blocked Domains**: Integrated HaGeZi Pro Plus and HaGeZi Threat Intelligence Feeds (TIF).
 - **Tailored Update Cycles**: 1h–4h rapid updates for malware/C2 feeds and 24h for ad/telemetry lists.
 - **Session-Isolated Live Traffic**: Connections sidebar & live views now show current running session traffic.
-- **Glitch-Free UI**: Reparented category cards grid to prevent UI destruction on category clicks.
+- **Glitch-Free UI**: Reparented category cards grid and bound LAN Shield toggle to visual BooleanVar.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

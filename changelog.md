@@ -1,3 +1,10 @@
+## [v3.1.19] - 3.2M+ Threat Feeds, Session Isolation & GUI Fixes
+
+- **3.23M+ Blocked Domains**: Integrated HaGeZi Pro Plus and HaGeZi Threat Intelligence Feeds (TIF), expanding unique domain index to over 3.23 Million domains.
+- **Tailored Update Cycles**: Set rapid 1h–4h update intervals for malware and C2 feeds, and 24h intervals for advertisement, telemetry, and tracking sources.
+- **Session-Isolated Live Traffic**: Active App Connections sidebar & live traffic views now display current running session activity, leaving historical logs in the Logs tab.
+- **Visual GUI Fixes**: Fixed LAN Shield toggle switch visual `BooleanVar` binding and reparented category cards grid to prevent UI destruction on category selection.
+
 ## [v3.1.17] - Bug Fixes & Dashboard Tweaks
 
 - **Dashboard**: Fixed an illusion issue where 'Allowed | Blocked' would abruptly display '0 | 0' after midnight. Unified both queries to use a reliable 24-hour rolling window instead of a hard midnight reset.
