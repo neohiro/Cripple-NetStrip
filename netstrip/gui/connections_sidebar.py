@@ -257,6 +257,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
                 for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
+                    p_name = conn_dict.get('process_name') or 'Unknown'
                     pid_val = conn_dict.get('pid')
                     my_pid = os.getpid()
                     is_our_netstrip = (pid_val == my_pid)

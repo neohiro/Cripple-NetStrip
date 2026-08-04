@@ -146,13 +146,13 @@ def restore_network():
                 backup_dns = get_backup_dns(interface)
                 if backup_dns:
                     logging.info(f"Restoring STATIC DNS for interface: {interface} -> {backup_dns}")
-                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "static", backup_dns], creationflags=subprocess.CREATE_NO_WINDOW)
+                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "static", backup_dns], creationflags=subprocess.CREATE_NO_WINDOW)
                 else:
                     logging.info(f"Restoring DHCP DNS for interface: {interface}")
-                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
+                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-                subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
-                subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f"interface={interface}", "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
             # Fail-open: Fast batch PowerShell command to wipe all NetStrip firewall rules.
             # IPv6/IPv4 protocol bindings are restored below based on the database state.

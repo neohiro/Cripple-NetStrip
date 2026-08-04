@@ -352,13 +352,13 @@ class BlocklistManager:
                 with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump({
                         "hash": current_hash,
-                        "domain_map": {k.value: v for k, v in self.domain_map.items()},
+                        "domain_map": {k: getattr(v, 'value', v) for k, v in self.domain_map.items()},
                         "identity_map": self.identity_map,
-                        "stats": {k.value: v for k, v in self.stats.items()},
-                        "sources_metadata": {k.value: v for k, v in self.sources_metadata.items()}
+                        "stats": {getattr(k, 'value', k): v for k, v in self.stats.items()},
+                        "sources_metadata": {getattr(k, 'value', k): v for k, v in self.sources_metadata.items()}
                     }, f)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to write cache: {e}")
         finally:
             self.is_loading = False
 

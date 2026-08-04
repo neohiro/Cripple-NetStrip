@@ -80,6 +80,7 @@ class LogView(ctk.CTkFrame):
         self._log_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
         self._log_scroll.pack(fill="both", expand=True)
 
+        self._last_signature = None
         self._row_pool = []
         for _ in range(50):
             frame, lbls = self._build_empty_row()
@@ -134,19 +135,19 @@ class LogView(ctk.CTkFrame):
             import tkinter.messagebox
             tkinter.messagebox.showerror("Export Failed", f"Failed to export logs:\n{str(e)}")
 
-    @safe_loop(delay_ms=500)
+    @safe_loop(delay_ms=750)
     def _refresh_logs(self):
         if getattr(self, '_destroyed', False):
             return
 
         if not self.winfo_ismapped():
             if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-            self._refresh_logs_id = self.after(500, self._refresh_logs)
+            self._refresh_logs_id = self.after(750, self._refresh_logs)
             return
 
         if getattr(self, '_is_fetching_logs', False):
             if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-            self._refresh_logs_id = self.after(500, self._refresh_logs)
+            self._refresh_logs_id = self.after(750, self._refresh_logs)
             return
 
         self._is_fetching_logs = True
@@ -173,6 +174,17 @@ class LogView(ctk.CTkFrame):
                             or query in (r['ip'] or '').lower()
                         ]
 
+                    # Fast signature diffing: skip all widget manipulations if logs & filter didn't change
+                    current_sig = (
+                        query,
+                        len(filtered_rows),
+                        tuple((r.get('id'), r.get('timestamp'), r.get('action'), r.get('category')) for r in filtered_rows[:15])
+                    )
+                    if self._last_signature == current_sig and hasattr(self, '_pool_initialized'):
+                        return
+                    self._last_signature = current_sig
+                    self._pool_initialized = True
+
                     if not filtered_rows:
                         if not hasattr(self, 'loading_frame'):
                             self.loading_frame = ctk.CTkFrame(self._log_scroll, fg_color=Colors.BG_DARK)
@@ -188,12 +200,15 @@ class LogView(ctk.CTkFrame):
                             self.loading_frame.destroy()
                             delattr(self, 'loading_frame')
 
-                    # In-place UI update (0 layout thrashing)
+                    # In-place UI update (zero layout thrashing)
                     for i, (frame, lbls) in enumerate(self._row_pool):
                         if i < len(filtered_rows):
-                            # Dynamic row background color for alternating contrast
+                            # Dynamic row background color for alternating contrast (only configure if changed)
                             bg_color = Colors.BG_ELEVATED if i % 2 == 0 else Colors.BG_PANEL
-                            frame.configure(fg_color=bg_color)
+                            if getattr(frame, '_last_bg', None) != bg_color:
+                                frame.configure(fg_color=bg_color)
+                                frame._last_bg = bg_color
+
                             if not frame.winfo_ismapped():
                                 frame.pack(fill="x", pady=1, padx=2)
                             self._fill_row(lbls, filtered_rows[i])
@@ -204,7 +219,7 @@ class LogView(ctk.CTkFrame):
                     self._is_fetching_logs = False
                     if not self._destroyed:
                         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-                        self._refresh_logs_id = self.after(500, self._refresh_logs)
+                        self._refresh_logs_id = self.after(750, self._refresh_logs)
 
             self.after(0, update_ui)
 
@@ -222,7 +237,7 @@ class LogView(ctk.CTkFrame):
         lbl_time = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_TERTIARY, anchor="w")
         lbl_time.grid(row=0, column=0, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        proc_frame = ctk.CTkFrame(frame, fg_color=Colors.BG_PANEL)
+        proc_frame = ctk.CTkFrame(frame, fg_color="transparent")
         proc_frame.grid(row=0, column=1, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
         lbl_dot = ctk.CTkLabel(proc_frame, text="● ", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS))
         lbl_dot.pack(side="left")
@@ -232,11 +247,12 @@ class LogView(ctk.CTkFrame):
         lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6, anchor="center")
-        lbl_cat.grid(row=0, column=3, sticky="ew", padx=Spacing.SM, pady=Spacing.SM)
+        # Fixed dimensions without sticky="ew" prevents dynamic canvas geometry re-centering glitches
+        lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), width=96, height=22, corner_radius=6, anchor="center")
+        lbl_cat.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6, anchor="center")
-        lbl_act.grid(row=0, column=4, sticky="ew", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), width=80, height=22, corner_radius=6, anchor="center")
+        lbl_act.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
 
         return frame, {
             'time': lbl_time,
@@ -295,6 +311,9 @@ class LogView(ctk.CTkFrame):
         if getattr(lbls['domain'], '_last_val', None) != domain_text:
             lbls['domain'].configure(text=domain_text)
             lbls['domain']._last_val = domain_text
+            
+        if getattr(lbls['domain'], '_last_raw_domain', None) != raw_domain:
+            lbls['domain']._last_raw_domain = raw_domain
             if raw_domain:
                 bind_copy_tooltip(lbls['domain'], raw_domain)
             
@@ -314,9 +333,10 @@ class LogView(ctk.CTkFrame):
             act_fg = "#4a1525"
             act_color = "#f43f5e"
 
-        if getattr(lbls['act'], '_last_val', None) != act_text:
+        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_fg', None) != act_fg:
             lbls['act'].configure(text=act_text, fg_color=act_fg, text_color=act_color)
             lbls['act']._last_val = act_text
+            lbls['act']._last_fg = act_fg
 
     def destroy(self):
         self._destroyed = True

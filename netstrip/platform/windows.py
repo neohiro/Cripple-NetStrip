@@ -59,14 +59,14 @@ class WindowsPlatform(PlatformBase):
             # Provision a dedicated IPv6 ULA loopback address for NetStrip to avoid port conflicts with DNSCrypt/Torifier on ::1
             self._run_cmd(["netsh", "interface", "ipv6", "add", "address", "interface=1", "address=fd00::127"])
             
-            cmd = ["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "static", dns_server]
+            cmd = ["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "static", dns_server]
             res = self._run_cmd(cmd)
             # Try setting IPv6 to our dedicated ULA loopback proxy
-            cmd_v6 = ["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "static", "fd00::127"]
+            cmd_v6 = ["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "static", "fd00::127"]
             self._run_cmd(cmd_v6)
             
             # Disable Router Advertisement (SLAAC) to prevent router from dynamically overriding our IPv6 DNS
-            cmd_ra = ["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=disabled"]
+            cmd_ra = ["netsh", "interface", "ipv6", "set", "interface", f"interface={interface}", "routerdiscovery=disabled"]
             self._run_cmd(cmd_ra)
             
             return res.returncode == 0
@@ -77,17 +77,17 @@ class WindowsPlatform(PlatformBase):
     def restore_system_dns(self, interface: str, original_dns_server: Optional[str] = None) -> bool:
         try:
             if original_dns_server and re.match(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$', original_dns_server):
-                cmd = ["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "static", original_dns_server]
+                cmd = ["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "static", original_dns_server]
             else:
-                cmd = ["netsh", "interface", "ipv4", "set", "dns", f'name="{interface}"', "dhcp"]
+                cmd = ["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "dhcp"]
             res = self._run_cmd(cmd)
             
             # Always restore IPv6 to auto
-            cmd_v6 = ["netsh", "interface", "ipv6", "set", "dns", f'name="{interface}"', "dhcp"]
+            cmd_v6 = ["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "dhcp"]
             self._run_cmd(cmd_v6)
             
             # Re-enable Router Advertisement (SLAAC)
-            cmd_ra = ["netsh", "interface", "ipv6", "set", "interface", f'interface="{interface}"', "routerdiscovery=enabled"]
+            cmd_ra = ["netsh", "interface", "ipv6", "set", "interface", f"interface={interface}", "routerdiscovery=enabled"]
             self._run_cmd(cmd_ra)
             
             return res.returncode == 0
@@ -97,7 +97,7 @@ class WindowsPlatform(PlatformBase):
 
     def get_original_dns(self, interface: str) -> Optional[str]:
         # Parse netsh interface ip show dns
-        res = self._run_cmd(["netsh", "interface", "ip", "show", "dns", f'name="{interface}"'])
+        res = self._run_cmd(["netsh", "interface", "ip", "show", "dns", f"name={interface}"])
         for line in res.stdout.splitlines():
             line = line.strip()
             if not line: continue

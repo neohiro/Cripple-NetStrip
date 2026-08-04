@@ -85,6 +85,155 @@ try:
 except Exception as e:
     logger.debug(f"Could not load online DoH providers: {e}")
 
+class _DNSConnectionPool:
+    """Thread-safe connection pool for DNS over TLS (DoT) and DNS over HTTPS (DoH) keep-alive sockets."""
+    def __init__(self, idle_timeout: float = 30.0, max_connections_per_host: int = 4):
+        self.idle_timeout = idle_timeout
+        self.max_connections_per_host = max_connections_per_host
+        self._dot_pool = {}  # ip -> list of (tls_sock, raw_sock, last_used_time)
+        self._doh_pool = {}  # (ip, host) -> list of (http_conn, last_used_time)
+        self._lock = threading.Lock()
+
+    def get_dot_socket(self, ip: str, port: int = 853, timeout: float = 2.0):
+        now = time.time()
+        with self._lock:
+            if ip in self._dot_pool:
+                while self._dot_pool[ip]:
+                    tls_sock, raw_sock, last_used = self._dot_pool[ip].pop()
+                    if now - last_used <= self.idle_timeout:
+                        try:
+                            import select
+                            r, _, _ = select.select([tls_sock], [], [], 0)
+                            if not r:
+                                tls_sock.settimeout(timeout)
+                                return tls_sock, raw_sock
+                        except Exception:
+                            pass
+                    self._close_sock(tls_sock, raw_sock)
+
+        # Create a new TLS socket
+        try:
+            import socket
+            import ssl
+            try:
+                import certifi
+                ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+            raw_sock = socket.create_connection((ip, port), timeout=timeout)
+            tls_sock = ctx.wrap_socket(raw_sock)
+            tls_sock.settimeout(timeout)
+            return tls_sock, raw_sock
+        except Exception:
+            return None, None
+
+    def put_dot_socket(self, ip: str, tls_sock, raw_sock):
+        if not tls_sock or not raw_sock:
+            return
+        now = time.time()
+        with self._lock:
+            if ip not in self._dot_pool:
+                self._dot_pool[ip] = []
+            if len(self._dot_pool[ip]) < self.max_connections_per_host:
+                self._dot_pool[ip].append((tls_sock, raw_sock, now))
+                return
+        self._close_sock(tls_sock, raw_sock)
+
+    def discard_dot_socket(self, tls_sock, raw_sock):
+        self._close_sock(tls_sock, raw_sock)
+
+    def _close_sock(self, tls_sock, raw_sock):
+        try:
+            if tls_sock:
+                tls_sock.close()
+        except Exception:
+            pass
+        try:
+            if raw_sock:
+                raw_sock.close()
+        except Exception:
+            pass
+
+    def get_doh_connection(self, ip: str, host: str, timeout: float = 2.0):
+        key = (ip, host)
+        now = time.time()
+        with self._lock:
+            if key in self._doh_pool:
+                while self._doh_pool[key]:
+                    conn, last_used = self._doh_pool[key].pop()
+                    if now - last_used <= self.idle_timeout and getattr(conn, 'sock', None):
+                        try:
+                            import select
+                            r, _, _ = select.select([conn.sock], [], [], 0)
+                            if not r:
+                                conn.timeout = timeout
+                                return conn
+                        except Exception:
+                            pass
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+        # Create new HTTPS connection
+        try:
+            import http.client
+            import ssl
+            try:
+                import certifi
+                ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+            conn = http.client.HTTPSConnection(ip, 443, context=ctx, timeout=timeout)
+            return conn
+        except Exception:
+            return None
+
+    def put_doh_connection(self, ip: str, host: str, conn):
+        if not conn:
+            return
+        key = (ip, host)
+        now = time.time()
+        with self._lock:
+            if key not in self._doh_pool:
+                self._doh_pool[key] = []
+            if len(self._doh_pool[key]) < self.max_connections_per_host:
+                self._doh_pool[key].append((conn, now))
+                return
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    def discard_doh_connection(self, conn):
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def close_all(self):
+        with self._lock:
+            for ip, list_socks in self._dot_pool.items():
+                for tls_sock, raw_sock, _ in list_socks:
+                    self._close_sock(tls_sock, raw_sock)
+            self._dot_pool.clear()
+
+            for key, list_conns in self._doh_pool.items():
+                for conn, _ in list_conns:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            self._doh_pool.clear()
+
+
 class NetStripResolver(BaseResolver):
     def __init__(self, classifier: TrafficClassifier, db: Database, default_upstream_port: int = 53, engine=None):
         self.classifier = classifier
@@ -92,10 +241,22 @@ class NetStripResolver(BaseResolver):
         self.engine = engine
         self.on_status: Callable = None
         self.upstream_port = default_upstream_port
-        self._dns_cache = {} # (qname, qtype) -> (timestamp, proxy_response_bytes)
-        self._cache_ttl = 300 # 5 minutes TTL
+        from collections import OrderedDict
+        self._dns_cache = OrderedDict()  # (qname, qtype) -> (timestamp, proxy_response_bytes)
+        self._max_cache_size = 5000
+        self._cache_ttl = 300  # 5 minutes TTL
+        self._proc_cache = OrderedDict()  # domain -> (timestamp, process_name)
+        self._proc_cache_ttl = 60  # 60 seconds
+        self._conn_pool = _DNSConnectionPool(idle_timeout=30.0, max_connections_per_host=4)
         
     def _infer_process(self, domain: str, src_port: int = None) -> str:
+        # Check fast in-memory process cache
+        now = time.time()
+        if domain in self._proc_cache:
+            ts, p_name = self._proc_cache[domain]
+            if now - ts < self._proc_cache_ttl:
+                return p_name
+
         # 1. Direct Socket Mapping: If the app bypasses OS DNS and sends its own UDP packets
         if src_port and self.engine and hasattr(self.engine, 'connection_monitor'):
             pid = self.engine.connection_monitor.port_to_pid.get(src_port)
@@ -104,6 +265,9 @@ class NetStripResolver(BaseResolver):
                     import psutil
                     name = psutil.Process(pid).name()
                     if name.lower() not in ('svchost.exe', 'dnscache'):
+                        if len(self._proc_cache) > 2000:
+                            self._proc_cache.popitem(last=False)
+                        self._proc_cache[domain] = (now, name)
                         return name
                 except:
                     pass
@@ -120,7 +284,11 @@ class NetStripResolver(BaseResolver):
                     """
                     row = conn.execute(query1, (domain,)).fetchone()
                     if row and row['process_name']:
-                        return row['process_name']
+                        p_name = row['process_name']
+                        if len(self._proc_cache) > 2000:
+                            self._proc_cache.popitem(last=False)
+                        self._proc_cache[domain] = (now, p_name)
+                        return p_name
                         
                     # B. Fallback to Parent Domain correlation (e.g. ads.example.com -> example.com)
                     parts = domain.split('.')
@@ -133,35 +301,35 @@ class NetStripResolver(BaseResolver):
                         """
                         row = conn.execute(query2, (parent_domain,)).fetchone()
                         if row and row['process_name']:
-                            return row['process_name']
+                            p_name = row['process_name']
+                            if len(self._proc_cache) > 2000:
+                                self._proc_cache.popitem(last=False)
+                            self._proc_cache[domain] = (now, p_name)
+                            return p_name
                             
         except Exception as e:
             logger.debug(f"Process inference failed: {e}")
             
-        return "Unknown (DNS)"
+        inferred = "Unknown (DNS)"
+        if len(self._proc_cache) > 2000:
+            self._proc_cache.popitem(last=False)
+        self._proc_cache[domain] = (now, inferred)
+        return inferred
 
-    def _send_dot(self, request_packet, ip, timeout=3):
-        import socket
-        import ssl
+    def _send_dot(self, request_packet, ip, timeout=2):
         import struct
-        try:
-            try:
-                import certifi
-                ctx = ssl.create_default_context(cafile=certifi.where())
-            except ImportError:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-            
-            sock = socket.create_connection((ip, 853), timeout=timeout)
-            tls_sock = ctx.wrap_socket(sock)
+        for attempt in range(2):
+            tls_sock, raw_sock = self._conn_pool.get_dot_socket(ip, port=853, timeout=timeout)
+            if not tls_sock:
+                return None
             try:
                 length = struct.pack("!H", len(request_packet))
                 tls_sock.sendall(length + request_packet)
                 
                 resp_len_bytes = tls_sock.recv(2)
-                if not resp_len_bytes:
-                    return None
+                if not resp_len_bytes or len(resp_len_bytes) < 2:
+                    self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
+                    continue
                 resp_len = struct.unpack("!H", resp_len_bytes)[0]
                 
                 resp_data = b""
@@ -170,52 +338,43 @@ class NetStripResolver(BaseResolver):
                     if not chunk: break
                     resp_data += chunk
                     
-                return resp_data if len(resp_data) == resp_len else None
-            finally:
-                try:
-                    tls_sock.close()
-                except: pass
-                try:
-                    sock.close()
-                except: pass
-        except Exception as e:
-            logger.debug(f"DoT error for {ip}: {e}")
-            return None
+                if len(resp_data) == resp_len:
+                    self._conn_pool.put_dot_socket(ip, tls_sock, raw_sock)
+                    return resp_data
+                else:
+                    self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
+            except Exception as e:
+                self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
+                if attempt == 1:
+                    logger.debug(f"DoT error for {ip}: {e}")
+        return None
 
     def _send_doh(self, request_packet, ip, host, url_path, timeout=2):
-        import urllib.request
-        import http.client
-        import socket
-        import ssl
-        try:
+        for attempt in range(2):
+            conn = self._conn_pool.get_doh_connection(ip, host, timeout=timeout)
+            if not conn:
+                return None
             try:
-                import certifi
-                ctx = ssl.create_default_context(cafile=certifi.where())
-            except ImportError:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-
-            class CustomHTTPSConnection(http.client.HTTPSConnection):
-                def connect(self):
-                    sock = socket.create_connection((ip, self.port), self.timeout, self.source_address)
-                    self.sock = ctx.wrap_socket(sock, server_hostname=self.host)
-
-            class CustomHTTPSHandler(urllib.request.HTTPSHandler):
-                def https_open(self, req):
-                    return self.do_open(CustomHTTPSConnection, req)
-
-            opener = urllib.request.build_opener(CustomHTTPSHandler())
-            req = urllib.request.Request(
-                f"https://{host}{url_path}", 
-                data=request_packet, 
-                headers={'Content-Type': 'application/dns-message', 'Accept': 'application/dns-message'}
-            )
-            with opener.open(req, timeout=timeout) as response:
-                return response.read()
-        except Exception as e:
-            logger.debug(f"DoH error for {ip}: {e}")
-            return None
+                headers = {
+                    'Host': host,
+                    'Content-Type': 'application/dns-message',
+                    'Accept': 'application/dns-message',
+                    'Content-Length': str(len(request_packet)),
+                    'Connection': 'keep-alive'
+                }
+                conn.request("POST", url_path, body=request_packet, headers=headers)
+                res = conn.getresponse()
+                if res.status == 200:
+                    data = res.read()
+                    self._conn_pool.put_doh_connection(ip, host, conn)
+                    return data
+                else:
+                    self._conn_pool.discard_doh_connection(conn)
+            except Exception as e:
+                self._conn_pool.discard_doh_connection(conn)
+                if attempt == 1:
+                    logger.debug(f"DoH error for {ip}: {e}")
+        return None
 
     def resolve(self, request, handler):
         qname = str(request.q.qname)
@@ -264,9 +423,22 @@ class NetStripResolver(BaseResolver):
             reply.add_answer(RR(qname, rdata=A("0.0.0.0")))
             return reply
 
-        # 4. Handle Allow (Forward to Upstream)
-        
-        # Log Allowed connection unconditionally
+        # 4. Handle Allow (Check LRU cache first for instant resolution)
+        cache_key = (qname, qtype)
+        if cache_key in self._dns_cache:
+            timestamp, cached_bytes = self._dns_cache[cache_key]
+            if time.time() - timestamp < self._cache_ttl:
+                self._dns_cache.move_to_end(cache_key)
+                try:
+                    cached_record = DNSRecord.parse(cached_bytes)
+                    cached_record.header.id = request.header.id
+                    return cached_record
+                except Exception:
+                    pass
+            else:
+                del self._dns_cache[cache_key]
+
+        # Cache Miss: Log Allowed connection and forward upstream
         src_port = getattr(handler, 'client_address', (None, None))[1]
         self.db.log_connection({
             'process_name': process_name,
@@ -277,21 +449,6 @@ class NetStripResolver(BaseResolver):
             'mode': self.classifier.mode.name
         })
         self.db.update_daily_stats(action.value, category.value)
-        
-        # Check cache
-        cache_key = (qname, qtype)
-        if cache_key in self._dns_cache:
-            timestamp, cached_bytes = self._dns_cache[cache_key]
-            if time.time() - timestamp < self._cache_ttl:
-                # Re-parse from raw bytes and inject the correct transaction ID
-                try:
-                    cached_record = DNSRecord.parse(cached_bytes)
-                    cached_record.header.id = request.header.id
-                    return cached_record
-                except:
-                    pass
-            else:
-                del self._dns_cache[cache_key]
         
         # Fetch dynamic upstream from settings
         upstream_ip = self.db.get_setting("dns_upstream", "8.8.8.8")
@@ -326,10 +483,11 @@ class NetStripResolver(BaseResolver):
 
             record = DNSRecord.parse(proxy_response)
             
-            # Save to cache
-            if len(self._dns_cache) > 10000:
-                self._dns_cache.clear()
+            # Save to bounded LRU cache
+            if len(self._dns_cache) >= self._max_cache_size:
+                self._dns_cache.popitem(last=False)
             self._dns_cache[cache_key] = (time.time(), proxy_response)
+            self._dns_cache.move_to_end(cache_key)
             
             # Extract A (1) and AAAA (28) records to populate persistent database cache
             for rr in record.rr:
@@ -394,4 +552,6 @@ class DNSProxyService:
         if self.udp_server_v6:
             self.udp_server_v6.stop()
             self.tcp_server_v6.stop()
+        if hasattr(self.resolver, '_conn_pool'):
+            self.resolver._conn_pool.close_all()
         logger.info("DNS Proxy stopped")
