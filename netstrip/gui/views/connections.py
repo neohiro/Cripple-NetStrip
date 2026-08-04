@@ -183,8 +183,7 @@ class ConnectionsView(ctk.CTkFrame):
         # Fetch recent connections in background thread to prevent UI micro-stutters
         def fetch():
             try:
-                session_start = getattr(self.engine, 'session_start_time', None)
-                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True, since_timestamp=session_start)
+                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
                 def process_ui():

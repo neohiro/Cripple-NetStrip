@@ -46,14 +46,14 @@ class BlocklistView(ctk.CTkFrame):
         # Search Results Area
         self._build_results_area()
         
+        # Bind Map event to refresh stats grid when tab becomes visible
+        self.bind("<Map>", lambda e: self._refresh_stats_grid())
+        
         # Start periodic poll to update counts as background blocklist loading completes
         self._poll_loading()
 
     def _poll_loading(self):
         if getattr(self, '_destroyed', False):
-            return
-        if not self.winfo_ismapped():
-            self.after(1000, self._poll_loading)
             return
 
         self._refresh_stats_grid()

@@ -122,22 +122,21 @@ class ConnectionsSidebar(ctk.CTkFrame):
         
         ctk.CTkLabel(self.lan_frame, text="LAN Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
+        is_lan_on = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true"
+        self.lan_toggle_var = ctk.BooleanVar(value=is_lan_on)
         self.lan_toggle = ctk.CTkSwitch(
             self.lan_frame, text="", width=36,
+            variable=self.lan_toggle_var,
             progress_color=Colors.CAT_LAN,
             command=self._on_lan_toggle
         )
         self.lan_toggle.pack(side="right")
         
-        # Initialize toggle state from DB
-        if self.engine.db.get_setting("lan_shield_enabled", "true") == "true":
-            self.lan_toggle.select()
-        
         self._refresh_loop()
 
     def _on_lan_toggle(self):
         def proceed():
-            val = self.lan_toggle.get() == 1
+            val = self.lan_toggle_var.get()
             self.engine.db.set_setting("lan_shield_enabled", "true" if val else "false")
             
             if val:
@@ -147,11 +146,11 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
 
         # We only care if they are trying to toggle it OFF
-        is_on = self.lan_toggle.get() == 1
+        is_on = self.lan_toggle_var.get()
         if not is_on: # They toggled it to OFF
             def on_cancel():
                 # Revert visual
-                self.lan_toggle.select()
+                self.lan_toggle_var.set(True)
             
             check_killswitch_override(self.engine, self, proceed, cancel_callback=on_cancel)
         else:
@@ -205,8 +204,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         # Fetch recent connections in background thread to prevent UI micro-stutters
         def fetch():
             try:
-                session_start = getattr(self.engine, 'session_start_time', None)
-                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True, since_timestamp=session_start)
+                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
                 def process_ui_batch(index=0, current_counts=None):
