@@ -1,3 +1,10 @@
+## [v3.1.21] - Smooth List Rendering & Extended Viewport
+
+- **Eliminated Freezes & Memory Leaks**: Removed global `bind_all("<MouseWheel>")` handlers in `BlocklistView` that accumulated event listener leaks and froze the app after extended use.
+- **Widget Pooling (Zero-Lag UI)**: Implemented 50-row Widget Pools in both `BlocklistView` and `LogView`. Rows update in-place with 0 widget creation overhead during scrolling/searching.
+- **Full Vertical Extended Results**: `_stats_container` now automatically collapses when a search query or category filter is active, allowing search results to expand into the full vertical viewport (showing 25+ results at once).
+- **Asynchronous Log Refresh**: Moved SQLite database queries in `LogView` to a background thread to eliminate GUI thread micro-stutters.
+
 ## [v3.1.20] - GeoIP Fix, Fast 3.2M Domain Indexing & LAN Shield Toggle Fix
 
 - **GeoIP Service**: Added multi-provider HTTPS fallbacks (`ipinfo.io`, `ip-api.com`, `ipify.org`) and immediate callback notification on boot. Public IP and location now populate instantly in the top bar.

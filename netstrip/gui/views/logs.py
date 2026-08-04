@@ -80,7 +80,7 @@ class LogView(ctk.CTkFrame):
         self._log_scroll.pack(fill="both", expand=True)
 
         self._row_pool = []
-        for _ in range(25):
+        for _ in range(50):
             frame, lbls = self._build_empty_row()
             frame.pack(fill="x", pady=1, padx=2)
             self._row_pool.append((frame, lbls))
@@ -143,49 +143,71 @@ class LogView(ctk.CTkFrame):
             self._refresh_logs_id = self.after(500, self._refresh_logs)
             return
 
-        try:
-            rows = list(self.engine.db.get_recent_connections(25)) # Keep max 25 in GUI memory
-        except Exception:
-            rows = []
-
-        query = self._filter_entry.get().strip().lower()
-        if query:
-            rows = [
-                r for r in rows
-                if query in (r['process_name'] or '').lower()
-                or query in (r['domain'] or '').lower()
-                or query in (r['ip'] or '').lower()
-            ]
-            
-        # Optional loading label handle
-        if not rows:
-            if not hasattr(self, 'loading_frame'):
-                self.loading_frame = ctk.CTkFrame(self._log_scroll, fg_color=Colors.BG_DARK)
-                self.loading_frame.pack(pady=Spacing.XL, expand=True)
-                ctk.CTkLabel(self.loading_frame, text="⏳", font=(Fonts.FAMILY_PRIMARY[0], 36)).pack()
-                ctk.CTkLabel(
-                    self.loading_frame, text="Listening for connections...",
-                    text_color=Colors.TEXT_TERTIARY,
-                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-                ).pack(pady=Spacing.XS)
-        else:
-            if hasattr(self, 'loading_frame'):
-                self.loading_frame.destroy()
-                delattr(self, 'loading_frame')
-
-        # In-place UI update (0 layout thrashing)
-        for i, (frame, lbls) in enumerate(self._row_pool):
-            if i < len(rows):
-                if not frame.winfo_ismapped():
-                    frame.pack(fill="x", pady=1, padx=2)
-                self._fill_row(lbls, rows[i])
-            else:
-                if frame.winfo_ismapped():
-                    frame.pack_forget()
-
-        if not self._destroyed:
+        if getattr(self, '_is_fetching_logs', False):
             if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
             self._refresh_logs_id = self.after(500, self._refresh_logs)
+            return
+
+        self._is_fetching_logs = True
+
+        import threading
+        def fetch_task():
+            try:
+                rows = list(self.engine.db.get_recent_connections(50))
+            except Exception:
+                rows = []
+
+            def update_ui():
+                try:
+                    if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                        return
+
+                    query = self._filter_entry.get().strip().lower()
+                    filtered_rows = rows
+                    if query:
+                        filtered_rows = [
+                            r for r in rows
+                            if query in (r['process_name'] or '').lower()
+                            or query in (r['domain'] or '').lower()
+                            or query in (r['ip'] or '').lower()
+                        ]
+
+                    if not filtered_rows:
+                        if not hasattr(self, 'loading_frame'):
+                            self.loading_frame = ctk.CTkFrame(self._log_scroll, fg_color=Colors.BG_DARK)
+                            self.loading_frame.pack(pady=Spacing.XL, expand=True)
+                            ctk.CTkLabel(self.loading_frame, text="⏳", font=(Fonts.FAMILY_PRIMARY[0], 36)).pack()
+                            ctk.CTkLabel(
+                                self.loading_frame, text="Listening for connections...",
+                                text_color=Colors.TEXT_TERTIARY,
+                                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+                            ).pack(pady=Spacing.XS)
+                    else:
+                        if hasattr(self, 'loading_frame'):
+                            self.loading_frame.destroy()
+                            delattr(self, 'loading_frame')
+
+                    # In-place UI update (0 layout thrashing)
+                    for i, (frame, lbls) in enumerate(self._row_pool):
+                        if i < len(filtered_rows):
+                            # Dynamic row background color for alternating contrast
+                            bg_color = Colors.BG_ELEVATED if i % 2 == 0 else Colors.BG_PANEL
+                            frame.configure(fg_color=bg_color)
+                            if not frame.winfo_ismapped():
+                                frame.pack(fill="x", pady=1, padx=2)
+                            self._fill_row(lbls, filtered_rows[i])
+                        else:
+                            if frame.winfo_ismapped():
+                                frame.pack_forget()
+                finally:
+                    self._is_fetching_logs = False
+                    if not self._destroyed:
+                        if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
+                        self._refresh_logs_id = self.after(500, self._refresh_logs)
+
+            self.after(0, update_ui)
+
+        threading.Thread(target=fetch_task, daemon=True).start()
 
     def _build_empty_row(self):
         frame = ctk.CTkFrame(

@@ -424,77 +424,54 @@ class BlocklistView(ctk.CTkFrame):
     def _build_results_area(self):
         self._results_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self._results_scroll.pack(fill="both", expand=True)
-        self._result_widgets = []
-        self._restore_empty_state()
         
-        # Setup infinite scrolling variables
         self._current_results = []
-        self._rendered_count = 0
-        self._page_size = 50
-        self._is_fetching = False
+        self._results_row_pool = []
         
-        # Bind mouse wheel to check scroll position on the parent canvas
-        self._results_scroll.bind_all("<MouseWheel>", self._check_scroll, add="+")
-
-    def _check_scroll(self, event=None):
-        if getattr(self, '_destroyed', False) or not self.winfo_ismapped():
-            return
+        # Pre-allocate 50 reusable result row widgets (0 widget creation thrashing)
+        for _ in range(50):
+            row = ctk.CTkFrame(self._results_scroll, fg_color=Colors.BG_ELEVATED, corner_radius=4, height=36)
+            row.pack_propagate(False)
             
-        if hasattr(self, '_scroll_timer'):
-            self.after_cancel(self._scroll_timer)
+            domain_lbl = ctk.CTkLabel(
+                row, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+                text_color=Colors.TEXT_PRIMARY, anchor="w"
+            )
+            domain_lbl.pack(side="left", padx=Spacing.MD)
             
-        def do_check():
-            try:
-                yview = self._results_scroll._parent_canvas.yview()
-                if yview[1] >= 0.5: # User scrolled halfway down
-                    self._render_next_chunk()
-            except Exception:
-                pass
-                
-        self._scroll_timer = self.after(100, do_check)
-
-    def _fetch_more_results(self):
-        if self._is_fetching: return
-        self._is_fetching = True
-        
-        query = self._search_entry.get().strip()
-        cat_filter = getattr(self, '_active_category_filter', None)
-        
-        def search_task():
-            try:
-                results = self.engine.blocklist.search(
-                    query, 
-                    limit=2000, 
-                    category_filter=cat_filter, 
-                    offset=len(self._current_results)
-                )
-                
-                def append_results():
-                    if getattr(self, '_destroyed', False): return
-                    self._current_results.extend(results)
-                    self._is_fetching = False
-                    # Force a render next chunk so it picks up the new results
-                    self._render_next_chunk()
-                    
-                self.after(0, append_results)
-            except Exception:
-                def fail_fetch():
-                    self._is_fetching = False
-                self.after(0, fail_fetch)
-                
-        import threading
-        threading.Thread(target=search_task, daemon=True).start()
+            cat_badge = ctk.CTkLabel(
+                row, text="", font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
+                corner_radius=4, height=22
+            )
+            cat_badge.pack(side="left", padx=Spacing.SM)
+            
+            btn = ctk.CTkButton(
+                row, text="", width=75, height=24, corner_radius=4,
+                font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"), text_color=Colors.TEXT_PRIMARY
+            )
+            btn.pack(side="right", padx=Spacing.MD)
+            
+            self._results_row_pool.append({
+                'frame': row,
+                'domain_lbl': domain_lbl,
+                'cat_badge': cat_badge,
+                'btn': btn
+            })
+            
+        self._restore_empty_state()
 
     def _restore_empty_state(self):
-        self._loading_label = ctk.CTkLabel(
-            self._results_scroll, text="Search for a domain to check if it is blocked.",
-            text_color=Colors.TEXT_TERTIARY,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic")
-        )
-        self._loading_label.pack(pady=Spacing.LG)
-        if not hasattr(self, '_result_widgets'):
-            self._result_widgets = []
-        self._result_widgets.append(self._loading_label)
+        for item in self._results_row_pool:
+            if item['frame'].winfo_ismapped():
+                item['frame'].pack_forget()
+                
+        if not hasattr(self, '_empty_lbl') or not self._empty_lbl.winfo_exists():
+            self._empty_lbl = ctk.CTkLabel(
+                self._results_scroll, text="Search for a domain or click an Indexed Category to explore filter lists.",
+                text_color=Colors.TEXT_TERTIARY,
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic")
+            )
+        self._empty_lbl.pack(pady=Spacing.LG)
 
     def _do_search(self):
         query = self._search_entry.get().strip()
@@ -503,50 +480,24 @@ class BlocklistView(ctk.CTkFrame):
         self._current_search_id = getattr(self, '_current_search_id', 0) + 1
         current_search_id = self._current_search_id
 
-        if not hasattr(self, '_result_widgets'):
-            self._result_widgets = []
-        for w in list(self._result_widgets):
-            try:
-                w.destroy()
-            except:
-                pass
-        self._result_widgets.clear()
-        
-        container = getattr(self, '_results_container', getattr(self, '_results_scroll', None))
-        if container:
-            for w in container.winfo_children():
-                try:
-                    w.destroy()
-                except:
-                    pass
-
-        if not query and not cat_filter:
-            self._restore_empty_state() # Restore empty state
+        # Hide or show stats container depending on search activity to extend results view below
+        if query or cat_filter:
+            if hasattr(self, '_stats_container') and self._stats_container.winfo_ismapped():
+                self._stats_container.pack_forget()
+        else:
+            if hasattr(self, '_stats_container') and not self._stats_container.winfo_ismapped():
+                self._stats_container.pack(fill="x", before=self._results_scroll, pady=(0, Spacing.MD))
+            self._restore_empty_state()
             return
 
-        # Show loading indicator
-        txt = f"Searching for '{query}'..." if query else "Loading domains..."
-        if cat_filter:
-            txt += f" in category: {cat_filter.upper()}"
-            
-        self._loading_label = ctk.CTkLabel(
-            self._results_scroll, text=txt,
-            text_color=Colors.TEXT_TERTIARY,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic")
-        )
-        self._loading_label.pack(pady=Spacing.LG)
-        self._result_widgets.append(self._loading_label)
-
-        # Run search in background thread to prevent UI freezing
+        # Background thread search query execution
         import threading
         def search_task():
             try:
-                # Cap to 200 results for fast response
-                results = self.engine.blocklist.search(query, limit=200, category_filter=cat_filter)
+                results = self.engine.blocklist.search(query, limit=50, category_filter=cat_filter)
             except Exception:
                 results = []
             
-            # Update UI on main thread safely
             if not self._destroyed and getattr(self, '_current_search_id', 0) == current_search_id:
                 self.after(0, lambda: self._init_render(results, query, current_search_id))
                 
@@ -555,101 +506,24 @@ class BlocklistView(ctk.CTkFrame):
     def _init_render(self, results, query, search_id):
         if self._destroyed or getattr(self, '_current_search_id', 0) != search_id:
             return
-            
-        try:
-            if hasattr(self, '_loading_label') and self._loading_label:
-                self._loading_label.destroy()
-        except Exception:
-            pass
 
-        self._current_results = results
-        self._rendered_count = 0
-        self._current_query = query
-        self._is_loading_chunk = False
-        
-        for w in self._result_widgets:
-            try:
-                w.destroy()
-            except:
-                pass
-        self._result_widgets.clear()
+        if hasattr(self, '_empty_lbl') and self._empty_lbl.winfo_exists():
+            self._empty_lbl.pack_forget()
 
-        if not results:
-            msg = f"No matches found for '{query}'" if query else "No domains found in this category."
-            lbl = ctk.CTkLabel(
-                self._results_scroll, text=msg,
-                text_color=Colors.TEXT_TERTIARY,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-            )
-            lbl.pack(pady=Spacing.LG)
-            self._result_widgets.append(lbl)
-            return
-
-        if query:
-            lbl = ctk.CTkLabel(
-                self._results_scroll, text=f"Showing matches for '{query}':",
-                text_color=Colors.TEXT_SECONDARY,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "italic"),
-            )
-            lbl.pack(anchor="w", padx=Spacing.SM, pady=(0, Spacing.SM))
-            self._result_widgets.append(lbl)
-
-        self._render_next_chunk()
-
-    def _render_next_chunk(self):
-        if getattr(self, '_destroyed', False) or not getattr(self, '_current_results', None):
-            return
-            
-        if getattr(self, '_is_loading_chunk', False):
-            return
-            
-        if self._rendered_count >= len(self._current_results):
-            self._fetch_more_results()
-            return # Done rendering current chunk
-            
-        self._is_loading_chunk = True
-        self._page_size = 30
-            
-        chunk = self._current_results[self._rendered_count : self._rendered_count + self._page_size]
-        if not chunk:
-            self._is_loading_chunk = False
-            return
-            
-        self._rendered_count += len(chunk)
-
-        search_id = getattr(self, '_current_search_id', 0)
         from netstrip.core.modes import ConnectionCategory
         from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
 
-        def _render_batch(items, index=0):
-            if getattr(self, '_destroyed', False) or index >= len(items) or getattr(self, '_current_search_id', 0) != search_id:
-                if getattr(self, '_current_search_id', 0) == search_id:
-                    self._is_loading_chunk = False
-                return
-                
-            batch_size = 10
-            for r in items[index : index + batch_size]:
-                parent_container = getattr(self, '_results_container', getattr(self, '_results_scroll', None))
-                row = ctk.CTkFrame(
-                    parent_container,
-                    fg_color=Colors.BG_ELEVATED, corner_radius=4, height=32
-                )
-                row.pack(fill="x", pady=2, padx=4)
-                row.pack_propagate(False)
-                if hasattr(self, '_result_widgets'):
-                    self._result_widgets.append(row)
-
+        for i, item in enumerate(self._results_row_pool):
+            if i < len(results):
+                r = results[i]
                 domain = r.get('domain', 'Unknown')
                 cat = r.get('category', 'unknown')
-
-                domain_lbl = ctk.CTkLabel(
-                    row, text=domain,
-                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
-                    text_color=Colors.TEXT_PRIMARY,
-                    anchor="w"
-                )
-                domain_lbl.pack(side="left", padx=Spacing.MD)
-
+                
+                # Dynamic row background color for crisp alternate contrast
+                bg_color = "#181824" if i % 2 == 0 else "#14141f"
+                item['frame'].configure(fg_color=bg_color)
+                item['domain_lbl'].configure(text=domain)
+                
                 try:
                     cat_enum = ConnectionCategory(cat)
                 except ValueError:
@@ -659,16 +533,12 @@ class BlocklistView(ctk.CTkFrame):
                 cat_label = get_category_label(cat_enum)
                 cat_icon = get_category_icon(cat_enum)
                 
-                cat_badge = ctk.CTkLabel(
-                    row, text=f"{cat_icon} {cat_label.upper()}",
-                    font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
+                item['cat_badge'].configure(
+                    text=f" {cat_icon} {cat_label.upper()} ",
                     text_color=cat_color,
-                    fg_color=Colors.BG_ELEVATED,
-                    corner_radius=4,
-                    height=22
+                    fg_color=Colors.BG_ELEVATED
                 )
-                cat_badge.pack(side="left", padx=Spacing.SM)
-
+                
                 is_allowed = cat in ('user_allowed', 'essential')
                 btn_text = "Block" if is_allowed else "Whitelist"
                 btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
@@ -694,19 +564,19 @@ class BlocklistView(ctk.CTkFrame):
                     self._refresh_stats_grid()
                     self._do_search()
 
-                ctk.CTkButton(
-                    row, text=btn_text, width=70, height=22, corner_radius=4,
-                    fg_color=btn_color, hover_color=btn_hover, text_color=Colors.TEXT_PRIMARY,
-                    font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"), command=make_action
-                ).pack(side="right", padx=Spacing.MD)
+                item['btn'].configure(
+                    text=btn_text, fg_color=btn_color, hover_color=btn_hover,
+                    command=make_action
+                )
                 
-            self.after(2, lambda: _render_batch(items, index + batch_size))
-            
-        _render_batch(chunk)
+                if not item['frame'].winfo_ismapped():
+                    item['frame'].pack(fill="x", pady=2, padx=4)
+            else:
+                if item['frame'].winfo_ismapped():
+                    item['frame'].pack_forget()
 
     def destroy(self):
         self._destroyed = True
-        self.unbind_all("<MouseWheel>")
         super().destroy()
 
 

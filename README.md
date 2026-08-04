@@ -317,10 +317,11 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.20 — GeoIP Fix, Fast 3.2M Domain Indexing & LAN Shield Toggle Fix
-- **Instant GeoIP Topbar**: Added multi-provider HTTPS fallbacks (`ipinfo.io`, `ip-api.com`, `ipify.org`). Public IP and city/country populate instantly on startup.
-- **Ultra-Fast 3.2M Domain Grid**: Removed 3.2M dictionary iteration bottleneck in GUI (grid refresh reduced to <1ms).
-- **LAN Shield Toggle Switch**: Fixed CustomTkinter `CTkSwitch` visual state binding using `ctk.StringVar`. Rendered ON by default.
+### v3.1.21 — Smooth List Rendering & Extended Viewport
+- **Eliminated UI Freezes**: Removed global mousewheel listener leaks.
+- **50-Row Widget Pool**: In-place row updates in Filter Lists and Logs views eliminate lag and rendering glitches.
+- **Extended Full-Height Viewport**: `_stats_container` auto-collapses during searches to show 25+ results at once.
+- **Async DB Logging**: Background thread SQLite log fetches eliminate micro-stutters.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes
