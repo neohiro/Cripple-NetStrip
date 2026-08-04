@@ -82,6 +82,60 @@ class BlocklistManager:
         finally:
             self.is_loading = False
 
+    def _parse_domains_from_file(self, filepath: str) -> Set[str]:
+        domains = set()
+        if not os.path.exists(filepath):
+            return domains
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or line.startswith('!') or line.startswith('['):
+                    continue
+                if line.startswith('include:'):
+                    continue
+                if line.startswith('@@'):
+                    continue
+                if '@' in line:
+                    line = line.split('@')[0].strip()
+                if line.startswith('full:'):
+                    line = line[5:].strip()
+                    
+                parts = line.split()
+                if not parts:
+                    continue
+                    
+                if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53'):
+                    domain = parts[1]
+                else:
+                    domain = parts[0]
+                
+                if domain.startswith('domain:'):
+                    domain = domain[7:]
+                if domain.startswith('||'):
+                    domain = domain[2:]
+                    
+                if '^' in domain:
+                    domain = domain.split('^')[0]
+                if '$' in domain:
+                    domain = domain.split('$')[0]
+                if '/' in domain:
+                    domain = domain.split('/')[0]
+                if '#' in domain:
+                    domain = domain.split('#')[0]
+                if domain.startswith('*.'):
+                    domain = domain[2:]
+                if domain.startswith('.'):
+                    domain = domain[1:]
+                    
+                domain = domain.strip().lower()
+                if not domain or '*' in domain or '=' in domain or domain.startswith('!') or domain.startswith('?'):
+                    continue
+                
+                if domain not in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost') and '.' in domain and len(domain) <= 253:
+                    if all(c.isalnum() or c in '.-' for c in domain):
+                        domains.add(domain)
+        return domains
+
     def load_all(self):
         """Load all default blocklists, using JSON cache if available."""
         self.is_loading = True
@@ -152,34 +206,12 @@ class BlocklistManager:
                 filename = os.path.basename(filepath)
                 dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
                 
+                domains = self._parse_domains_from_file(filepath)
+                
                 if category:
                     if category not in new_sources_metadata:
                         new_sources_metadata[category] = []
-                    new_sources_metadata[category].append({'filename': filename, 'updated': dt, 'size': 0})
-                    
-                domains = set()
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith('#') or line.startswith('include:'): continue
-                        if '@' in line: line = line.split('@')[0]
-                        if line.startswith('full:'): line = line[5:]
-                            
-                        parts = line.split()
-                        if not parts: continue
-                        domain = parts[1] if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1') else parts[0]
-                        
-                        if domain.startswith('domain:'): domain = domain[7:]
-                        if domain.startswith('||'): domain = domain[2:]
-                        if domain.endswith('^'): domain = domain[:-1]
-                        if domain.startswith('*.'): domain = domain[2:]
-                        if domain.startswith('^'): domain = domain[1:]
-                        if '/' in domain or '*' in domain or '=' in domain or domain.startswith('!'): continue
-                        if domain != '0.0.0.0' and domain != 'localhost' and '.' in domain:
-                            domains.add(domain)
-                            
-                if category and new_sources_metadata.get(category):
-                    new_sources_metadata[category][-1]['size'] = len(domains)
+                    new_sources_metadata[category].append({'filename': filename, 'updated': dt, 'size': len(domains)})
                     
                 # Add to temporary maps directly without locks
                 for domain in domains:
@@ -187,13 +219,13 @@ class BlocklistManager:
                     if category:
                         if d not in new_domain_map:
                             new_domain_map[d] = category
-                            new_stats[category] += 1
+                            new_stats[category] = new_stats.get(category, 0) + 1
                         else:
                             existing_cat = new_domain_map[d]
                             if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
                                 new_domain_map[d] = category
                                 new_stats[existing_cat] -= 1
-                                new_stats[category] += 1
+                                new_stats[category] = new_stats.get(category, 0) + 1
                     if identity_name:
                         new_identity_map[d] = identity_name
 
@@ -245,7 +277,7 @@ class BlocklistManager:
                 with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump({
                         "hash": current_hash,
-                        "domain_map": {k: v.value for k, v in self.domain_map.items()},
+                        "domain_map": {k.value: v for k, v in self.domain_map.items()},
                         "identity_map": self.identity_map,
                         "stats": {k.value: v for k, v in self.stats.items()},
                         "sources_metadata": {k.value: v for k, v in self.sources_metadata.items()}
@@ -260,12 +292,12 @@ class BlocklistManager:
         if not os.path.exists(filepath):
             return
             
-        import time
         import datetime
-        
         filename = os.path.basename(filepath)
         mod_time = os.path.getmtime(filepath)
         dt = datetime.datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+        domains = self._parse_domains_from_file(filepath)
         
         if category:
             if category not in self.sources_metadata:
@@ -273,61 +305,8 @@ class BlocklistManager:
             self.sources_metadata[category].append({
                 'filename': filename,
                 'updated': dt,
-                'size': 0
+                'size': len(domains)
             })
-            
-        domains = set()
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#') or line.startswith('!') or line.startswith('['):
-                    continue
-                if line.startswith('include:'):
-                    continue
-                if line.startswith('@@'):
-                    continue
-                if '@' in line:
-                    line = line.split('@')[0].strip()
-                if line.startswith('full:'):
-                    line = line[5:].strip()
-                    
-                parts = line.split()
-                if not parts:
-                    continue
-                    
-                if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53'):
-                    domain = parts[1]
-                else:
-                    domain = parts[0]
-                
-                if domain.startswith('domain:'):
-                    domain = domain[7:]
-                if domain.startswith('||'):
-                    domain = domain[2:]
-                    
-                if '^' in domain:
-                    domain = domain.split('^')[0]
-                if '$' in domain:
-                    domain = domain.split('$')[0]
-                if '/' in domain:
-                    domain = domain.split('/')[0]
-                if '#' in domain:
-                    domain = domain.split('#')[0]
-                if domain.startswith('*.'):
-                    domain = domain[2:]
-                if domain.startswith('.'):
-                    domain = domain[1:]
-                    
-                domain = domain.strip().lower()
-                if not domain or '*' in domain or '=' in domain or domain.startswith('!') or domain.startswith('?'):
-                    continue
-                
-                if domain not in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost') and '.' in domain and len(domain) <= 253:
-                    if all(c.isalnum() or c in '.-' for c in domain):
-                        domains.add(domain)
-                    
-        if category and self.sources_metadata.get(category):
-            self.sources_metadata[category][-1]['size'] = len(domains)
             
         self.add_domains(domains, category, identity_name)
 

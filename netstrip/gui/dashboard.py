@@ -214,9 +214,10 @@ class DashboardView(ctk.CTkScrollableFrame):
         # Run DB queries in background thread to prevent UI micro-stutters
         def fetch():
             try:
+                session_start = getattr(self.engine, 'session_start_time', None)
                 today_stats = self.engine.db.get_24h_statistics()
                 db_sent, db_recv = self.engine.db.get_24h_bandwidth()
-                recent_conns = self.engine.db.get_recent_connections(limit=300)
+                recent_conns = self.engine.db.get_recent_connections(limit=300, since_timestamp=session_start)
                 
                 if today_stats:
                     try:

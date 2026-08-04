@@ -247,20 +247,30 @@ class Database:
                     import logging
                     logging.getLogger(__name__).error(f"Error caching domain mapping: {e}")
 
-    def get_recent_connections(self, limit: int = 100, unique_only: bool = False) -> List[sqlite3.Row]:
+    def get_recent_connections(self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None) -> List[sqlite3.Row]:
         with self.lock:
             with self._get_connection() as conn:
+                where_clause = ""
+                params = []
+                if since_timestamp:
+                    where_clause = "WHERE timestamp >= ?"
+                    params.append(since_timestamp)
+                    
                 if unique_only:
-                    cursor = conn.execute('''
+                    query = f'''
                         SELECT *, max(id) as max_id 
                         FROM (
-                            SELECT * FROM connection_log ORDER BY id DESC LIMIT 5000
+                            SELECT * FROM connection_log {where_clause} ORDER BY id DESC LIMIT 5000
                         )
                         GROUP BY process_name, coalesce(domain, ip) 
                         ORDER BY max_id DESC LIMIT ?
-                    ''', (limit,))
+                    '''
+                    params.append(limit)
+                    cursor = conn.execute(query, params)
                 else:
-                    cursor = conn.execute('SELECT * FROM connection_log ORDER BY id DESC LIMIT ?', (limit,))
+                    query = f'SELECT * FROM connection_log {where_clause} ORDER BY id DESC LIMIT ?'
+                    params.append(limit)
+                    cursor = conn.execute(query, params)
                 return cursor.fetchall()
 
     def get_unique_allowed_24h(self) -> int:

@@ -36,6 +36,8 @@ class NetStripEngine:
         self.is_headless = is_headless
         self.is_running = False
         self._stop_event = threading.Event()
+        import datetime
+        self.session_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # Data layer
         self.db = Database()

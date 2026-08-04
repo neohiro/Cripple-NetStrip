@@ -101,8 +101,8 @@ class BlocklistUpdater:
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
                     any_updated = True
                     
-                    # Prevent network/CPU spike by delaying between downloads
-                    time.sleep(3)
+                    # Short delay between downloads
+                    time.sleep(0.2)
 
                     
                 except Exception as e:
@@ -119,8 +119,7 @@ class BlocklistUpdater:
                         source['enabled'] = False
                         sources_modified = True
                         
-                    # Prevent network spike even if host rejected connection
-                    time.sleep(3)
+                    time.sleep(0.2)
                         
             # Save state
             try:
