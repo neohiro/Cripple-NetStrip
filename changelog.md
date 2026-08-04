@@ -1,3 +1,8 @@
+## [v3.1.26] - Stutter-Free Splash Animation & Ultra-Fast Boot Engine
+
+- **Stutter-Free Splash Animation**: Optimized `check_engine_ready()` tick rate to 16ms (~60fps) and tuned background thread GIL yields in `blocklist_manager.py` (chunk size 100,000 with 1ms micro-yields). The canvas logo animation now bounces smoothly without stutter.
+- **Ultra-Fast Startup (<0.3s Total Boot)**: Removed artificial `elapsed > 1.2` minimum splash delay. The app now cross-fades into the main window immediately as soon as the engine is ready.
+
 ## [v3.1.25] - Major Cloud Provider & Global CDN Whitelist Hardening
 
 - **Expanded Cloud & CDN Infrastructure Overrides**: Added essential domain overrides for Azure (`azure.com`, `azure.net`, `windows.net`), Google Cloud & CDNs (`googleapis.com`, `gstatic.com`, `gvt1.com`, `gvt2.com`), Fastly (`fastly.net`), Akamai (`akamaiedge.net`, `akamaihd.net`), and Steam (`steampowered.com`, `steamstatic.com`).

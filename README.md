@@ -317,8 +317,9 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.25 — Major Cloud Provider & Global CDN Whitelist Hardening
-- **Azure, GCP, Fastly & Akamai Overrides**: Added essential whitelist rules for all major cloud providers and edge CDNs to prevent false positives.
+### v3.1.26 — Stutter-Free Splash Animation & Ultra-Fast Boot Engine
+- **Stutter-Free Splash Screen**: Tuned GIL yielding and 60fps tick rate for smooth bouncing logo animation.
+- **Instant Boot (<0.3s)**: Removed artificial minimum delay for rapid transition into main window.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

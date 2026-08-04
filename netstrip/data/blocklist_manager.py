@@ -198,12 +198,12 @@ class BlocklistManager:
                         
                         items = list(cache_data["domain_map"].items())
                         new_domain_map = {}
-                        chunk_size = 25000
+                        chunk_size = 100000
                         for i in range(0, len(items), chunk_size):
                             chunk = items[i:i + chunk_size]
                             for k, v in chunk:
                                 new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
-                            time.sleep(0.005) # Yield GIL
+                            time.sleep(0.001) # Yield GIL
                             
                         new_stats = {
                             ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["stats"].items()
