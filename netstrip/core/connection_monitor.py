@@ -250,41 +250,54 @@ class ConnectionMonitor:
             
             if not is_local_ipv4 and not is_local_ipv6:
                 domain = "" # Default to empty, look up in background
-                def _resolve_dns_bg(resolve_ip):
-                    try:
-                        default_timeout = socket.getdefaulttimeout()
-                        socket.setdefaulttimeout(0.5)
-                        name, _, _ = socket.gethostbyaddr(resolve_ip)
-                        self.db.cache_domain_mapping(resolve_ip, name)
-                    except socket.herror:
-                        pass
-                    finally:
-                        socket.setdefaulttimeout(default_timeout)
-                        
-                self._dns_executor.submit(_resolve_dns_bg, ip)
-            elif is_local_ipv4 and ip not in ("127.0.0.1", "0.0.0.0"):
-                # --- Connection-level ARP Pinning ---
-                if self.db.get_setting("lan_shield_enabled", "false") != "true":
-                    def _arp_pinning_bg(check_ip):
-                        import subprocess, re
+                if not hasattr(self, '_pending_dns_lookups'):
+                    self._pending_dns_lookups = set()
+                if ip not in self._pending_dns_lookups and len(self._pending_dns_lookups) < 100:
+                    self._pending_dns_lookups.add(ip)
+                    def _resolve_dns_bg(resolve_ip):
                         try:
-                            kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
-                            res = subprocess.run(["arp", "-a"], capture_output=True, text=True, **kwargs)
-                            mac = None
-                            for line in res.stdout.splitlines():
-                                if check_ip in line:
-                                    match = re.search(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})', line)
-                                    if match:
-                                        mac = match.group(0).lower().replace('-', ':')
-                                        break
-                            if mac:
-                                if check_ip in self._arp_cache and self._arp_cache[check_ip] != mac:
-                                    if self.on_malware_detected:
-                                        self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
-                                self._arp_cache[check_ip] = mac
+                            name, _, _ = socket.gethostbyaddr(resolve_ip)
+                            if name:
+                                self.db.cache_domain_mapping(resolve_ip, name)
+                        except (socket.herror, socket.gaierror, OSError):
+                            pass
+                        finally:
+                            if hasattr(self, '_pending_dns_lookups'):
+                                self._pending_dns_lookups.discard(resolve_ip)
+                            
+                    try:
+                        self._dns_executor.submit(_resolve_dns_bg, ip)
+                    except Exception:
+                        self._pending_dns_lookups.discard(ip)
+            elif is_local_ipv4 and ip not in ("127.0.0.1", "0.0.0.0"):
+                # --- Connection-level ARP Pinning (Rate-limited to once every 5 seconds) ---
+                now_ts = time.time()
+                if getattr(self, '_last_arp_check', 0) + 5.0 < now_ts:
+                    self._last_arp_check = now_ts
+                    if self.db.get_setting("lan_shield_enabled", "false") != "true":
+                        def _arp_pinning_bg(check_ip):
+                            import subprocess, re
+                            try:
+                                kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                                res = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=2.0, **kwargs)
+                                mac = None
+                                for line in res.stdout.splitlines():
+                                    if check_ip in line:
+                                        match = re.search(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})', line)
+                                        if match:
+                                            mac = match.group(0).lower().replace('-', ':')
+                                            break
+                                if mac:
+                                    if check_ip in self._arp_cache and self._arp_cache[check_ip] != mac:
+                                        if self.on_malware_detected:
+                                            self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
+                                    self._arp_cache[check_ip] = mac
+                            except Exception:
+                                pass
+                        try:
+                            self._dns_executor.submit(_arp_pinning_bg, ip)
                         except Exception:
                             pass
-                    self._dns_executor.submit(_arp_pinning_bg, ip)
 
         # Fetch corporate identity if we have a domain
         identity = self.classifier.blocklist.get_identity(domain) if domain else None

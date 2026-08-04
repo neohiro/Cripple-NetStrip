@@ -8,7 +8,7 @@ import json
 import logging
 import threading
 import time
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 
 logger = logging.getLogger(__name__)
 

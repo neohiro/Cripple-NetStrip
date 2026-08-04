@@ -114,3 +114,49 @@ def mask_ip_string(text: str) -> str:
     # Mask common IPv6 patterns
     text = re.sub(r'\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b', '<HIDDEN_IP>', text)
     return text
+
+def enable_smooth_scrolling(scrollable_frame):
+    """
+    Enables instant, smooth mousewheel scrolling on a CTkScrollableFrame without
+    startup delay or laggy boundary checks.
+    """
+    def _on_mousewheel(event):
+        try:
+            if not scrollable_frame.winfo_exists() or not scrollable_frame.winfo_ismapped():
+                return
+            canvas = getattr(scrollable_frame, '_parent_canvas', None)
+            if canvas:
+                if hasattr(event, 'delta') and event.delta:
+                    step = int(-1 * (event.delta / 40))
+                    if step == 0:
+                        step = -1 if event.delta > 0 else 1
+                    canvas.yview_scroll(step, "units")
+                elif getattr(event, 'num', None) == 4:
+                    canvas.yview_scroll(-2, "units")
+                elif getattr(event, 'num', None) == 5:
+                    canvas.yview_scroll(2, "units")
+        except Exception:
+            pass
+
+    def _bind_wheel(event=None):
+        try:
+            scrollable_frame.bind_all("<MouseWheel>", _on_mousewheel, add="+")
+            scrollable_frame.bind_all("<Button-4>", _on_mousewheel, add="+")
+            scrollable_frame.bind_all("<Button-5>", _on_mousewheel, add="+")
+        except Exception:
+            pass
+
+    def _unbind_wheel(event=None):
+        try:
+            scrollable_frame.unbind_all("<MouseWheel>")
+            scrollable_frame.unbind_all("<Button-4>")
+            scrollable_frame.unbind_all("<Button-5>")
+        except Exception:
+            pass
+
+    scrollable_frame.bind("<Enter>", _bind_wheel, add="+")
+    scrollable_frame.bind("<Leave>", _unbind_wheel, add="+")
+    canvas = getattr(scrollable_frame, '_parent_canvas', None)
+    if canvas:
+        canvas.bind("<Enter>", _bind_wheel, add="+")
+        canvas.bind("<Leave>", _unbind_wheel, add="+")

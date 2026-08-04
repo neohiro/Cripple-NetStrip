@@ -10,7 +10,7 @@ from netstrip.gui.theme import (
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
     get_category_color, get_category_label, get_category_icon,
 )
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip
+from netstrip.gui.utils import safe_loop, bind_copy_tooltip, enable_smooth_scrolling
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -79,6 +79,7 @@ class LogView(ctk.CTkFrame):
         # Scrollable body
         self._log_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
         self._log_scroll.pack(fill="both", expand=True)
+        enable_smooth_scrolling(self._log_scroll)
 
         self._last_signature = None
         self._row_pool = []
@@ -239,27 +240,35 @@ class LogView(ctk.CTkFrame):
 
         proc_frame = ctk.CTkFrame(frame, fg_color="transparent")
         proc_frame.grid(row=0, column=1, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
-        lbl_dot = ctk.CTkLabel(proc_frame, text="● ", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS))
-        lbl_dot.pack(side="left")
+        lbl_dot = ctk.CTkLabel(proc_frame, text="●", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS))
+        lbl_dot.pack(side="left", padx=(0, 4))
         lbl_proc = ctk.CTkLabel(proc_frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY, anchor="w")
-        lbl_proc.pack(side="left", fill="x", expand=True)
+        lbl_proc.pack(side="left")
 
         lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        # Fixed dimensions without sticky="ew" prevents dynamic canvas geometry re-centering glitches
-        lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), width=96, height=22, corner_radius=6, anchor="center")
-        lbl_cat.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
+        # Stable badge frames prevent canvas re-drawing text flicker
+        cat_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=96, height=22, corner_radius=6)
+        cat_badge.grid_propagate(False)
+        cat_badge.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
+        lbl_cat = ctk.CTkLabel(cat_badge, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
+        lbl_cat.pack(fill="both", expand=True)
 
-        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), width=80, height=22, corner_radius=6, anchor="center")
-        lbl_act.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
+        act_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=80, height=22, corner_radius=6)
+        act_badge.grid_propagate(False)
+        act_badge.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
+        lbl_act = ctk.CTkLabel(act_badge, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
+        lbl_act.pack(fill="both", expand=True)
 
         return frame, {
             'time': lbl_time,
             'dot': lbl_dot,
             'proc': lbl_proc,
             'domain': lbl_domain,
+            'cat_badge': cat_badge,
             'cat': lbl_cat,
+            'act_badge': act_badge,
             'act': lbl_act
         }
 
@@ -317,26 +326,31 @@ class LogView(ctk.CTkFrame):
             if raw_domain:
                 bind_copy_tooltip(lbls['domain'], raw_domain)
             
-        cat_text = f" {get_category_label(cat).upper()} "
-        if getattr(lbls['cat'], '_last_val', None) != cat_text or getattr(lbls['cat'], '_last_color', None) != c_color:
-            lbls['cat'].configure(text=cat_text, fg_color=c_color)
+        cat_text = get_category_label(cat).upper()
+        if getattr(lbls['cat_badge'], '_last_color', None) != c_color:
+            lbls['cat_badge'].configure(fg_color=c_color)
+            lbls['cat_badge']._last_color = c_color
+        if getattr(lbls['cat'], '_last_val', None) != cat_text:
+            lbls['cat'].configure(text=cat_text)
             lbls['cat']._last_val = cat_text
-            lbls['cat']._last_color = c_color
             
         action = (row['action'] or '').lower()
         if action == 'allow':
-            act_text = " ALLOW "
+            act_text = "ALLOW"
             act_fg = Colors.SUCCESS_DIM
             act_color = "white"
         else:
-            act_text = " BLOCK "
+            act_text = "BLOCK"
             act_fg = "#4a1525"
             act_color = "#f43f5e"
 
-        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_fg', None) != act_fg:
-            lbls['act'].configure(text=act_text, fg_color=act_fg, text_color=act_color)
+        if getattr(lbls['act_badge'], '_last_fg', None) != act_fg:
+            lbls['act_badge'].configure(fg_color=act_fg)
+            lbls['act_badge']._last_fg = act_fg
+        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_color', None) != act_color:
+            lbls['act'].configure(text=act_text, text_color=act_color)
             lbls['act']._last_val = act_text
-            lbls['act']._last_fg = act_fg
+            lbls['act']._last_color = act_color
 
     def destroy(self):
         self._destroyed = True

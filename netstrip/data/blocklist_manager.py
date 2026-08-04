@@ -114,7 +114,10 @@ UPDATE_DOMAINS = frozenset({
 })
 
 class BlocklistManager:
-    def __init__(self, lists_dir: str = None, db=None):
+    def __init__(self, lists_dir: str = None, db=None, **kwargs):
+        if lists_dir is not None and not isinstance(lists_dir, (str, bytes, os.PathLike)):
+            db = lists_dir
+            lists_dir = None
         self.db = db
         self.domain_map = {}
         self.identity_map = {}
@@ -134,17 +137,29 @@ class BlocklistManager:
         self.is_loading = True
         threading.Thread(target=self._load_async_worker, daemon=True).start()
 
+    def _get_cache_paths(self) -> List[str]:
+        """Return potential cache file locations in priority order."""
+        paths = []
+        user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
+        paths.append(os.path.join(user_dir, "NetStrip_cache.json"))
+        if self.lists_dir:
+            paths.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
+        return paths
+
     def _get_lists_hash(self):
-        """Generate a hash of the current lists directory to detect changes."""
+        """Generate a stable deterministic hash of the current lists directory based on names and sizes."""
         h = hashlib.md5()
-        h.update(b"v2_race_fix")
+        h.update(b"v3_stable_size_hash")
         if not os.path.exists(self.lists_dir):
             return h.hexdigest()
         for filename in sorted(os.listdir(self.lists_dir)):
             if not filename.endswith('.txt'): continue
             filepath = os.path.join(self.lists_dir, filename)
-            h.update(filename.encode('utf-8'))
-            h.update(str(os.path.getmtime(filepath)).encode('utf-8'))
+            try:
+                size = os.path.getsize(filepath)
+                h.update(f"{filename}:{size}".encode('utf-8'))
+            except Exception:
+                pass
         return h.hexdigest()
 
     def _load_async_worker(self):
@@ -215,54 +230,49 @@ class BlocklistManager:
         """Load all default blocklists, using JSON cache if available."""
         self.is_loading = True
         try:
-            cache_file = os.path.join(self.lists_dir, "NetStrip_cache.json")
             current_hash = self._get_lists_hash()
             
-            # Remove old pickle cache if it exists (one-time migration)
-            old_pkl = os.path.join(self.lists_dir, "NetStrip_cache.pkl")
-            if os.path.exists(old_pkl):
-                try:
-                    os.remove(old_pkl)
-                except Exception:
-                    pass
-            
-            if os.path.exists(cache_file):
-                try:
-                    import time
-                    with open(cache_file, "r", encoding="utf-8") as f:
-                        cache_data = json.load(f)
-                    
-                    if cache_data.get("hash") == current_hash:
-                        # Load from cache
-                        ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
+            # 1. Try loading from existing cache files
+            for cache_file in self._get_cache_paths():
+                if os.path.exists(cache_file):
+                    try:
+                        import time
+                        with open(cache_file, "r", encoding="utf-8") as f:
+                            cache_data = json.load(f)
                         
-                        items = list(cache_data["domain_map"].items())
-                        new_domain_map = {}
-                        chunk_size = 100000
-                        for i in range(0, len(items), chunk_size):
-                            chunk = items[i:i + chunk_size]
-                            for k, v in chunk:
-                                new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
-                            time.sleep(0.001) # Yield GIL
+                        if cache_data.get("hash") == current_hash and "domain_map" in cache_data:
+                            ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
                             
-                        new_stats = {
-                            ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["stats"].items()
-                        }
-                        new_sources_metadata = {
-                            ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v for k, v in cache_data["sources_metadata"].items()
-                        }
-                        
-                        # Atomic swap inside lock
-                        with self.lock:
-                            self.domain_map = new_domain_map
-                            self.identity_map = cache_data["identity_map"]
-                            self.stats = new_stats
-                            self.sources_metadata = new_sources_metadata
-                        return
-                except Exception as e:
-                    logger.warning(f"Failed to load cache: {e}. Rebuilding...")
+                            items = list(cache_data["domain_map"].items())
+                            new_domain_map = {}
+                            chunk_size = 100000
+                            for i in range(0, len(items), chunk_size):
+                                chunk = items[i:i + chunk_size]
+                                for k, v in chunk:
+                                    new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
+                                time.sleep(0.001) # Yield GIL
+                                
+                            new_stats = {
+                                ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                for k, v in cache_data.get("stats", {}).items()
+                            }
+                            new_sources_metadata = {
+                                ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                for k, v in cache_data.get("sources_metadata", {}).items()
+                            }
+                            
+                            # Atomic swap inside lock
+                            with self.lock:
+                                self.domain_map = new_domain_map
+                                self.identity_map = cache_data.get("identity_map", {})
+                                self.stats = new_stats
+                                self.sources_metadata = new_sources_metadata
+                            logger.info(f"Blocklists successfully loaded from cache ({len(new_domain_map)} domains)")
+                            return
+                    except Exception as e:
+                        logger.warning(f"Failed to load cache from {cache_file}: {e}. Checking alternatives...")
                     
-            # Full reload - Build into temporary structures to avoid zero-leak window and lock contention
+            # 2. Full reload if cache miss or corrupted
             new_domain_map = {}
             new_identity_map = {}
             new_stats = {cat: 0 for cat in ConnectionCategory}
@@ -348,17 +358,35 @@ class BlocklistManager:
                 self.stats = new_stats
                 self.sources_metadata = new_sources_metadata
                         
-            try:
-                with open(cache_file, "w", encoding="utf-8") as f:
-                    json.dump({
-                        "hash": current_hash,
-                        "domain_map": {k: getattr(v, 'value', v) for k, v in self.domain_map.items()},
-                        "identity_map": self.identity_map,
-                        "stats": {getattr(k, 'value', k): v for k, v in self.stats.items()},
-                        "sources_metadata": {getattr(k, 'value', k): v for k, v in self.sources_metadata.items()}
-                    }, f)
-            except Exception as e:
-                logger.error(f"Failed to write cache: {e}")
+            # Atomic save to user cache directory
+            user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
+            os.makedirs(user_dir, exist_ok=True)
+            save_targets = [os.path.join(user_dir, "NetStrip_cache.json")]
+            if self.lists_dir and os.path.exists(self.lists_dir):
+                save_targets.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
+
+            cache_payload = {
+                "hash": current_hash,
+                "domain_map": {k: getattr(v, 'value', v) for k, v in self.domain_map.items()},
+                "identity_map": self.identity_map,
+                "stats": {getattr(k, 'value', k): v for k, v in self.stats.items()},
+                "sources_metadata": {getattr(k, 'value', k): v for k, v in self.sources_metadata.items()}
+            }
+
+            for target in save_targets:
+                temp_target = target + ".tmp"
+                try:
+                    with open(temp_target, "w", encoding="utf-8") as f:
+                        json.dump(cache_payload, f)
+                    if os.path.exists(target):
+                        try: os.remove(target)
+                        except Exception: pass
+                    os.replace(temp_target, target)
+                except Exception as e:
+                    logger.debug(f"Could not write cache to {target}: {e}")
+                    if os.path.exists(temp_target):
+                        try: os.remove(temp_target)
+                        except Exception: pass
         finally:
             self.is_loading = False
 
