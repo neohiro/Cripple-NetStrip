@@ -1,3 +1,9 @@
+## [v3.1.23] - UnboundLocalError & Active Connections KeyError Fix
+
+- **Fixed UnboundLocalError**: Removed shadowed `import time` statement inside `NetStripResolver.resolve()` in `dns_proxy.py` that raised `UnboundLocalError`.
+- **Fixed Active App Connections Sticking/Freezing**: Resolved `KeyError` in `sidebar_components.py` line 580 when pruning `oldest_target` from `self.rows`. Preventing this crash allows `_process_connections` to complete its cycle and cleanly hide inactive/closed processes from the Active App Connections list.
+- **Fast DNS Upstream & Fallback Resolution**: Prioritized standard UDP port 53 with 1.5s timeout. Reverse DNS PTR queries now failover in 1.5s instead of 12s.
+
 ## [v3.1.22] - Zero-Freeze Splash Screen Animation & Boot Pump
 
 - **Zero-Freeze Splash Screen**: Updated `check_engine_ready()` loop in `main.py` to yield to `splash.update()` and `app.update_idletasks()` every 30ms, ensuring canvas logo animations and progress bar text cycle continuously without micro-freezing during startup.

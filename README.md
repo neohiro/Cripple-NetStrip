@@ -317,9 +317,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.22 — Zero-Freeze Splash Screen & Boot Pump
-- **Zero-Freeze Splash Screen**: Continuous main loop event pumping during startup prevents OS window freeze.
-- **Smooth Cross-Fade**: Rapid 30ms window alpha interpolation for clean transition into main application window.
+### v3.1.23 — UnboundLocalError & Active Connections KeyError Fix
+- **UnboundLocalError Fix**: Removed local `import time` shadow in `dns_proxy.py`.
+- **Clean Inactive Process Removal**: Fixed `KeyError` in `sidebar_components.py` row pruning. Inactive processes now vanish instantly when closed.
+- **Fast 1.5s DNS Upstream Timeout**: Prioritized standard UDP DNS port 53 with 1.5s timeout.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

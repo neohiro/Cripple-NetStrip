@@ -279,7 +279,6 @@ class NetStripResolver(BaseResolver):
         self.db.update_daily_stats(action.value, category.value)
         
         # Check cache
-        import time
         cache_key = (qname, qtype)
         if cache_key in self._dns_cache:
             timestamp, cached_bytes = self._dns_cache[cache_key]
@@ -309,19 +308,22 @@ class NetStripResolver(BaseResolver):
             proxy_response = None
             is_public_ip = not upstream_ip.startswith("127.") and upstream_ip != "::1"
             
-            # 1. Try DNS-over-TLS (DoT) within 2 seconds. Better performance (less overhead) but sometimes blocked by firewalls on port 853.
-            if is_public_ip:
-                proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=2)
-                
-            # 2. Try DNS-over-HTTPS (DoH) within 3 seconds if DoT failed. Higher overhead, but evades firewalls on port 443.
-            if not proxy_response and is_public_ip and upstream_ip in DOH_PROVIDERS:
-                host, url_path = DOH_PROVIDERS[upstream_ip]
-                proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=3)
-                
-            # 3. Fallback to standard UDP port 53 within 4 seconds if all secure methods failed or local proxy
+            # 1. Primary: Standard UDP port 53 (Fastest, 10-30ms response time, 1.5s timeout)
+            try:
+                proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
+            except Exception:
+                proxy_response = None
+
+            # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH) if standard UDP failed and public IP
+            if not proxy_response and is_public_ip:
+                proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
+                if not proxy_response and upstream_ip in DOH_PROVIDERS:
+                    host, url_path = DOH_PROVIDERS[upstream_ip]
+                    proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=1.5)
+
             if not proxy_response:
-                proxy_response = request.send(upstream_ip, self.upstream_port, timeout=4)
-                
+                raise TimeoutError(f"No response from upstream DNS {upstream_ip}")
+
             record = DNSRecord.parse(proxy_response)
             
             # Save to cache
@@ -337,16 +339,14 @@ class NetStripResolver(BaseResolver):
                     
             return record
         except Exception as e:
-            logger.error(f"DNS Upstream error for {domain} via {upstream_ip}: {e}")
+            logger.debug(f"DNS Upstream error for {domain} via {upstream_ip}: {e}")
             if upstream_ip != "1.1.1.1":
                 try:
-                    logger.info(f"Falling back to 1.1.1.1 for {domain}")
-                    proxy_response = request.send("1.1.1.1", 53, timeout=3)
+                    proxy_response = request.send("1.1.1.1", 53, timeout=1.5)
                     record = DNSRecord.parse(proxy_response)
-                    # Don't cache the fallback A records, just return them
                     return record
                 except Exception as e_fallback:
-                    logger.error(f"DNS Fallback error: {e_fallback}")
+                    logger.debug(f"DNS Fallback error for {domain}: {e_fallback}")
             return request.reply()
 
 

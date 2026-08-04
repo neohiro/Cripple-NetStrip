@@ -577,7 +577,11 @@ class AppGroupFrame(ctk.CTkFrame):
             action = conn_data.get('action', 'allow')
             self._trigger_pulse(action)
             self._flash_traffic_light(action)
-            self.rows[target]._trigger_pulse(action)
+            if target in self.rows:
+                try:
+                    self.rows[target]._trigger_pulse(action)
+                except Exception:
+                    pass
             
         # The system block visual override is handled in refresh_global_state during the UI loop
     def _toggle_global_action(self, target_action: str):
