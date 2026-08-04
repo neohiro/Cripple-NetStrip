@@ -367,9 +367,16 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 
             current_filter = self.filter_var.get()
             
-            # Extract currently packed AppGroupFrames in order
-            current_packed = [c for c in self.scroll_frame.winfo_children() if isinstance(c, AppGroupFrame) and getattr(c, '_is_packed', True)]
-            
+            # Prune completely empty app groups (where all rows have expired/pruned)
+            for p_name, group in list(self.app_groups.items()):
+                if not group.rows:
+                    if getattr(group, '_is_packed', False):
+                        group.grid_forget()
+                    group.destroy()
+                    self.app_groups.pop(p_name, None)
+
+            groups = list(self.app_groups.values())
+
             # Update internal visibility first without packing/unpacking
             for group in groups:
                 if hasattr(group, 'refresh_global_state'):
@@ -385,8 +392,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 visible_groups.remove(dns_group)
                 visible_groups.append(dns_group)
                 
-            # Intelligent packing to eliminate flicker
-            # Unpack groups that are no longer visible
+            # Intelligent grid packing to eliminate flicker and stuttering
+            current_packed = [c for c in self.scroll_frame.winfo_children() if isinstance(c, AppGroupFrame) and getattr(c, '_is_packed', True)]
             for group in current_packed:
                 if group not in visible_groups:
                     group.grid_forget()
@@ -401,7 +408,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         
             # Export active apps for dashboard to avoid redundant classification
             active_apps = set()
-            for group in groups:
+            for group in visible_groups:
                 if any(row.conn_data.get('action') == 'allow' for row in group.rows.values()):
                     active_apps.add(group.process_name)
             self.engine._cached_active_apps = active_apps

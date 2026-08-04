@@ -75,66 +75,100 @@ class GeoIPService:
             
         old_ip = self.current_data.get('ip')
         
-        # Provider 1: ipinfo.io (HTTPS)
+        import ssl
         try:
-            req = urllib.request.Request('https://ipinfo.io/json', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                if data.get('ip'):
-                    ip = data.get('ip')
-                    city = data.get('city', 'Unknown')
-                    country = data.get('country', 'XX')
-                    self.current_data = {
-                        'ip': ip,
-                        'city': city,
-                        'country': country,
-                        'countryCode': country,
-                        'flag': self.get_flag_emoji(country)
-                    }
-                    for cb in self.callbacks:
-                        try: cb(old_ip, self.current_data)
-                        except Exception: pass
-                    return True
-        except Exception as e:
-            logger.debug(f"GeoIP ipinfo.io failed: {e}")
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
-        # Provider 2: ip-api.com (HTTP)
-        try:
-            req = urllib.request.Request('http://ip-api.com/json/', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                if data.get('status') == 'success':
-                    ip = data.get('query', 'Unknown')
-                    city = data.get('city', 'Unknown')
-                    country = data.get('country', 'Unknown')
-                    cc = data.get('countryCode', 'XX')
-                    self.current_data = {
-                        'ip': ip,
-                        'city': city,
-                        'country': country,
-                        'countryCode': cc,
-                        'flag': self.get_flag_emoji(cc)
-                    }
-                    for cb in self.callbacks:
-                        try: cb(old_ip, self.current_data)
-                        except Exception: pass
-                    return True
-        except Exception as e:
-            logger.debug(f"GeoIP ip-api.com failed: {e}")
+        # Helper to try a provider URL
+        def try_provider(url: str, is_json: bool = True, timeout: float = 3.0) -> Optional[Dict]:
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NetStrip/1.0'})
+                with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx if url.startswith('https') else None) as resp:
+                    raw = resp.read().decode('utf-8')
+                    if is_json:
+                        return json.loads(raw)
+                    return {'ip': raw.strip()}
+            except Exception as ex:
+                logger.debug(f"GeoIP fetch failed for {url}: {ex}")
+                return None
 
-        # Provider 3: api.ipify.org fallback for IP-only
-        try:
-            req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'Mozilla/5.0 NetStrip/1.0'})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                fast_ip = resp.read().decode('utf-8').strip()
-                if fast_ip:
-                    self.current_data['ip'] = fast_ip
-                    for cb in self.callbacks:
-                        try: cb(old_ip, self.current_data)
-                        except Exception: pass
-                    return True
-        except Exception as e:
-            logger.debug(f"GeoIP ipify fallback failed: {e}")
+        # Provider 1: ipapi.co (HTTPS, highly reliable)
+        d1 = try_provider('https://ipapi.co/json/')
+        if d1 and d1.get('ip'):
+            cc = d1.get('country_code', 'XX')
+            self.current_data = {
+                'ip': d1.get('ip'),
+                'city': d1.get('city', 'Unknown'),
+                'country': d1.get('country_name', 'Unknown'),
+                'countryCode': cc,
+                'flag': self.get_flag_emoji(cc)
+            }
+            for cb in self.callbacks:
+                try: cb(old_ip, self.current_data)
+                except Exception: pass
+            return True
+
+        # Provider 2: ipinfo.io (HTTPS)
+        d2 = try_provider('https://ipinfo.io/json')
+        if d2 and d2.get('ip'):
+            cc = d2.get('country', 'XX')
+            self.current_data = {
+                'ip': d2.get('ip'),
+                'city': d2.get('city', 'Unknown'),
+                'country': cc,
+                'countryCode': cc,
+                'flag': self.get_flag_emoji(cc)
+            }
+            for cb in self.callbacks:
+                try: cb(old_ip, self.current_data)
+                except Exception: pass
+            return True
+
+        # Provider 3: ipwho.is (HTTPS)
+        d3 = try_provider('https://ipwho.is/')
+        if d3 and d3.get('success') and d3.get('ip'):
+            cc = d3.get('country_code', 'XX')
+            self.current_data = {
+                'ip': d3.get('ip'),
+                'city': d3.get('city', 'Unknown'),
+                'country': d3.get('country', 'Unknown'),
+                'countryCode': cc,
+                'flag': self.get_flag_emoji(cc)
+            }
+            for cb in self.callbacks:
+                try: cb(old_ip, self.current_data)
+                except Exception: pass
+            return True
+
+        # Provider 4: ip-api.com (HTTP / HTTPS)
+        d4 = try_provider('http://ip-api.com/json/')
+        if d4 and d4.get('status') == 'success':
+            cc = d4.get('countryCode', 'XX')
+            self.current_data = {
+                'ip': d4.get('query', 'Unknown'),
+                'city': d4.get('city', 'Unknown'),
+                'country': d4.get('country', 'Unknown'),
+                'countryCode': cc,
+                'flag': self.get_flag_emoji(cc)
+            }
+            for cb in self.callbacks:
+                try: cb(old_ip, self.current_data)
+                except Exception: pass
+            return True
+
+        # Provider 5: api.ipify.org fallback for IP-only
+        d5 = try_provider('https://api.ipify.org', is_json=False)
+        if d5 and d5.get('ip'):
+            self.current_data['ip'] = d5.get('ip')
+            for cb in self.callbacks:
+                try: cb(old_ip, self.current_data)
+                except Exception: pass
+            return True
 
         return False
 

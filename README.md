@@ -317,10 +317,11 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.23 — UnboundLocalError & Active Connections KeyError Fix
-- **UnboundLocalError Fix**: Removed local `import time` shadow in `dns_proxy.py`.
-- **Clean Inactive Process Removal**: Fixed `KeyError` in `sidebar_components.py` row pruning. Inactive processes now vanish instantly when closed.
-- **Fast 1.5s DNS Upstream Timeout**: Prioritized standard UDP DNS port 53 with 1.5s timeout.
+### v3.1.24 — Hardened GeoIP, AWS False Positive Fix & Smooth Sidebar UX
+- **Multi-Provider HTTPS GeoIP Engine**: Added `ipapi.co`, `ipinfo.io`, `ipwho.is`, `ip-api.com` with robust SSL contexts.
+- **Zero False Positives**: AWS (`amazonaws.com`), Second Life (`lindenlab.com`), and Steam endpoints marked essential.
+- **Clean Process Cleanup**: Inactive processes vanish automatically when closed.
+- **Smooth 60FPS Sidebar Scrolling**: Optimized widget repacking to eliminate scroll stuttering.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

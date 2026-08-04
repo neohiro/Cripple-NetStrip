@@ -1,3 +1,10 @@
+## [v3.1.24] - Hardened GeoIP, AWS False Positive Fix & Smooth Sidebar UX
+
+- **Multi-Provider HTTPS GeoIP Engine**: Hardened `GeoIPService` with custom SSL contexts and added multi-provider HTTPS fallbacks (`ipapi.co`, `ipinfo.io`, `ipwho.is`, `ip-api.com`, `api.ipify.org`). Public IP and geolocation populate reliably on boot.
+- **Eliminated False Hits (AWS & Second Life)**: Added essential domain overrides for AWS infrastructure (`amazonaws.com`, `cloudfront.net`), Second Life (`lindenlab.com`, `secondlife.com`), Steam (`steamcontent.com`), and all GeoIP providers to prevent false positive malware/ad blocks.
+- **Automatic Inactive Process Pruning**: Empty app group cards with 0 active connections are now automatically pruned and destroyed, ensuring closed/inactive processes disappear cleanly from the sidebar.
+- **Smooth 60FPS Sidebar UX**: Optimized grid repacking in `connections_sidebar.py` to skip layout recalculations when app order is unchanged, restoring silky-smooth scrolling.
+
 ## [v3.1.23] - UnboundLocalError & Active Connections KeyError Fix
 
 - **Fixed UnboundLocalError**: Removed shadowed `import time` statement inside `NetStripResolver.resolve()` in `dns_proxy.py` that raised `UnboundLocalError`.

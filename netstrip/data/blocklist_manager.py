@@ -30,11 +30,25 @@ CATEGORY_PRIORITY = {
 ESSENTIAL_DOMAINS = frozenset({
     # Telemetry / Updates
     'api.github.com',
+    'raw.githubusercontent.com',
     'frenzypenguin.media',
     'github.com',
     # GeoIP / Network utilities
     'ip-api.com',
+    'ipinfo.io',
     'ipify.org',
+    'api.ipify.org',
+    'ipapi.co',
+    'ipwho.is',
+    'api.myip.com',
+    # Common Cloud infrastructure & Gaming CDN essential services (Prevents false positives)
+    'amazonaws.com',
+    's3.amazonaws.com',
+    'cloudfront.net',
+    'lindenlab.com',
+    'secondlife.com',
+    'steamcontent.com',
+    'gvt1.com',
     # Local loopbacks
     '127.0.0.1', '127.0.0.53', '::1', 'localhost',
 })
