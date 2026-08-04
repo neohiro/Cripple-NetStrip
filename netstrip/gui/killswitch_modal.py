@@ -8,15 +8,10 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         self.callback = callback
         
         self.title("WARNING: Master Killswitch")
-        self.geometry("450x250")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        
-        # Center modal
-        self.update_idletasks()
-        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (450 // 2)
-        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (250 // 2)
-        self.geometry(f"+{x}+{y}")
+        from netstrip.gui.utils import center_window
+        center_window(self, 450, 250, parent=parent)
         
         self._build_ui()
         self.grab_set()
@@ -72,14 +67,10 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         self.engine = engine
         
         self.title("CRITICAL: Network Intrusion Detected")
-        self.geometry("500x250")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        
-        self.update_idletasks()
-        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (500 // 2)
-        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (250 // 2)
-        self.geometry(f"+{x}+{y}")
+        from netstrip.gui.utils import center_window
+        center_window(self, 500, 250, parent=parent)
         
         self.message = message
         self._build_ui()

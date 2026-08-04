@@ -17,10 +17,12 @@ class CTkAnomalyAlert(ctk.CTkToplevel):
         self.on_decision = on_decision
         
         self.title("CRITICAL SECURITY ALERT")
-        self.geometry("500x350")
         self.resizable(False, False)
         self.attributes('-topmost', True)
         self.grab_set() # Force focus
+        
+        from netstrip.gui.utils import center_window
+        center_window(self, 500, 350, parent=master)
         
         # UI Setup
         self._build_ui()

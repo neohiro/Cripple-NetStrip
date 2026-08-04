@@ -171,3 +171,94 @@ def enable_smooth_scrolling(scrollable_frame):
     scrollable_frame.bind("<Button-5>", _on_mousewheel, add="+")
     scrollable_frame.bind("<Enter>", _bind_wheel, add="+")
     scrollable_frame.bind("<Leave>", _unbind_wheel, add="+")
+
+
+def get_screen_dimensions(window=None):
+    """
+    Get the actual primary screen width and height reliably across platforms and DPI scales.
+    """
+    screen_w, screen_h = 1920, 1080
+    try:
+        import sys
+        if sys.platform.startswith("win"):
+            import ctypes
+            try:
+                user32 = ctypes.windll.user32
+                sw = user32.GetSystemMetrics(0) # SM_CXSCREEN
+                sh = user32.GetSystemMetrics(1) # SM_CYSCREEN
+                if sw > 0 and sh > 0:
+                    screen_w, screen_h = sw, sh
+            except Exception:
+                pass
+    except Exception:
+        pass
+        
+    if window:
+        try:
+            w = window.winfo_screenwidth()
+            h = window.winfo_screenheight()
+            if w > 100 and h > 100:
+                screen_w, screen_h = w, h
+        except Exception:
+            pass
+            
+    return screen_w, screen_h
+
+
+def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92, max_h_ratio=0.90):
+    """
+    Universally centers any Tk / CustomTkinter window on the primary screen or over a parent window.
+    Ensures dimensions fit comfortably on any display resolution (720p, 1080p, 1440p, 4K, laptops, etc.)
+    and prevents off-screen placement.
+    """
+    try:
+        window.update_idletasks()
+    except Exception:
+        pass
+
+    screen_w, screen_h = get_screen_dimensions(window)
+
+    if width is None:
+        try:
+            width = window.winfo_width()
+            if width <= 1:
+                width = window.winfo_reqwidth()
+        except Exception:
+            width = 400
+    if height is None:
+        try:
+            height = window.winfo_height()
+            if height <= 1:
+                height = window.winfo_reqheight()
+        except Exception:
+            height = 300
+
+    max_w = max(300, int(screen_w * max_w_ratio))
+    max_h = max(200, int(screen_h * max_h_ratio))
+    
+    final_w = min(int(width), max_w)
+    final_h = min(int(height), max_h)
+
+    if parent is not None:
+        try:
+            parent.update_idletasks()
+            pw = parent.winfo_width()
+            ph = parent.winfo_height()
+            px = parent.winfo_rootx()
+            py = parent.winfo_rooty()
+            if pw > 100 and ph > 100 and px >= 0 and py >= 0:
+                x = px + (pw - final_w) // 2
+                y = py + (ph - final_h) // 2
+                # Clamp within screen bounds
+                x = max(10, min(x, screen_w - final_w - 10))
+                y = max(10, min(y, screen_h - final_h - 10))
+                window.geometry(f"{final_w}x{final_h}+{x}+{y}")
+                return final_w, final_h, x, y
+        except Exception:
+            pass
+
+    x = max(0, (screen_w - final_w) // 2)
+    y = max(0, (screen_h - final_h) // 2)
+    window.geometry(f"{final_w}x{final_h}+{x}+{y}")
+    return final_w, final_h, x, y
+

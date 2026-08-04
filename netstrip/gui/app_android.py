@@ -62,7 +62,11 @@ class NetStripApp(ctk.CTk):
 
         # Setup Window
         self.title("NetStrip — Intelligent Network Debloater")
-        self.geometry("1500x800")
+        from netstrip.gui.utils import get_screen_dimensions, center_window
+        screen_w, screen_h = get_screen_dimensions(self)
+        win_w = min(1500, max(960, int(screen_w * 0.88)))
+        win_h = min(850, max(600, int(screen_h * 0.85)))
+        center_window(self, win_w, win_h)
         self.configure(fg_color=Colors.BG_DARKEST)
         
         # Fix Taskbar icon grouping on Windows globally for this process

@@ -13,16 +13,11 @@ class SmartParanoidModal(ctk.CTkToplevel):
         self.conn_data = conn_data
         
         self.title("CRITICAL ALERT - Smart Shield Triggered")
-        self.geometry("500x320")
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self.configure(fg_color=Colors.BG_DARKEST)
-        
-        # Center the modal
-        self.update_idletasks()
-        x = master.winfo_x() + (master.winfo_width() // 2) - (500 // 2)
-        y = master.winfo_y() + (master.winfo_height() // 2) - (320 // 2)
-        self.geometry(f"+{x}+{y}")
+        from netstrip.gui.utils import center_window
+        center_window(self, 500, 320, parent=master)
 
         self._build_ui()
         

@@ -936,25 +936,22 @@ class SettingsView(ctk.CTkFrame):
         import customtkinter as ctk
         dialog = ctk.CTkToplevel(self)
         dialog.title('⚠ Factory Reset — Confirm')
-        dialog.geometry('460x260')
         dialog.configure(fg_color=Colors.BG_DARKEST)
         dialog.transient(self.master)
         dialog.grab_set()
         dialog.attributes("-topmost", True)
         dialog.resizable(False, False)
         
-        # Center it
-        dialog.update_idletasks()
-        x = self.master.winfo_x() + (self.master.winfo_width() - 460) // 2
-        y = self.master.winfo_y() + (self.master.winfo_height() - 260) // 2
-        dialog.geometry(f'+{x}+{y}')
+        # Center it reliably over the main application
+        from netstrip.gui.utils import center_window
+        center_window(dialog, 460, 270, parent=self.master)
         
-        ctk.CTkLabel(dialog, text='⚠  FACTORY RESET', font=(Fonts.FAMILY_PRIMARY[0], 20, 'bold'), text_color=Colors.DANGER).pack(pady=(24, 8))
+        ctk.CTkLabel(dialog, text='⚠  FACTORY RESET', font=(Fonts.FAMILY_PRIMARY[0], 20, 'bold'), text_color=Colors.DANGER).pack(pady=(20, 6))
         ctk.CTkLabel(dialog, text='Are you sure? This action is irreversible.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, 'bold'), text_color=Colors.TEXT_PRIMARY).pack(pady=(0, 6))
-        ctk.CTkLabel(dialog, text='All user rules, settings, connection logs, custom blocklists,\nand online list registrations will be permanently deleted.\nMake sure you have exported a Backup Profile first!\n\nCripple will restart automatically after the wipe.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY, justify='center').pack(pady=(0, 20))
+        ctk.CTkLabel(dialog, text='All user rules, settings, connection logs, custom blocklists,\nand online list registrations will be permanently deleted.\nMake sure you have exported a Backup Profile first!\n\nNetStrip will restart automatically after the wipe.', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY, justify='center').pack(pady=(0, 16))
         
         btn_frame = ctk.CTkFrame(dialog, fg_color='transparent')
-        btn_frame.pack()
+        btn_frame.pack(pady=(0, 12))
         
         def on_confirm():
             dialog.destroy()
@@ -964,29 +961,19 @@ class SettingsView(ctk.CTkFrame):
         ctk.CTkButton(btn_frame, text='WIPE & RESTART', width=140, height=36, fg_color=Colors.DANGER, hover_color='#f43f5e', text_color='white', font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, 'bold'), command=on_confirm).pack(side='right', padx=10)
         
     def _do_factory_wipe(self):
+        # 1. Thread-safe wipe of database and cache
         try:
-            conn = self.engine.db._get_connection()
-            conn.execute('DELETE FROM user_rules')
-            conn.execute('DELETE FROM settings')
-            conn.execute('DELETE FROM connection_log')
-            conn.execute('DELETE FROM statistics')
-            try: conn.execute('DELETE FROM dns_cache')
-            except: pass
-            conn.commit()
-            conn.execute('VACUUM')
+            self.engine.db.factory_reset()
         except Exception as e:
-            print('Wipe failed:', e)
+            logger.error(f"Factory reset DB wipe error: {e}")
             
+        # 2. Clean custom blocklists and custom updater sources (preserving default bundled lists)
         try:
             import os, json
-            from netstrip.core.engine import NetStripEngine
-            
-            # Reconstruct lists_dir and sources_file path
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             lists_dir = os.path.join(base_dir, 'data', 'lists')
             sources_file = os.path.join(base_dir, 'data', 'updater_sources.json')
             
-            # 1. Clean updater_sources.json
             if os.path.exists(sources_file):
                 with open(sources_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -998,30 +985,62 @@ class SettingsView(ctk.CTkFrame):
                     with open(sources_file, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2)
                         
-            # 2. Delete custom downloaded txt files and cache
             if os.path.exists(lists_dir):
                 for fname in os.listdir(lists_dir):
-                    if "Custom_" in fname or fname == "NetStrip_cache.json" or fname == "updater_state.json":
+                    if fname.startswith("Custom_") or fname == "updater_state.json":
                         try:
                             os.remove(os.path.join(lists_dir, fname))
-                        except:
+                        except Exception:
                             pass
         except Exception as e:
-            print("Failed to clean custom blocklists:", e)
+            logger.error(f"Failed to clean custom blocklists: {e}")
             
+        # 3. Gracefully stop engine subsystems (DNS unhook, sockets unbind)
+        try:
+            self.engine.stop()
+        except Exception as e:
+            logger.error(f"Engine stop during factory wipe: {e}")
+            
+        # 4. Stop DB background writer
+        try:
+            self.engine.db.stop()
+        except Exception:
+            pass
+
+        # 5. Clean IPC socket if exposed in main
+        try:
+            import sys
+            main_mod = sys.modules.get('__main__') or sys.modules.get('main')
+            if main_mod and hasattr(main_mod, '_ipc_socket') and main_mod._ipc_socket:
+                main_mod._ipc_socket.close()
+        except Exception:
+            pass
+            
+        # 6. Spawn fresh restart process cleanly
         import sys, os, subprocess
         creationflags = 0
         if os.name == 'nt':
             creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
             
         if getattr(sys, 'frozen', False):
-            # PyInstaller exe restart
-            subprocess.Popen([sys.executable] + sys.argv[1:], creationflags=creationflags)
+            exe = sys.executable
+            args = [exe] + [a for a in sys.argv[1:] if a != "--parent-pid"]
+            cwd = os.path.dirname(os.path.abspath(exe))
         else:
-            # Python script restart
-            subprocess.Popen([sys.executable] + sys.argv, creationflags=creationflags)
+            exe = sys.executable
+            main_script = os.path.abspath(sys.argv[0])
+            args = [exe, main_script] + [a for a in sys.argv[1:] if a != main_script and a != "--parent-pid"]
+            cwd = os.path.dirname(main_script)
+            
+        if self.engine.platform.is_admin() and "--elevated" not in args:
+            args.append("--elevated")
+            
+        try:
+            subprocess.Popen(args, cwd=cwd, creationflags=creationflags, close_fds=(os.name != 'nt'))
+        except Exception:
+            subprocess.Popen(args, cwd=cwd, creationflags=creationflags)
         
-        # Kill current process forcefully to ensure clean restart without hanging threads
+        # Kill current process forcefully to ensure clean restart
         os._exit(0)
     def _build_analytics_card(self):
         card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)

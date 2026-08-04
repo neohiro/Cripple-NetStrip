@@ -356,12 +356,28 @@ def main():
     import socket
     IPC_PORT = 54321
     ipc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    is_primary_instance = False
     try:
-        ipc_socket.bind(('127.0.0.1', IPC_PORT))
-        ipc_socket.listen(1)
-        is_primary_instance = True
-    except OSError:
+        ipc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except Exception:
+        pass
+        
+    global _ipc_socket
+    _ipc_socket = ipc_socket
+
+    is_primary_instance = False
+    bind_attempts = 0
+    while bind_attempts < 6:
+        try:
+            ipc_socket.bind(('127.0.0.1', IPC_PORT))
+            ipc_socket.listen(1)
+            is_primary_instance = True
+            break
+        except OSError:
+            bind_attempts += 1
+            if bind_attempts < 6:
+                time.sleep(0.15)
+
+    if not is_primary_instance:
         # Another instance is already running
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

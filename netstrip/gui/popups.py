@@ -13,17 +13,13 @@ def check_killswitch_override(engine, parent, proceed_callback, cancel_callback=
 
     dialog = ctk.CTkToplevel(parent)
     dialog.title("Killswitch Active")
-    dialog.geometry("400x250")
     dialog.transient(parent)
     dialog.grab_set()
     dialog.attributes("-topmost", True)
     dialog.configure(fg_color=Colors.BG_DARKEST)
 
-    # Center dialog
-    dialog.update_idletasks()
-    x = parent.winfo_rootx() + (parent.winfo_width() // 2) - 200
-    y = parent.winfo_rooty() + (parent.winfo_height() // 2) - 125
-    dialog.geometry(f"+{x}+{y}")
+    from netstrip.gui.utils import center_window
+    center_window(dialog, 400, 250, parent=parent)
 
     content = ctk.CTkFrame(dialog, fg_color=Colors.BG_PANEL, corner_radius=Spacing.RADIUS_MD)
     content.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.LG)

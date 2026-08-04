@@ -166,6 +166,12 @@ class Database:
         self._stop_writer = True
         if hasattr(self, '_writer_thread') and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=1.0)
+        if hasattr(self, '_local') and hasattr(self._local, 'conn') and self._local.conn:
+            try:
+                self._local.conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
 
     def _async_writer_loop(self):
         consecutive_errors = 0
@@ -638,3 +644,34 @@ class Database:
         if ssid in wifis:
             wifis.remove(ssid)
             self.set_setting("trusted_wifis", json.dumps(wifis))
+
+    def factory_reset(self):
+        """
+        Thread-safely flush pending async writes, purge all database tables,
+        reinitialize default rows, vacuum database, and reset all in-memory caches.
+        """
+        self.flush()
+        with self.lock:
+            with self._get_connection() as conn:
+                conn.executescript('''
+                    DELETE FROM user_rules;
+                    DELETE FROM settings;
+                    DELETE FROM connection_log;
+                    DELETE FROM statistics;
+                    DELETE FROM dns_cache;
+                    DELETE FROM bandwidth_stats;
+                    DELETE FROM whitelisted_anomalies;
+                    VACUUM;
+                ''')
+                today = datetime.now().strftime('%Y-%m-%d')
+                conn.execute('INSERT OR IGNORE INTO statistics (date) VALUES (?)', (today,))
+                conn.commit()
+            if hasattr(self, '_settings_cache'):
+                self._settings_cache.clear()
+            if hasattr(self, '_rules_cache'):
+                self._rules_cache.clear()
+            if hasattr(self, '_user_rules_cache'):
+                self._user_rules_cache = None
+            if hasattr(self, '_domain_rule_lookup'):
+                self._domain_rule_lookup.clear()
+

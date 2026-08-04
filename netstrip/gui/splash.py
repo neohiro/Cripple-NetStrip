@@ -11,14 +11,9 @@ class SplashScreen(ctk.CTkToplevel):
         self.after(1000, lambda: self.attributes('-topmost', False))
         self.configure(fg_color=Colors.BG_DARKEST)
         
-        # Center the splash screen
-        width = 400
-        height = 400
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        # Center the splash screen reliably across all resolutions and DPI scalings
+        from netstrip.gui.utils import center_window
+        center_window(self, 400, 400)
         
         # Explicitly set the icon on the splash screen as well to guarantee it doesn't default to the feather
         try:
