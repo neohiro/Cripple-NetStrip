@@ -25,11 +25,11 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 
 ### What you get
 
-- **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time
-- **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click
-- **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS
-- **Zero-configuration privacy** — Ships with 1.5 million blocked domains out of the box. Ads, trackers, telemetry, and malware — gone before you even open a browser
-- **Your network, offline** — Run it on a Raspberry Pi, a NUC, or a home server and protect every device on your LAN without installing anything on them
+- **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time.
+- **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click.
+- **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS.
+- **Zero-configuration privacy** — Ships with **3.2+ Million unique blocked domains** out of the box across 42 active threat feeds. Ads, trackers, telemetry, and malware — gone before you even open a browser.
+- **Your network, offline** — Run it on a Raspberry Pi, a NUC, or a home server and protect every device on your LAN without installing anything on them.
 
 ---
 
@@ -37,6 +37,7 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 
 - [How It Works](#how-it-works)
 - [What Gets Blocked](#what-gets-blocked)
+- [Active Blocklists & Threat Feeds](#-active-blocklists--threat-feeds)
 - [Protecting Your LAN](#-protecting-your-lan)
 - [Android](#-android)
 - [Headless & Remote Management](#-headless--remote-management)
@@ -52,7 +53,7 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 Most "ad blockers" and "firewalls" work at a single layer — they rewrite DNS queries or filter HTTP headers. Cripple is different. It works at **three layers simultaneously**:
 
 ### Layer 1 — DNS Sinkhole
-Every DNS query your system makes passes through Cripple first. Known bad domains (ads, trackers, telemetry, malware) get sinkholes — they resolve to `0.0.0.0` so the connection never happens. This is fast, silent, and invisible to the apps making the requests.
+Every DNS query your system makes passes through Cripple first. Known bad domains (ads, trackers, telemetry, malware) get sinkholed — they resolve to `0.0.0.0` so the connection never happens. This is fast, silent, and invisible to the apps making the requests.
 
 > **Why this matters to you:** Your browser loads pages faster because ad networks never even get contacted. Your system uses less bandwidth. And tracking companies get zero data about you.
 
@@ -77,7 +78,7 @@ Out of the box, with no configuration, Cripple blocks:
 | **Ads** | Banner ads, video pre-rolls, pop-ups, native ads | Faster page loads, cleaner browsing, less bandwidth |
 | **Trackers** | Cross-site tracking pixels, fingerprinting scripts | Companies can't build a profile of your browsing habits |
 | **Telemetry** | OS phoning home, app crash reports, usage statistics | Your computer stops reporting your behavior to Microsoft/Apple/Google |
-| **Malware** | Known C2 servers, phishing domains, exploit kits | Protection against drive-by downloads and compromised sites |
+| **Malware** | Known C2 servers, phishing domains, botnets, exploit kits | Protection against drive-by downloads and compromised sites |
 | **IoT Chatter** | Smart devices calling home to cloud servers | Your smart TV stops sending your viewing habits to advertisers |
 
 You can customize everything: add your own blocklists (paste any URL), create per-app rules, set temporary "time bomb" allows that auto-expire, or switch between three protection modes:
@@ -87,6 +88,46 @@ You can customize everything: add your own blocklists (paste any URL), create pe
 | **🔓 Loose** | Blocks confirmed bad domains only | Maximum compatibility, minimal friction |
 | **🔰 Normal** | Blocks ads + trackers + telemetry | Daily use (recommended) |
 | **🔒 Paranoid** | Blocks everything not explicitly whitelisted | Maximum security, hardened environments |
+
+---
+
+## 🛡 Active Blocklists & Threat Feeds
+
+Cripple aggregates **3,236,262+ unique domains** from 42 active, high-reputation blocklists and threat intelligence feeds. Feeds are automatically updated on tailored schedules:
+
+### ☠ Rapid Threat Intelligence & Malware Feeds (1h–4h Cycle)
+| Blocklist Source | Category | Update Interval | Description |
+|---|---|---|---|
+| **URLhaus Malware** | Malware / C2 | **1 hour** | Real-time malware distribution and C2 server domains |
+| **Feodo Tracker Botnet C2** | Malware / C2 | **1 hour** | Active botnet command and control servers |
+| **HaGeZi TIF** | Threat Intelligence | **2 hours** | Threat Intelligence Feeds blocking phishing, malware, and exploits |
+| **DShield Suspicious Domains** | Security | **4 hours** | High-risk suspicious domains reported by SANS Internet Storm Center |
+| **PhishTank / Phishing Army** | Malware / Phishing | **4 hours** | Verified active phishing campaigns and credential harvesting sites |
+
+### 🚫 Advertisement & Tracking Blocklists (24h Cycle)
+| Blocklist Source | Category | Unique Domains | Description |
+|---|---|---|---|
+| **HaGeZi Ultimate** | Ads / Trackers | `677,000+` | Comprehensive high-coverage ad and tracker blocklist |
+| **HaGeZi Pro Plus** | Ads / Trackers | `586,000+` | Expanded protection covering intrusive popups and trackers |
+| **OISD Big** | Ads / Trackers | `333,000+` | Curated zero-false-positive ad and telemetry blocklist |
+| **AdGuard Base Filter** | Ads | `158,000+` | Primary AdGuard desktop & mobile ad-blocking rules |
+| **Steven Black Unified** | Ads / Malware | `93,000+` | Amalgamated hosts file combining top community blocklists |
+| **Dan Pollock Hosts** | Ads | `12,900+` | Classic hosts file covering ad networks and malware hosts |
+| **AdGuard Mobile Ads** | Mobile Ads | `10,700+` | Mobile ad networks, in-app trackers, and SDK analytics |
+| **AdAway Default** | Ads | `6,500+` | AdAway mobile ad server blocking list |
+| **Peter Lowe AdServers** | Ads | `3,500+` | Curated list of ad servers and tracking hosts |
+| **AdGuard Regional Filters** | Regional Ads | `30,000+` | Specific rules for Russian, Japanese, Turkish, Chinese, and French sites |
+| **EasyList Regional Filters** | Regional Ads | `15,000+` | Specific rules for German, Italian, Dutch, Arabic, and Korean (YousList) sites |
+
+### 📡 OS Telemetry & Identity Protection (24h Cycle)
+| Blocklist Source | Category | Description |
+|---|---|---|
+| **HaGeZi Windows Telemetry** | System Telemetry | Blocks Microsoft Windows 10/11 telemetry and diagnostics |
+| **HaGeZi Apple Telemetry** | System Telemetry | Blocks macOS and iOS analytics and diagnostics endpoints |
+| **HaGeZi Mobile Telemetry** | System Telemetry | Native telemetry blocking for Xiaomi, Huawei, Vivo, Oppo, Realme, & Amazon |
+| **WindowsSpyBlocker (Spy/Update/Extra)** | System Telemetry | Deep Windows telemetry, diagnostics, and forced update server blocking |
+| **HaGeZi DoH/DoT Providers** | Security | Prevents browser Encrypted DNS (DoH/DoT) bypass attempts |
+| **v2fly Identity Lists** | Identity Mapping | Category mapping for Microsoft, Google, Apple, Amazon, Facebook, Cloudflare, & Fastly |
 
 ---
 
@@ -276,6 +317,12 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.1.18 — Expanded Threat Feeds & Session Isolation
+- **3.23M+ Unique Blocked Domains**: Integrated HaGeZi Pro Plus and HaGeZi Threat Intelligence Feeds (TIF).
+- **Tailored Update Cycles**: 1h–4h rapid updates for malware/C2 feeds and 24h for ad/telemetry lists.
+- **Session-Isolated Live Traffic**: Connections sidebar & live views now show current running session traffic.
+- **Glitch-Free UI**: Reparented category cards grid to prevent UI destruction on category clicks.
+
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes
 - Dual Android VPN — native VPN slot or companion mode alongside another VPN
@@ -293,11 +340,6 @@ pip install -r requirements.txt
 - Futuristic-minimalist UI theme
 - CPU stability improvements
 
-### v2.0.0 — System Classification Engine
-- Automatic domain classification engine
-- Auto-updater with rate limiting
-- GUI rebrand and memory optimizations
-
 ---
 
 ## 🙏 Credits
@@ -305,8 +347,8 @@ pip install -r requirements.txt
 **Core Technologies:**  
 [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) • [dnslib](https://github.com/paulc/dnslib) • [psutil](https://github.com/giampaolo/psutil) • [WinDivert](https://github.com/basil00/Divert) • [cryptography](https://github.com/pyca/cryptography)
 
-**Blocklists:**  
-[AdGuard](https://adguard.com/en/blog/adguard-dns-filter.html) • [oisd](https://oisd.nl/) • [Steven Black](https://github.com/StevenBlack/hosts) • [HaGeZi](https://github.com/hagezi/dns-blocklists) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [URLHaus](https://urlhaus.abuse.ch/) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [Energized Protection](https://energized.pro/)
+**Blocklists & Threat Feeds:**  
+[HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists) • [AdGuard Filters](https://adguard.com/) • [OISD](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [URLhaus](https://urlhaus.abuse.ch/) • [Feodo Tracker](https://feodotracker.abuse.ch/) • [PhishTank](https://phishing.army/) • [DShield](https://www.dshield.org/) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [EasyList](https://easylist.to/)
 
 ---
 
