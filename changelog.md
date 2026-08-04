@@ -1,3 +1,8 @@
+## [v3.1.27] - Cross-Platform OS & Global Cloud Infrastructure Hardening
+
+- **Cross-Platform OS Whitelist**: Added essential infrastructure domain overrides for Apple (`apple.com`, `icloud.com`, `cdn-apple.com`), Android (`android.com`, `ggpht.com`), and Linux distributions (`ubuntu.com`, `debian.org`, `archlinux.org`, `fedoraproject.org`, `flathub.org`).
+- **Global Cloud & Package Registries**: Whitelisted Oracle Cloud (`oraclecloud.com`), DigitalOcean (`digitaloceanspaces.com`), Hetzner (`hetzner.com`), Linode (`linode.com`), Vultr (`vultr.com`), and developer package registries (`pypi.org`, `npmjs.org`, `crates.io`, `docker.com`).
+
 ## [v3.1.26] - Stutter-Free Splash Animation & Ultra-Fast Boot Engine
 
 - **Stutter-Free Splash Animation**: Optimized `check_engine_ready()` tick rate to 16ms (~60fps) and tuned background thread GIL yields in `blocklist_manager.py` (chunk size 100,000 with 1ms micro-yields). The canvas logo animation now bounces smoothly without stutter.

@@ -28,12 +28,12 @@ CATEGORY_PRIORITY = {
 # Essential domains - NEVER block, regardless of mode or user rules.
 # This guarantees updates, crash telemetry, and core networking functions work.
 ESSENTIAL_DOMAINS = frozenset({
-    # Telemetry / Updates
+    # Core Application Updates & Repositories
     'api.github.com',
     'raw.githubusercontent.com',
     'frenzypenguin.media',
     'github.com',
-    # GeoIP / Network utilities
+    # GeoIP & Network Connectivity Diagnostic Tools
     'ip-api.com',
     'ipinfo.io',
     'ipify.org',
@@ -41,35 +41,67 @@ ESSENTIAL_DOMAINS = frozenset({
     'ipapi.co',
     'ipwho.is',
     'api.myip.com',
-    # Amazon Web Services (AWS)
+    # Amazon Web Services (AWS) & CloudFront CDN
     'amazonaws.com',
     's3.amazonaws.com',
     'cloudfront.net',
-    # Microsoft Azure & Cloud Infrastructure
+    # Microsoft Azure & Windows System Cloud Infrastructure
     'azure.com',
     'azure.net',
     'windows.net',
     'microsoft.com',
     'msftconnecttest.com',
-    # Google Cloud Platform (GCP) & CDNs
+    # Google Cloud Platform (GCP), Android & Google CDNs
     'googleapis.com',
     'gstatic.com',
     'googleusercontent.com',
     'gvt1.com',
     'gvt2.com',
-    # Major Global CDNs (Fastly & Akamai)
+    'android.com',
+    'ggpht.com',
+    # Apple Ecosystem (macOS & iOS System Infrastructure)
+    'apple.com',
+    'icloud.com',
+    'apple-dns.net',
+    'cdn-apple.com',
+    'mzstatic.com',
+    # Linux Distributions & Package Registries (Ubuntu, Debian, Fedora, Arch, Flathub)
+    'ubuntu.com',
+    'canonical.com',
+    'debian.org',
+    'archlinux.org',
+    'fedoraproject.org',
+    'redhat.com',
+    'opensuse.org',
+    'flathub.org',
+    # Major Global Edge CDNs (Fastly & Akamai)
     'fastly.net',
     'fastlylb.net',
     'akamaiedge.net',
     'akamaihd.net',
     'edgekey.net',
+    'cloudflare.com',
+    # Other Major Cloud Infrastructure (Oracle, DigitalOcean, Hetzner, Linode, Vultr)
+    'oraclecloud.com',
+    'digitaloceanspaces.com',
+    'hetzner.com',
+    'linode.com',
+    'vultr.com',
+    # Developer Package Registries (Python, Node.js, Rust, Docker)
+    'pypi.org',
+    'pythonhosted.org',
+    'npmjs.org',
+    'npmjs.com',
+    'crates.io',
+    'docker.com',
+    'docker.io',
     # Gaming & Virtual World Infrastructure (Second Life, Steam, Epic)
     'lindenlab.com',
     'secondlife.com',
     'steampowered.com',
     'steamcontent.com',
     'steamstatic.com',
-    # Local loopbacks
+    # Local Loopbacks (Required for System IPC and Local Resolvers)
     '127.0.0.1', '127.0.0.53', '::1', 'localhost',
 })
 
