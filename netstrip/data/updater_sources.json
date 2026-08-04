@@ -103,7 +103,8 @@
       "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/tif.txt",
       "format": "hosts",
       "category": "malware",
-      "enabled": true
+      "enabled": true,
+      "update_interval_hours": 2
     },
     {
       "name": "URLhaus Malware",
