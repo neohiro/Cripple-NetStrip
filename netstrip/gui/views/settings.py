@@ -425,9 +425,16 @@ class SettingsView(ctk.CTkFrame):
                     with bl.lock:
                         for d in telemetry_domains:
                             bl.whitelist.discard(d)
-                # Flush classifier cache so changes take effect immediately
-                self.engine.classifier._domain_cache.clear()
-                    
+                if hasattr(self.engine, 'classifier'):
+                    self.engine.classifier._domain_cache.clear()
+
+            if setting_key == 'block_system_connections':
+                # Flush classifier caches so system connection rules apply immediately
+                if hasattr(self.engine, 'classifier'):
+                    self.engine.classifier._domain_cache.clear()
+                    if hasattr(self.engine.classifier, '_ip_cache'):
+                        self.engine.classifier._ip_cache.clear()
+
             readable_name = setting_key.replace('_', ' ').title()
             status = "Enabled" if value == 'true' else "Disabled"
             if hasattr(self.engine, 'on_status') and self.engine.on_status:
@@ -679,6 +686,13 @@ class SettingsView(ctk.CTkFrame):
         def toggle_local_api():
             val = local_api_var.get()
             self.engine.db.set_setting("iot_local_sensor_enabled", val)
+            if hasattr(self.engine, 'iot_local_api') and self.engine.iot_local_api:
+                if val == "true":
+                    self.engine.iot_local_api.start()
+                else:
+                    self.engine.iot_local_api.stop()
+            if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                self.engine.on_status(f"Local Native IoT Sensor {'Enabled' if val == 'true' else 'Disabled'}")
             
         local_api_switch = ctk.CTkSwitch(local_api_row, text="", variable=local_api_var, onvalue="true", offvalue="false", command=toggle_local_api, progress_color=Colors.SUCCESS_DIM)
         local_api_switch.pack(side="right")
@@ -808,17 +822,32 @@ class SettingsView(ctk.CTkFrame):
         self._end_entry.pack(side="left", padx=Spacing.SM)
         self._end_entry.insert(0, self.engine.db.get_setting("killswitch_end", "07:00"))
 
-        ctk.CTkButton(
+        self._btn_save_sched = ctk.CTkButton(
             row, text="Save Schedule", width=100, height=32, corner_radius=8,
             fg_color=Colors.ACCENT_PRIMARY, hover_color=Colors.ACCENT_LIGHT,
             text_color=Colors.TEXT_PRIMARY,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             command=self._save_schedule,
-        ).pack(side="right")
+        )
+        self._btn_save_sched.pack(side="right")
 
     def _save_schedule(self):
-        self.engine.db.set_setting("killswitch_start", self._start_entry.get())
-        self.engine.db.set_setting("killswitch_end", self._end_entry.get())
+        import re
+        start_val = self._start_entry.get().strip()
+        end_val = self._end_entry.get().strip()
+        time_pattern = r'^([01]\d|2[0-3]):[0-5]\d$'
+        if not re.match(time_pattern, start_val) or not re.match(time_pattern, end_val):
+            if hasattr(self, '_btn_save_sched'):
+                self._btn_save_sched.configure(text="Invalid Format", fg_color=Colors.DANGER)
+                self.after(2000, lambda: self._btn_save_sched.configure(text="Save Schedule", fg_color=Colors.ACCENT_PRIMARY))
+            return
+        self.engine.db.set_setting("killswitch_start", start_val)
+        self.engine.db.set_setting("killswitch_end", end_val)
+        if hasattr(self, '_btn_save_sched'):
+            self._btn_save_sched.configure(text="Saved ✓", fg_color=Colors.SUCCESS_DIM)
+            self.after(2000, lambda: self._btn_save_sched.configure(text="Save Schedule", fg_color=Colors.ACCENT_PRIMARY))
+        if hasattr(self.engine, 'on_status') and self.engine.on_status:
+            self.engine.on_status(f"Killswitch Schedule updated: {start_val} to {end_val}")
 
     def _build_migration_card(self):
         card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
@@ -890,8 +919,15 @@ class SettingsView(ctk.CTkFrame):
         if path:
             try:
                 self.engine.db.import_profile(path)
+                # Hot-reload the engine with imported settings and rules
+                if hasattr(self.engine, 'blocklist'):
+                    self.engine.blocklist.load_all()
+                if hasattr(self.engine, 'classifier'):
+                    self.engine.classifier._domain_cache.clear()
+                    if hasattr(self.engine.classifier, '_ip_cache'):
+                        self.engine.classifier._ip_cache.clear()
                 from tkinter import messagebox
-                messagebox.showinfo("Import Successful", "Profile successfully imported! Some settings may require a restart to apply.")
+                messagebox.showinfo("Import Successful", "Profile successfully imported and applied!")
             except Exception as e:
                 from tkinter import messagebox
                 messagebox.showerror("Import Failed", f"Failed to import profile:\n{e}")

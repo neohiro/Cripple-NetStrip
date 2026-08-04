@@ -35,11 +35,16 @@ class Database:
         """Get a thread-safe connection"""
         if not hasattr(self, '_local'):
             self._local = threading.local()
-        if not hasattr(self._local, 'conn'):
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             # Enable WAL mode for better concurrency
-            conn.execute('PRAGMA journal_mode=WAL')
+            try:
+                conn.execute('PRAGMA journal_mode=WAL;')
+                conn.execute('PRAGMA busy_timeout=30000;')
+                conn.execute('PRAGMA synchronous=NORMAL;')
+            except Exception:
+                pass
             self._local.conn = conn
         return self._local.conn
 
@@ -165,8 +170,9 @@ class Database:
                 logs = [b['data'] for b in batch if b['type'] == 'log']
                 stats = [b['data'] for b in batch if b['type'] == 'stat']
                 
-                with self.lock:
-                    try:
+                write_success = False
+                try:
+                    with self.lock:
                         with self._get_connection() as conn:
                             if logs:
                                 conn.executemany('''
@@ -199,23 +205,31 @@ class Database:
                                 
                             conn.commit()
                             consecutive_errors = 0
-                    except Exception as e:
-                        import logging
-                        logging.getLogger(__name__).error(f"Error in async writer thread: {e}")
-                        consecutive_errors += 1
-                        if consecutive_errors > 5:
-                            logging.getLogger(__name__).critical("DB Async writer circuit breaker triggered. Delaying writes.")
-                            time.sleep(5)
-                        else:
-                            time.sleep(consecutive_errors)
-                        # Re-queue batch to not lose data
+                            write_success = True
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Error in async writer thread: {e}")
+                    consecutive_errors += 1
+
+                # Handle errors and retries WITHOUT holding self.lock to avoid freezing GUI
+                if not write_success:
+                    sleep_time = 5.0 if consecutive_errors > 5 else min(float(consecutive_errors), 2.0)
+                    time.sleep(sleep_time)
+                    # Re-queue batch if write queue isn't overflowed (max 10,000)
+                    if self.write_queue.qsize() < 10000:
                         for item in batch:
                             self.write_queue.put(item)
 
     def log_connection(self, data: Dict[str, Any]):
-        
-        """Log a connection event via async queue"""
+        """Log a connection event via async queue with queue bound protection"""
         if hasattr(self, 'write_queue'):
+            if self.write_queue.qsize() > 15000:
+                # Drop oldest items to avoid memory explosion if disk is locked
+                try:
+                    for _ in range(100):
+                        self.write_queue.get_nowait()
+                except Exception:
+                    pass
             row = (
                 data.get('process_name'), data.get('process_path'), data.get('pid'),
                 data.get('domain'), data.get('ip'), data.get('port'), data.get('protocol'),

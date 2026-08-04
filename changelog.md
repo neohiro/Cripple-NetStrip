@@ -1,3 +1,39 @@
+## [v3.2.3] - Process Normalization, Direct DNS Enforcement & Full Settings Optimization
+
+- **Process Normalization & Deep Parent Hierarchy**:
+  - Implemented `netstrip/core/process_utils.py` for canonical naming and process tree resolution (merging variations like `AntiGravity.exe` and `AntiGravity` under unified identity).
+  - Traced console hosts and child processes back to parent executables, eliminating duplicate process entries in active connections.
+  - Cleaned test/benchmark process entries and legacy database artifacts.
+- **Direct Browser DNS Enforcement & Local Proxy Transparency**:
+  - `engine.py::_evaluate_packet` strictly intercepts direct external DNS queries (DoH/DoT and port 53/853) when `allow_in_browser_dns` is disabled.
+  - Local loopback proxy listeners (`127.0.0.0/8`, `::1`) and Cripple's internal DNS resolver (`127.127.127.127`) remain transparently unblocked.
+  - Blocklist caching now hashes DNS toggle state to dynamically invalidate stale filter sets.
+- **Settings Synchronization & Protection Engine Hardening**:
+  - `smart_paranoid_mode`: Auto-escalates protection mode to `ProtectionLevel.PARANOID` on threat/intrusion detection alongside Master Killswitch.
+  - `killswitch_schedule_enabled`: Automatically restores network connectivity when daily scheduled downtime window completes.
+  - Added input format validation (`HH:MM`) with visual feedback (`"Saved ✓"`) in Killswitch Scheduler.
+  - `block_system_connections` & `analytics_opt_in`: Automatically flushes classifier domain and IP caches on toggle for instantaneous rule application.
+  - `iot_local_sensor_enabled`: Dynamically starts or stops native REST/mDNS IoT service upon toggle.
+  - `import_profile`: Automatically hot-reloads blocklists, user rules, and purges classifier caches upon profile import.
+
+## [v3.2.2] - Concurrency Stability, Instant Scrolling & Glitch-Free UI
+
+- **Deadlock & Freeze Prevention**:
+  - Activated SQLite WAL mode (`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;`) and isolated error handling in `_async_writer_loop` without holding SQLite thread locks during retries.
+  - Implemented queue size bounds on `Database.log_connection` to prevent memory bloat during disk contention.
+  - Bounded `IconManager` extraction to a dedicated `ThreadPoolExecutor(max_workers=2)` with timeouts, eliminating PowerShell child process exhaustion.
+- **Glitch-Free Connection Logs UI**:
+  - Converted category and action badge rendering in `LogView` to fixed geometry containers with transparent text labels, completely eliminating canvas text re-centering flicker during live updates.
+  - Added signature diffing and in-place row recycling to prevent layout thrashing and UI stutter during rapid connection bursts.
+- **Instantaneous Smooth Mousewheel Scrolling**:
+  - Replaced sluggish parent-canvas traversal with direct, unified `enable_smooth_scrolling` across `ConnectionsSidebar`, `ConnectionsView`, and `LogView`.
+- **Blocklist Manager & Boot Reliability**:
+  - Ensured atomic, crash-resilient blocklist caching using `.tmp` atomic renames and deterministic size-based hashing.
+  - Added a 3-second safety transition timeout to `main.py` splash sequence to guarantee immediate window display regardless of async loading states.
+- **Typing & Import Fixes**:
+  - Resolved `Optional` typing import in `netstrip/core/geoip.py`.
+  - Added flexible positional argument handling in `BlocklistManager.__init__`.
+
 ## [v3.2.1] - DNS Keep-Alive Pool, High-Throughput LRU Cache & Engine Optimizations
 
 - **Upstream DNS Keep-Alive Connection Pool**: Implemented thread-safe `_DNSConnectionPool` for upstream DoT (DNS over TLS) and DoH (DNS over HTTPS) sockets, eliminating per-query TLS handshakes with auto idle-timeout recycling.

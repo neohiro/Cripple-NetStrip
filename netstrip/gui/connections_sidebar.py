@@ -11,7 +11,7 @@ import os
 
 
 from netstrip.gui.components.sidebar_components import ConnectionRow, AppGroupFrame
-from netstrip.gui.utils import safe_loop
+from netstrip.gui.utils import safe_loop, enable_smooth_scrolling
 from netstrip.gui.popups import check_killswitch_override
 
 class ConnectionsSidebar(ctk.CTkFrame):
@@ -138,37 +138,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         self.lan_toggle.pack(side="right")
 
         # Smooth mousewheel scroll handling
-        def _on_mousewheel(event):
-            try:
-                if not self.winfo_exists() or not self.winfo_ismapped():
-                    return
-                if not self._is_mouse_inside():
-                    return
-                canvas = getattr(self.scroll_frame, '_parent_canvas', None)
-                if canvas:
-                    if hasattr(event, 'delta') and event.delta:
-                        step = int(-1 * (event.delta / 40))
-                        if step == 0:
-                            step = -1 if event.delta > 0 else 1
-                        canvas.yview_scroll(step, "units")
-                    elif getattr(event, 'num', None) == 4:
-                        canvas.yview_scroll(-2, "units")
-                    elif getattr(event, 'num', None) == 5:
-                        canvas.yview_scroll(2, "units")
-            except Exception:
-                pass
-
-        self._on_mousewheel_handler = _on_mousewheel
-        self.bind("<Map>", lambda e: (
-            self.bind_all("<MouseWheel>", self._on_mousewheel_handler, add="+"),
-            self.bind_all("<Button-4>", self._on_mousewheel_handler, add="+"),
-            self.bind_all("<Button-5>", self._on_mousewheel_handler, add="+")
-        ))
-        self.bind("<Unmap>", lambda e: (
-            self.unbind_all("<MouseWheel>"),
-            self.unbind_all("<Button-4>"),
-            self.unbind_all("<Button-5>")
-        ))
+        enable_smooth_scrolling(self.scroll_frame)
 
         self._refresh_loop()
 
@@ -287,30 +257,17 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 app_conn_counts = {}
             
             if len(conns) > 0:
+                from netstrip.core.process_utils import normalize_process_name
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
                 for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
-                    p_name = conn_dict.get('process_name') or 'Unknown'
+                    raw_p_name = conn_dict.get('process_name') or 'Unknown'
                     pid_val = conn_dict.get('pid')
-                    my_pid = os.getpid()
-                    is_our_netstrip = (pid_val == my_pid)
                     
-                    if not is_our_netstrip and pid_val:
-                        try:
-                            import psutil
-                            pr = psutil.Process(pid_val)
-                            cmd = " ".join(pr.cmdline()).lower()
-                            if "netstrip" in cmd or "main.py" in cmd or "cripple" in cmd:
-                                is_our_netstrip = True
-                        except Exception:
-                            pass
-
-                    if p_name and (is_our_netstrip or p_name.lower() in ('cripple.exe', 'cripple (internal)', 'netstrip.exe')):
-                        p_name = 'Cripple (Internal)'
-                    elif p_name and p_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe'):
-                        p_name = 'Python'
-                    elif p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
+                    if raw_p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
                         p_name = 'DNS'
+                    else:
+                        p_name = normalize_process_name(raw_p_name, pid=pid_val)
                             
                     if app_conn_counts.get(p_name, 0) >= 50:
                         continue

@@ -314,19 +314,19 @@ class NetStripEngine:
         process_name = "Unknown"
         if pid:
             if pid == os.getpid():
-                # Allow NetStrip's own traffic (DNS upstream, updates)
-                if self.classifier.mode.name == "PARANOID" and dst_port in (80, 443):
-                    return False
+                # Always allow NetStrip's own internal traffic (DNS upstream queries, update checks)
                 return True
             
-            # HIGH-7: Use PID→name cache instead of psutil.Process().name() on every packet
+            # Use PID→name cache with deep process resolution
             now = time.time()
             cached = self._pid_name_cache.get(pid)
             if cached and (now - cached[1]) < self._pid_cache_ttl:
                 process_name = cached[0]
             else:
                 try:
-                    process_name = psutil.Process(pid).name()
+                    proc = psutil.Process(pid)
+                    from netstrip.core.process_utils import resolve_process_identity
+                    process_name, _, _, _ = resolve_process_identity(proc)
                     self._pid_name_cache[pid] = (process_name, now)
                     # Evict stale entries periodically
                     if len(self._pid_name_cache) > 1000:
@@ -336,6 +336,32 @@ class NetStripEngine:
                         }
                 except Exception:
                     pass
+
+        # ----------------------------------------------------
+        # DIRECT EXTERNAL DNS / DoT INTERCEPTION & ENFORCEMENT
+        # ----------------------------------------------------
+        # When allow_in_browser_dns is disabled (false), direct external queries on port 53 (DNS)
+        # and port 853 (DoT) from non-NetStrip processes are blocked to enforce local proxy usage.
+        allow_external_dns = self.db.get_setting("allow_in_browser_dns", "false") == "true"
+        if not allow_external_dns and dst_port in (53, 853) and not (dst_ip.startswith("127.") or dst_ip == "::1"):
+            # Check if this is a detected local DNS proxy tool (e.g. dnscrypt-proxy, AdGuard Home, CoreDNS)
+            local_tool = self.db.get_setting("local_dns_tool", "")
+            is_local_proxy = bool(local_tool and (local_tool.lower() in process_name.lower() or process_name.lower() in local_tool.lower()))
+            
+            if not is_local_proxy:
+                try:
+                    self.db.log_connection({
+                        'process_name': process_name,
+                        'domain': f"{dst_ip}:{dst_port}",
+                        'protocol': protocol,
+                        'category': ConnectionCategory.TRACKER.value,
+                        'action': ConnectionAction.BLOCK.value,
+                        'mode': self.classifier.mode.name
+                    })
+                except Exception:
+                    pass
+                return False
+        # ----------------------------------------------------
                 
         cat, action = self.classifier.classify_ip(dst_ip, dst_port, process_name)
         
@@ -748,6 +774,8 @@ class NetStripEngine:
             
         logger.critical(f"Network Intrusion/Anomaly Detected: {message}. ENGAGING AUTO-KILLSWITCH.")
         self.set_killswitch(True)
+        if self.db.get_setting("smart_paranoid_mode", "true") == "true":
+            self.set_mode(ProtectionLevel.PARANOID)
         
         # Send OS desktop notification
         try:
@@ -799,10 +827,17 @@ class NetStripEngine:
                     else: # Wraps around midnight
                         is_scheduled = current_time >= start_time or current_time <= end_time
                     
-                    if is_scheduled and not self.killswitch_active:
-                        self.set_killswitch(True)
-                        if self.on_critical_network_event:
-                            self.on_critical_network_event("Scheduled Downtime Window Active")
+                    if is_scheduled:
+                        if not self.killswitch_active:
+                            self._scheduled_killswitch_engaged = True
+                            self.set_killswitch(True)
+                            if self.on_critical_network_event:
+                                self.on_critical_network_event("Scheduled Downtime Window Active")
+                    else:
+                        if getattr(self, '_scheduled_killswitch_engaged', False) and self.killswitch_active:
+                            self._scheduled_killswitch_engaged = False
+                            self.set_killswitch(False)
+                            self.broadcast_status("Scheduled Downtime Window Ended — Network Restored")
             except Exception as e:
                 logger.error(f"Watchdog error: {e}")
             

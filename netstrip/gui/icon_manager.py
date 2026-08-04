@@ -73,6 +73,8 @@ class AppIdentifier:
             
         return 'user_app'
 
+import concurrent.futures
+
 class IconManager:
     def __init__(self, cache_dir: str):
         self.cache_dir = os.path.join(cache_dir, 'icons')
@@ -85,6 +87,8 @@ class IconManager:
         self._image_cache = {}
         # Prevent multiple threads extracting the same icon
         self._in_progress = set()
+        # Bounded worker pool to prevent spawning dozens of PowerShell / download threads
+        self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
     def _check_cache_version(self):
         try:
@@ -194,22 +198,20 @@ class IconManager:
         if not callback:
             return None
             
-        # Otherwise, initiate background fetch
-        if process_path not in self._in_progress:
+        # Otherwise, initiate background fetch via bounded worker pool
+        if process_path not in self._in_progress and len(self._in_progress) < 30:
             self._in_progress.add(process_path)
             
             if process_path.endswith('.exe') and os.path.exists(process_path):
-                threading.Thread(
-                    target=self._extract_icon_native,
-                    args=(process_path, process_name, cached_exe_icon, callback),
-                    daemon=True
-                ).start()
+                try:
+                    self._worker_pool.submit(self._extract_icon_native, process_path, process_name, cached_exe_icon, callback)
+                except Exception:
+                    self._in_progress.discard(process_path)
             else:
-                threading.Thread(
-                    target=self._do_fallback,
-                    args=(process_path, process_name, callback),
-                    daemon=True
-                ).start()
+                try:
+                    self._worker_pool.submit(self._do_fallback, process_path, process_name, callback)
+                except Exception:
+                    self._in_progress.discard(process_path)
                 
         return None
 
@@ -220,7 +222,6 @@ class IconManager:
         success = False
         try:
             # We use System.Drawing.Icon.ExtractAssociatedIcon to grab the icon
-            # Escape single quotes in paths for PowerShell
             safe_process_path = process_path.replace("'", "''")
             safe_save_path = save_path.replace("'", "''")
             
@@ -233,19 +234,16 @@ class IconManager:
             }} catch {{}}
             """
             
-            # Encode script to Base64 to prevent any syntax/encoding errors with special characters in paths
             encoded_script = base64.b64encode(ps_script.encode('utf-16-le')).decode('utf-8')
             
-            # Run PowerShell silently
             subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded_script],
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                timeout=5
+                timeout=4
             )
             
-            # Require at least 200 bytes to filter out corrupt/blank 1x1 PNGs
             if os.path.exists(save_path) and os.path.getsize(save_path) > 200:
                 success = True
         except Exception:
@@ -263,27 +261,6 @@ class IconManager:
     def _do_fallback(self, process_path: str, process_name: str, callback):
         app_name_base = process_name.lower().replace('.exe', '')
         
-        # Check parent process for child services (e.g. jhi_service.exe -> Antigravity.exe, NVIDIA Overlay -> nvcontainer.exe)
-        try:
-            import psutil
-            for p in psutil.process_iter(['name', 'exe', 'cmdline']):
-                if p.info['name'] and p.info['name'].lower() == process_name.lower():
-                    parent = p.parent()
-                    if parent and parent.info['exe'] and os.path.exists(parent.info['exe']):
-                        parent_exe = parent.info['exe']
-                        parent_name = parent.info['name']
-                        cached_parent_icon = os.path.join(self.cache_dir, f"exe_{parent_name.lower().replace('.exe', '')}.png")
-                        if not os.path.exists(cached_parent_icon):
-                            self._extract_icon_native(parent_exe, parent_name, cached_parent_icon, callback)
-                            return
-                        else:
-                            img = Image.open(cached_parent_icon)
-                            self._image_cache[process_path] = img
-                            callback()
-                            return
-        except Exception:
-            pass
-
         if app_name_base in APP_ICONS:
             app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
             self._download_icon(APP_ICONS[app_name_base], app_icon_path, process_path, callback)
@@ -301,11 +278,11 @@ class IconManager:
     def _download_icon(self, url: str, save_path: str, process_path: str, callback):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'NetStrip/1.0'})
-            with urllib.request.urlopen(req, timeout=5) as response, open(save_path, 'wb') as out_file:
+            with urllib.request.urlopen(req, timeout=4) as response, open(save_path, 'wb') as out_file:
                 out_file.write(response.read())
             callback()
         except Exception as e:
-            logging.getLogger(__name__).error(f"Failed to download icon from {url}: {e}")
+            logging.getLogger(__name__).debug(f"Failed to download icon from {url}: {e}")
         finally:
             if process_path in self._in_progress:
                 self._in_progress.remove(process_path)

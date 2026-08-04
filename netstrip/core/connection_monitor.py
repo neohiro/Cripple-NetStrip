@@ -158,45 +158,9 @@ class ConnectionMonitor:
         self.known_connections = current_connections
 
     def _resolve_process_identity(self, proc: psutil.Process):
-        """Ascend the process tree to find the root parent application."""
-        system_launchers = {'explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe'}
-        
-        current_proc = proc
-        root_proc = proc
-        
-        try:
-            depth = 0
-            while depth < 10:
-                parent = current_proc.parent()
-                if not parent:
-                    break
-                
-                parent_name = parent.name().lower()
-                if parent_name in system_launchers:
-                    break
-                    
-                root_proc = parent
-                current_proc = parent
-                depth += 1
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-            
-        try:
-            process_name = root_proc.name()
-        except Exception:
-            process_name = "Unknown"
-            
-        try:
-            process_path = root_proc.exe()
-        except Exception:
-            process_path = ""
-            
-        try:
-            original_exe = proc.name()
-        except Exception:
-            original_exe = process_name
-            
-        return process_name, process_path, root_proc, original_exe
+        """Ascend the process tree to find the root parent application using process_utils."""
+        from netstrip.core.process_utils import resolve_process_identity
+        return resolve_process_identity(proc)
 
     def _handle_new_connection(self, conn, conn_sig, direction):
         original_exe = "Unknown"
@@ -208,21 +172,6 @@ class ConnectionMonitor:
             else:
                 proc = psutil.Process(conn.pid)
                 process_name, process_path, root_proc, original_exe = self._resolve_process_identity(proc)
-                    
-                # Enhance process name for generic runtimes (using root_proc)
-                if process_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe', 'node.exe', 'java.exe', 'ruby.exe', 'javaw.exe', 'cmd.exe', 'powershell.exe'):
-                    try:
-                        cmdline = root_proc.cmdline()
-                        cmd_str = " ".join(cmdline).lower()
-                        if "antigravity" in cmd_str or "agy" in cmd_str:
-                            process_name = "Antigravity"
-                        elif len(cmdline) > 1:
-                            script_arg = cmdline[1]
-                            if script_arg.endswith(('.py', '.js', '.jar', '.rb')):
-                                script_name = os.path.basename(script_arg)
-                                process_name = f"{process_name} ({script_name})"
-                    except Exception:
-                        pass
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             process_name = "Unknown"
             process_path = ""
@@ -250,41 +199,54 @@ class ConnectionMonitor:
             
             if not is_local_ipv4 and not is_local_ipv6:
                 domain = "" # Default to empty, look up in background
-                def _resolve_dns_bg(resolve_ip):
-                    try:
-                        default_timeout = socket.getdefaulttimeout()
-                        socket.setdefaulttimeout(0.5)
-                        name, _, _ = socket.gethostbyaddr(resolve_ip)
-                        self.db.cache_domain_mapping(resolve_ip, name)
-                    except socket.herror:
-                        pass
-                    finally:
-                        socket.setdefaulttimeout(default_timeout)
-                        
-                self._dns_executor.submit(_resolve_dns_bg, ip)
-            elif is_local_ipv4 and ip not in ("127.0.0.1", "0.0.0.0"):
-                # --- Connection-level ARP Pinning ---
-                if self.db.get_setting("lan_shield_enabled", "false") != "true":
-                    def _arp_pinning_bg(check_ip):
-                        import subprocess, re
+                if not hasattr(self, '_pending_dns_lookups'):
+                    self._pending_dns_lookups = set()
+                if ip not in self._pending_dns_lookups and len(self._pending_dns_lookups) < 100:
+                    self._pending_dns_lookups.add(ip)
+                    def _resolve_dns_bg(resolve_ip):
                         try:
-                            kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
-                            res = subprocess.run(["arp", "-a"], capture_output=True, text=True, **kwargs)
-                            mac = None
-                            for line in res.stdout.splitlines():
-                                if check_ip in line:
-                                    match = re.search(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})', line)
-                                    if match:
-                                        mac = match.group(0).lower().replace('-', ':')
-                                        break
-                            if mac:
-                                if check_ip in self._arp_cache and self._arp_cache[check_ip] != mac:
-                                    if self.on_malware_detected:
-                                        self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
-                                self._arp_cache[check_ip] = mac
+                            name, _, _ = socket.gethostbyaddr(resolve_ip)
+                            if name:
+                                self.db.cache_domain_mapping(resolve_ip, name)
+                        except (socket.herror, socket.gaierror, OSError):
+                            pass
+                        finally:
+                            if hasattr(self, '_pending_dns_lookups'):
+                                self._pending_dns_lookups.discard(resolve_ip)
+                            
+                    try:
+                        self._dns_executor.submit(_resolve_dns_bg, ip)
+                    except Exception:
+                        self._pending_dns_lookups.discard(ip)
+            elif is_local_ipv4 and ip not in ("127.0.0.1", "0.0.0.0"):
+                # --- Connection-level ARP Pinning (Rate-limited to once every 5 seconds) ---
+                now_ts = time.time()
+                if getattr(self, '_last_arp_check', 0) + 5.0 < now_ts:
+                    self._last_arp_check = now_ts
+                    if self.db.get_setting("lan_shield_enabled", "false") != "true":
+                        def _arp_pinning_bg(check_ip):
+                            import subprocess, re
+                            try:
+                                kwargs = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
+                                res = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=2.0, **kwargs)
+                                mac = None
+                                for line in res.stdout.splitlines():
+                                    if check_ip in line:
+                                        match = re.search(r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})', line)
+                                        if match:
+                                            mac = match.group(0).lower().replace('-', ':')
+                                            break
+                                if mac:
+                                    if check_ip in self._arp_cache and self._arp_cache[check_ip] != mac:
+                                        if self.on_malware_detected:
+                                            self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
+                                    self._arp_cache[check_ip] = mac
+                            except Exception:
+                                pass
+                        try:
+                            self._dns_executor.submit(_arp_pinning_bg, ip)
                         except Exception:
                             pass
-                    self._dns_executor.submit(_arp_pinning_bg, ip)
 
         # Fetch corporate identity if we have a domain
         identity = self.classifier.blocklist.get_identity(domain) if domain else None

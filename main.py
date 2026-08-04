@@ -117,8 +117,9 @@ def is_server_or_embedded():
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
+        from netstrip import __version__
         print(f"\n{'='*60}")
-        print(f"  Cripple (NetStrip) v3.2.0 - CLI / Daemon")
+        print(f"  Cripple (NetStrip) v{__version__} - CLI / Daemon")
         print(f"{'='*60}")
         print("\nBOOT VARIABLES:")
         print("  --service              Headless/daemon mode (no GUI).")
@@ -717,7 +718,10 @@ def main():
             if not is_headless:
                 app.deiconify()
             app.apply_icon()
-            app.update() 
+            try:
+                app.update_idletasks()
+            except Exception:
+                pass
             
             def on_transition_done():
                 if not is_headless:
@@ -770,25 +774,19 @@ def main():
                 try:
                     if splash and splash.winfo_exists():
                         splash.update_idletasks()
-                        splash.update()
                     app.update_idletasks()
                 except Exception:
                     pass
 
-                if is_fallback or is_headless:
-                    while engine_instance.is_running:
-                        try:
-                            app.update()
-                        except Exception:
-                            pass
-                        time.sleep(0.05)
+                if is_headless:
+                    on_transition_done()
                     return
     
-                if hasattr(engine, 'blocklist') and not engine.blocklist.is_loading:
-                    # Trigger immediate smooth cross-fade
+                # Cross-fade when blocklist finishes loading or after at most 3 seconds timeout
+                if (hasattr(engine, 'blocklist') and not engine.blocklist.is_loading) or elapsed > 3.0:
                     cross_fade()
                 else:
-                    app.after(16, check_engine_ready)
+                    app.after(25, check_engine_ready)
                     
             check_engine_ready()
         except Exception as e:

@@ -250,6 +250,7 @@ class NetStripResolver(BaseResolver):
         self._conn_pool = _DNSConnectionPool(idle_timeout=30.0, max_connections_per_host=4)
         
     def _infer_process(self, domain: str, src_port: int = None) -> str:
+        from netstrip.core.process_utils import resolve_process_identity, normalize_process_name
         # Check fast in-memory process cache
         now = time.time()
         if domain in self._proc_cache:
@@ -257,19 +258,20 @@ class NetStripResolver(BaseResolver):
             if now - ts < self._proc_cache_ttl:
                 return p_name
 
-        # 1. Direct Socket Mapping: If the app bypasses OS DNS and sends its own UDP packets
+        # 1. Direct Socket Mapping: If the app sends its own UDP packets
         if src_port and self.engine and hasattr(self.engine, 'connection_monitor'):
             pid = self.engine.connection_monitor.port_to_pid.get(src_port)
             if pid:
                 try:
                     import psutil
-                    name = psutil.Process(pid).name()
-                    if name.lower() not in ('svchost.exe', 'dnscache'):
+                    proc = psutil.Process(pid)
+                    p_name, _, _, _ = resolve_process_identity(proc)
+                    if p_name and p_name.lower() not in ('svchost', 'svchost.exe', 'dnscache', 'unknown'):
                         if len(self._proc_cache) > 2000:
                             self._proc_cache.popitem(last=False)
-                        self._proc_cache[domain] = (now, name)
-                        return name
-                except:
+                        self._proc_cache[domain] = (now, p_name)
+                        return p_name
+                except Exception:
                     pass
                     
         # 2. Database History Inference
@@ -284,7 +286,7 @@ class NetStripResolver(BaseResolver):
                     """
                     row = conn.execute(query1, (domain,)).fetchone()
                     if row and row['process_name']:
-                        p_name = row['process_name']
+                        p_name = normalize_process_name(row['process_name'])
                         if len(self._proc_cache) > 2000:
                             self._proc_cache.popitem(last=False)
                         self._proc_cache[domain] = (now, p_name)
@@ -301,7 +303,7 @@ class NetStripResolver(BaseResolver):
                         """
                         row = conn.execute(query2, (parent_domain,)).fetchone()
                         if row and row['process_name']:
-                            p_name = row['process_name']
+                            p_name = normalize_process_name(row['process_name'])
                             if len(self._proc_cache) > 2000:
                                 self._proc_cache.popitem(last=False)
                             self._proc_cache[domain] = (now, p_name)
