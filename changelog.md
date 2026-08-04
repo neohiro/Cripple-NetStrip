@@ -1,3 +1,15 @@
+## [v3.2.0] - Major Major Milestone: Fixed LAN Shield, Logs UI, Icons, Filter Categories & Smooth Settings
+
+- **Default LAN Shield ON**: Fixed switch binding so LAN Shield defaults ON visually and logically on clean boot.
+- **Enhanced Connection Log UI**: Stretched table full-width, centered Action (`ALLOW`/`BLOCK`) badges with distinct contrast background colors, eliminating redraw lag.
+- **Accurate App Logos & Parent Tracing**:
+  - `Cripple (Internal)` now displays the static PNG logo instead of the animated canvas logo.
+  - Standard `python.exe` running other scripts receives native Python executable icon instead of Cripple logo.
+  - Child processes (`jhi_service.exe`, `NVIDIA Overlay.exe`) inherit parent process icons (`Antigravity.exe`, `nvcontainer.exe`).
+- **Centered DNS Icon**: Generated a clean, perfectly centered 64x64 DNS logo image (`assets/dns_logo.png`).
+- **Filter Lists Category Sticky Top Bar**: Indexed category selector cards stay pinned on top when clicking a category so users can switch categories seamlessly.
+- **Hiccup-Free Settings Scrolling**: Added smooth mousewheel event handling for `SettingsView.scroll_frame`.
+
 ## [v3.1.29] - Cleaned Second Life Domain Overrides
 
 - **Removed Hardcoded Second Life Domains**: Removed `lindenlab.com` and `secondlife.com` from system domain overrides.

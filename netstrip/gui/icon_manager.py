@@ -262,6 +262,28 @@ class IconManager:
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
         app_name_base = process_name.lower().replace('.exe', '')
+        
+        # Check parent process for child services (e.g. jhi_service.exe -> Antigravity.exe, NVIDIA Overlay -> nvcontainer.exe)
+        try:
+            import psutil
+            for p in psutil.process_iter(['name', 'exe', 'cmdline']):
+                if p.info['name'] and p.info['name'].lower() == process_name.lower():
+                    parent = p.parent()
+                    if parent and parent.info['exe'] and os.path.exists(parent.info['exe']):
+                        parent_exe = parent.info['exe']
+                        parent_name = parent.info['name']
+                        cached_parent_icon = os.path.join(self.cache_dir, f"exe_{parent_name.lower().replace('.exe', '')}.png")
+                        if not os.path.exists(cached_parent_icon):
+                            self._extract_icon_native(parent_exe, parent_name, cached_parent_icon, callback)
+                            return
+                        else:
+                            img = Image.open(cached_parent_icon)
+                            self._image_cache[process_path] = img
+                            callback()
+                            return
+        except Exception:
+            pass
+
         if app_name_base in APP_ICONS:
             app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
             self._download_icon(APP_ICONS[app_name_base], app_icon_path, process_path, callback)

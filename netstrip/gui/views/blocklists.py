@@ -480,13 +480,11 @@ class BlocklistView(ctk.CTkFrame):
         self._current_search_id = getattr(self, '_current_search_id', 0) + 1
         current_search_id = self._current_search_id
 
-        # Hide or show stats container depending on search activity to extend results view below
-        if query or cat_filter:
-            if hasattr(self, '_stats_container') and self._stats_container.winfo_ismapped():
-                self._stats_container.pack_forget()
-        else:
-            if hasattr(self, '_stats_container') and not self._stats_container.winfo_ismapped():
-                self._stats_container.pack(fill="x", before=self._results_scroll, pady=(0, Spacing.MD))
+        # Keep stats container visible at top so user can click other categories easily
+        if hasattr(self, '_stats_container') and not self._stats_container.winfo_ismapped():
+            self._stats_container.pack(fill="x", pady=(0, Spacing.SM))
+
+        if not query and not cat_filter:
             self._restore_empty_state()
             return
 

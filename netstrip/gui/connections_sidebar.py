@@ -131,6 +131,10 @@ class ConnectionsSidebar(ctk.CTkFrame):
             progress_color=Colors.CAT_LAN,
             command=self._on_lan_toggle
         )
+        if is_lan_on:
+            self.lan_toggle.select()
+        else:
+            self.lan_toggle.deselect()
         self.lan_toggle.pack(side="right")
         
         self._refresh_loop()
@@ -253,20 +257,26 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
                 for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
-                    p_name = conn_dict.get('process_name', 'Unknown')
+                    pid_val = conn_dict.get('pid')
+                    my_pid = os.getpid()
+                    is_our_netstrip = (pid_val == my_pid)
                     
-                    # Normalize names early for counting
-                    domain_ip = str(conn_dict.get('domain') or conn_dict.get('ip') or '')
-                    if p_name and p_name.lower() in ('cripple.exe', 'cripple (internal)', 'netstrip', 'netstrip (internal)'):
+                    if not is_our_netstrip and pid_val:
+                        try:
+                            import psutil
+                            pr = psutil.Process(pid_val)
+                            cmd = " ".join(pr.cmdline()).lower()
+                            if "netstrip" in cmd or "main.py" in cmd or "cripple" in cmd:
+                                is_our_netstrip = True
+                        except Exception:
+                            pass
+
+                    if p_name and (is_our_netstrip or p_name.lower() in ('cripple.exe', 'cripple (internal)', 'netstrip.exe')):
                         p_name = 'Cripple (Internal)'
-                    elif p_name and p_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe', 'language_server.exe'):
-                        if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
-                            p_name = 'Cripple (Internal)'
+                    elif p_name and p_name.lower() in ('python.exe', 'python3.exe', 'pythonw.exe'):
+                        p_name = 'Python'
                     elif p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
-                        if any(x in domain_ip for x in ('github', 'urlhaus', 'oisd.nl', 'stevenblack', 'ip-api.com', 'ipify.org', 'yoyo.org', 'adaway.org', 'energized.pro', 'someonewhocares', 'v2fly', 'adguard')):
-                            p_name = 'Cripple (Internal)'
-                        else:
-                            p_name = 'DNS'
+                        p_name = 'DNS'
                             
                     if app_conn_counts.get(p_name, 0) >= 50:
                         continue
@@ -417,11 +427,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
             import logging
             logging.getLogger(__name__).error(f"Error updating sidebar: {e}", exc_info=True)
 
-        # Update LAN toggle state
-        lan_enabled = self.engine.db.get_setting("lan_shield_enabled", "true") == "true"
-        if lan_enabled and not self.lan_toggle.get():
+        # Update LAN toggle state cleanly
+        lan_enabled = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true"
+        if lan_enabled and self.lan_toggle_var.get() != "on":
+            self.lan_toggle_var.set("on")
             self.lan_toggle.select()
-        elif not lan_enabled and self.lan_toggle.get():
+        elif not lan_enabled and self.lan_toggle_var.get() != "off":
+            self.lan_toggle_var.set("off")
             self.lan_toggle.deselect()
             
         if not self._destroyed:

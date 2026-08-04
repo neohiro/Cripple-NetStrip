@@ -495,22 +495,13 @@ class AppGroupFrame(ctk.CTkFrame):
         if img:
             _apply_raw_image(img)
         else:
-            pname = self.process_name.lower() if self.process_name else ""
-            if pname in ("python.exe", "NetStrip.exe", "pythonw.exe", "NetStrip", "cripple (internal)"):
-                self.icon_label.place_forget()
+            first_letter = self.process_name[0].upper() if self.process_name else "?"
+            self.icon_label.configure(text=first_letter, image="")
+            if self.process_name and self.process_name.startswith("Unknown"):
                 self.icon_bg.configure(fg_color=Colors.BG_DARK)
-                from netstrip.gui.animated_logo import AnimatedLogo
-                self.NetStrip_logo = AnimatedLogo(self.icon_bg, width=24, height=24, bg_color=Colors.BG_DARK)
-                self.NetStrip_logo.place(relx=0.5, rely=0.5, anchor="center")
-                self.NetStrip_logo.bind("<Button-1>", self._toggle_expand)
+                self.icon_label.configure(text_color=Colors.TEXT_TERTIARY)
             else:
-                first_letter = self.process_name[0].upper() if self.process_name else "?"
-                self.icon_label.configure(text=first_letter, image="")
-                if self.process_name and self.process_name.startswith("Unknown"):
-                    self.icon_bg.configure(fg_color=Colors.BG_DARK)
-                    self.icon_label.configure(text_color=Colors.TEXT_TERTIARY)
-                else:
-                    self.icon_bg.configure(fg_color=Colors.ACCENT_PRIMARY)
+                self.icon_bg.configure(fg_color=Colors.ACCENT_PRIMARY)
 
 
     def _trigger_pulse(self, action="allow"):

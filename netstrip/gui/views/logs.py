@@ -22,11 +22,11 @@ class LogView(ctk.CTkFrame):
     """Searchable, auto-refreshing connection log with category color-coding."""
 
     COL_CONFIGS = [
-        {"weight": 0, "minsize": 100},  # Time
-        {"weight": 0, "minsize": 180},  # Process
-        {"weight": 1, "minsize": 250},  # Domain (takes up available slack)
+        {"weight": 0, "minsize": 110},  # Time
+        {"weight": 0, "minsize": 160},  # Process
+        {"weight": 1, "minsize": 200},  # Domain/IP (takes up available slack)
         {"weight": 0, "minsize": 120},  # Category
-        {"weight": 0, "minsize": 80},   # Action
+        {"weight": 0, "minsize": 110},  # Action
     ]
 
     def __init__(self, master, engine, **kwargs):
@@ -59,21 +59,22 @@ class LogView(ctk.CTkFrame):
         self._filter_entry.pack(fill="x", pady=(0, Spacing.SM))
         self._filter_entry.bind("<KeyRelease>", lambda e: self._refresh_logs())
 
-        # Column headers (padded on the right by 15px to account for the scrollbar below)
+        # Column headers (stretches to exact pane width)
         hdr = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL, corner_radius=0, height=36)
-        hdr.pack(fill="x", pady=(0, Spacing.XS), padx=(0, 15))
+        hdr.pack(fill="x", pady=(0, Spacing.XS), padx=0)
         
         for i, (label, cfg) in enumerate(zip(
             ["Time", "Process", "Domain/IP", "Category", "Action"],
             self.COL_CONFIGS,
         )):
             hdr.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
+            align_anchor = "center" if label in ("Category", "Action") else "w"
             ctk.CTkLabel(
                 hdr, text=label,
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
                 text_color=Colors.TEXT_TERTIARY,
-                anchor="w"
-            ).grid(row=0, column=i, sticky="w", padx=Spacing.SM, pady=Spacing.XS)
+                anchor=align_anchor
+            ).grid(row=0, column=i, sticky="ew" if label in ("Category", "Action") else "w", padx=Spacing.SM, pady=Spacing.XS)
 
         # Scrollable body
         self._log_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
@@ -231,11 +232,11 @@ class LogView(ctk.CTkFrame):
         lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6)
-        lbl_cat.grid(row=0, column=3, sticky="e", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_cat = ctk.CTkLabel(frame, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6, anchor="center")
+        lbl_cat.grid(row=0, column=3, sticky="ew", padx=Spacing.SM, pady=Spacing.SM)
 
-        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), anchor="e")
-        lbl_act.grid(row=0, column=4, sticky="e", padx=Spacing.SM, pady=Spacing.SM)
+        lbl_act = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), height=22, corner_radius=6, anchor="center")
+        lbl_act.grid(row=0, column=4, sticky="ew", padx=Spacing.SM, pady=Spacing.SM)
 
         return frame, {
             'time': lbl_time,
@@ -297,17 +298,24 @@ class LogView(ctk.CTkFrame):
             if raw_domain:
                 bind_copy_tooltip(lbls['domain'], raw_domain)
             
-        cat_text = f"  {get_category_label(cat).upper()}  "
+        cat_text = f" {get_category_label(cat).upper()} "
         if getattr(lbls['cat'], '_last_val', None) != cat_text or getattr(lbls['cat'], '_last_color', None) != c_color:
             lbls['cat'].configure(text=cat_text, fg_color=c_color)
             lbls['cat']._last_val = cat_text
             lbls['cat']._last_color = c_color
             
-        action = row['action'] or ''
-        act_text = Icons.ALLOWED if action == 'allow' else Icons.BLOCKED
-        act_color = Colors.SUCCESS if action == 'allow' else Colors.DANGER
+        action = (row['action'] or '').lower()
+        if action == 'allow':
+            act_text = " ALLOW "
+            act_fg = Colors.SUCCESS_DIM
+            act_color = "white"
+        else:
+            act_text = " BLOCK "
+            act_fg = "#4a1525"
+            act_color = "#f43f5e"
+
         if getattr(lbls['act'], '_last_val', None) != act_text:
-            lbls['act'].configure(text=act_text, text_color=act_color)
+            lbls['act'].configure(text=act_text, fg_color=act_fg, text_color=act_color)
             lbls['act']._last_val = act_text
 
     def destroy(self):

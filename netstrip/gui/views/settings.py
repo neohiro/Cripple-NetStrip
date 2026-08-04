@@ -108,6 +108,19 @@ class SettingsView(ctk.CTkFrame):
         self._build_migration_card()
         self._build_analytics_card()
         self._build_about_card()
+
+        # Smooth mousewheel scroll handling
+        def _on_mousewheel(event):
+            try:
+                if not self.winfo_exists() or not self.winfo_ismapped(): return
+                canvas = getattr(self.scroll_frame, '_parent_canvas', None)
+                if canvas:
+                    canvas.yview_scroll(int(-1 * (event.delta / 40)), "units")
+            except Exception:
+                pass
+
+        self.bind("<Map>", lambda e: self.scroll_frame.bind_all("<MouseWheel>", _on_mousewheel, add="+"))
+        self.bind("<Unmap>", lambda e: self.scroll_frame.unbind_all("<MouseWheel>"))
         
     def _build_updates_card(self):
         from netstrip import __version__

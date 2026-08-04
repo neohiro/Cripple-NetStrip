@@ -317,8 +317,13 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.29 — Cleaned Second Life Domain Overrides
-- **Second Life Domain Removal**: Completely removed `lindenlab.com` and `secondlife.com` from hardcoded overrides.
+### v3.2.0 — Major Major Milestone: Fixed LAN Shield, Logs UI, Icons, Filter Categories & Smooth Settings
+- **LAN Shield ON Default**: LAN Shield switch defaults ON on clean boot.
+- **Centered Action Badges**: Full-width logs table with centered `ALLOW` / `BLOCK` badges.
+- **Smart App Logos & Parent Tracing**: Static Cripple logo for internal tasks, native Python icon for standard scripts, and parent icon inheritance for child processes (`jhi_service.exe`, `NVIDIA Overlay.exe`).
+- **Centered DNS Icon**: Perfect geometric center alignment for fallback DNS queries.
+- **Sticky Filter Categories**: Category selector cards remain pinned at top for easy category switching.
+- **Hiccup-Free Settings**: Smooth mousewheel canvas scrolling.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes
