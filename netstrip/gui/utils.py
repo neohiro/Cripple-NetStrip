@@ -117,8 +117,8 @@ def mask_ip_string(text: str) -> str:
 
 def enable_smooth_scrolling(scrollable_frame):
     """
-    Enables instant, smooth mousewheel scrolling on a CTkScrollableFrame without
-    startup delay or laggy boundary checks.
+    Enables instant, ultra-smooth mousewheel scrolling on a CTkScrollableFrame.
+    Binds canvas and frame immediately so the initial scroll has zero lag.
     """
     def _on_mousewheel(event):
         try:
@@ -154,9 +154,20 @@ def enable_smooth_scrolling(scrollable_frame):
         except Exception:
             pass
 
-    scrollable_frame.bind("<Enter>", _bind_wheel, add="+")
-    scrollable_frame.bind("<Leave>", _unbind_wheel, add="+")
+    # Bind immediately so initial hover/scroll works seamlessly
     canvas = getattr(scrollable_frame, '_parent_canvas', None)
     if canvas:
-        canvas.bind("<Enter>", _bind_wheel, add="+")
-        canvas.bind("<Leave>", _unbind_wheel, add="+")
+        try:
+            canvas.bind("<MouseWheel>", _on_mousewheel, add="+")
+            canvas.bind("<Button-4>", _on_mousewheel, add="+")
+            canvas.bind("<Button-5>", _on_mousewheel, add="+")
+            canvas.bind("<Enter>", _bind_wheel, add="+")
+            canvas.bind("<Leave>", _unbind_wheel, add="+")
+        except Exception:
+            pass
+
+    scrollable_frame.bind("<MouseWheel>", _on_mousewheel, add="+")
+    scrollable_frame.bind("<Button-4>", _on_mousewheel, add="+")
+    scrollable_frame.bind("<Button-5>", _on_mousewheel, add="+")
+    scrollable_frame.bind("<Enter>", _bind_wheel, add="+")
+    scrollable_frame.bind("<Leave>", _unbind_wheel, add="+")

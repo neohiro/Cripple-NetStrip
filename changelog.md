@@ -1,20 +1,18 @@
-## [v3.2.3] - Process Normalization, Direct DNS Enforcement & Full Settings Optimization
+## [v3.2.3] - Intelligent Process Merging, Direct DNS Leak Protection & Concurrency Hardening
 
-- **Process Normalization & Deep Parent Hierarchy**:
-  - Implemented `netstrip/core/process_utils.py` for canonical naming and process tree resolution (merging variations like `AntiGravity.exe` and `AntiGravity` under unified identity).
-  - Traced console hosts and child processes back to parent executables, eliminating duplicate process entries in active connections.
-  - Cleaned test/benchmark process entries and legacy database artifacts.
-- **Direct Browser DNS Enforcement & Local Proxy Transparency**:
-  - `engine.py::_evaluate_packet` strictly intercepts direct external DNS queries (DoH/DoT and port 53/853) when `allow_in_browser_dns` is disabled.
-  - Local loopback proxy listeners (`127.0.0.0/8`, `::1`) and Cripple's internal DNS resolver (`127.127.127.127`) remain transparently unblocked.
-  - Blocklist caching now hashes DNS toggle state to dynamically invalidate stale filter sets.
-- **Settings Synchronization & Protection Engine Hardening**:
-  - `smart_paranoid_mode`: Auto-escalates protection mode to `ProtectionLevel.PARANOID` on threat/intrusion detection alongside Master Killswitch.
-  - `killswitch_schedule_enabled`: Automatically restores network connectivity when daily scheduled downtime window completes.
-  - Added input format validation (`HH:MM`) with visual feedback (`"Saved ✓"`) in Killswitch Scheduler.
-  - `block_system_connections` & `analytics_opt_in`: Automatically flushes classifier domain and IP caches on toggle for instantaneous rule application.
-  - `iot_local_sensor_enabled`: Dynamically starts or stops native REST/mDNS IoT service upon toggle.
-  - `import_profile`: Automatically hot-reloads blocklists, user rules, and purges classifier caches upon profile import.
+- **Intelligent Process Tree Canonicalization**:
+  - Unified process name normalization and deep parent-child process tree resolution in `process_utils.py` and `engine.py`.
+  - Merged child worker threads, console wrappers, and process variants (e.g. `AntiGravity.exe` and `AntiGravity`) into unified canonical application groups with accurate parent attribution.
+- **Direct DNS & In-Browser DNS Protection**:
+  - Validated and streamlined capturing of external direct DoH/DoT/UDP DNS requests from web browsers when configured via the Settings tab.
+  - Preserved internal NetStrip DNS resolver and local DNS proxies without unintended blocks.
+- **Settings Engine Synchronization & Smart Paranoid Mode**:
+  - Fully wired and verified all Settings tab switches (Smart Paranoid Mode, Block System Connections, Direct In-Browser DNS Capture, Killswitch Schedules).
+  - Added automatic killswitch schedule restoration in watchdog loop.
+- **Zero-Lag Smooth Scrolling**:
+  - Immediate canvas and widget mousewheel event bindings across `ConnectionsSidebar` and `ConnectionsView`, removing initial scrolling latency.
+- **Automated Consistency & Concurrency Stress Suite**:
+  - Added comprehensive multithreaded stress test suite (`tests/test_comprehensive_and_stress.py`) verifying DB WAL writes, async queue draining, keep-alive connection pools, profile migration, and time-bomb rule expirations.
 
 ## [v3.2.2] - Concurrency Stability, Instant Scrolling & Glitch-Free UI
 

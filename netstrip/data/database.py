@@ -143,7 +143,14 @@ class Database:
                     pass # Column already exists
 
 
+    def flush(self, timeout: float = 5.0):
+        """Wait for the async write queue to drain completely to SQLite."""
+        start = time.time()
+        while hasattr(self, 'write_queue') and not self.write_queue.empty() and (time.time() - start) < timeout:
+            time.sleep(0.02)
+
     def stop(self):
+        self.flush(timeout=2.0)
         self._stop_writer = True
         if hasattr(self, '_writer_thread') and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=1.0)
