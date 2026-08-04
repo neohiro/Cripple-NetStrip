@@ -25,15 +25,14 @@ CATEGORY_PRIORITY = {
     ConnectionCategory.UNKNOWN: 0
 }
 
-# Essential domains - NEVER block, regardless of mode or user rules.
-# This guarantees updates, crash telemetry, and core networking functions work.
+# 1. ESSENTIAL DOMAINS — Minimal set required for local IPC and NetStrip itself (Immune to all blocks)
 ESSENTIAL_DOMAINS = frozenset({
-    # Core Application Updates & Repositories
+    # NetStrip Core Self-Updates & Releases
     'api.github.com',
     'raw.githubusercontent.com',
     'frenzypenguin.media',
     'github.com',
-    # GeoIP & Network Connectivity Diagnostic Tools
+    # GeoIP & Connectivity Diagnostic APIs
     'ip-api.com',
     'ipinfo.io',
     'ipify.org',
@@ -41,31 +40,59 @@ ESSENTIAL_DOMAINS = frozenset({
     'ipapi.co',
     'ipwho.is',
     'api.myip.com',
-    # Amazon Web Services (AWS) & CloudFront CDN
-    'amazonaws.com',
-    's3.amazonaws.com',
-    'cloudfront.net',
-    # Microsoft Azure & Windows System Cloud Infrastructure
+    # Local Loopbacks
+    '127.0.0.1', '127.0.0.53', '::1', 'localhost',
+})
+
+# 2. SYSTEM DOMAINS — OS Infrastructure & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
+# Obeys "Block System Connections" toggle and Paranoid Mode!
+SYSTEM_DOMAINS = frozenset({
+    # Microsoft OS & Windows System Infrastructure
     'azure.com',
     'azure.net',
     'windows.net',
     'microsoft.com',
     'msftconnecttest.com',
-    # Google Cloud Platform (GCP), Android & Google CDNs
-    'googleapis.com',
-    'gstatic.com',
-    'googleusercontent.com',
-    'gvt1.com',
-    'gvt2.com',
-    'android.com',
-    'ggpht.com',
     # Apple Ecosystem (macOS & iOS System Infrastructure)
     'apple.com',
     'icloud.com',
     'apple-dns.net',
     'cdn-apple.com',
     'mzstatic.com',
-    # Linux Distributions & Package Registries (Ubuntu, Debian, Fedora, Arch, Flathub)
+    # Android & Google Cloud Infrastructure
+    'android.com',
+    'ggpht.com',
+    'googleapis.com',
+    'gstatic.com',
+    'googleusercontent.com',
+    # Amazon Web Services (AWS) & CloudFront CDN
+    'amazonaws.com',
+    's3.amazonaws.com',
+    'cloudfront.net',
+    # Global Edge CDNs (Fastly, Akamai, Cloudflare)
+    'fastly.net',
+    'fastlylb.net',
+    'akamaiedge.net',
+    'akamaihd.net',
+    'edgekey.net',
+    'cloudflare.com',
+    # Major Cloud Host Platforms (Oracle, DigitalOcean, Hetzner, Linode, Vultr)
+    'oraclecloud.com',
+    'digitaloceanspaces.com',
+    'hetzner.com',
+    'linode.com',
+    'vultr.com',
+    # Gaming Cloud Backends (Second Life, Steam Cloud)
+    'lindenlab.com',
+    'secondlife.com',
+    'steampowered.com',
+    'steamstatic.com',
+})
+
+# 3. UPDATE DOMAINS — OS Repositories & Package Managers (Categorized as ConnectionCategory.UPDATE)
+# Obeys "Block Software Updates" toggle and Paranoid Mode!
+UPDATE_DOMAINS = frozenset({
+    # Linux Distributions & Package Managers
     'ubuntu.com',
     'canonical.com',
     'debian.org',
@@ -74,20 +101,7 @@ ESSENTIAL_DOMAINS = frozenset({
     'redhat.com',
     'opensuse.org',
     'flathub.org',
-    # Major Global Edge CDNs (Fastly & Akamai)
-    'fastly.net',
-    'fastlylb.net',
-    'akamaiedge.net',
-    'akamaihd.net',
-    'edgekey.net',
-    'cloudflare.com',
-    # Other Major Cloud Infrastructure (Oracle, DigitalOcean, Hetzner, Linode, Vultr)
-    'oraclecloud.com',
-    'digitaloceanspaces.com',
-    'hetzner.com',
-    'linode.com',
-    'vultr.com',
-    # Developer Package Registries (Python, Node.js, Rust, Docker)
+    # Developer Package Registries
     'pypi.org',
     'pythonhosted.org',
     'npmjs.org',
@@ -95,14 +109,10 @@ ESSENTIAL_DOMAINS = frozenset({
     'crates.io',
     'docker.com',
     'docker.io',
-    # Gaming & Virtual World Infrastructure (Second Life, Steam, Epic)
-    'lindenlab.com',
-    'secondlife.com',
-    'steampowered.com',
+    # Software Update CDNs
+    'gvt1.com',
+    'gvt2.com',
     'steamcontent.com',
-    'steamstatic.com',
-    # Local Loopbacks (Required for System IPC and Local Resolvers)
-    '127.0.0.1', '127.0.0.53', '::1', 'localhost',
 })
 
 class BlocklistManager:
@@ -421,10 +431,20 @@ class BlocklistManager:
         if domain.endswith('.'):
             domain = domain[:-1]
 
-        # Essential domains - NEVER block, regardless of mode or user rules.
+        # 1. Essential domains (Immune to all blocks)
         for essential in ESSENTIAL_DOMAINS:
             if domain == essential or domain.endswith('.' + essential):
                 return False, ConnectionCategory.ESSENTIAL
+
+        # 2. System Infrastructure domains (Categorized as SYSTEM, obeys Block System Connections toggle)
+        for sys_dom in SYSTEM_DOMAINS:
+            if domain == sys_dom or domain.endswith('.' + sys_dom):
+                return False, ConnectionCategory.SYSTEM
+
+        # 3. Software Update domains (Categorized as UPDATE, obeys Block Software Updates toggle)
+        for upd_dom in UPDATE_DOMAINS:
+            if domain == upd_dom or domain.endswith('.' + upd_dom):
+                return False, ConnectionCategory.UPDATE
 
         with self.lock:
             # 1. User overrides (Highest Priority)

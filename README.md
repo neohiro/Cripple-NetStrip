@@ -317,8 +317,8 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.27 — Cross-Platform OS & Global Cloud Infrastructure Hardening
-- **Apple, Android, Linux & Package Registries**: Added essential whitelist rules for Apple, Android, Linux distros, and dev package registries (PyPI, npm, Crates, Docker).
+### v3.1.28 — Categorical Domain Architecture: SYSTEM & UPDATE Restructuring
+- **Dedicated SYSTEM & UPDATE Domains**: Restructured domain overrides so OS system services and Linux/dev package registries correctly respect "Block System Connections" and "Block Software Updates" settings.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

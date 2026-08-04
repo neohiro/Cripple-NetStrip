@@ -37,13 +37,21 @@ class TrafficClassifier:
             self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
             return ConnectionCategory.ESSENTIAL
             
-        # Check NetStrip essential domains & infrastructure overrides
-        from netstrip.data.blocklist_manager import ESSENTIAL_DOMAINS
+        # Check NetStrip domain overrides
+        from netstrip.data.blocklist_manager import ESSENTIAL_DOMAINS, SYSTEM_DOMAINS, UPDATE_DOMAINS
         d_lower = domain.lower()
         for essential in ESSENTIAL_DOMAINS:
             if d_lower == essential or d_lower.endswith('.' + essential):
                 self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
                 return ConnectionCategory.ESSENTIAL
+        for sys_dom in SYSTEM_DOMAINS:
+            if d_lower == sys_dom or d_lower.endswith('.' + sys_dom):
+                self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
+                return ConnectionCategory.SYSTEM
+        for upd_dom in UPDATE_DOMAINS:
+            if d_lower == upd_dom or d_lower.endswith('.' + upd_dom):
+                self._domain_cache[cache_key] = ConnectionCategory.UPDATE
+                return ConnectionCategory.UPDATE
         
         # If the target is actually an IP and it's a LAN IP, prioritize LAN classification
         if self._is_lan_ip(domain):

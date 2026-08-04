@@ -1,3 +1,10 @@
+## [v3.1.28] - Categorical Domain Architecture: SYSTEM & UPDATE Restructuring
+
+- **Clean Categorical Domain Architecture**: Restructured hardcoded domain overrides into 3 dedicated sets:
+  - `ESSENTIAL_DOMAINS`: Reserved strictly for NetStrip self-updates, GeoIP APIs, and local loopbacks (`127.0.0.1`).
+  - `SYSTEM_DOMAINS` (`ConnectionCategory.SYSTEM`): Covers Microsoft OS, Apple OS, Android, AWS, Azure, GCP, Fastly, Akamai, and Cloud providers. Respects the **"Block System Connections"** toggle and Paranoid Mode!
+  - `UPDATE_DOMAINS` (`ConnectionCategory.UPDATE`): Covers Linux distribution repositories (Ubuntu, Debian, Arch, Fedora) and developer package registries (PyPI, npm, Crates, Docker). Respects the **"Block Software Updates"** toggle and Paranoid Mode!
+
 ## [v3.1.27] - Cross-Platform OS & Global Cloud Infrastructure Hardening
 
 - **Cross-Platform OS Whitelist**: Added essential infrastructure domain overrides for Apple (`apple.com`, `icloud.com`, `cdn-apple.com`), Android (`android.com`, `ggpht.com`), and Linux distributions (`ubuntu.com`, `debian.org`, `archlinux.org`, `fedoraproject.org`, `flathub.org`).
