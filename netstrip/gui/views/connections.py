@@ -129,11 +129,42 @@ class ConnectionsView(ctk.CTkFrame):
             command=self._on_lan_toggle
         )
         self.lan_toggle.pack(side="right")
-        
-        # Initialize toggle state from DB
         if self.engine.db.get_setting("lan_shield_enabled", "true") == "true":
             self.lan_toggle.select()
         
+        # Smooth mousewheel scroll handling
+        def _on_mousewheel(event):
+            try:
+                if not self.winfo_exists() or not self.winfo_ismapped():
+                    return
+                if not self._is_mouse_inside():
+                    return
+                canvas = getattr(self.scroll_frame, '_parent_canvas', None)
+                if canvas:
+                    if hasattr(event, 'delta') and event.delta:
+                        step = int(-1 * (event.delta / 40))
+                        if step == 0:
+                            step = -1 if event.delta > 0 else 1
+                        canvas.yview_scroll(step, "units")
+                    elif getattr(event, 'num', None) == 4:
+                        canvas.yview_scroll(-2, "units")
+                    elif getattr(event, 'num', None) == 5:
+                        canvas.yview_scroll(2, "units")
+            except Exception:
+                pass
+
+        self._on_mousewheel_handler = _on_mousewheel
+        self.bind("<Map>", lambda e: (
+            self.bind_all("<MouseWheel>", self._on_mousewheel_handler, add="+"),
+            self.bind_all("<Button-4>", self._on_mousewheel_handler, add="+"),
+            self.bind_all("<Button-5>", self._on_mousewheel_handler, add="+")
+        ))
+        self.bind("<Unmap>", lambda e: (
+            self.unbind_all("<MouseWheel>"),
+            self.unbind_all("<Button-4>"),
+            self.unbind_all("<Button-5>")
+        ))
+
         self._refresh_loop()
 
     def _on_lan_toggle(self):
