@@ -317,8 +317,8 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.1.28 — Categorical Domain Architecture: SYSTEM & UPDATE Restructuring
-- **Dedicated SYSTEM & UPDATE Domains**: Restructured domain overrides so OS system services and Linux/dev package registries correctly respect "Block System Connections" and "Block Software Updates" settings.
+### v3.1.29 — Cleaned Second Life Domain Overrides
+- **Second Life Domain Removal**: Completely removed `lindenlab.com` and `secondlife.com` from hardcoded overrides.
 
 ### v3.1.0 — Security Hardening & Full CLI
 - SSH Safeguard — always allows port 22/2222, survives all lockdown modes

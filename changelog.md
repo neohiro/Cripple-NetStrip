@@ -1,3 +1,7 @@
+## [v3.1.29] - Cleaned Second Life Domain Overrides
+
+- **Removed Hardcoded Second Life Domains**: Removed `lindenlab.com` and `secondlife.com` from system domain overrides.
+
 ## [v3.1.28] - Categorical Domain Architecture: SYSTEM & UPDATE Restructuring
 
 - **Clean Categorical Domain Architecture**: Restructured hardcoded domain overrides into 3 dedicated sets:

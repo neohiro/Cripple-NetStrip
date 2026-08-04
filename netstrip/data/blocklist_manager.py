@@ -82,9 +82,7 @@ SYSTEM_DOMAINS = frozenset({
     'hetzner.com',
     'linode.com',
     'vultr.com',
-    # Gaming Cloud Backends (Second Life, Steam Cloud)
-    'lindenlab.com',
-    'secondlife.com',
+    # Gaming Cloud Backends (Steam Cloud)
     'steampowered.com',
     'steamstatic.com',
 })
