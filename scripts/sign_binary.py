@@ -1,13 +1,17 @@
 """
-FrenzyPenguin Media - Authenticode Signing & Certificate Helper
-Generates a valid code-signing certificate for FrenzyPenguin Media, signs compiled executables,
-and packages the certificate and installer script for Smart App Control / SmartScreen compliance.
+FrenzyPenguin Media - Authenticode Code Signing & Packaging Helper
+Automatically signs Windows binaries for FrenzyPenguin Media with Authenticode SHA-256.
+Supports:
+  1. GitHub Secrets CI (via WINDOWS_PFX_BASE64 and WINDOWS_PFX_PASSWORD env vars)
+  2. Local PFX certificate file (scripts/frenzy_signing.pfx)
+  3. Dynamic Pure-.NET Code-Signing Certificate Generation (zero dependencies, works on any Windows/CI runner)
 """
 import os
 import sys
 import subprocess
 import shutil
 import base64
+import tempfile
 from pathlib import Path
 
 def run_powershell(script: str) -> subprocess.CompletedProcess:
@@ -20,7 +24,7 @@ def run_powershell(script: str) -> subprocess.CompletedProcess:
 
 def sign_and_package():
     print("=" * 60)
-    print(" FrenzyPenguin Media - Code Signing & Packaging Helper")
+    print(" FrenzyPenguin Media - Autosign & Packaging Helper")
     print("=" * 60)
 
     dist_cripple = Path("dist/Cripple")
@@ -31,61 +35,101 @@ def sign_and_package():
         print(f"Warning: {dist_cripple} not found. Skipping binary signing.")
         return
 
-    # 1. Create or get FrenzyPenguin Media code signing certificate in CurrentUser\My
-    ps_cert_script = """
-    Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
-    Import-Module PKI -ErrorAction SilentlyContinue
-    $ErrorActionPreference = 'Stop'
-    $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My | Where-Object { $_.Subject -like '*FrenzyPenguin Media*' } | Select-Object -First 1
-    if (-not $cert) {
-        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FrenzyPenguin Media, O=FrenzyPenguin Media, C=US' -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddYears(5) -KeyUsage DigitalSignature -FriendlyName 'FrenzyPenguin Media Code Signing'
-    }
-    if ($cert) {
-        Write-Output $cert.Thumbprint
-    }
-    """
-    res = run_powershell(ps_cert_script)
-    lines = [l.strip() for l in res.stdout.strip().splitlines() if l.strip()]
-    if not lines:
-        print("Error: Could not retrieve code signing certificate thumbprint.")
-        if res.stderr:
-            print("PowerShell Error:", res.stderr)
-        return
-    thumbprint = lines[-1]
-    print(f"[+] Using Code Signing Certificate Thumbprint: {thumbprint}")
+    # 1. Determine PFX source
+    pfx_env = os.environ.get("WINDOWS_PFX_BASE64", "").strip()
+    pfx_pass = os.environ.get("WINDOWS_PFX_PASSWORD", "FrenzyPenguin2026").strip()
 
-    # 2. Sign all executables (.exe, .dll, .pyd) in dist/Cripple
+    temp_pfx_file = None
+    if pfx_env:
+        print("[+] Found WINDOWS_PFX_BASE64 in environment (GitHub Secrets).")
+        temp_pfx = tempfile.NamedTemporaryFile(suffix=".pfx", delete=False)
+        temp_pfx.write(base64.b64decode(pfx_env))
+        temp_pfx.close()
+        pfx_path_str = temp_pfx.name
+        temp_pfx_file = temp_pfx.name
+    elif Path("scripts/frenzy_signing.pfx").exists():
+        print("[+] Found local scripts/frenzy_signing.pfx certificate.")
+        pfx_path_str = str(Path("scripts/frenzy_signing.pfx").resolve())
+    else:
+        print("[+] Generating fresh FrenzyPenguin Media Code Signing Certificate via .NET...")
+        pfx_temp = Path("scripts/frenzy_signing.pfx").resolve()
+        ps_gen_script = f"""
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $req = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest(
+            "CN=FrenzyPenguin Media, O=FrenzyPenguin Media, C=US",
+            $rsa,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        )
+        $oid = New-Object System.Security.Cryptography.Oid("1.3.6.1.5.5.7.3.3", "Code Signing")
+        $oidCollection = New-Object System.Security.Cryptography.OidCollection
+        $oidCollection.Add($oid) | Out-Null
+        $eku = New-Object System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension($oidCollection, $false)
+        $req.CertificateExtensions.Add($eku)
+
+        $keyUsage = New-Object System.Security.Cryptography.X509Certificates.X509KeyUsageExtension(
+            [System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature,
+            $true
+        )
+        $req.CertificateExtensions.Add($keyUsage)
+
+        $cert = $req.CreateSelfSigned((Get-Date), (Get-Date).AddYears(5))
+        $pfxBytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, "{pfx_pass}")
+        [System.IO.File]::WriteAllBytes('{str(pfx_temp).replace("'", "''")}', $pfxBytes)
+        """
+        run_powershell(ps_gen_script)
+        pfx_path_str = str(pfx_temp)
+
+    # 2. Collect all binary files in dist/Cripple (.exe, .dll, .pyd)
     binaries = list(dist_cripple.rglob("*.exe")) + list(dist_cripple.rglob("*.dll")) + list(dist_cripple.rglob("*.pyd"))
     print(f"[+] Found {len(binaries)} binary files to sign in {dist_cripple}")
 
-    signed_count = 0
-    for bin_file in binaries:
-        file_path_str = str(bin_file.resolve()).replace("'", "''")
-        ps_sign_script = f"""
-        Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
-        Import-Module PKI -ErrorAction SilentlyContinue
-        $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
-        $signResult = Set-AuthenticodeSignature -FilePath '{file_path_str}' -Certificate $cert -HashAlgorithm SHA256
-        Write-Output $signResult.Status
-        """
-        res_sign = run_powershell(ps_sign_script)
-        status = res_sign.stdout.strip()
-        signed_count += 1
-        if bin_file.name == "Cripple.exe":
-            print(f"[+] Signed main executable: {bin_file.name} -> Status: {status}")
+    # 3. Batch Sign all binaries using .NET X509Certificate2 & Set-AuthenticodeSignature
+    file_paths_str = "@(\n" + ",\n".join([f"    '{str(b.resolve()).replace('\'', '\'\'')}'" for b in binaries]) + "\n)"
+    cer_path_escaped = str(cer_path.resolve()).replace("'", "''")
+    pfx_path_escaped = pfx_path_str.replace("'", "''")
 
-    print(f"[+] Successfully signed {signed_count} binaries with Authenticode SHA256.")
+    ps_sign_batch = f"""
+    $pfxPath = '{pfx_path_escaped}'
+    $pfxPass = '{pfx_pass}'
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+        $pfxPath,
+        $pfxPass,
+        [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+    )
+    Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
 
-    # 3. Export Certificate .cer
-    cer_path_str = str(cer_path.resolve()).replace("'", "''")
-    ps_export_script = f"""
-    Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
-    Import-Module PKI -ErrorAction SilentlyContinue
-    $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
-    Export-Certificate -Cert $cert -FilePath '{cer_path_str}' -Force | Out-Null
+    $files = {file_paths_str}
+    $signed = 0
+    foreach ($f in $files) {{
+        if (Test-Path $f) {{
+            $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256
+            $signed++
+        }}
+    }}
+    Write-Output "SIGNED_COUNT:$signed"
+
+    # Export Public .cer Certificate
+    $cerPath = '{cer_path_escaped}'
+    [System.IO.File]::WriteAllBytes($cerPath, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+    Write-Output "EXPORTED_CER:$cerPath"
     """
-    run_powershell(ps_export_script)
-    print(f"[+] Exported Public Certificate to {cer_path}")
+
+    res = run_powershell(ps_sign_batch)
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("CERT_THUMBPRINT:"):
+            print(f"[+] Certificate Thumbprint: {line.split(':', 1)[1]}")
+        elif line.startswith("SIGNED_COUNT:"):
+            print(f"[+] Successfully signed {line.split(':', 1)[1]} binaries with Authenticode SHA-256.")
+        elif line.startswith("EXPORTED_CER:"):
+            print(f"[+] Exported Public Certificate to {cer_path}")
+
+    if temp_pfx_file and os.path.exists(temp_pfx_file):
+        try:
+            os.remove(temp_pfx_file)
+        except Exception:
+            pass
 
     # 4. Copy Install_Certificate.bat
     cert_installer = Path("scripts/Install_Certificate.bat")
