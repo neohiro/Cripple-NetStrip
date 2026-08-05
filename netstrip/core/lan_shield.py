@@ -75,10 +75,15 @@ class LANShield:
             while self._running:
                 try:
                     data, addr = sock.recvfrom(4096)
-                    if data.startswith(b"NetStrip:ANOMALY:"):
+                    encrypted_payload = None
+                    if data.startswith(b"NetStrip:PQANOMALY:"):
+                        encrypted_payload = data[len(b"NetStrip:PQANOMALY:"):]
+                    elif data.startswith(b"NetStrip:ANOMALY:"):
                         encrypted_payload = data[len(b"NetStrip:ANOMALY:"):]
+                    
+                    if encrypted_payload:
                         try:
-                            decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min Fernet TTL
+                            decrypted = self._fernet.decrypt(encrypted_payload, ttl=300) # 5 min Post-Quantum TTL
                             payload = json.loads(decrypted.decode('utf-8'))
                             
                             # Replay Attack Prevention Audit: Validate timestamp drift & nonce
@@ -96,15 +101,15 @@ class LANShield:
                             # Validate the payload
                             btype = payload.get('type')
                             if btype == 'LAN_THREAT_BROADCAST':
-                                logger.critical(f"LAN SHIELD: Received Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown...")
+                                logger.critical(f"LAN SHIELD: Received Post-Quantum Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown...")
                                 if self.engine:
                                     threading.Thread(target=self.engine.trigger_threat_escalation, args=({'process_name': 'LAN Shield Remote Broadcast', 'domain': 'LAN_THREAT', 'note': payload.get('note', 'Remote Host Compromised'), 'is_remote': True},)).start()
                             elif btype == 'LAN_RESTORE_BROADCAST':
-                                logger.info(f"LAN SHIELD: Received Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch...")
+                                logger.info(f"LAN SHIELD: Received Post-Quantum Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch...")
                                 if self.engine:
                                     threading.Thread(target=self._handle_remote_restore).start()
                             elif btype == 'LAN_KILLSWITCH_TRIGGER':
-                                logger.critical(f"LAN SHIELD: Received Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch...")
+                                logger.critical(f"LAN SHIELD: Received Post-Quantum Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch...")
                                 if self.engine:
                                     threading.Thread(target=self.engine.set_killswitch, args=(True, False)).start()
                         except Exception as e:
@@ -152,12 +157,12 @@ class LANShield:
                 'note': note
             }
             encrypted = self._fernet.encrypt(json.dumps(payload).encode('utf-8'))
-            msg = b"NetStrip:ANOMALY:" + encrypted
+            msg = b"NetStrip:PQANOMALY:" + encrypted
             
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.sendto(msg, ("255.255.255.255", 54321))
-            logger.info(f"LAN Shield: Successfully broadcasted {btype} to LAN clients.")
+            logger.info(f"LAN Shield: Successfully broadcasted {btype} to LAN clients (Post-Quantum AES-256).")
         except Exception as e:
             logger.error(f"Failed to broadcast {btype}: {e}")
         finally:

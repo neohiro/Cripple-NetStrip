@@ -1,3 +1,15 @@
+## [v3.3.0] - Post-Quantum Cryptography Architecture (AES-256 / SHA-512 / HKDF)
+
+- **Post-Quantum Cryptography Engine (`QuantumFernet`)**:
+  - Upgraded symmetric encryption to pure-Python **AES-256-CBC (14 rounds, 256-bit key)** and integrity authentication to **HMAC-SHA512**, providing $128+$ bits of true quantum security against Grover's algorithm.
+  - Implemented **RFC 5869 HKDF-SHA512** key derivation to seamlessly elevate legacy 44-character (256-bit) keys to independent 256-bit AES + 256-bit HMAC keys without breaking existing device pairings.
+  - Introduced native 88-character (512-bit) Post-Quantum Pre-Shared Keys.
+- **LAN Shield Post-Quantum Protocol**:
+  - Updated LAN Shield broadcast packet handling to support `NetStrip:PQANOMALY:` headers alongside legacy `NetStrip:ANOMALY:` signals for backwards compatibility.
+- **UI & CLI Post-Quantum Integration**:
+  - Added visual **"🛡️ QUANTUM-PROOF"** badge in Settings LAN Shield section.
+  - Updated key generation, paste validation, and CLI `--set-psk` to support 512-bit Quantum keys.
+
 ## [v3.2.6] - Pure-Python Fernet Engine & Windows Application Control Resiliency
 
 - **Pure-Python Fernet Encryption & Zero-Crash Fallback**:

@@ -187,23 +187,24 @@ def main():
         try:
             idx = sys.argv.index("--set-psk")
             psk = sys.argv[idx + 1].strip()
-            # Validate Fernet key format
-            if len(psk) != 44 or not psk.endswith('='):
-                print("Error: PSK must be a 44-character Fernet key (base64 ending with '=').")
+            # Validate Post-Quantum or Legacy Fernet key format
+            if len(psk) not in (44, 88) or not psk.endswith('='):
+                print("Error: PSK must be a 44-character or 88-character Post-Quantum key (base64 ending with '=').")
                 sys.exit(1)
             try:
                 from netstrip.core.crypto_utils import Fernet
                 Fernet(psk.encode('utf-8'))  # Validates structure
             except Exception:
-                print("Error: Invalid Fernet key format.")
+                print("Error: Invalid Post-Quantum key format.")
                 sys.exit(1)
             db = _get_db()
             db.set_setting("lan_shield_psk", psk)
             db.stop()
-            print(f"LAN Shield PSK saved successfully.")
+            key_type = "512-bit Native Post-Quantum" if len(psk) == 88 else "256-bit Legacy (HKDF-SHA512 Upgraded)"
+            print(f"LAN Shield PSK saved successfully ({key_type}).")
             print(f"Restart the daemon for the new key to take effect, or use the GUI which hot-reloads.")
         except IndexError:
-            print("Usage: --set-psk <44-char-Fernet-key>")
+            print("Usage: --set-psk <44-or-88-char-Quantum-Key>")
         except Exception as e:
             print(f"Error saving PSK: {e}")
         sys.exit(0)

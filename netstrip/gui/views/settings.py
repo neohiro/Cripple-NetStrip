@@ -493,11 +493,24 @@ class SettingsView(ctk.CTkFrame):
         psk_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
         psk_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
         
+        header_left = ctk.CTkFrame(psk_row, fg_color="transparent")
+        header_left.pack(side="left")
+
         ctk.CTkLabel(
-            psk_row, text="🔑  LAN Shield Pre-Shared Key",
+            header_left, text="🔑  LAN Shield Pre-Shared Key",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY
         ).pack(side="left")
+
+        # Post-Quantum Protection Badge
+        pq_badge = ctk.CTkLabel(
+            header_left, text="  🛡️ QUANTUM-PROOF  ",
+            font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
+            text_color=Colors.SUCCESS,
+            fg_color=Colors.SUCCESS_DIM,
+            corner_radius=6
+        )
+        pq_badge.pack(side="left", padx=(Spacing.SM, 0))
 
         psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
 
@@ -524,15 +537,15 @@ class SettingsView(ctk.CTkFrame):
             except Exception:
                 _show_psk_status("Nothing in clipboard", is_error=True)
                 return
-            # Validate: Fernet keys are 44 char, URL-safe base64 ending with '='
-            if len(raw) != 44 or not raw.endswith('='):
-                _show_psk_status("Invalid key — must be a 44-char Fernet key", is_error=True)
+            # Validate: Key must be 44 or 88 char URL-safe base64
+            if len(raw) not in (44, 88) or not raw.endswith('='):
+                _show_psk_status("Invalid key — must be 44-char or 88-char Quantum key", is_error=True)
                 return
             try:
                 from netstrip.core.crypto_utils import Fernet
                 Fernet(raw.encode('utf-8'))  # Validates key structure
             except Exception:
-                _show_psk_status("Invalid Fernet key format", is_error=True)
+                _show_psk_status("Invalid Quantum key format", is_error=True)
                 return
             # Valid — save
             psk_entry.configure(state="normal")
@@ -548,13 +561,13 @@ class SettingsView(ctk.CTkFrame):
                     self.engine.lan_shield._fernet = F(raw.encode('utf-8'))
             except Exception:
                 pass
-            _show_psk_status("Key applied ✓ — LAN Shield updated", is_error=False)
+            _show_psk_status("Quantum Key applied ✓ — LAN Shield updated", is_error=False)
 
         def _regen_psk():
-            """Generate a fresh Fernet key."""
+            """Generate a fresh 512-bit Post-Quantum Fernet key."""
             try:
                 from netstrip.core.crypto_utils import Fernet
-                new_key = Fernet.generate_key().decode('utf-8')
+                new_key = Fernet.generate_key(native_pq=True).decode('utf-8')
                 psk_entry.configure(state="normal")
                 psk_entry.delete(0, "end")
                 psk_entry.insert(0, new_key)
@@ -564,7 +577,7 @@ class SettingsView(ctk.CTkFrame):
                 if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
                     self.engine.lan_shield._psk = new_key.encode('utf-8')
                     self.engine.lan_shield._fernet = Fernet(new_key.encode('utf-8'))
-                _show_psk_status("New key generated ✓ — share with paired devices", is_error=False)
+                _show_psk_status("New Quantum key generated (512-bit) ✓ — share with paired devices", is_error=False)
             except Exception:
                 _show_psk_status("Key generation failed", is_error=True)
 
@@ -617,7 +630,7 @@ class SettingsView(ctk.CTkFrame):
             )
             self.after(4000, lambda: psk_status.configure(text=""))
 
-        self._add_subtitle(card, "Copy this key to other Cripple / NetStrip devices on your LAN to pair them for E2E encrypted broadcast lockdown signals. Use Paste to import a key from another device. This key persists across app updates.", pady=(0, Spacing.LG))
+        self._add_subtitle(card, "Copy this 512-bit Post-Quantum key to other Cripple / NetStrip devices on your LAN for AES-256 / SHA-512 encrypted broadcast lockdown signals. Replay-proof and immune to Grover's quantum attack.", pady=(0, Spacing.LG))
 
         # Home Automation & IoT Integrations
         self._add_title(card, "Home Automation & IoT Integrations", icon="🏠", pady=(Spacing.LG, Spacing.SM))
