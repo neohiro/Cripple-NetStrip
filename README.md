@@ -318,6 +318,13 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.3 — Privacy Audit, Upstream Credits, Boot Bottleneck Fix & Filter Pagination
+- **Comprehensive Privacy Audit & Spec Sanitization**: Cleaned hardcoded developer paths in `Cripple.spec` and `dns_proxy.py`. Replaced with dynamic PyInstaller hook collection (`collect_all('customtkinter')`). 0 privacy leaks repository-wide.
+- **Boot Freeze Bottleneck Elimination**: Shifted blocklist update checks to a 30-minute startup delay and made `NetStrip_cache.json` disk persistence completely asynchronous.
+- **Filter Lists Infinite Scrolling**: Added lazy-loading pagination with page offsets in `blocklists.py` and `blocklist_manager.py` with smooth scrolling container.
+- **Full Upstream Blocklist & Threat Intelligence Credits**: Attributed all 42 integrated open-source lists across Settings and documentation.
+- **Settings UI/UX Polish**: Responsive description text wrapping and redesigned LAN Shield PSK control card.
+
 ### v3.3.2 — Semantic Versioning, Card Badge Polish, Domain Precedence & Nested Filter Scrolling
 - **Semantic Versioning Hierarchy Engine**: Integrated `parse_version_tuple` and `is_newer_version` across update loops to accurately evaluate future release versions (`3.3.1` < `3.3.2` < `3.10.0`).
 - **Connection Log Card Badges & Zero-Thrash**: Curved pill badges (`corner_radius=11`) with card containers, high contrast, and smooth pooling.

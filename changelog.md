@@ -1,3 +1,21 @@
+## [v3.3.3] - Privacy Audit, Upstream Credits, Boot Bottleneck Fix & Filter Pagination
+
+- **Comprehensive Codebase Privacy Audit & Spec Sanitization**:
+  - Removed hardcoded local developer paths from `Cripple.spec` and implemented dynamic PyInstaller hook discovery via `collect_all('customtkinter')`.
+  - Sanitized internal comment paths in `dns_proxy.py` and executed codebase-wide regex verification across all code, configs, workflows, and specs (0 privacy leaks).
+  - Updated `buildozer.spec` versioning to v3.3.3.
+- **Boot Freeze Bottleneck Elimination**:
+  - Replaced synchronous blocklist updater and cache operations with background worker threads and delayed initial updater loop by 30 minutes, preventing Windows 10-15s startup freezes.
+  - Converted blocklist cache disk writes (`NetStrip_cache.json`) to asynchronous background worker queue.
+- **Filter Lists Infinite Scrolling & Dynamic Category Search**:
+  - Implemented smooth infinite scrolling lazy loading with page-offset pagination in `blocklists.py` and `blocklist_manager.py`.
+  - Resolved category selection filtering so clicking blocked, allowed, essential, and system cards immediately populates results.
+- **Full Upstream Blocklist & Threat Intelligence Credits**:
+  - Added comprehensive attributions in Settings view and `README.md` for all 42 integrated open-source feeds (AdGuard, HaGeZi, OISD, StevenBlack, URLhaus, Feodo Tracker, PhishTank, DShield SANS ISC, WindowsSpyBlocker, v2fly, Dan Pollock, Peter Lowe, AdAway, EasyList, YousList).
+- **Settings UI/UX & LAN Shield PSK Card Polish**:
+  - Added auto-wrapping on settings description labels with scrollbar margin buffers.
+  - Redesigned the LAN Shield PSK card with distinct Copy, Regenerate, and Save action controls.
+
 ## [v3.3.2] - Semantic Versioning, Card Badge Polish, Domain Precedence & Nested Filter Scrolling
 
 - **Semantic Versioning Hierarchy Engine**:
