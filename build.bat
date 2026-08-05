@@ -26,10 +26,11 @@ echo [4.5] Generating high-resolution Windows icon...
 python -c "from PIL import Image; img=Image.open('assets/cripple_logo.png'); img.save('assets/logo.ico', format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])"
 
 pyinstaller ^
+    --clean ^
     --noconfirm ^
     --noconsole ^
     --windowed ^
-    --uac-admin ^
+    --manifest "app.manifest" ^
     --noupx ^
     --version-file "version_info.txt" ^
     --name "Cripple" ^
@@ -101,6 +102,9 @@ pyinstaller ^
     --hidden-import "netstrip.platform.macos" ^
     --hidden-import "netstrip.watchdog" ^
     main.py
+
+echo [4.8] Applying Authenticode Code Signing for FrenzyPenguin Media...
+python scripts\sign_binary.py
 
 echo.
 echo [5] Build Complete!

@@ -1,5 +1,9 @@
-## [v3.3.6] - Multi-Monitor DPI Splash Screen Precision, Snappy Cross-Fade, Dashboard Deep-Scroll & Live List Sync
+## [v3.3.6] - Multi-Monitor DPI Splash Screen Precision, Snappy Cross-Fade, Dashboard Deep-Scroll, Live List Sync & SAC Mitigation
 
+- **Windows Smart App Control (SAC) Mitigation & Authenticode Signing**:
+  - Embedded official developer and company metadata (**FrenzyPenguin Media**) into PE version resources (`version_info.txt`).
+  - Added dedicated Windows 10/11 application manifest (`app.manifest`) with modern OS compatibility GUIDs and DPI awareness, removing hardcoded `requireAdministrator` at the PE manifest layer in favor of smooth runtime elevation.
+  - Implemented automated Authenticode code signing with FrenzyPenguin Media publisher certificate and bundled one-click `Install_Certificate.bat` installer in release packages.
 - **Native Win32 Multi-Monitor & DPI-Aware Window Centering**:
   - Implemented Win32 `MonitorFromWindow` / `MonitorFromPoint` and `GetMonitorInfoW` in [`netstrip/gui/utils.py`](file:///C:/Users/skele/.gemini/antigravity/scratch/Cripple-NetStrip/netstrip/gui/utils.py) to accurately calculate monitor work areas across multi-monitor setups with mixed DPI scalings.
   - Corrected CustomTkinter geometry coordinate scaling offsets so splash screens and dialogs are centered with zero pixel drift on any monitor.
