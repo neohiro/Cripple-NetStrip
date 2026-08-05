@@ -12,8 +12,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - Watchdog - %(messa
 import hmac
 import secrets
 
-# Generate ephemeral in-memory 256-bit secret key per watchdog session
-HMAC_SECRET_KEY = secrets.token_bytes(32)
+# Generate ephemeral in-memory 512-bit secret key per watchdog session (Post-Quantum Keyed Hashing)
+HMAC_SECRET_KEY = secrets.token_bytes(64)
 
 def get_critical_files():
     base_dir = Path(__file__).parent.parent
@@ -27,28 +27,28 @@ def get_critical_files():
     return files
 
 def snapshot_integrity():
-    """Hash all critical files on startup using keyed HMAC-SHA256 baseline to prevent hash forgery."""
+    """Hash all critical files on startup using keyed HMAC-SHA512 baseline to prevent hash forgery."""
     baseline = {}
     for filepath in get_critical_files():
         if filepath.exists():
             try:
                 with open(filepath, 'rb') as f:
                     content = f.read()
-                h = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha256).hexdigest()
+                h = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha512).hexdigest()
                 baseline[str(filepath)] = h
             except Exception as e:
                 logging.error(f"Failed to hash {filepath}: {e}")
     return baseline
 
 def verify_integrity(baseline):
-    """Verify keyed HMAC-SHA256 baseline of all core modules and engine files."""
+    """Verify keyed HMAC-SHA512 baseline of all core modules and engine files."""
     tampered = []
     for filepath in get_critical_files():
         if filepath.exists():
             try:
                 with open(filepath, 'rb') as f:
                     content = f.read()
-                current_hmac = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha256).hexdigest()
+                current_hmac = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha512).hexdigest()
                 if str(filepath) in baseline and current_hmac != baseline[str(filepath)]:
                     tampered.append(filepath.name)
             except Exception:

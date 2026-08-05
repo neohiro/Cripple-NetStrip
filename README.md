@@ -268,11 +268,12 @@ Two independent layers that never block each other:
 
 | Layer | What it does |
 |---|---|
-| **HMAC-SHA256 Watchdog** | Periodically verifies integrity of all engine files with keyed hashes |
-| **DLL Sideloading Mitigation** | `SetDefaultDllDirectories` restricts DLL search paths at startup |
+| **🛡️ Post-Quantum Cryptography** | Pure-Python AES-256-CBC + HMAC-SHA512 + HKDF-SHA512 (immune to Grover's quantum attack & WDAC blocks) |
+| **🔍 HMAC-SHA512 Watchdog** | Ephemeral 512-bit keyed hashes continuously verify integrity of all engine files & modules against live tampering |
+| **DLL Sideloading Mitigation** | `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` + dynamic `_MEIPASS` search path restriction at startup |
 | **IPC Command Validation** | Regex-validated domain commands on the IPC socket |
 | **Shell Sandboxing** | All system commands use `shell=False` with isolated arguments |
-| **Anti-Replay Nonces** | LAN Shield broadcasts include nonces — replaying old packets does nothing |
+| **Anti-Replay Nonces** | LAN Shield broadcasts include cryptographic nonces — replaying old packets does nothing |
 | **Crash Report Guarantee** | Essential domains are whitelisted, crash reports retry 5× with exponential backoff |
 | **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
 | **ARP Lockdown** | Gateway MAC address pinned — prevents ARP spoofing / MITM attacks |
@@ -317,7 +318,18 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.2.0 — Major Major Milestone: Fixed LAN Shield, Logs UI, Icons, Filter Categories & Smooth Settings
+### v3.3.0 — Post-Quantum Cryptography Architecture & 512-bit Watchdog Verification
+- **Post-Quantum Cryptography Engine (`QuantumFernet`)**: Pure-Python AES-256-CBC (14 rounds, 256-bit key) + HMAC-SHA512 for quantum-grade confidentiality and authenticity ($128+$ bits Grover resistance).
+- **RFC 5869 HKDF-SHA512 Key Derivation**: Seamlessly elevates existing 44-char keys to 512-bit independent key material, preserving backward pairing while providing full quantum security. Supports native 88-char keys.
+- **Post-Quantum Watchdog File Verification**: Upgraded live file integrity monitoring to 512-bit ephemeral keys and HMAC-SHA512, ensuring instantaneous detection and termination if any engine module is modified or deleted.
+- **LAN Shield Post-Quantum Protocol**: `NetStrip:PQANOMALY:` header with AES-256 broadcast protection.
+- **UI "🛡️ QUANTUM-PROOF" Badge**: Visual indicator and 512-bit key generator in Settings.
+
+### v3.2.6 — Pure-Python Fernet Engine & Windows Application Control Resiliency
+- **Pure-Python Fallback**: 100% pure-Python symmetric cryptography bypassing WDAC / AppLocker CFFI restrictions.
+- **Safe DLL Search Path**: Safe dynamic DLL loading for PyInstaller frozen binaries.
+
+### v3.2.0 — Major Milestone: Fixed LAN Shield, Logs UI, Icons, Filter Categories & Smooth Settings
 - **LAN Shield ON Default**: LAN Shield switch defaults ON on clean boot.
 - **Centered Action Badges**: Full-width logs table with centered `ALLOW` / `BLOCK` badges.
 - **Smart App Logos & Parent Tracing**: Static Cripple logo for internal tasks, native Python icon for standard scripts, and parent icon inheritance for child processes (`jhi_service.exe`, `NVIDIA Overlay.exe`).
