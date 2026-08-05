@@ -45,9 +45,24 @@ class SplashScreen(ctk.CTkToplevel):
         apply_window_icon(self)
         center_window(self, 400, 400)
         
+        self._cycle_id = None
         # Start dynamic loading animation
-        self.after(500, self._cycle_loading_text)
+        self._cycle_id = self.after(500, self._cycle_loading_text)
         
+    def stop_animation(self):
+        """Stops all background timers and canvas animations."""
+        if hasattr(self, '_cycle_id') and self._cycle_id:
+            try:
+                self.after_cancel(self._cycle_id)
+            except Exception:
+                pass
+            self._cycle_id = None
+        if hasattr(self, 'logo') and self.logo:
+            try:
+                self.logo.stop_animation()
+            except Exception:
+                pass
+
     def update_status(self, text, progress_val):
         """Update the loading text and progress bar."""
         if self.winfo_exists():
@@ -82,20 +97,26 @@ class SplashScreen(ctk.CTkToplevel):
             self._phrase_idx = 0
         
         # Don't overwrite if it's a specific engine broadcast
-        current = self.status_label.cget("text")
-        if current.endswith("..."):
-            self.status_label.configure(text=self._phrases[self._phrase_idx])
-            self._phrase_idx = (self._phrase_idx + 1) % len(self._phrases)
+        try:
+            current = self.status_label.cget("text")
+            if current.endswith("..."):
+                self.status_label.configure(text=self._phrases[self._phrase_idx])
+                self._phrase_idx = (self._phrase_idx + 1) % len(self._phrases)
+                
+            # Slightly advance progress bar artificially
+            current_prog = self.progress.get()
+            if current_prog < 0.9:
+                self.progress.set(current_prog + 0.05)
+        except Exception:
+            pass
             
-        # Slightly advance progress bar artificially
-        current_prog = self.progress.get()
-        if current_prog < 0.9:
-            self.progress.set(current_prog + 0.05)
-            
-        self.after(1500, self._cycle_loading_text)
+        self._cycle_id = self.after(1500, self._cycle_loading_text)
 
-    def fade_out(self, callback=None, step=0, total_steps=20):
-        """Fade out the splash screen before destroying it."""
+    def fade_out(self, callback=None, step=0, total_steps=10):
+        """Fade out the splash screen smoothly before destroying it."""
+        if step == 0:
+            self.stop_animation()
+
         if not self.winfo_exists():
             if callback:
                 callback()
@@ -112,7 +133,7 @@ class SplashScreen(ctk.CTkToplevel):
             pass
             
         if step < total_steps:
-            self.after(16, lambda: self.fade_out(callback, step + 1, total_steps))
+            self.after(25, lambda: self.fade_out(callback, step + 1, total_steps))
         else:
             try:
                 self.withdraw()

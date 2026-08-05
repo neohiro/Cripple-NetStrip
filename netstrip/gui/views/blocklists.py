@@ -87,8 +87,14 @@ class BlocklistView(ctk.CTkFrame):
         if getattr(self.engine.updater, 'is_updating', False):
             return
         self._btn_update.configure(state="disabled", text="Updating...")
-        self._update_status_lbl.configure(text="Fetching remote blocklists...")
+        self._update_status_lbl.configure(text="Connecting to blocklist mirrors...")
         
+        def on_progress(current, total, name):
+            if not self._destroyed:
+                def update_prog():
+                    self._update_status_lbl.configure(text=f"Syncing {current}/{total}: {name[:24]}...")
+                self.after(0, update_prog)
+
         def on_complete(updated_count):
             if not self._destroyed:
                 def update_ui():
@@ -98,7 +104,7 @@ class BlocklistView(ctk.CTkFrame):
                     self._do_search()
                 self.after(0, update_ui)
                 
-        self.engine.updater.check_and_update(force=True, on_complete=on_complete)
+        self.engine.updater.check_and_update(force=True, on_complete=on_complete, on_progress=on_progress)
 
     def _on_blocklist_data_reloaded(self):
         if getattr(self, '_destroyed', False):
@@ -317,18 +323,18 @@ class BlocklistView(ctk.CTkFrame):
             from netstrip.core.modes import ConnectionCategory
             
             for cat_enum, (card, inner, lbl_count) in getattr(self, '_category_ui_elements', {}).items():
-                if cat_enum == ConnectionCategory.USER_ALLOWED:
-                    cnt = whitelist_size + app_whitelist_size
-                elif cat_enum == ConnectionCategory.USER_BLOCKED:
-                    cnt = blacklist_size + app_blacklist_size
-                else:
-                    cat_val = getattr(cat_enum, 'value', str(cat_enum))
-                    sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
-                    cnt = sum(s.get('size', 0) for s in sources)
-                    if not cnt and stats:
-                        cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0) or 0
-                    if not cnt and domain_map:
-                        cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
+                cat_val = getattr(cat_enum, 'value', str(cat_enum))
+                sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
+                cnt = sum(s.get('size', 0) for s in sources)
+                if not cnt and stats:
+                    cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0) or 0
+                if not cnt and domain_map:
+                    cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
+                    
+                if cat_enum == ConnectionCategory.USER_ALLOWED or cat_val == 'user_allowed':
+                    cnt += whitelist_size + app_whitelist_size
+                elif cat_enum == ConnectionCategory.USER_BLOCKED or cat_val == 'user_blocked':
+                    cnt += blacklist_size + app_blacklist_size
                         
                 cnt = int(cnt or 0)
                 lbl_count.configure(text=f"{cnt:,}")

@@ -1,3 +1,18 @@
+## [v3.3.6] - Multi-Monitor DPI Splash Screen Precision, Snappy Cross-Fade, Dashboard Deep-Scroll & Live List Sync
+
+- **Native Win32 Multi-Monitor & DPI-Aware Window Centering**:
+  - Implemented Win32 `MonitorFromWindow` / `MonitorFromPoint` and `GetMonitorInfoW` in [`netstrip/gui/utils.py`](file:///C:/Users/skele/.gemini/antigravity/scratch/Cripple-NetStrip/netstrip/gui/utils.py) to accurately calculate monitor work areas across multi-monitor setups with mixed DPI scalings.
+  - Corrected CustomTkinter geometry coordinate scaling offsets so splash screens and dialogs are centered with zero pixel drift on any monitor.
+- **Snappy Splash Screen Transition & CPU Animation Teardown**:
+  - Added clean `stop_animation()` teardown on `AnimatedLogo` and `SplashScreen` to immediately halt CPU-intensive canvas redraws when boot finishes.
+  - Streamlined boot cross-fade to a crisp 10-frame transition and prevented redundant idle loop polling during the handover to the main GUI.
+- **Dashboard Full Scrollability & Nested Mousewheel Propagation**:
+  - Added bottom scroll buffer padding to `DashboardView` ensuring the Recent Blocks list and footer controls are fully visible with generous breathing room.
+  - Implemented recursive mousewheel event binding across stat cards, switches, and activity list items for frictionless scrolling anywhere on the dashboard.
+- **Online Blocklist Live Progress Sync & Accurate Category Labeling**:
+  - Added granular `on_progress` live feed reporting (`Syncing X/Y: name...`) to `BlocklistUpdater` and Filter Manager UI.
+  - Enhanced category stats counting and list filtering to accurately reflect downloaded feeds, custom rules, and whitelist/blacklist modifications.
+
 ## [v3.3.5] - DPI-Aware Splash Screen Precision Centering & Multi-Monitor Geometry Alignment
 
 - **DPI-Aware Splash Screen & Modal Centering Precision**:

@@ -74,14 +74,14 @@ class BlocklistUpdater:
         self.is_updating = False
         self.on_update_callback = on_update_callback
 
-    def check_and_update(self, force: bool = False, on_complete: callable = None):
+    def check_and_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         """Run the update in a background thread."""
         if self.is_updating:
             return
             
-        threading.Thread(target=self._perform_update, args=(force, on_complete), daemon=True).start()
+        threading.Thread(target=self._perform_update, args=(force, on_complete, on_progress), daemon=True).start()
 
-    def _perform_update(self, force: bool = False, on_complete: callable = None):
+    def _perform_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         self.is_updating = True
         try:
             if not os.path.exists(self.sources_file):
@@ -94,6 +94,8 @@ class BlocklistUpdater:
                 data = json.load(f)
 
             sources = data.get('sources', [])
+            enabled_sources = [s for s in sources if s.get('enabled', False) and s.get('url') and s.get('category')]
+            total_enabled = len(enabled_sources)
             
             # Load state
             state_file = os.path.join(self.lists_dir, 'updater_state.json')
@@ -119,22 +121,23 @@ class BlocklistUpdater:
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
             
-            for source in sources:
-                if not source.get('enabled', False):
-                    continue
-                    
+            for idx, source in enumerate(enabled_sources, 1):
                 url = source.get('url')
                 category = source.get('category')
                 name = source.get('name')
                 
-                if not url or not category:
-                    continue
-                    
                 name = str(name) if name else f"unknown_{category}_{int(time.time())}"
                 safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
                 temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
                 target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
                 
+                # Report progress
+                if on_progress:
+                    try:
+                        on_progress(idx, total_enabled, name)
+                    except Exception:
+                        pass
+
                 # Get the update interval for this source (default 24h)
                 update_interval_hours = float(source.get('update_interval_hours', 24))
                 update_interval_seconds = update_interval_hours * 3600
@@ -174,7 +177,7 @@ class BlocklistUpdater:
                     updated_count += 1
                     
                     # Short delay between downloads
-                    time.sleep(0.1)
+                    time.sleep(0.05)
 
                 except Exception as e:
                     logger.error(f"Failed to update blocklist '{name}': {e}")

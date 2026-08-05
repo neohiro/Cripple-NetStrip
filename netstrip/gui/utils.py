@@ -128,34 +128,54 @@ def enable_smooth_scrolling(scrollable_frame):
 
 def get_screen_dimensions(window=None):
     """
-    Get the actual screen width and height in Tk coordinate space.
+    Get the actual physical monitor width, height, and offset (left, top) in OS coordinate space.
+    Returns (width, height, left, top).
     """
-    if window is not None:
+    import sys
+    if sys.platform.startswith("win"):
+        import ctypes
+        from ctypes import wintypes
         try:
-            w = window.winfo_screenwidth()
-            h = window.winfo_screenheight()
-            if w > 100 and h > 100:
-                return w, h
+            if window is not None and window.winfo_exists():
+                try:
+                    hwnd = window.winfo_id()
+                    if hwnd:
+                        monitor = ctypes.windll.user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+                        class RECT(ctypes.Structure):
+                            _fields_ = [('left', wintypes.LONG), ('top', wintypes.LONG), ('right', wintypes.LONG), ('bottom', wintypes.LONG)]
+                        class MONITORINFO(ctypes.Structure):
+                            _fields_ = [('cbSize', wintypes.DWORD), ('rcMonitor', RECT), ('rcWork', RECT), ('dwFlags', wintypes.DWORD)]
+                        mi = MONITORINFO()
+                        mi.cbSize = ctypes.sizeof(MONITORINFO)
+                        if ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(mi)):
+                            mw = mi.rcMonitor.right - mi.rcMonitor.left
+                            mh = mi.rcMonitor.bottom - mi.rcMonitor.top
+                            if mw > 100 and mh > 100:
+                                return mw, mh, mi.rcMonitor.left, mi.rcMonitor.top
+                except Exception:
+                    pass
+            user32 = ctypes.windll.user32
+            sw = user32.GetSystemMetrics(0)  # SM_CXSCREEN
+            sh = user32.GetSystemMetrics(1)  # SM_CYSCREEN
+            if sw > 0 and sh > 0:
+                return sw, sh, 0, 0
         except Exception:
             pass
-            
-    screen_w, screen_h = 1920, 1080
-    try:
-        import sys
-        if sys.platform.startswith("win"):
-            import ctypes
-            try:
-                user32 = ctypes.windll.user32
-                sw = user32.GetSystemMetrics(0) # SM_CXSCREEN
-                sh = user32.GetSystemMetrics(1) # SM_CYSCREEN
-                if sw > 0 and sh > 0:
-                    screen_w, screen_h = sw, sh
-            except Exception:
-                pass
-    except Exception:
-        pass
-        
-    return screen_w, screen_h
+
+    if window is not None:
+        try:
+            import customtkinter as ctk
+            scale = 1.0
+            if hasattr(ctk, 'ScalingTracker'):
+                scale = ctk.ScalingTracker.get_window_scaling(window)
+            w = int(round(window.winfo_screenwidth() * scale))
+            h = int(round(window.winfo_screenheight() * scale))
+            if w > 100 and h > 100:
+                return w, h, 0, 0
+        except Exception:
+            pass
+
+    return 1920, 1080, 0, 0
 
 
 def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92, max_h_ratio=0.90):
@@ -179,7 +199,7 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
     if not scale or scale <= 0:
         scale = 1.0
 
-    screen_w, screen_h = get_screen_dimensions(window)
+    screen_w, screen_h, screen_left, screen_top = get_screen_dimensions(window)
 
     if width is None:
         try:
@@ -226,15 +246,15 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
                 x = px + (pw - actual_w) // 2
                 y = py + (ph - actual_h) // 2
                 # Clamp within screen bounds
-                x = max(10, min(x, screen_w - actual_w - 10))
-                y = max(10, min(y, screen_h - actual_h - 10))
+                x = max(screen_left + 10, min(x, screen_left + screen_w - actual_w - 10))
+                y = max(screen_top + 10, min(y, screen_top + screen_h - actual_h - 10))
                 window.geometry(f"{width}x{height}+{x}+{y}")
                 return width, height, x, y
         except Exception:
             pass
 
-    x = max(0, (screen_w - actual_w) // 2)
-    y = max(0, (screen_h - actual_h) // 2)
+    x = screen_left + max(0, (screen_w - actual_w) // 2)
+    y = screen_top + max(0, (screen_h - actual_h) // 2)
     window.geometry(f"{width}x{height}+{x}+{y}")
     return width, height, x, y
 

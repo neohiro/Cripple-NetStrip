@@ -25,10 +25,22 @@ class AnimatedLogo(ctk.CTkCanvas):
         
         self._animation_step = 0
         self._scale_y = scale_y
+        self._running = True
+        self._anim_id = None
         self._animate()
 
+    def stop_animation(self):
+        """Stop animation loop and cancel pending timer."""
+        self._running = False
+        if self._anim_id:
+            try:
+                self.after_cancel(self._anim_id)
+            except Exception:
+                pass
+            self._anim_id = None
+
     def _animate(self):
-        if not self.winfo_exists():
+        if not self._running or not self.winfo_exists():
             return
             
         top = self.winfo_toplevel()
@@ -36,7 +48,7 @@ class AnimatedLogo(ctk.CTkCanvas):
             try:
                 state = str(top.state())
                 if state in ("iconic", "withdrawn") or not self.winfo_ismapped():
-                    self.after(250, self._animate)
+                    self._anim_id = self.after(250, self._animate)
                     return
             except Exception:
                 pass
@@ -61,5 +73,5 @@ class AnimatedLogo(ctk.CTkCanvas):
             115*scale_x, (130*scale_y) + down_offset, 150*scale_x, (90*scale_y) + down_offset, 130*scale_x, (90*scale_y) + down_offset, 130*scale_x, (30*scale_y) + down_offset
         )
         
-        # 25ms for ~40fps ultra-smooth animation with minimal CPU overhead
-        self.after(25, self._animate)
+        if self._running:
+            self._anim_id = self.after(25, self._animate)

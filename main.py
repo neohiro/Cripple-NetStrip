@@ -756,10 +756,16 @@ def main():
                 else:
                     app._show_tray_icon()
                     
-            def cross_fade(frame=0, total_frames=25):
+            def cross_fade(frame=0, total_frames=10):
                 if is_headless:
                     on_transition_done()
                     return
+
+                if frame == 0 and splash and hasattr(splash, 'stop_animation'):
+                    try:
+                        splash.stop_animation()
+                    except Exception:
+                        pass
                     
                 import math
                 progress = min(1.0, float(frame) / float(total_frames))
@@ -781,10 +787,11 @@ def main():
                     pass
                     
                 if frame < total_frames:
-                    app.after(16, lambda: cross_fade(frame + 1, total_frames))
+                    app.after(25, lambda: cross_fade(frame + 1, total_frames))
                 else:
                     if splash and splash.winfo_exists():
                         try:
+                            splash.stop_animation()
                             splash.withdraw()
                         except Exception:
                             pass
@@ -795,32 +802,31 @@ def main():
                     app.after(300, lambda: app.attributes('-topmost', False))
                     on_transition_done()
 
+            transition_started = False
             def check_engine_ready():
-                elapsed = time.time() - start_time
-                try:
-                    if splash and splash.winfo_exists():
-                        splash.update_idletasks()
-                    app.update_idletasks()
-                except Exception:
-                    pass
+                nonlocal transition_started
+                if transition_started:
+                    return
 
+                elapsed = time.time() - start_time
                 if is_headless:
+                    transition_started = True
                     on_transition_done()
                     return
     
                 # Enforce minimum 1.5s display duration and wait for blocklist ready (or 4.0s safety timeout)
                 is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
                 if (is_blocklist_ready and elapsed >= 1.5) or elapsed >= 4.0:
+                    transition_started = True
                     if splash and splash.winfo_exists():
                         try:
                             splash.progress.set(1.0)
                             splash.status_label.configure(text="Starting NetStrip...")
-                            splash.update_idletasks()
                         except Exception:
                             pass
                     cross_fade()
                 else:
-                    app.after(30, check_engine_ready)
+                    app.after(50, check_engine_ready)
                     
             check_engine_ready()
         except Exception as e:
