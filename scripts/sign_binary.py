@@ -7,11 +7,13 @@ import os
 import sys
 import subprocess
 import shutil
+import base64
 from pathlib import Path
 
 def run_powershell(script: str) -> subprocess.CompletedProcess:
+    encoded = base64.b64encode(script.encode('utf-16le')).decode('ascii')
     return subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
         capture_output=True,
         text=True
     )
@@ -31,16 +33,21 @@ def sign_and_package():
 
     # 1. Create or get FrenzyPenguin Media code signing certificate in CurrentUser\My
     ps_cert_script = """
-    $cert = Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert | Where-Object { $_.Subject -like '*FrenzyPenguin Media*' } | Select-Object -First 1
+    $ErrorActionPreference = 'Stop'
+    $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My | Where-Object { $_.Subject -like '*FrenzyPenguin Media*' } | Select-Object -First 1
     if (-not $cert) {
-        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FrenzyPenguin Media, O=FrenzyPenguin Media, C=US' -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddYears(5)
+        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=FrenzyPenguin Media, O=FrenzyPenguin Media, C=US' -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddYears(5) -KeyUsage DigitalSignature -FriendlyName 'FrenzyPenguin Media Code Signing'
     }
-    Write-Output $cert.Thumbprint
+    if ($cert) {
+        Write-Output $cert.Thumbprint
+    }
     """
     res = run_powershell(ps_cert_script)
     lines = [l.strip() for l in res.stdout.strip().splitlines() if l.strip()]
     if not lines:
         print("Error: Could not retrieve code signing certificate thumbprint.")
+        if res.stderr:
+            print("PowerShell Error:", res.stderr)
         return
     thumbprint = lines[-1]
     print(f"[+] Using Code Signing Certificate Thumbprint: {thumbprint}")
@@ -51,9 +58,10 @@ def sign_and_package():
 
     signed_count = 0
     for bin_file in binaries:
+        file_path_str = str(bin_file.resolve()).replace("'", "''")
         ps_sign_script = f"""
-        $cert = Get-ChildItem Cert:\\CurrentUser\\My\\{thumbprint}
-        $signResult = Set-AuthenticodeSignature -FilePath '{bin_file.resolve()}' -Certificate $cert -HashAlgorithm SHA256
+        $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
+        $signResult = Set-AuthenticodeSignature -FilePath '{file_path_str}' -Certificate $cert -HashAlgorithm SHA256
         Write-Output $signResult.Status
         """
         res_sign = run_powershell(ps_sign_script)
@@ -65,9 +73,10 @@ def sign_and_package():
     print(f"[+] Successfully signed {signed_count} binaries with Authenticode SHA256.")
 
     # 3. Export Certificate .cer
+    cer_path_str = str(cer_path.resolve()).replace("'", "''")
     ps_export_script = f"""
-    $cert = Get-ChildItem Cert:\\CurrentUser\\My\\{thumbprint}
-    Export-Certificate -Cert $cert -FilePath '{cer_path.resolve()}' -Force | Out-Null
+    $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
+    Export-Certificate -Cert $cert -FilePath '{cer_path_str}' -Force | Out-Null
     """
     run_powershell(ps_export_script)
     print(f"[+] Exported Public Certificate to {cer_path}")
