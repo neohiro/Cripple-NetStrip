@@ -40,3 +40,5 @@ changelog_utf8.md
 bin/
 *.apk
 *.zip
+*.pfx
+*.cer
