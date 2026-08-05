@@ -12,27 +12,9 @@ class SplashScreen(ctk.CTkToplevel):
         self.configure(fg_color=Colors.BG_DARKEST)
         
         # Center the splash screen reliably across all resolutions and DPI scalings
-        from netstrip.gui.utils import center_window
+        from netstrip.gui.utils import center_window, apply_window_icon
+        apply_window_icon(self)
         center_window(self, 400, 400)
-        
-        # Explicitly set the icon on the splash screen as well to guarantee it doesn't default to the feather
-        try:
-            import os, sys
-            if getattr(sys, 'frozen', False):
-                base_path = sys._MEIPASS
-            else:
-                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            icon_path = os.path.join(base_path, 'assets', 'logo.ico')
-            if os.path.exists(icon_path):
-                self.iconbitmap(icon_path)
-                import ctypes
-                hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-                hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
-                if hicon:
-                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
-                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
-        except Exception:
-            pass
         
         # Animated Canvas for Logo
         self.logo = AnimatedLogo(self, width=200, height=150, bg_color=Colors.BG_DARKEST)

@@ -13,15 +13,12 @@ class NotificationPopup(ctk.CTkToplevel):
         self.on_resolve = on_resolve
         
         self.title("Cripple - Unknown Connection")
-        self.geometry("400x160")
         self.resizable(False, False)
-        # self.overrideredirect(True) # Remove window decorations for true toast style
         self.attributes("-topmost", True)
         
-        # Position at bottom right (simplified logic)
-        # screen_width = self.winfo_screenwidth()
-        # screen_height = self.winfo_screenheight()
-        # self.geometry(f"+{screen_width - 420}+{screen_height - 200}")
+        from netstrip.gui.utils import center_window, apply_window_icon
+        apply_window_icon(self)
+        center_window(self, 400, 160, parent=master)
         
         self.configure(fg_color=Colors.BG_ELEVATED)
         

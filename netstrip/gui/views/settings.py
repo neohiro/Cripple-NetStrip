@@ -25,6 +25,9 @@ class DNSSelectorModal(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         
+        from netstrip.gui.utils import apply_window_icon
+        apply_window_icon(self)
+        
         self.dns_options_map = dns_options_map
         self.on_select_callback = on_select_callback
         
@@ -943,7 +946,8 @@ class SettingsView(ctk.CTkFrame):
         dialog.resizable(False, False)
         
         # Center it reliably over the main application
-        from netstrip.gui.utils import center_window
+        from netstrip.gui.utils import center_window, apply_window_icon
+        apply_window_icon(dialog)
         center_window(dialog, 460, 270, parent=self.master)
         
         ctk.CTkLabel(dialog, text='⚠  FACTORY RESET', font=(Fonts.FAMILY_PRIMARY[0], 20, 'bold'), text_color=Colors.DANGER).pack(pady=(20, 6))

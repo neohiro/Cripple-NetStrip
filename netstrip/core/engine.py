@@ -756,13 +756,30 @@ class NetStripEngine:
                 self.lan_shield.broadcast_restore()
 
     def _handle_geoip_change(self, old_ip: str, geo_data: dict):
-        if old_ip in ('Loading...', 'Unknown', 'PARANOID MODE'):
+        if not old_ip or not geo_data or not isinstance(geo_data, dict):
             return
-        new_ip = geo_data['ip']
+        new_ip = geo_data.get('ip')
+        if not new_ip:
+            return
+            
+        ignored_states = {'loading...', 'unknown', 'paranoid mode', 'pending', 'blocked (no update)', 'none', ''}
+        if str(old_ip).strip().lower() in ignored_states or str(new_ip).strip().lower() in ignored_states:
+            return
+            
+        # Ignore if public IP has NOT changed (prevent false positive IP flux trigger)
+        if str(old_ip).strip() == str(new_ip).strip():
+            return
+            
         self._evaluate_network_event(f"Public IP changed from {old_ip} to {new_ip}", is_ip_flux=True)
 
     def _handle_network_change(self, event_data: dict):
-        self._evaluate_network_event(event_data['message'], is_ip_flux=False)
+        if not event_data or not isinstance(event_data, dict):
+            return
+        old_val = event_data.get('old_ip') or event_data.get('old_mac')
+        new_val = event_data.get('new_ip') or event_data.get('new_mac')
+        if old_val and new_val and str(old_val).strip() == str(new_val).strip():
+            return
+        self._evaluate_network_event(event_data.get('message', 'Network state changed'), is_ip_flux=False)
 
     def _evaluate_network_event(self, message: str, is_ip_flux: bool = False):
         ip_flux_allowed = self.db.get_setting("ip_flux_tolerance", "false") == "true"

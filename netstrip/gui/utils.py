@@ -262,3 +262,84 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
     window.geometry(f"{final_w}x{final_h}+{x}+{y}")
     return final_w, final_h, x, y
 
+
+_cached_logo_images = {}
+
+def get_app_logo_image(size=(24, 24)):
+    """
+    Returns a CTkImage of the Cripple NetStrip logo at the specified size.
+    """
+    import os
+    import sys
+    from PIL import Image
+    import customtkinter as ctk
+    
+    if size in _cached_logo_images:
+        return _cached_logo_images[size]
+        
+    try:
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+        logo_path = os.path.join(base_path, 'assets', 'cripple_logo.png')
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(base_path, 'assets', 'logo.ico')
+            
+        if os.path.exists(logo_path):
+            pil_img = Image.open(logo_path)
+            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=size)
+            _cached_logo_images[size] = ctk_img
+            return ctk_img
+    except Exception as e:
+        logger.debug(f"Failed to load logo image: {e}")
+    return None
+
+
+def apply_window_icon(window):
+    """
+    Applies the Cripple NetStrip logo icon to any window or CTkToplevel modal.
+    Sets Tk iconbitmap and native Windows OS window icons (small & big) in the title bar.
+    """
+    try:
+        import os
+        import sys
+        
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+        icon_path = os.path.join(base_path, 'assets', 'logo.ico')
+        if os.path.exists(icon_path):
+            try:
+                window.iconbitmap(icon_path)
+            except Exception:
+                pass
+            
+            if sys.platform.startswith("win"):
+                def _set_win_icon():
+                    try:
+                        import ctypes
+                        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+                        if not hwnd:
+                            hwnd = window.winfo_id()
+                        hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
+                        if hicon and hwnd:
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
+                    except Exception:
+                        pass
+                
+                # Execute immediately and also schedule after 10ms in case window wasn't fully mapped
+                _set_win_icon()
+                if hasattr(window, 'after'):
+                    try:
+                        window.after(10, _set_win_icon)
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.debug(f"Failed to apply window icon: {e}")
+
+

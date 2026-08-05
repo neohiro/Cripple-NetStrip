@@ -18,17 +18,26 @@ def check_killswitch_override(engine, parent, proceed_callback, cancel_callback=
     dialog.attributes("-topmost", True)
     dialog.configure(fg_color=Colors.BG_DARKEST)
 
-    from netstrip.gui.utils import center_window
+    from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+    apply_window_icon(dialog)
     center_window(dialog, 400, 250, parent=parent)
 
     content = ctk.CTkFrame(dialog, fg_color=Colors.BG_PANEL, corner_radius=Spacing.RADIUS_MD)
     content.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.LG)
 
+    header = ctk.CTkFrame(content, fg_color="transparent")
+    header.pack(pady=(Spacing.LG, Spacing.SM))
+
+    logo_img = get_app_logo_image(size=(22, 22))
+    if logo_img:
+        lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
+        lbl_logo.pack(side="left", padx=(0, 8))
+
     ctk.CTkLabel(
-        content, text="⚠️ Killswitch is Active",
+        header, text="⚠️ Killswitch is Active",
         font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD),
         text_color=Colors.DANGER
-    ).pack(pady=(Spacing.LG, Spacing.SM))
+    ).pack(side="left")
 
     ctk.CTkLabel(
         content, 

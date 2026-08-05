@@ -16,12 +16,14 @@ class SmartParanoidModal(ctk.CTkToplevel):
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self.configure(fg_color=Colors.BG_DARKEST)
-        from netstrip.gui.utils import center_window
+        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        apply_window_icon(self)
         center_window(self, 500, 320, parent=master)
 
         self._build_ui()
         
     def _build_ui(self):
+        from netstrip.gui.utils import get_app_logo_image
         # Outer container with a thin info/danger border
         frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.DANGER)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
@@ -29,8 +31,17 @@ class SmartParanoidModal(ctk.CTkToplevel):
         inner = ctk.CTkFrame(frame, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=24, pady=24)
         
-        lbl_title = ctk.CTkLabel(inner, text="SMART SHIELD ACTIVATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
-        lbl_title.pack(anchor="w", pady=(0, 10))
+        # Header with Cripple logo and title
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        
+        logo_img = get_app_logo_image(size=(24, 24))
+        if logo_img:
+            lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
+            lbl_logo.pack(side="left", padx=(0, 10))
+            
+        lbl_title = ctk.CTkLabel(header, text="SMART SHIELD ACTIVATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title.pack(side="left")
         
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         

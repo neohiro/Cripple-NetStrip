@@ -10,13 +10,15 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         self.title("WARNING: Master Killswitch")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        from netstrip.gui.utils import center_window
+        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        apply_window_icon(self)
         center_window(self, 450, 250, parent=parent)
         
         self._build_ui()
         self.grab_set()
 
     def _build_ui(self):
+        from netstrip.gui.utils import get_app_logo_image
         # Outer container with a thin danger border for futuristic accent
         frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.DANGER)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
@@ -24,8 +26,17 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         inner = ctk.CTkFrame(frame, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=24, pady=24)
         
-        lbl_title = ctk.CTkLabel(inner, text="SYSTEM LOCKDOWN INITIATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
-        lbl_title.pack(anchor="w", pady=(0, 10))
+        # Header with Cripple logo and title
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        
+        logo_img = get_app_logo_image(size=(24, 24))
+        if logo_img:
+            lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
+            lbl_logo.pack(side="left", padx=(0, 10))
+            
+        lbl_title = ctk.CTkLabel(header, text="SYSTEM LOCKDOWN INITIATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title.pack(side="left")
         
         # Subtle separator
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
@@ -69,7 +80,8 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         self.title("CRITICAL: Network Intrusion Detected")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        from netstrip.gui.utils import center_window
+        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        apply_window_icon(self)
         center_window(self, 500, 250, parent=parent)
         
         self.message = message
@@ -77,6 +89,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
+        from netstrip.gui.utils import get_app_logo_image
         # Outer container with a thin info/danger border
         frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.WARNING)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
@@ -84,8 +97,17 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         inner = ctk.CTkFrame(frame, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=24, pady=24)
         
-        lbl_title = ctk.CTkLabel(inner, text="AUTO-KILLSWITCH ENGAGED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.WARNING)
-        lbl_title.pack(anchor="w", pady=(0, 10))
+        # Header with Cripple logo and title
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        
+        logo_img = get_app_logo_image(size=(24, 24))
+        if logo_img:
+            lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
+            lbl_logo.pack(side="left", padx=(0, 10))
+            
+        lbl_title = ctk.CTkLabel(header, text="AUTO-KILLSWITCH ENGAGED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.WARNING)
+        lbl_title.pack(side="left")
         
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         

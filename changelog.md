@@ -1,3 +1,12 @@
+## [v3.2.5] - Public IP Watchdog False Alarm Fix & Cripple Branding Window Icons
+
+- **Public IP & Network Anomaly False-Positive Elimination**:
+  - Resolved false-positive watchdog killswitch engagement triggered when GeoIP checks return identical consecutive public IP addresses.
+  - Added strict validation for `_handle_geoip_change` and `_handle_network_change` in `NetStripEngine` to disregard identical IP/MAC reports, empty values, and placeholder states (`Loading...`, `Unknown`, `PARANOID MODE`, `Pending`, `Blocked`).
+- **Consistent Cripple NetStrip Window & Header Icons**:
+  - Implemented `apply_window_icon()` and `get_app_logo_image()` in `netstrip/gui/utils.py` with multi-platform window icon loading and native Windows Win32 message synchronization (`WM_SETICON`).
+  - Added Cripple NetStrip logo branding and window icons across all dialog modals: `SmartParanoidModal`, `ManualKillswitchModal`, `CriticalRecoveryModal`, `CTkAnomalyAlert`, `check_killswitch_override`, `DNSSelectorModal`, `FactoryReset`, and `SplashScreen`.
+
 ## [v3.2.4] - 60FPS Eased Splash Transition, SQLite Lock-Free In-Memory Caching & Process Tree Acceleration
 
 - **Silky-Smooth 60FPS Splash Transition**:

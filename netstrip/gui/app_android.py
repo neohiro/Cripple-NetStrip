@@ -377,8 +377,10 @@ class NetStripApp(ctk.CTk):
         # Quick inline warning modal for bypassing Cripple entirely
         modal = ctk.CTkToplevel(self)
         modal.title("WARNING: BYPASS MODE")
-        modal.geometry("450x200")
         modal.attributes("-topmost", True)
+        from netstrip.gui.utils import center_window, apply_window_icon
+        apply_window_icon(modal)
+        center_window(modal, 450, 200, parent=self)
         
         lbl_title = ctk.CTkLabel(modal, text="🚨 WARNING: ENDPOINT UNPROTECTED", font=Fonts.h3(), text_color=Colors.WARNING)
         lbl_title.pack(pady=(20, 10))
