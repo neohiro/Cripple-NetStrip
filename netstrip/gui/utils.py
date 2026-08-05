@@ -128,8 +128,17 @@ def enable_smooth_scrolling(scrollable_frame):
 
 def get_screen_dimensions(window=None):
     """
-    Get the actual primary screen width and height reliably across platforms and DPI scales.
+    Get the actual screen width and height in Tk coordinate space.
     """
+    if window is not None:
+        try:
+            w = window.winfo_screenwidth()
+            h = window.winfo_screenheight()
+            if w > 100 and h > 100:
+                return w, h
+        except Exception:
+            pass
+            
     screen_w, screen_h = 1920, 1080
     try:
         import sys
@@ -146,51 +155,65 @@ def get_screen_dimensions(window=None):
     except Exception:
         pass
         
-    if window:
-        try:
-            w = window.winfo_screenwidth()
-            h = window.winfo_screenheight()
-            if w > 100 and h > 100:
-                screen_w, screen_h = w, h
-        except Exception:
-            pass
-            
     return screen_w, screen_h
 
 
 def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92, max_h_ratio=0.90):
     """
     Universally centers any Tk / CustomTkinter window on the primary screen or over a parent window.
-    Ensures dimensions fit comfortably on any display resolution (720p, 1080p, 1440p, 4K, laptops, etc.)
-    and prevents off-screen placement.
+    Accounts for DPI scaling in CustomTkinter so windows are pixel-perfect centered across all resolutions.
     """
     try:
         window.update_idletasks()
     except Exception:
         pass
 
+    # Get CustomTkinter window scaling factor
+    scale = 1.0
+    try:
+        import customtkinter as ctk
+        if hasattr(ctk, 'ScalingTracker'):
+            scale = ctk.ScalingTracker.get_window_scaling(window)
+    except Exception:
+        scale = 1.0
+    if not scale or scale <= 0:
+        scale = 1.0
+
     screen_w, screen_h = get_screen_dimensions(window)
 
     if width is None:
         try:
-            width = window.winfo_width()
-            if width <= 1:
-                width = window.winfo_reqwidth()
+            actual_w = window.winfo_width()
+            if actual_w <= 1:
+                actual_w = window.winfo_reqwidth()
+            width = int(round(actual_w / scale))
         except Exception:
             width = 400
+            actual_w = int(round(width * scale))
+    else:
+        actual_w = int(round(width * scale))
+
     if height is None:
         try:
-            height = window.winfo_height()
-            if height <= 1:
-                height = window.winfo_reqheight()
+            actual_h = window.winfo_height()
+            if actual_h <= 1:
+                actual_h = window.winfo_reqheight()
+            height = int(round(actual_h / scale))
         except Exception:
             height = 300
+            actual_h = int(round(height * scale))
+    else:
+        actual_h = int(round(height * scale))
 
-    max_w = max(300, int(screen_w * max_w_ratio))
-    max_h = max(200, int(screen_h * max_h_ratio))
+    max_actual_w = max(300, int(screen_w * max_w_ratio))
+    max_actual_h = max(200, int(screen_h * max_h_ratio))
     
-    final_w = min(int(width), max_w)
-    final_h = min(int(height), max_h)
+    if actual_w > max_actual_w:
+        actual_w = max_actual_w
+        width = int(round(actual_w / scale))
+    if actual_h > max_actual_h:
+        actual_h = max_actual_h
+        height = int(round(actual_h / scale))
 
     if parent is not None:
         try:
@@ -200,20 +223,20 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
             px = parent.winfo_rootx()
             py = parent.winfo_rooty()
             if pw > 100 and ph > 100 and px >= 0 and py >= 0:
-                x = px + (pw - final_w) // 2
-                y = py + (ph - final_h) // 2
+                x = px + (pw - actual_w) // 2
+                y = py + (ph - actual_h) // 2
                 # Clamp within screen bounds
-                x = max(10, min(x, screen_w - final_w - 10))
-                y = max(10, min(y, screen_h - final_h - 10))
-                window.geometry(f"{final_w}x{final_h}+{x}+{y}")
-                return final_w, final_h, x, y
+                x = max(10, min(x, screen_w - actual_w - 10))
+                y = max(10, min(y, screen_h - actual_h - 10))
+                window.geometry(f"{width}x{height}+{x}+{y}")
+                return width, height, x, y
         except Exception:
             pass
 
-    x = max(0, (screen_w - final_w) // 2)
-    y = max(0, (screen_h - final_h) // 2)
-    window.geometry(f"{final_w}x{final_h}+{x}+{y}")
-    return final_w, final_h, x, y
+    x = max(0, (screen_w - actual_w) // 2)
+    y = max(0, (screen_h - actual_h) // 2)
+    window.geometry(f"{width}x{height}+{x}+{y}")
+    return width, height, x, y
 
 
 _cached_logo_images = {}

@@ -11,11 +11,6 @@ class SplashScreen(ctk.CTkToplevel):
         self.after(1000, lambda: self.attributes('-topmost', False))
         self.configure(fg_color=Colors.BG_DARKEST)
         
-        # Center the splash screen reliably across all resolutions and DPI scalings
-        from netstrip.gui.utils import center_window, apply_window_icon
-        apply_window_icon(self)
-        center_window(self, 400, 400)
-        
         # Animated Canvas for Logo
         self.logo = AnimatedLogo(self, width=200, height=150, bg_color=Colors.BG_DARKEST)
         self.logo.pack(pady=(40, 20))
@@ -44,6 +39,11 @@ class SplashScreen(ctk.CTkToplevel):
             text_color=Colors.TEXT_TERTIARY
         )
         self.copyright_label.pack(side="bottom", pady=10)
+        
+        # Center the splash screen reliably across all resolutions and DPI scalings
+        from netstrip.gui.utils import center_window, apply_window_icon
+        apply_window_icon(self)
+        center_window(self, 400, 400)
         
         # Start dynamic loading animation
         self.after(500, self._cycle_loading_text)
