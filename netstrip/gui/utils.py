@@ -126,7 +126,7 @@ def enable_smooth_scrolling(scrollable_frame):
         pass
 
 
-def get_screen_dimensions(window=None):
+def get_screen_bounds(window=None):
     """
     Get the actual physical monitor width, height, and offset (left, top) in OS coordinate space.
     Returns (width, height, left, top).
@@ -178,6 +178,15 @@ def get_screen_dimensions(window=None):
     return 1920, 1080, 0, 0
 
 
+def get_screen_dimensions(window=None):
+    """
+    Get the monitor width and height.
+    Returns (width, height).
+    """
+    w, h, _, _ = get_screen_bounds(window)
+    return w, h
+
+
 def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92, max_h_ratio=0.90):
     """
     Universally centers any Tk / CustomTkinter window on the primary screen or over a parent window.
@@ -199,7 +208,7 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
     if not scale or scale <= 0:
         scale = 1.0
 
-    screen_w, screen_h, screen_left, screen_top = get_screen_dimensions(window)
+    screen_w, screen_h, screen_left, screen_top = get_screen_bounds(window)
 
     if width is None:
         try:
