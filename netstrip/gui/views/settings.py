@@ -186,7 +186,7 @@ class SettingsView(ctk.CTkFrame):
             # Trigger blocklist auto-updater cycle
             if hasattr(self.engine, 'updater') and self.engine.updater:
                 try:
-                    self.engine.updater.check_and_update()
+                    self.engine.updater.check_and_update(force=True)
                 except Exception:
                     pass
 
@@ -1077,8 +1077,8 @@ class SettingsView(ctk.CTkFrame):
 
     def _build_about_card(self):
         from netstrip import __version__
-        card = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=14, border_width=1, border_color=Colors.BORDER_SUBTLE)
-        card.pack(fill="x")
+        card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
+        card.pack(fill="x", pady=(0, Spacing.MD))
 
         ctk.CTkLabel(
             card, text="About",
@@ -1113,8 +1113,8 @@ class SettingsView(ctk.CTkFrame):
         self._build_credits()
 
     def _build_credits(self):
-        credits_frame = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=10, border_width=1, border_color=Colors.BORDER_SUBTLE)
-        credits_frame.pack(fill="x", padx=Spacing.LG, pady=Spacing.MD)
+        credits_frame = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
+        credits_frame.pack(fill="x", pady=(0, Spacing.MD))
         
         ctk.CTkLabel(
             credits_frame, text="OPEN SOURCE CREDITS & INTEGRATED FILTER LISTS",
@@ -1133,14 +1133,14 @@ class SettingsView(ctk.CTkFrame):
                 credits_frame, text=title,
                 font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
                 text_color=Colors.ACCENT_PRIMARY,
-            ).pack(anchor="center", pady=(Spacing.XS, 0))
+            ).pack(anchor="center", pady=(Spacing.XS, 0), padx=Spacing.LG)
             
             ctk.CTkLabel(
                 credits_frame, text=text,
                 font=(Fonts.FAMILY_PRIMARY[0], 9),
                 text_color=Colors.TEXT_TERTIARY,
                 justify="center"
-            ).pack(anchor="center", pady=(0, Spacing.XS))
+            ).pack(anchor="center", pady=(0, Spacing.XS), padx=Spacing.LG)
             
         # Bottom spacer
         ctk.CTkFrame(credits_frame, height=Spacing.SM, fg_color="transparent").pack()

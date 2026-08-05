@@ -124,6 +124,22 @@ class NetStripEngine:
         # Updater state
         self.update_available = False
         self.latest_version = None
+        
+        # Wire blocklist reload notification
+        self.blocklist.add_loaded_callback(self._on_blocklists_reloaded)
+
+    def _on_blocklists_reloaded(self):
+        self.broadcast_status("Blocklists synchronized")
+        if self.gui_update_callback:
+            try:
+                import tkinter as tk
+                root = tk._default_root
+                if root:
+                    root.after(0, lambda: self.gui_update_callback("BLOCKLIST_RELOADED"))
+                else:
+                    self.gui_update_callback("BLOCKLIST_RELOADED")
+            except Exception:
+                pass
 
     def set_status_callback(self, callback: Callable):
         self.on_status_update = callback

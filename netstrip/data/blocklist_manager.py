@@ -157,8 +157,8 @@ class BlocklistManager:
         self.blacklist = {}
         self.lock = threading.RLock()
         self.stats = {cat: 0 for cat in ConnectionCategory}
-
         self.sources_metadata = {}
+        self.on_loaded_callbacks = []
         
         if lists_dir is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -166,6 +166,19 @@ class BlocklistManager:
         self.lists_dir = lists_dir
         self.is_loading = True
         threading.Thread(target=self._load_async_worker, daemon=True).start()
+
+    def add_loaded_callback(self, callback: callable):
+        """Register a callback to be called when blocklists finish reloading."""
+        if callable(callback):
+            self.on_loaded_callbacks.append(callback)
+
+    def _notify_loaded(self):
+        """Invoke all registered callbacks on reload completion."""
+        for cb in list(self.on_loaded_callbacks):
+            try:
+                cb()
+            except Exception as e:
+                logger.debug(f"Error executing on_loaded_callback: {e}")
 
     def _get_cache_paths(self) -> List[str]:
         """Return potential cache file locations in priority order."""
@@ -179,7 +192,7 @@ class BlocklistManager:
     def _get_lists_hash(self):
         """Generate a stable deterministic hash of the current lists directory and DNS settings."""
         h = hashlib.md5()
-        h.update(b"v3.3.3_priority_dedup_hash")
+        h.update(b"v3.3.4_sac_updater_fix_hash")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:
             try:
@@ -304,6 +317,8 @@ class BlocklistManager:
                                 self.identity_map = cache_data.get("identity_map", {})
                                 self.stats = new_stats
                                 self.sources_metadata = new_sources_metadata
+                            self.is_loading = False
+                            self._notify_loaded()
                             logger.info(f"Blocklists successfully loaded from cache ({len(new_domain_map)} domains)")
                             return
                     except Exception as e:
@@ -449,6 +464,7 @@ class BlocklistManager:
 
         finally:
             self.is_loading = False
+            self._notify_loaded()
 
     def _load_list(self, filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
         """Parse a hosts or domain list file and add it to the map."""

@@ -30,6 +30,8 @@ pyinstaller ^
     --noconsole ^
     --windowed ^
     --uac-admin ^
+    --noupx ^
+    --version-file "version_info.txt" ^
     --name "Cripple" ^
     --icon "assets/logo.ico" ^
     --paths "." ^

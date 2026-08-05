@@ -33,12 +33,33 @@ class BlocklistView(ctk.CTkFrame):
         self._main_scroll.pack(fill="both", expand=True)
         enable_smooth_scrolling(self._main_scroll)
 
-        # Header
+        # Header Row
+        header_row = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
+        header_row.pack(fill="x", pady=(0, Spacing.MD))
+
         ctk.CTkLabel(
-            self._main_scroll, text="Filter Manager",
+            header_row, text="Filter Manager",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY,
-        ).pack(anchor="w", pady=(0, Spacing.MD))
+        ).pack(side="left")
+        
+        self._btn_update = ctk.CTkButton(
+            header_row, text=f"{Icons.SHIELD} Update Blocklists",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.ACCENT_PRIMARY,
+            hover_color=Colors.ACCENT_LIGHT,
+            height=32,
+            corner_radius=6,
+            command=self._on_manual_update_click,
+        )
+        self._btn_update.pack(side="right")
+        
+        self._update_status_lbl = ctk.CTkLabel(
+            header_row, text="",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
+            text_color=Colors.TEXT_SECONDARY,
+        )
+        self._update_status_lbl.pack(side="right", padx=Spacing.MD)
         
         # Search Bar (Top)
         self._build_search_bar()
@@ -55,8 +76,44 @@ class BlocklistView(ctk.CTkFrame):
         # Bind Map event to refresh stats grid when tab becomes visible
         self.bind("<Map>", lambda e: self._refresh_stats_grid() if e.widget is self else None)
         
+        # Register blocklist reload listener
+        if hasattr(self.engine.blocklist, 'add_loaded_callback'):
+            self.engine.blocklist.add_loaded_callback(self._on_blocklist_data_reloaded)
+            
         # Start periodic poll to update counts as background blocklist loading completes
         self._poll_loading()
+
+    def _on_manual_update_click(self):
+        if getattr(self.engine.updater, 'is_updating', False):
+            return
+        self._btn_update.configure(state="disabled", text="Updating...")
+        self._update_status_lbl.configure(text="Fetching remote blocklists...")
+        
+        def on_complete(updated_count):
+            if not self._destroyed:
+                def update_ui():
+                    self._btn_update.configure(state="normal", text=f"{Icons.SHIELD} Update Blocklists")
+                    self._update_status_lbl.configure(text=f"Updated ({updated_count} lists synced)")
+                    self._refresh_stats_grid()
+                    self._do_search()
+                self.after(0, update_ui)
+                
+        self.engine.updater.check_and_update(force=True, on_complete=on_complete)
+
+    def _on_blocklist_data_reloaded(self):
+        if getattr(self, '_destroyed', False):
+            return
+        try:
+            self.after(0, self._on_blocklist_data_reloaded_ui)
+        except Exception:
+            pass
+
+    def _on_blocklist_data_reloaded_ui(self):
+        if getattr(self, '_destroyed', False):
+            return
+        self._refresh_stats_grid()
+        if self._active_category_filter or (hasattr(self, '_search_entry') and self._search_entry.get().strip()):
+            self._do_search()
 
     def _poll_loading(self):
         if getattr(self, '_destroyed', False):
@@ -267,9 +324,13 @@ class BlocklistView(ctk.CTkFrame):
                 else:
                     cat_val = getattr(cat_enum, 'value', str(cat_enum))
                     sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
+                    if not sources and cat_val == 'ad':
+                        sources = metadata.get('ads') or []
                     cnt = sum(s.get('size', 0) for s in sources)
                     if cnt == 0 and stats:
-                        cnt = stats.get(cat_enum) or stats.get(cat_val) or 0
+                        cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0)
+                    if cnt == 0 and domain_map:
+                        cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
                         
                 lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:

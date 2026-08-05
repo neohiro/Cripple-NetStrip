@@ -74,19 +74,21 @@ class BlocklistUpdater:
         self.is_updating = False
         self.on_update_callback = on_update_callback
 
-    def check_and_update(self):
+    def check_and_update(self, force: bool = False, on_complete: callable = None):
         """Run the update in a background thread."""
         if self.is_updating:
             return
             
-        threading.Thread(target=self._perform_update, daemon=True).start()
+        threading.Thread(target=self._perform_update, args=(force, on_complete), daemon=True).start()
 
-    def _perform_update(self):
+    def _perform_update(self, force: bool = False, on_complete: callable = None):
         self.is_updating = True
         try:
             if not os.path.exists(self.sources_file):
                 logger.warning(f"Updater sources file not found: {self.sources_file}")
-                return
+                if on_complete:
+                    on_complete(0)
+                return False
 
             with open(self.sources_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -105,6 +107,17 @@ class BlocklistUpdater:
 
             sources_modified = False
             any_updated = False
+            updated_count = 0
+
+            # Create robust SSL context
+            import ssl
+            try:
+                import certifi
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+            except Exception:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
             
             for source in sources:
                 if not source.get('enabled', False):
@@ -126,43 +139,48 @@ class BlocklistUpdater:
                 update_interval_hours = float(source.get('update_interval_hours', 24))
                 update_interval_seconds = update_interval_hours * 3600
                 
-                # Check file age (skip if updated within the required interval)
-                if os.path.exists(target_file):
-                    file_age_seconds = time.time() - os.path.getmtime(target_file)
-                    if file_age_seconds < update_interval_seconds:
-                        continue
+                if not force:
+                    # Check file age (skip if updated within the required interval)
+                    if os.path.exists(target_file):
+                        file_age_seconds = time.time() - os.path.getmtime(target_file)
+                        if file_age_seconds < update_interval_seconds:
+                            continue
 
-                # Check if it's been attempted recently (throttle to prevent spamming on failures)
-                # Throttle is either 1 hour, or half the update interval if the interval is short
-                throttle_seconds = min(3600, update_interval_seconds / 2.0)
-                last_attempt = state_data.get(name, {}).get('last_attempt', 0)
-                if time.time() - last_attempt < throttle_seconds:
-                    continue
+                    # Check if it's been attempted recently (throttle to prevent spamming on failures)
+                    throttle_seconds = min(3600, update_interval_seconds / 2.0)
+                    last_attempt = state_data.get(name, {}).get('last_attempt', 0)
+                    if time.time() - last_attempt < throttle_seconds:
+                        continue
                     
                 logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")
                 
                 try:
-                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NetStrip/1.0'})
-                    with urllib.request.urlopen(req, timeout=15) as response:
+                    req = urllib.request.Request(
+                        url, 
+                        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                    )
+                    with urllib.request.urlopen(req, timeout=15, context=ssl_context) as response:
                         with open(temp_file, 'wb') as out_file:
                             out_file.write(response.read())
                     
                     if os.path.exists(target_file):
-                        os.remove(target_file)
-                    os.rename(temp_file, target_file)
+                        try: os.remove(target_file)
+                        except Exception: pass
+                    os.replace(temp_file, target_file)
                         
                     logger.info(f"Successfully updated '{name}'")
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
                     any_updated = True
+                    updated_count += 1
                     
                     # Short delay between downloads
-                    time.sleep(0.2)
+                    time.sleep(0.1)
 
-                    
                 except Exception as e:
                     logger.error(f"Failed to update blocklist '{name}': {e}")
                     if os.path.exists(temp_file):
-                        os.remove(temp_file)
+                        try: os.remove(temp_file)
+                        except Exception: pass
                         
                     # Track failure
                     failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
@@ -173,7 +191,7 @@ class BlocklistUpdater:
                         source['enabled'] = False
                         sources_modified = True
                         
-                    time.sleep(0.2)
+                    time.sleep(0.1)
                         
             # Save state
             try:
@@ -196,6 +214,11 @@ class BlocklistUpdater:
                 
             # Fetch DNSCrypt resolvers to build dynamic upstream options
             self._fetch_dnscrypt_resolvers()
+            
+            if on_complete:
+                try: on_complete(updated_count)
+                except Exception: pass
+                
             return any_updated
                         
         finally:

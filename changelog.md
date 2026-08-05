@@ -1,3 +1,16 @@
+## [v3.3.4] - Smart App Control (SAC) Mitigation, Blocklist Updater Sync & Settings UI Alignment
+
+- **Windows Smart App Control (SAC) & Defender Heuristic Mitigation**:
+  - Disabled UPX compression (`upx=False`, `--noupx`) in `Cripple.spec` and `build.bat` to eliminate packer-based false positive flags.
+  - Attached embedded Windows PE `VSVersionInfo` metadata resource (`version_info.txt`) specifying Company, Product, Version `3.3.4.0`, and Copyright.
+- **Online Blocklist Updater & Real-Time Category Synchronization**:
+  - Added `force=True` parameter to `BlocklistUpdater` routines to bypass time throttling during manual user update checks.
+  - Wired `on_loaded_callbacks` in `BlocklistManager` and `Engine` to dispatch `"BLOCKLIST_RELOADED"` events to GUI views upon background reload completion.
+  - Added a dedicated "Update Blocklists" button with live status feedback directly in the Filter Manager header.
+  - Fixed category count normalization and real-time category filtering when adding custom online lists.
+- **Settings View Aesthetic Alignment**:
+  - Updated Credits frame to use standard `**CTK_FRAME_STYLE` and aligned padding so its width matches all other subsection cards.
+
 ## [v3.3.3] - Privacy Audit, Upstream Credits, Boot Bottleneck Fix & Filter Pagination
 
 - **Comprehensive Codebase Privacy Audit & Spec Sanitization**:
