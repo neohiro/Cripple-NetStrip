@@ -179,9 +179,12 @@ class LANShield:
     def broadcast_killswitch(self):
         self._send_encrypted_broadcast('LAN_KILLSWITCH_TRIGGER', 'User triggered network killswitch')
 
-    def apply_mode(self, level: ProtectionLevel):
+    def apply_mode(self, level):
         """Apply LAN shielding based on the selected mode and user preference."""
-        mode_config = get_mode(level)
+        if hasattr(level, 'block_lan'):
+            mode_config = level
+        else:
+            mode_config = get_mode(level)
         
         if mode_config.block_lan:
             # Paranoid mode forces LAN shield on temporarily, without mutating the DB preference

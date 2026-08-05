@@ -181,9 +181,14 @@ class BlocklistManager:
                 logger.debug(f"Error executing on_loaded_callback: {e}")
 
     def _get_cache_paths(self) -> List[str]:
-        """Return potential cache file locations in priority order."""
+        """Return potential cache file locations in priority order (.pkl binary then .json)."""
         paths = []
         user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
+        # 1. High-speed binary pickle caches
+        paths.append(os.path.join(user_dir, "NetStrip_cache.pkl"))
+        if self.lists_dir:
+            paths.append(os.path.join(self.lists_dir, "NetStrip_cache.pkl"))
+        # 2. JSON caches (fallback / compatibility)
         paths.append(os.path.join(user_dir, "NetStrip_cache.json"))
         if self.lists_dir:
             paths.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
@@ -192,7 +197,7 @@ class BlocklistManager:
     def _get_lists_hash(self):
         """Generate a stable deterministic hash of the current lists directory and DNS settings."""
         h = hashlib.md5()
-        h.update(b"v3.3.6_release_hash")
+        h.update(b"v3.3.7_release_hash")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:
             try:
@@ -211,6 +216,62 @@ class BlocklistManager:
             except Exception:
                 pass
         return h.hexdigest()
+
+    def get_updater_sources(self) -> List[Dict[str, Any]]:
+        """Return all online blocklist sources with their sync status and file details."""
+        sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
+        if not os.path.exists(sources_file):
+            return []
+        try:
+            with open(sources_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            sources = data.get('sources', [])
+            
+            # Enrich with local disk status
+            for s in sources:
+                name = s.get('name', '')
+                category = s.get('category', 'ad')
+                safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
+                filename = f"{category}_{safe_name}.txt"
+                filepath = os.path.join(self.lists_dir, filename)
+                s['filename'] = filename
+                s['is_local'] = os.path.exists(filepath)
+                if s['is_local']:
+                    try:
+                        s['local_size'] = os.path.getsize(filepath)
+                        s['local_mtime'] = os.path.getmtime(filepath)
+                    except Exception:
+                        s['local_size'] = 0
+                        s['local_mtime'] = 0
+                else:
+                    s['local_size'] = 0
+                    s['local_mtime'] = 0
+            return sources
+        except Exception as e:
+            logger.error(f"Error reading updater sources: {e}")
+            return []
+
+    def toggle_updater_source(self, source_name: str, enabled: bool) -> bool:
+        """Enable or disable a specific online source by name."""
+        sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
+        if not os.path.exists(sources_file):
+            return False
+        try:
+            with open(sources_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            modified = False
+            for s in data.get('sources', []):
+                if s.get('name') == source_name:
+                    s['enabled'] = enabled
+                    modified = True
+                    break
+            if modified:
+                with open(sources_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+            return modified
+        except Exception as e:
+            logger.error(f"Error toggling updater source '{source_name}': {e}")
+            return False
 
     def _load_async_worker(self):
         """Worker thread to load blocklists without freezing the UI."""
@@ -277,31 +338,39 @@ class BlocklistManager:
         return domains
 
     def load_all(self):
-        """Load all default blocklists, using JSON cache if available."""
+        """Load all default blocklists, using fast binary/JSON cache if available."""
         self.is_loading = True
         try:
             current_hash = self._get_lists_hash()
             
-            # 1. Try loading from existing cache files
+            # 1. Try loading from existing cache files (.pkl first, then .json)
+            ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
+            for cat in ConnectionCategory:
+                ConnectionCategory_dict[cat] = cat
+
             for cache_file in self._get_cache_paths():
                 if os.path.exists(cache_file):
                     try:
-                        import time
-                        with open(cache_file, "r", encoding="utf-8") as f:
-                            cache_data = json.load(f)
-                        
-                        if cache_data.get("hash") == current_hash and "domain_map" in cache_data:
-                            ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
+                        cache_data = None
+                        if cache_file.endswith('.pkl'):
+                            import pickle
+                            with open(cache_file, "rb") as f:
+                                cache_data = pickle.load(f)
+                        elif cache_file.endswith('.json'):
+                            with open(cache_file, "r", encoding="utf-8") as f:
+                                cache_data = json.load(f)
+
+                        if cache_data and cache_data.get("hash") == current_hash and "domain_map" in cache_data:
+                            raw_map = cache_data["domain_map"]
+                            sample_val = next(iter(raw_map.values())) if raw_map else None
+                            if isinstance(sample_val, ConnectionCategory):
+                                new_domain_map = raw_map
+                            else:
+                                new_domain_map = {
+                                    k: ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
+                                    for k, v in raw_map.items()
+                                }
                             
-                            items = list(cache_data["domain_map"].items())
-                            new_domain_map = {}
-                            chunk_size = 100000
-                            for i in range(0, len(items), chunk_size):
-                                chunk = items[i:i + chunk_size]
-                                for k, v in chunk:
-                                    new_domain_map[k] = ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
-                                time.sleep(0.001) # Yield GIL
-                                
                             new_stats = {
                                 ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
                                 for k, v in cache_data.get("stats", {}).items()
@@ -319,7 +388,7 @@ class BlocklistManager:
                                 self.sources_metadata = new_sources_metadata
                             self.is_loading = False
                             self._notify_loaded()
-                            logger.info(f"Blocklists successfully loaded from cache ({len(new_domain_map)} domains)")
+                            logger.info(f"Blocklists successfully loaded from cache {os.path.basename(cache_file)} ({len(new_domain_map)} domains)")
                             return
                     except Exception as e:
                         logger.warning(f"Failed to load cache from {cache_file}: {e}. Checking alternatives...")
@@ -384,7 +453,7 @@ class BlocklistManager:
                     if not filename.endswith('.txt'): continue
                     filepath = os.path.join(self.lists_dir, filename)
                     
-                    if filename.startswith('ads_') or filename == 'ads.txt':
+                    if filename.startswith('ads_') or filename.startswith('ad_') or filename == 'ads.txt':
                         load_into_temp(filepath, ConnectionCategory.AD)
                     elif filename.startswith('telemetry_') or filename == 'telemetry.txt':
                         load_into_temp(filepath, ConnectionCategory.TELEMETRY)
@@ -426,39 +495,69 @@ class BlocklistManager:
             # Decouple and save cache asynchronously in background thread to avoid freezing GUI
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
-            save_targets = [os.path.join(user_dir, "NetStrip_cache.json")]
-            if self.lists_dir and os.path.exists(self.lists_dir):
-                save_targets.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
 
-            def _save_cache_worker(targets, c_hash, d_map, i_map, st, sm):
+            def _save_cache_worker(user_d, lists_d, c_hash, d_map, i_map, st, sm):
                 try:
-                    cache_payload = {
+                    import pickle
+                    # 1. Binary payload for high-speed sub-second startup
+                    pkl_payload = {
+                        "hash": c_hash,
+                        "domain_map": d_map,
+                        "identity_map": i_map,
+                        "stats": st,
+                        "sources_metadata": sm
+                    }
+                    # 2. JSON payload for compatibility and transparency
+                    json_payload = {
                         "hash": c_hash,
                         "domain_map": {k: getattr(v, 'value', v) for k, v in d_map.items()},
                         "identity_map": i_map,
                         "stats": {getattr(k, 'value', k): v for k, v in st.items()},
                         "sources_metadata": {getattr(k, 'value', k): v for k, v in sm.items()}
                     }
-                    for target in targets:
-                        temp_target = target + ".tmp"
+                    
+                    target_dirs = [user_d]
+                    if lists_d and os.path.exists(lists_d):
+                        target_dirs.append(lists_d)
+                        
+                    for t_dir in target_dirs:
+                        # Write PKL
+                        pkl_target = os.path.join(t_dir, "NetStrip_cache.pkl")
+                        pkl_tmp = pkl_target + ".tmp"
                         try:
-                            with open(temp_target, "w", encoding="utf-8") as f:
-                                json.dump(cache_payload, f)
-                            if os.path.exists(target):
-                                try: os.remove(target)
+                            with open(pkl_tmp, "wb") as f:
+                                pickle.dump(pkl_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+                            if os.path.exists(pkl_target):
+                                try: os.remove(pkl_target)
                                 except Exception: pass
-                            os.replace(temp_target, target)
+                            os.replace(pkl_tmp, pkl_target)
                         except Exception as e:
-                            logger.debug(f"Could not write cache to {target}: {e}")
-                            if os.path.exists(temp_target):
-                                try: os.remove(temp_target)
+                            logger.debug(f"Could not write pkl cache to {pkl_target}: {e}")
+                            if os.path.exists(pkl_tmp):
+                                try: os.remove(pkl_tmp)
+                                except Exception: pass
+                                
+                        # Write JSON
+                        json_target = os.path.join(t_dir, "NetStrip_cache.json")
+                        json_tmp = json_target + ".tmp"
+                        try:
+                            with open(json_tmp, "w", encoding="utf-8") as f:
+                                json.dump(json_payload, f)
+                            if os.path.exists(json_target):
+                                try: os.remove(json_target)
+                                except Exception: pass
+                            os.replace(json_tmp, json_target)
+                        except Exception as e:
+                            logger.debug(f"Could not write json cache to {json_target}: {e}")
+                            if os.path.exists(json_tmp):
+                                try: os.remove(json_tmp)
                                 except Exception: pass
                 except Exception as e:
                     logger.debug(f"Async cache save worker encountered error: {e}")
 
             threading.Thread(
                 target=_save_cache_worker,
-                args=(save_targets, current_hash, new_domain_map, new_identity_map, new_stats, new_sources_metadata),
+                args=(user_dir, self.lists_dir, current_hash, new_domain_map, new_identity_map, new_stats, new_sources_metadata),
                 daemon=True
             ).start()
 

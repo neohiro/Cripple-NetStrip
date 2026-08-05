@@ -436,7 +436,8 @@ class NetStripEngine:
         if hasattr(self.lan_shield, 'start'):
             self.lan_shield.start()
             try:
-                self.lan_shield.apply_mode(self.current_mode)
+                mode = getattr(self.classifier, 'mode', None) or self.db.get_setting("protection_mode", "NORMAL")
+                self.lan_shield.apply_mode(mode)
             except Exception as e:
                 logger.error(f"Failed to apply initial mode to LAN Shield: {e}")
         if self.ebpf_manager and self.db.get_setting("linux_ebpf_mode", "false") == "true":

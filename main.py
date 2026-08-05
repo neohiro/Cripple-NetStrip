@@ -756,17 +756,11 @@ def main():
                 else:
                     app._show_tray_icon()
                     
-            def cross_fade(frame=0, total_frames=10):
+            def cross_fade(frame=0, total_frames=8):
                 if is_headless:
                     on_transition_done()
                     return
 
-                if frame == 0 and splash and hasattr(splash, 'stop_animation'):
-                    try:
-                        splash.stop_animation()
-                    except Exception:
-                        pass
-                    
                 import math
                 progress = min(1.0, float(frame) / float(total_frames))
                 # Cosine ease-in-out curve: 0.0 -> 1.0
@@ -799,7 +793,7 @@ def main():
                     app.attributes('-topmost', True)
                     app.lift()
                     app.focus_force()
-                    app.after(300, lambda: app.attributes('-topmost', False))
+                    app.after(200, lambda: app.attributes('-topmost', False))
                     on_transition_done()
 
             transition_started = False
@@ -814,19 +808,19 @@ def main():
                     on_transition_done()
                     return
     
-                # Enforce minimum 1.5s display duration and wait for blocklist ready (or 4.0s safety timeout)
+                # Enforce minimum 1.2s display duration and wait for blocklist ready (or 3.0s safety timeout)
                 is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
-                if (is_blocklist_ready and elapsed >= 1.5) or elapsed >= 4.0:
+                if (is_blocklist_ready and elapsed >= 1.2) or elapsed >= 3.0:
                     transition_started = True
                     if splash and splash.winfo_exists():
                         try:
                             splash.progress.set(1.0)
-                            splash.status_label.configure(text="Starting NetStrip...")
+                            splash.status_label.configure(text="Ready")
                         except Exception:
                             pass
-                    cross_fade()
+                    app.after(50, cross_fade)
                 else:
-                    app.after(50, check_engine_ready)
+                    app.after(30, check_engine_ready)
                     
             check_engine_ready()
         except Exception as e:

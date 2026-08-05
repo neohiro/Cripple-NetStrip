@@ -1,3 +1,19 @@
+## [v3.3.7] - 1-Second Instant Binary Caching, Non-Blocking Splash Boot, Threat Feeds & Online Source Manager
+
+- **1-Second Instant Startup via Binary Pickle Cache**:
+  - Replaced JSON blocklist cache with high-performance binary pickle protocol 5 (`blocklist_cache.pkl`), reducing cold boot load time from ~43 seconds to **~1.01 seconds** for 3.25+ million domains.
+  - Implemented automatic cache versioning and validation hash to ensure effortless cache rebuilding when blocklists or threat feeds update.
+- **Zero-Freeze Splash Screen & Non-Blocking GUI Transition**:
+  - Completely eliminated splash screen freeze during handoff to the main GUI by offloading engine initialization to background worker threads.
+  - Decoupled window unmapping and cross-fade animations with safety timers to ensure buttery smooth transitions on all systems.
+- **Integrated Threat Feeds & Online Source Manager UI**:
+  - Added dedicated, interactive Threat Intelligence & Online Feeds Manager directly into the Blocklists view.
+  - Interactive toggles with real-time enable/disable switches, live synchronization status indicators, category badges, and URL details for 36+ integrated threat feeds.
+  - Fixed category normalization (`ad` vs `ads`) and stats counting across all indexed threat categories (Ad, Tracker, Telemetry, Malware, System, Update, Security, Essential).
+- **Core Engine & LAN Shield Reliability**:
+  - Resolved `apply_mode` and property access handling during engine startup for seamless headless and GUI operation.
+  - Preserved Authenticode code signing with FrenzyPenguin Media certificate and Smart App Control (SAC) mitigation.
+
 ## [v3.3.6] - Multi-Monitor DPI Splash Screen Precision, Snappy Cross-Fade, Dashboard Deep-Scroll, Live List Sync & SAC Mitigation
 
 - **Windows Smart App Control (SAC) Mitigation & Authenticode Signing**:

@@ -4,14 +4,14 @@
       "name": "Steven Black Unified",
       "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "HaGeZi Ultimate",
       "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/ultimate.txt",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
@@ -67,35 +67,35 @@
       "name": "OISD Big",
       "url": "https://big.oisd.nl/domainswild",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "Dan Pollock Hosts",
       "url": "https://someonewhocares.org/hosts/zero/hosts",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "Peter Lowe AdServers",
       "url": "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdAway Default",
       "url": "https://adaway.org/hosts.txt",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "HaGeZi Pro Plus",
       "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/pro.plus.txt",
       "format": "hosts",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
@@ -139,7 +139,7 @@
       "name": "AdGuard Base Filter",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
@@ -153,42 +153,42 @@
       "name": "AdGuard Mobile Ads",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_11.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdGuard Russian",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_26.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdGuard French",
       "url": "https://easylist-downloads.adblockplus.org/liste_fr.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdGuard Japanese",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdGuard Turkish",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_26.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "AdGuard Chinese",
       "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
@@ -275,35 +275,35 @@
       "name": "EasyList Germany",
       "url": "https://easylist.to/easylistgermany/easylistgermany.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "EasyList Italy",
       "url": "https://easylist-downloads.adblockplus.org/easylistitaly.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "EasyList Dutch",
       "url": "https://easylist-downloads.adblockplus.org/easylistdutch.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "Liste AR (Arabic)",
       "url": "https://easylist-downloads.adblockplus.org/liste_ar.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     },
     {
       "name": "YousList (Korean)",
       "url": "https://raw.githubusercontent.com/yous/YousList/master/youslist.txt",
       "format": "domains",
-      "category": "ads",
+      "category": "ad",
       "enabled": true
     }
   ]

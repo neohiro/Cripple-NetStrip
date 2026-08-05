@@ -70,6 +70,9 @@ class BlocklistView(ctk.CTkFrame):
         # Compact Stats Grid (Indexed Categories)
         self._build_stats_grid()
 
+        # Online Threat Feeds & Sources Manager
+        self._build_sources_section()
+
         # Search Results Area with dedicated inner scrollbar
         self._build_results_area()
         
@@ -327,7 +330,13 @@ class BlocklistView(ctk.CTkFrame):
                 sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
                 cnt = sum(s.get('size', 0) for s in sources)
                 if not cnt and stats:
-                    cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0) or 0
+                    cnt = (
+                        stats.get(cat_enum)
+                        or stats.get(cat_val)
+                        or (stats.get('ad') if cat_val in ('ad', 'ads') else 0)
+                        or (stats.get('ads') if cat_val in ('ad', 'ads') else 0)
+                        or 0
+                    )
                 if not cnt and domain_map:
                     cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
                     
@@ -492,6 +501,155 @@ class BlocklistView(ctk.CTkFrame):
                 widget.bind("<Enter>", on_enter)
                 widget.bind("<Leave>", on_leave)
                 widget.bind("<Button-1>", on_click)
+
+    def _build_sources_section(self):
+        """Construct the interactive online threat feeds & blocklist sources manager."""
+        self._sources_container = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
+        self._sources_container.pack(fill="x", pady=(0, Spacing.LG))
+
+        header_frame = ctk.CTkFrame(self._sources_container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, Spacing.SM))
+
+        ctk.CTkLabel(
+            header_frame, text="Threat Intelligence & Online Feeds",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        self._sources_expanded = False
+        self._btn_toggle_sources = ctk.CTkButton(
+            header_frame, text="▼ Show Online Feeds (36)",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
+            text_color=Colors.TEXT_PRIMARY,
+            height=28, width=180, corner_radius=6,
+            command=self._toggle_sources_view
+        )
+        self._btn_toggle_sources.pack(side="right")
+
+        self._sources_list_frame = ctk.CTkScrollableFrame(
+            self._sources_container, fg_color=Colors.BG_DARK,
+            height=280, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
+        )
+        enable_smooth_scrolling(self._sources_list_frame)
+
+    def _toggle_sources_view(self):
+        if self._sources_expanded:
+            self._sources_list_frame.pack_forget()
+            sources = self.engine.blocklist.get_updater_sources()
+            count = len(sources) if sources else 36
+            self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
+            self._sources_expanded = False
+        else:
+            self._sources_list_frame.pack(fill="x", pady=(Spacing.XS, 0))
+            self._populate_sources_list()
+            self._btn_toggle_sources.configure(text="▲ Hide Online Feeds")
+            self._sources_expanded = True
+
+    def _populate_sources_list(self):
+        for child in self._sources_list_frame.winfo_children():
+            child.destroy()
+
+        sources = self.engine.blocklist.get_updater_sources()
+        from netstrip.core.modes import ConnectionCategory
+        from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
+
+        if not sources:
+            ctk.CTkLabel(
+                self._sources_list_frame, text="No online sources configured.",
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic"),
+                text_color=Colors.TEXT_TERTIARY
+            ).pack(pady=Spacing.MD)
+            return
+
+        for idx, src in enumerate(sources):
+            name = src.get('name', 'Unknown Source')
+            url = src.get('url', '')
+            cat_str = src.get('category', 'ad')
+            enabled = src.get('enabled', True)
+            is_local = src.get('is_local', False)
+            local_size = src.get('local_size', 0)
+
+            # Row container
+            row_bg = "#181824" if idx % 2 == 0 else "#14141f"
+            row = ctk.CTkFrame(self._sources_list_frame, fg_color=row_bg, corner_radius=6, height=42)
+            row.pack(fill="x", pady=2, padx=4)
+            row.pack_propagate(False)
+
+            # Left: Status indicator dot + Name & URL
+            left_frame = ctk.CTkFrame(row, fg_color="transparent")
+            left_frame.pack(side="left", fill="both", expand=True, padx=Spacing.SM)
+
+            status_dot_color = Colors.SUCCESS if (enabled and is_local) else (Colors.WARNING if enabled else Colors.TEXT_TERTIARY)
+            dot_lbl = ctk.CTkLabel(
+                left_frame, text="●", font=(Fonts.FAMILY_PRIMARY[0], 12),
+                text_color=status_dot_color, width=16
+            )
+            dot_lbl.pack(side="left", padx=(0, Spacing.XS))
+
+            info_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+            info_frame.pack(side="left", fill="both", expand=True)
+
+            name_lbl = ctk.CTkLabel(
+                info_frame, text=name,
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+                text_color=Colors.TEXT_PRIMARY if enabled else Colors.TEXT_TERTIARY,
+                anchor="w"
+            )
+            name_lbl.pack(anchor="w")
+
+            url_short = url[:65] + "..." if len(url) > 65 else url
+            size_str = f" • {local_size / 1024:.1f} KB" if (is_local and local_size > 0) else ""
+            sub_lbl = ctk.CTkLabel(
+                info_frame, text=f"{url_short}{size_str}",
+                font=(Fonts.FAMILY_PRIMARY[0], 10),
+                text_color=Colors.TEXT_TERTIARY,
+                anchor="w"
+            )
+            sub_lbl.pack(anchor="w")
+
+            # Center: Category badge
+            try:
+                norm_cat = "ad" if cat_str == "ads" else cat_str
+                cat_enum = ConnectionCategory(norm_cat)
+            except Exception:
+                cat_enum = ConnectionCategory.UNKNOWN
+
+            cat_color = get_category_color(cat_enum)
+            cat_label = get_category_label(cat_enum)
+            cat_icon = get_category_icon(cat_enum)
+
+            badge = ctk.CTkLabel(
+                row, text=f" {cat_icon} {cat_label.upper()} ",
+                font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
+                text_color=cat_color,
+                fg_color=Colors.BG_ELEVATED,
+                corner_radius=8,
+                height=22,
+                width=90
+            )
+            badge.pack(side="left", padx=Spacing.MD)
+
+            # Right: Enable/Disable Switch
+            switch_var = ctk.BooleanVar(value=enabled)
+
+            def make_toggle_handler(src_name=name, var=switch_var, n_lbl=name_lbl, d_lbl=dot_lbl):
+                def on_toggle():
+                    val = var.get()
+                    self.engine.blocklist.toggle_updater_source(src_name, val)
+                    n_lbl.configure(text_color=Colors.TEXT_PRIMARY if val else Colors.TEXT_TERTIARY)
+                    d_lbl.configure(text_color=Colors.SUCCESS if val else Colors.TEXT_TERTIARY)
+                    if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                        self.engine.on_status(f"{'Enabled' if val else 'Disabled'} feed: {src_name}")
+                return on_toggle
+
+            switch = ctk.CTkSwitch(
+                row, text="", variable=switch_var,
+                command=make_toggle_handler(),
+                width=45, height=22,
+                **CTK_SWITCH_STYLE
+            )
+            switch.pack(side="right", padx=Spacing.MD)
 
     def _build_results_area(self):
         self._results_container = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
