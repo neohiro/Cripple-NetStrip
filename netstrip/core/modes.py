@@ -84,9 +84,7 @@ class ModeConfig:
     def get_action_for_category(self, category: ConnectionCategory, db=None) -> ConnectionAction:
         """Determine what action to take for a given connection category."""
         if self.level == ProtectionLevel.PARANOID:
-            if category == ConnectionCategory.USER_ALLOWED:
-                return ConnectionAction.ALLOW
-            if category == ConnectionCategory.DNS:
+            if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL):
                 return ConnectionAction.ALLOW
             return ConnectionAction.BLOCK
             

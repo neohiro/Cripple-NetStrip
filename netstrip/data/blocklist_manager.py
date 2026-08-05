@@ -43,6 +43,12 @@ ESSENTIAL_DOMAINS = frozenset({
     'ipapi.co',
     'ipwho.is',
     'api.myip.com',
+    # NTP Time Synchronization
+    'pool.ntp.org', 'time.windows.com', 'time.apple.com', 'time.google.com', 'time.cloudflare.com',
+    # Network Captive Portal & Connectivity Checkers
+    'captive.apple.com', 'connectivitycheck.gstatic.com', 'connectivitycheck.android.com',
+    # Core Secure DNS Upstream Resolvers
+    'dns.google', 'dns.quad9.net', 'cloudflare-dns.com',
     # Local Loopbacks
     '127.0.0.1', '127.0.0.53', '::1', 'localhost', 'broadcasthost',
 })

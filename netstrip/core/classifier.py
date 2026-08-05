@@ -29,45 +29,19 @@ class TrafficClassifier:
         if cache_key in self._domain_cache:
             return self._domain_cache[cache_key]
             
-        # Check blocklist manager (whitelist, blacklist, trie)
-        is_blocked, category = self.blocklist.is_blocked(domain, process_name)
-        
         # Check loopback specifically (local DNS resolvers)
         if domain.startswith("127.") or domain == "::1":
             self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
             return ConnectionCategory.ESSENTIAL
-            
-        # Check NetStrip domain overrides
-        from netstrip.data.blocklist_manager import ESSENTIAL_DOMAINS, SYSTEM_DOMAINS, UPDATE_DOMAINS
-        d_lower = domain.lower()
-        for essential in ESSENTIAL_DOMAINS:
-            if d_lower == essential or d_lower.endswith('.' + essential):
-                self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
-                return ConnectionCategory.ESSENTIAL
-        for sys_dom in SYSTEM_DOMAINS:
-            if d_lower == sys_dom or d_lower.endswith('.' + sys_dom):
-                self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
-                return ConnectionCategory.SYSTEM
-        for upd_dom in UPDATE_DOMAINS:
-            if d_lower == upd_dom or d_lower.endswith('.' + upd_dom):
-                self._domain_cache[cache_key] = ConnectionCategory.UPDATE
-                return ConnectionCategory.UPDATE
-        
+
         # If the target is actually an IP and it's a LAN IP, prioritize LAN classification
         if self._is_lan_ip(domain):
             self._domain_cache[cache_key] = ConnectionCategory.LAN
             return ConnectionCategory.LAN
-            
+
+        # Check blocklist manager (whitelist, blacklist, trie, and fallback domain sets)
+        is_blocked, category = self.blocklist.is_blocked(domain, process_name)
         if category and category != ConnectionCategory.UNKNOWN:
-            # If we are NOT in paranoid mode, don't block OS/app updates or security background noise
-            # EXCEPT if the user toggled "block_system_connections"
-            if category in (ConnectionCategory.UPDATE, ConnectionCategory.SECURITY) and self.mode.level != ProtectionLevel.PARANOID:
-                sys_val = self.db and self.db.get_setting("block_system_connections", "false")
-                block_sys = str(sys_val).lower() == "true"
-                if not block_sys:
-                    self._domain_cache[cache_key] = ConnectionCategory.UNKNOWN
-                    return ConnectionCategory.UNKNOWN
-                
             self._domain_cache[cache_key] = category
             return category
 
