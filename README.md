@@ -318,6 +318,20 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.2 — Semantic Versioning, Card Badge Polish, Domain Precedence & Nested Filter Scrolling
+- **Semantic Versioning Hierarchy Engine**: Integrated `parse_version_tuple` and `is_newer_version` across update loops to accurately evaluate future release versions (`3.3.1` < `3.3.2` < `3.10.0`).
+- **Connection Log Card Badges & Zero-Thrash**: Curved pill badges (`corner_radius=11`) with card containers, high contrast, and smooth pooling.
+- **Domain Precedence & Deduplication**: Expanded `ESSENTIAL_DOMAINS`, `SYSTEM_DOMAINS`, and `UPDATE_DOMAINS` and enforced strict category priority over ad/tracker lists.
+- **Filter Lists Tab Nested Scrolling**: Smooth scrolling for entire tab combined with dedicated scrollbar for 100-result filter entries.
+- **LAN Shield Default Active Enforcement**: Defaulted LAN Shield to ON across database initialization and GUI sidebar.
+
+### v3.3.1 — Snappy Window Restore, Centralized 4x Smooth Scroll & UI Hardening
+- **Snappy Window Restore**: Filtered root-level `<Map>` events and throttled `AnimatedLogo` when minimized to eliminate window unminimization latency.
+- **Centralized 4x Smooth Mousewheel Scrolling**: Globally monkey-patched `CTkScrollableFrame` with 4x scrolling speed and eliminated conflicting local handlers and `unbind_all` wipes.
+- **LAN Shield Startup Sync**: Initialized LAN Shield active mode in engine boot and bound sidebar/view toggles to `lan_shield.is_active`.
+- **Connection Logs Row Rendering Fix**: Fixed `sqlite3.Row` dictionary indexing to restore full connection log row visibility.
+- **Settings Subtitle Dynamic Text Layout**: Added left anchoring and responsive container width wrapping to eliminate text clipping.
+
 ### v3.3.0 — Post-Quantum Cryptography Architecture & 512-bit Watchdog Verification
 - **Post-Quantum Cryptography Engine (`QuantumFernet`)**: Pure-Python AES-256-CBC (14 rounds, 256-bit key) + HMAC-SHA512 for quantum-grade confidentiality and authenticity ($128+$ bits Grover resistance).
 - **RFC 5869 HKDF-SHA512 Key Derivation**: Seamlessly elevates existing 44-char keys to 512-bit independent key material, preserving backward pairing while providing full quantum security. Supports native 88-char keys.

@@ -122,7 +122,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
         
         ctk.CTkLabel(self.lan_frame, text="LAN Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
-        is_lan_on = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true"
+        lan_setting = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower()
+        is_lan_on = lan_setting not in ("false", "0", "off")
         self.lan_toggle_var = ctk.StringVar(value="on" if is_lan_on else "off")
         self.lan_toggle = ctk.CTkSwitch(
             self.lan_frame, text="", width=36,
@@ -419,7 +420,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
             logging.getLogger(__name__).error(f"Error updating sidebar: {e}", exc_info=True)
 
         # Update LAN toggle state cleanly
-        lan_enabled = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true"
+        lan_pref = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower()
+        lan_enabled = lan_pref not in ("false", "0", "off")
         if lan_enabled and self.lan_toggle_var.get() != "on":
             self.lan_toggle_var.set("on")
             self.lan_toggle.select()

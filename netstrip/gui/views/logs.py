@@ -85,7 +85,7 @@ class LogView(ctk.CTkFrame):
         self._row_pool = []
         for _ in range(50):
             frame, lbls = self._build_empty_row()
-            frame.pack(fill="x", pady=1, padx=2)
+            frame.pack(fill="x", pady=2, padx=4)
             self._row_pool.append((frame, lbls))
 
         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
@@ -179,7 +179,7 @@ class LogView(ctk.CTkFrame):
                     current_sig = (
                         query,
                         len(filtered_rows),
-                        tuple((r.get('id'), r.get('timestamp'), r.get('action'), r.get('category')) for r in filtered_rows[:15])
+                        tuple((r['id'], str(r['timestamp']), str(r['action']), str(r['category'])) for r in filtered_rows[:15])
                     )
                     if self._last_signature == current_sig and hasattr(self, '_pool_initialized'):
                         return
@@ -211,7 +211,7 @@ class LogView(ctk.CTkFrame):
                                 frame._last_bg = bg_color
 
                             if not frame.winfo_ismapped():
-                                frame.pack(fill="x", pady=1, padx=2)
+                                frame.pack(fill="x", pady=2, padx=4)
                             self._fill_row(lbls, filtered_rows[i])
                         else:
                             if frame.winfo_ismapped():
@@ -229,8 +229,8 @@ class LogView(ctk.CTkFrame):
     def _build_empty_row(self):
         frame = ctk.CTkFrame(
             self._log_scroll,
-            fg_color=Colors.BG_PANEL, corner_radius=0,
-            border_width=0, border_color=Colors.BORDER_SUBTLE,
+            fg_color=Colors.BG_PANEL, corner_radius=6,
+            border_width=1, border_color=Colors.BORDER_SUBTLE,
         )
         for i, cfg in enumerate(self.COL_CONFIGS):
             frame.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
@@ -248,14 +248,14 @@ class LogView(ctk.CTkFrame):
         lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        # Stable badge frames prevent canvas re-drawing text flicker
-        cat_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=96, height=22, corner_radius=6)
+        # Stable rounded pill badge frames (corner_radius=11 for height=22) prevent text flicker & canvas thrashing
+        cat_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=96, height=22, corner_radius=11)
         cat_badge.grid_propagate(False)
         cat_badge.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
         lbl_cat = ctk.CTkLabel(cat_badge, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
         lbl_cat.pack(fill="both", expand=True)
 
-        act_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=80, height=22, corner_radius=6)
+        act_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=80, height=22, corner_radius=11)
         act_badge.grid_propagate(False)
         act_badge.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
         lbl_act = ctk.CTkLabel(act_badge, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
@@ -285,7 +285,10 @@ class LogView(ctk.CTkFrame):
             else:
                 time_str = ts.astimezone().strftime("%H:%M:%S (%m-%d)")
         except Exception:
-            time_str = str(row.get('timestamp', ''))[:14]
+            try:
+                time_str = str(row['timestamp'])[:14]
+            except Exception:
+                time_str = ""
             
         cat = row['category'] or 'unknown'
         c_color = get_category_color(cat)

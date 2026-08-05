@@ -9,37 +9,67 @@ from netstrip.gui.hovertip import apply_global_tooltips
 # Apply global auto-tooltips monkey-patch
 apply_global_tooltips()
 
-# Monkey-patch CustomTkinter Scrollable Frame to scroll 3x faster
-original_mouse_wheel_all = ctk.CTkScrollableFrame._mouse_wheel_all
-
+# Monkey-patch CustomTkinter Scrollable Frame for centralized, ultra-smooth 4x scrolling
 def fast_mouse_wheel_all(self, event):
-    if self._check_if_valid_scroll(event.widget):
-        if sys.platform.startswith("win"):
-            if self._shift_pressed:
-                if self._parent_canvas.xview() != (0.0, 1.0):
-                    self._parent_canvas.xview("scroll", -int(event.delta / 4), "units")
-            else:
-                if self._parent_canvas.yview() != (0.0, 1.0):
-                    self._parent_canvas.yview("scroll", -int(event.delta / 4), "units")
-        elif sys.platform == "darwin":
-            if self._shift_pressed:
-                if self._parent_canvas.xview() != (0.0, 1.0):
-                    self._parent_canvas.xview("scroll", -int(event.delta * 2), "units")
-            else:
-                if self._parent_canvas.yview() != (0.0, 1.0):
-                    self._parent_canvas.yview("scroll", -int(event.delta * 2), "units")
-        else:
-            if self._shift_pressed:
-                if self._parent_canvas.xview() != (0.0, 1.0):
-                    self._parent_canvas.xview("scroll", -int(event.delta / 4), "units")
-            else:
-                if self._parent_canvas.yview() != (0.0, 1.0):
-                    self._parent_canvas.yview("scroll", -int(event.delta / 4), "units")
+    try:
+        if self._check_if_valid_scroll(event.widget):
+            canvas = getattr(self, '_parent_canvas', None)
+            if not canvas or not canvas.winfo_exists():
+                return
+
+            if sys.platform.startswith("win"):
+                if hasattr(event, 'delta') and event.delta:
+                    # 4x standard speed: 80 units per standard 120-delta notch
+                    step = -int(event.delta / 1.5)
+                    if step == 0:
+                        step = -1 if event.delta > 0 else 1
+                    if getattr(self, '_shift_pressed', False):
+                        if canvas.xview() != (0.0, 1.0):
+                            canvas.xview("scroll", step, "units")
+                    else:
+                        if canvas.yview() != (0.0, 1.0):
+                            canvas.yview("scroll", step, "units")
+            elif sys.platform == "darwin":
+                if hasattr(event, 'delta') and event.delta:
+                    step = -int(event.delta * 4)
+                    if getattr(self, '_shift_pressed', False):
+                        if canvas.xview() != (0.0, 1.0):
+                            canvas.xview("scroll", step, "units")
+                    else:
+                        if canvas.yview() != (0.0, 1.0):
+                            canvas.yview("scroll", step, "units")
+            else: # Linux / X11
+                step = -4 if getattr(event, 'num', None) == 4 else 4
+                if getattr(self, '_shift_pressed', False):
+                    if canvas.xview() != (0.0, 1.0):
+                        canvas.xview_scroll(step, "units")
+                else:
+                    if canvas.yview() != (0.0, 1.0):
+                        canvas.yview_scroll(step, "units")
+    except Exception:
+        pass
 
 def fast_check_if_valid_scroll(self, widget):
-    canvas_str = str(self._parent_canvas)
-    widget_str = str(widget)
-    return widget_str == canvas_str or widget_str.startswith(canvas_str + ".")
+    try:
+        if not self.winfo_exists() or not self.winfo_ismapped():
+            return False
+        canvas = getattr(self, '_parent_canvas', None)
+        if not canvas or not canvas.winfo_exists():
+            return False
+            
+        canvas_str = str(canvas)
+        widget_str = str(widget)
+        if widget_str == canvas_str or widget_str.startswith(canvas_str + ".") or widget_str == str(self) or widget_str.startswith(str(self) + "."):
+            return True
+            
+        curr = widget
+        while curr is not None:
+            if curr == canvas or curr == self:
+                return True
+            curr = getattr(curr, 'master', None)
+    except Exception:
+        pass
+    return False
 
 ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
@@ -80,7 +110,7 @@ class NetStripApp(ctk.CTk):
         self.apply_icon()
         
         # Prevent black rendering artifacts on window restore
-        self.bind("<Map>", lambda e: self.after(10, self.update_idletasks))
+        self.bind("<Map>", lambda e: self.after(30, self.update_idletasks) if e.widget is self else None)
         self.bind("<Configure>", self._on_window_resize)
         self._resize_timer = None
 

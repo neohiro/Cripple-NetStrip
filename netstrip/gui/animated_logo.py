@@ -31,6 +31,16 @@ class AnimatedLogo(ctk.CTkCanvas):
         if not self.winfo_exists():
             return
             
+        top = self.winfo_toplevel()
+        if top:
+            try:
+                state = str(top.state())
+                if state in ("iconic", "withdrawn") or not self.winfo_ismapped():
+                    self.after(250, self._animate)
+                    return
+            except Exception:
+                pass
+            
         self._animation_step += 0.05
         # Bounce animation using sine wave, scaled
         up_offset = math.sin(self._animation_step) * (5 * self._scale_y)
@@ -51,5 +61,5 @@ class AnimatedLogo(ctk.CTkCanvas):
             115*scale_x, (130*scale_y) + down_offset, 150*scale_x, (90*scale_y) + down_offset, 130*scale_x, (90*scale_y) + down_offset, 130*scale_x, (30*scale_y) + down_offset
         )
         
-        # 16ms for ~60fps smooth animation
-        self.after(16, self._animate)
+        # 25ms for ~40fps ultra-smooth animation with minimal CPU overhead
+        self.after(25, self._animate)

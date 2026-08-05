@@ -14,6 +14,8 @@ from netstrip.core.modes import ConnectionCategory
 logger = logging.getLogger(__name__)
 
 CATEGORY_PRIORITY = {
+    ConnectionCategory.USER_ALLOWED: 250,
+    ConnectionCategory.USER_BLOCKED: 240,
     ConnectionCategory.ESSENTIAL: 200,
     ConnectionCategory.SYSTEM: 190,
     ConnectionCategory.UPDATE: 180,
@@ -30,8 +32,9 @@ ESSENTIAL_DOMAINS = frozenset({
     # NetStrip Core Self-Updates & Releases
     'api.github.com',
     'raw.githubusercontent.com',
-    'frenzypenguin.media',
+    'objects.githubusercontent.com',
     'github.com',
+    'frenzypenguin.media',
     # GeoIP & Connectivity Diagnostic APIs
     'ip-api.com',
     'ipinfo.io',
@@ -41,12 +44,18 @@ ESSENTIAL_DOMAINS = frozenset({
     'ipwho.is',
     'api.myip.com',
     # Local Loopbacks
-    '127.0.0.1', '127.0.0.53', '::1', 'localhost',
+    '127.0.0.1', '127.0.0.53', '::1', 'localhost', 'broadcasthost',
 })
 
-# 2. SYSTEM DOMAINS — OS Infrastructure & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
+# 2. SYSTEM DOMAINS — OS Infrastructure, Search Engines & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
 # Obeys "Block System Connections" toggle and Paranoid Mode!
 SYSTEM_DOMAINS = frozenset({
+    # Global Search & Core Web Portals
+    'google.com', 'google.co.uk', 'google.de', 'google.fr', 'google.ca',
+    'google.com.au', 'google.co.jp', 'google.es', 'google.it', 'google.nl',
+    'google.pl', 'google.com.br', 'google.co.in',
+    'bing.com', 'live.com', 'office.com', 'microsoftonline.com',
+    'duckduckgo.com', 'yahoo.com', 'wikipedia.org', 'wikimedia.org',
     # Microsoft OS & Windows System Infrastructure
     'azure.com',
     'azure.net',
@@ -69,20 +78,21 @@ SYSTEM_DOMAINS = frozenset({
     'amazonaws.com',
     's3.amazonaws.com',
     'cloudfront.net',
-    # Global Edge CDNs (Fastly, Akamai, Cloudflare)
+    # Global Edge CDNs & Cloud Infrastructure
     'fastly.net',
     'fastlylb.net',
     'akamaiedge.net',
     'akamaihd.net',
     'edgekey.net',
     'cloudflare.com',
-    # Major Cloud Host Platforms (Oracle, DigitalOcean, Hetzner, Linode, Vultr)
+    'cloudflare-dns.com',
+    # Major Cloud Host Platforms
     'oraclecloud.com',
     'digitaloceanspaces.com',
     'hetzner.com',
     'linode.com',
     'vultr.com',
-    # Gaming Cloud Backends (Steam Cloud)
+    # Gaming Cloud Backends
     'steampowered.com',
     'steamstatic.com',
 })
@@ -107,10 +117,13 @@ UPDATE_DOMAINS = frozenset({
     'crates.io',
     'docker.com',
     'docker.io',
+    'github-releases.githubusercontent.com',
     # Software Update CDNs
     'gvt1.com',
     'gvt2.com',
     'steamcontent.com',
+    'windowsupdate.com',
+    'update.microsoft.com',
 })
 
 class BlocklistManager:
@@ -149,7 +162,7 @@ class BlocklistManager:
     def _get_lists_hash(self):
         """Generate a stable deterministic hash of the current lists directory and DNS settings."""
         h = hashlib.md5()
-        h.update(b"v3_stable_size_hash")
+        h.update(b"v3.3.2_priority_dedup_hash")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:
             try:
@@ -285,10 +298,18 @@ class BlocklistManager:
             new_stats = {cat: 0 for cat in ConnectionCategory}
             new_sources_metadata = {}
             
-            # Inject hardcoded essential domains
+            # Inject hardcoded essential, system, and update domains
             for domain in ESSENTIAL_DOMAINS:
                 new_domain_map[domain] = ConnectionCategory.ESSENTIAL
             new_stats[ConnectionCategory.ESSENTIAL] = len(ESSENTIAL_DOMAINS)
+
+            for domain in SYSTEM_DOMAINS:
+                new_domain_map[domain] = ConnectionCategory.SYSTEM
+            new_stats[ConnectionCategory.SYSTEM] = len(SYSTEM_DOMAINS)
+
+            for domain in UPDATE_DOMAINS:
+                new_domain_map[domain] = ConnectionCategory.UPDATE
+            new_stats[ConnectionCategory.UPDATE] = len(UPDATE_DOMAINS)
             
             # Internal helper to parse list without locking
             def load_into_temp(filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
@@ -309,6 +330,11 @@ class BlocklistManager:
                 for domain in domains:
                     d = domain.lower()
                     if category:
+                        # Prevent lower priority blocklists from overtaking system/essential/update apex domains
+                        if category in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
+                            if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
+                                continue
+
                         if d not in new_domain_map:
                             new_domain_map[d] = category
                             new_stats[category] = new_stats.get(category, 0) + 1
@@ -418,35 +444,32 @@ class BlocklistManager:
                 'size': len(domains)
             })
             
-        self.add_domains(domains, category, identity_name)
+        self.add_domains_chunked(domains, category, identity_name)
 
-    def add_domains(self, domains: Set[str], category: Optional[ConnectionCategory], identity_name: str = None):
-        """Thread-safe method to add multiple domains in chunks to avoid blocking the GIL and UI."""
-        import time
-        domains_list = list(domains)
-        chunk_size = 5000
-        
+    def add_domains_chunked(self, domains_list: List[str], category: Optional[ConnectionCategory] = None, identity_name: str = None, chunk_size: int = 50000):
+        """Add domains in batches yielding to Tkinter event loop to prevent UI hangs."""
         for i in range(0, len(domains_list), chunk_size):
             chunk = domains_list[i:i + chunk_size]
             with self.lock:
                 for domain in chunk:
                     d = domain.lower()
                     if category:
+                        if category in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
+                            if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
+                                continue
+
                         if d not in self.domain_map:
                             self.domain_map[d] = category
                             self.stats[category] = self.stats.get(category, 0) + 1
                         else:
                             existing_cat = self.domain_map[d]
-                            # If the new category is higher priority, overwrite it
                             if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
                                 self.domain_map[d] = category
                                 self.stats[existing_cat] -= 1
                                 self.stats[category] = self.stats.get(category, 0) + 1
-                                
                     if identity_name:
                         self.identity_map[d] = identity_name
-            
-            # Yield GIL and processor time to ensure GUI (Tkinter mainloop) stays 60fps
+            import time
             time.sleep(0.001)
 
     def remove_domains(self, domains: Set[str]):
@@ -464,21 +487,6 @@ class BlocklistManager:
         if domain.endswith('.'):
             domain = domain[:-1]
 
-        # 1. Essential domains (Immune to all blocks)
-        for essential in ESSENTIAL_DOMAINS:
-            if domain == essential or domain.endswith('.' + essential):
-                return False, ConnectionCategory.ESSENTIAL
-
-        # 2. System Infrastructure domains (Categorized as SYSTEM, obeys Block System Connections toggle)
-        for sys_dom in SYSTEM_DOMAINS:
-            if domain == sys_dom or domain.endswith('.' + sys_dom):
-                return False, ConnectionCategory.SYSTEM
-
-        # 3. Software Update domains (Categorized as UPDATE, obeys Block Software Updates toggle)
-        for upd_dom in UPDATE_DOMAINS:
-            if domain == upd_dom or domain.endswith('.' + upd_dom):
-                return False, ConnectionCategory.UPDATE
-
         with self.lock:
             # 1. User overrides (Highest Priority)
             if process_name and process_name in self.app_whitelist:
@@ -491,14 +499,28 @@ class BlocklistManager:
             if domain in self.blacklist:
                 return True, ConnectionCategory.USER_BLOCKED
 
-            # 2. Blocklist Trie (Standard Priority)
-
+            # 2. Blocklist Trie (Prioritized by CATEGORY_PRIORITY)
             parts = domain.split('.')
             for i in range(len(parts)):
                 test_domain = '.'.join(parts[i:])
                 if test_domain in self.domain_map:
-                    return True, self.domain_map[test_domain]
-                    
+                    cat = self.domain_map[test_domain]
+                    is_blk = cat not in (ConnectionCategory.ESSENTIAL, ConnectionCategory.SYSTEM, ConnectionCategory.UPDATE, ConnectionCategory.USER_ALLOWED)
+                    return is_blk, cat
+
+            # 3. Fallback checks for hardcoded sets
+            for essential in ESSENTIAL_DOMAINS:
+                if domain == essential or domain.endswith('.' + essential):
+                    return False, ConnectionCategory.ESSENTIAL
+
+            for sys_dom in SYSTEM_DOMAINS:
+                if domain == sys_dom or domain.endswith('.' + sys_dom):
+                    return False, ConnectionCategory.SYSTEM
+
+            for upd_dom in UPDATE_DOMAINS:
+                if domain == upd_dom or domain.endswith('.' + upd_dom):
+                    return False, ConnectionCategory.UPDATE
+
             return False, ConnectionCategory.UNKNOWN
 
     def get_identity(self, domain: str) -> Optional[str]:

@@ -10,6 +10,7 @@ from netstrip.gui.theme import (
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
     get_category_color, get_category_label, get_category_icon,
 )
+from netstrip.gui.utils import enable_smooth_scrolling
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -27,9 +28,14 @@ class BlocklistView(ctk.CTkFrame):
         self._active_category_filter = None
         self._category_ui_elements = {}
 
+        # Main scrollable container for the entire tab
+        self._main_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_PANEL)
+        self._main_scroll.pack(fill="both", expand=True)
+        enable_smooth_scrolling(self._main_scroll)
+
         # Header
         ctk.CTkLabel(
-            self, text="Filter Manager",
+            self._main_scroll, text="Filter Manager",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", pady=(0, Spacing.MD))
@@ -43,11 +49,11 @@ class BlocklistView(ctk.CTkFrame):
         # Compact Stats Grid (Indexed Categories)
         self._build_stats_grid()
 
-        # Search Results Area
+        # Search Results Area with dedicated inner scrollbar
         self._build_results_area()
         
         # Bind Map event to refresh stats grid when tab becomes visible
-        self.bind("<Map>", lambda e: self._refresh_stats_grid())
+        self.bind("<Map>", lambda e: self._refresh_stats_grid() if e.widget is self else None)
         
         # Start periodic poll to update counts as background blocklist loading completes
         self._poll_loading()
@@ -62,7 +68,7 @@ class BlocklistView(ctk.CTkFrame):
             self.after(500, self._poll_loading)
 
     def _build_add_rule_bar(self):
-        add_row = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL)
+        add_row = ctk.CTkFrame(self._main_scroll, fg_color=Colors.BG_PANEL)
         add_row.pack(fill="x", pady=(0, Spacing.LG))
         
         self._action_var = ctk.StringVar(value="Block")
@@ -271,7 +277,7 @@ class BlocklistView(ctk.CTkFrame):
             logging.getLogger(__name__).error(f"Error refreshing stats grid: {e}")
 
     def _build_search_bar(self):
-        search_row = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL)
+        search_row = ctk.CTkFrame(self._main_scroll, fg_color=Colors.BG_PANEL)
         search_row.pack(fill="x", pady=(0, Spacing.LG))
 
         self._search_entry = ctk.CTkEntry(
@@ -293,7 +299,7 @@ class BlocklistView(ctk.CTkFrame):
         btn_search.pack(side="right")
 
     def _build_stats_grid(self):
-        self._stats_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._stats_container = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
         self._stats_container.pack(fill="x", pady=0)
         
         ctk.CTkLabel(
@@ -422,15 +428,40 @@ class BlocklistView(ctk.CTkFrame):
                 widget.bind("<Button-1>", on_click)
 
     def _build_results_area(self):
-        self._results_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self._results_container = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
+        self._results_container.pack(fill="both", expand=True, pady=(Spacing.SM, Spacing.MD))
+
+        hdr_row = ctk.CTkFrame(self._results_container, fg_color="transparent")
+        hdr_row.pack(fill="x", pady=(0, Spacing.XS))
+        
+        self._lbl_results_title = ctk.CTkLabel(
+            hdr_row, text="Matching Filter List Entries",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        )
+        self._lbl_results_title.pack(side="left")
+        
+        self._lbl_results_count = ctk.CTkLabel(
+            hdr_row, text="",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_TERTIARY,
+        )
+        self._lbl_results_count.pack(side="right")
+
+        # Scrollable inner results list with dedicated scrollbar
+        self._results_scroll = ctk.CTkScrollableFrame(
+            self._results_container, fg_color=Colors.BG_DARK,
+            height=420, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
+        )
         self._results_scroll.pack(fill="both", expand=True)
+        enable_smooth_scrolling(self._results_scroll)
         
         self._current_results = []
         self._results_row_pool = []
         
-        # Pre-allocate 50 reusable result row widgets (0 widget creation thrashing)
-        for _ in range(50):
-            row = ctk.CTkFrame(self._results_scroll, fg_color=Colors.BG_ELEVATED, corner_radius=4, height=36)
+        # Pre-allocate 100 reusable result row widgets (0 widget creation thrashing)
+        for _ in range(100):
+            row = ctk.CTkFrame(self._results_scroll, fg_color=Colors.BG_ELEVATED, corner_radius=6, height=36)
             row.pack_propagate(False)
             
             domain_lbl = ctk.CTkLabel(
@@ -441,12 +472,12 @@ class BlocklistView(ctk.CTkFrame):
             
             cat_badge = ctk.CTkLabel(
                 row, text="", font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
-                corner_radius=4, height=22
+                corner_radius=11, height=22
             )
             cat_badge.pack(side="left", padx=Spacing.SM)
             
             btn = ctk.CTkButton(
-                row, text="", width=75, height=24, corner_radius=4,
+                row, text="", width=75, height=24, corner_radius=6,
                 font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"), text_color=Colors.TEXT_PRIMARY
             )
             btn.pack(side="right", padx=Spacing.MD)
@@ -465,6 +496,9 @@ class BlocklistView(ctk.CTkFrame):
             if item['frame'].winfo_ismapped():
                 item['frame'].pack_forget()
                 
+        if hasattr(self, '_lbl_results_count'):
+            self._lbl_results_count.configure(text="")
+
         if not hasattr(self, '_empty_lbl') or not self._empty_lbl.winfo_exists():
             self._empty_lbl = ctk.CTkLabel(
                 self._results_scroll, text="Search for a domain or click an Indexed Category to explore filter lists.",
@@ -488,11 +522,11 @@ class BlocklistView(ctk.CTkFrame):
             self._restore_empty_state()
             return
 
-        # Background thread search query execution
+        # Background thread search query execution (limit=100)
         import threading
         def search_task():
             try:
-                results = self.engine.blocklist.search(query, limit=50, category_filter=cat_filter)
+                results = self.engine.blocklist.search(query, limit=100, category_filter=cat_filter)
             except Exception:
                 results = []
             
@@ -507,6 +541,9 @@ class BlocklistView(ctk.CTkFrame):
 
         if hasattr(self, '_empty_lbl') and self._empty_lbl.winfo_exists():
             self._empty_lbl.pack_forget()
+
+        if hasattr(self, '_lbl_results_count'):
+            self._lbl_results_count.configure(text=f"Showing {len(results)} results")
 
         from netstrip.core.modes import ConnectionCategory
         from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon

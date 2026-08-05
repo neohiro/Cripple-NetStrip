@@ -1,3 +1,37 @@
+## [v3.3.2] - Semantic Versioning, Card Badge Polish, Domain Precedence & Nested Filter Scrolling
+
+- **Semantic Versioning Hierarchy Engine**:
+  - Implemented robust `parse_version_tuple` and `is_newer_version` in `updater.py` supporting semver tuples `(major, minor, patch, build)` with full pre-release suffix parsing (`-beta`, `-rc`, `-alpha`).
+  - Integrated into background update loop (`engine.py`) and manual check (`settings.py`) to correctly recognize all future version hierarchies (e.g., `3.3.1` < `3.3.2` < `3.10.0`).
+- **Connection Log Aesthetic Polish & Zero-Thrash Optimization**:
+  - Enhanced badge labels with curved pill corners (`corner_radius=11`) for action badges and category badges.
+  - Redesigned log rows with sleek card containers, subtle elevation border, and zero-allocation frame pooling.
+- **Domain Precedence & Apex Deduplication**:
+  - Expanded `ESSENTIAL_DOMAINS`, `SYSTEM_DOMAINS`, and `UPDATE_DOMAINS` with core infrastructure and search apex domains (e.g. `google.com`, `windowsupdate.com`, `apple.com`).
+  - Added strict category priority enforcement (`CATEGORY_PRIORITY`) preventing lower-priority ad/tracker blocklists from overriding essential, system, and update domains.
+  - Subdomains (e.g., `adservice.google.com`, `doubleclick.net`) continue to be accurately blocked while root services remain accessible.
+- **Filter Lists Tab Nested Scrolling & Expanded Result Pool**:
+  - Encapsulated the entire Filter Lists tab within a smooth-scrolling frame, enabling seamless scrolling down from search/category cards to results.
+  - Implemented a dedicated inner scrollable results container with its own scrollbar displaying up to 100 simultaneous matching filter list entries.
+- **LAN Shield Default State Enforcement**:
+  - Hardened database initialization and GUI sidebar toggle synchronization so LAN Shield defaults to ON across all startups.
+
+## [v3.3.1] - Snappy Window Restore, Centralized 4x Smooth Scroll & UI Hardening
+
+- **Snappy Window Restore & Instant Rendering**:
+  - Eliminated unminimization/restore lag by isolating Tkinter `<Map>` window bindings to root-level events only, preventing cascading child widget redraw stalls.
+  - Added visibility and window state throttling to `AnimatedLogo` (250ms interval when minimized/hidden) to eliminate background canvas CPU usage.
+- **Centralized Ultra-Smooth 4x Mousewheel Scrolling Engine**:
+  - Unified mousewheel scrolling into a single monkey-patch on `ctk.CTkScrollableFrame` with 4x standard scroll increment.
+  - Eliminated conflicting local scroll handlers and destructive `unbind_all("<MouseWheel>")` calls across views and utils.
+- **LAN Shield Startup Synchronization**:
+  - Ensured `lan_shield.apply_mode()` is invoked during `engine.start()`.
+  - Synchronized initial LAN toggle UI states in `connections_sidebar.py` and `views/connections.py` with `engine.lan_shield.is_active` and saved database settings.
+- **Connection Logs Row Visibility Fix**:
+  - Resolved `AttributeError: 'sqlite3.Row' object has no attribute 'get'` in `logs.py` signature diffing and fallback timestamp parsing so all connection log rows render immediately and accurately.
+- **Settings Subtitle Dynamic Text Layout**:
+  - Enhanced `_add_subtitle` with left anchoring (`anchor="w"`) and responsive `<Configure>` container wrapping, eliminating text clipping on small windows and high-DPI scaling.
+
 ## [v3.3.0] - Post-Quantum Cryptography Architecture (AES-256 / SHA-512 / HKDF)
 
 - **Post-Quantum Cryptography Engine (`QuantumFernet`)**:

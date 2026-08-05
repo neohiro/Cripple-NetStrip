@@ -188,8 +188,8 @@ class LANShield:
             self.enable()
         else:
             # Otherwise use the user's explicit preference, defaulting to True at init
-            lan_pref = self.engine.db.get_setting("lan_shield_enabled", "true")
-            if lan_pref == "true":
+            lan_pref = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower()
+            if lan_pref not in ("false", "0", "off"):
                 self.enable()
             else:
                 self.disable()

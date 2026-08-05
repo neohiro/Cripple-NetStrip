@@ -142,6 +142,9 @@ class Database:
                 except sqlite3.OperationalError:
                     pass # Column already exists
 
+                # Ensure default settings are initialized
+                conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('lan_shield_enabled', '\"true\"')")
+
                 # Pre-load settings cache
                 self._settings_cache = {}
                 try:

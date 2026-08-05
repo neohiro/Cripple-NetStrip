@@ -5,13 +5,67 @@ Downloads updates for offline blocklists on the first internet connection after 
 
 import json
 import os
+import re
 import urllib.request
 import threading
 import logging
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
+
+def parse_version_tuple(v: str) -> Tuple:
+    """
+    Parse a semantic version string into a comparable tuple.
+    Handles 'v3.3.2', '3.10.0', '3.3.1.2', '3.3.2-beta1', 'v3.3.2-rc2', etc.
+    """
+    if not v:
+        return (0, 0, 0, 0, '')
+    clean_v = str(v).strip().lstrip('vV')
+    
+    pre_release_weight = 0 # 0 means release / final
+    pre_tag = ""
+    if '-' in clean_v:
+        parts = clean_v.split('-', 1)
+        clean_v = parts[0]
+        pre_tag = parts[1].lower()
+        pre_release_weight = -1
+    elif 'rc' in clean_v.lower():
+        idx = clean_v.lower().find('rc')
+        pre_tag = clean_v[idx:].lower()
+        clean_v = clean_v[:idx].rstrip('.')
+        pre_release_weight = -1
+    elif 'beta' in clean_v.lower():
+        idx = clean_v.lower().find('beta')
+        pre_tag = clean_v[idx:].lower()
+        clean_v = clean_v[:idx].rstrip('.')
+        pre_release_weight = -2
+    elif 'alpha' in clean_v.lower():
+        idx = clean_v.lower().find('alpha')
+        pre_tag = clean_v[idx:].lower()
+        clean_v = clean_v[:idx].rstrip('.')
+        pre_release_weight = -3
+
+    numbers = []
+    for part in clean_v.split('.'):
+        digits = re.findall(r'\d+', part)
+        if digits:
+            numbers.append(int(digits[0]))
+        else:
+            numbers.append(0)
+            
+    while len(numbers) < 3:
+        numbers.append(0)
+        
+    return tuple(numbers) + (pre_release_weight, pre_tag)
+
+def is_newer_version(remote: str, current: str) -> bool:
+    """Return True if remote version is strictly newer than current version."""
+    try:
+        return parse_version_tuple(remote) > parse_version_tuple(current)
+    except Exception:
+        return False
+
 
 class BlocklistUpdater:
     def __init__(self, lists_dir: str, on_update_callback: callable = None):

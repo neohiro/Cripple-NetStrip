@@ -111,19 +111,6 @@ class SettingsView(ctk.CTkFrame):
         self._build_migration_card()
         self._build_analytics_card()
         self._build_about_card()
-
-        # Smooth mousewheel scroll handling
-        def _on_mousewheel(event):
-            try:
-                if not self.winfo_exists() or not self.winfo_ismapped(): return
-                canvas = getattr(self.scroll_frame, '_parent_canvas', None)
-                if canvas:
-                    canvas.yview_scroll(int(-1 * (event.delta / 40)), "units")
-            except Exception:
-                pass
-
-        self.bind("<Map>", lambda e: self.scroll_frame.bind_all("<MouseWheel>", _on_mousewheel, add="+"))
-        self.bind("<Unmap>", lambda e: self.scroll_frame.unbind_all("<MouseWheel>"))
         
     def _build_updates_card(self):
         from netstrip import __version__
@@ -193,6 +180,7 @@ class SettingsView(ctk.CTkFrame):
         def _check():
             import urllib.request, json
             from netstrip import __version__
+            from netstrip.core.updater import is_newer_version
             check_failed = False
 
             # Trigger blocklist auto-updater cycle
@@ -211,7 +199,7 @@ class SettingsView(ctk.CTkFrame):
                 with urllib.request.urlopen(req, timeout=10) as response:
                     data = json.loads(response.read().decode())
                     tag = data.get('tag_name', '').lstrip('v')
-                    if tag and tag != __version__:
+                    if tag and is_newer_version(tag, __version__):
                         self.engine.latest_version = tag
                         self.engine.update_available = True
                         if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
@@ -281,9 +269,19 @@ class SettingsView(ctk.CTkFrame):
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
             text_color=Colors.TEXT_TERTIARY,
             justify="left",
-            wraplength=650
+            anchor="w",
+            wraplength=540
         )
         lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=pady)
+        
+        def _update_wrap(event):
+            try:
+                if lbl.winfo_exists():
+                    new_wrap = max(280, event.width - (Spacing.LG * 2 + 10))
+                    lbl.configure(wraplength=new_wrap)
+            except Exception:
+                pass
+        parent.bind("<Configure>", _update_wrap, add="+")
         
     def _add_title(self, parent, text, icon=None, pady=(Spacing.LG, Spacing.SM)):
         display_text = f"{icon}  {text}" if icon else text

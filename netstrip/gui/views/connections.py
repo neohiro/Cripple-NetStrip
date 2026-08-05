@@ -123,14 +123,17 @@ class ConnectionsView(ctk.CTkFrame):
         
         ctk.CTkLabel(self.lan_frame, text="LAN Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
+        is_lan_on = (hasattr(self.engine, 'lan_shield') and getattr(self.engine.lan_shield, 'is_active', False)) or (str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower() == "true")
         self.lan_toggle = ctk.CTkSwitch(
             self.lan_frame, text="", width=36,
             progress_color=Colors.CAT_LAN,
             command=self._on_lan_toggle
         )
         self.lan_toggle.pack(side="right")
-        if self.engine.db.get_setting("lan_shield_enabled", "true") == "true":
+        if is_lan_on:
             self.lan_toggle.select()
+        else:
+            self.lan_toggle.deselect()
         
         # Smooth mousewheel scroll handling
         enable_smooth_scrolling(self.scroll_frame)

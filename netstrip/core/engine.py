@@ -419,6 +419,10 @@ class NetStripEngine:
         self.anomaly_scanner.start()
         if hasattr(self.lan_shield, 'start'):
             self.lan_shield.start()
+            try:
+                self.lan_shield.apply_mode(self.current_mode)
+            except Exception as e:
+                logger.error(f"Failed to apply initial mode to LAN Shield: {e}")
         if self.ebpf_manager and self.db.get_setting("linux_ebpf_mode", "false") == "true":
             self.ebpf_manager.start()
         
@@ -527,6 +531,7 @@ class NetStripEngine:
         import urllib.request
         import json
         from netstrip import __version__
+        from netstrip.core.updater import is_newer_version
         while self.is_running:
             try:
                 req = urllib.request.Request(
@@ -536,11 +541,13 @@ class NetStripEngine:
                 with urllib.request.urlopen(req, timeout=10) as response:
                     data = json.loads(response.read().decode())
                     tag = data.get('tag_name', '').lstrip('v')
-                    if tag and tag != __version__:
+                    if tag and is_newer_version(tag, __version__):
                         self.latest_version = tag
                         self.update_available = True
                         if hasattr(self, 'gui_update_callback') and self.gui_update_callback:
                             self.gui_update_callback("UPDATE_AVAILABLE")
+                    else:
+                        self.update_available = False
             except Exception as e:
                 logger.error(f"Failed to check for updates: {e}")
                 
