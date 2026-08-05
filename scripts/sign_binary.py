@@ -85,7 +85,11 @@ def sign_and_package():
     print(f"[+] Found {len(binaries)} binary files to sign in {dist_cripple}")
 
     # 3. Batch Sign all binaries using .NET X509Certificate2 & Set-AuthenticodeSignature
-    file_paths_str = "@(\n" + ",\n".join([f"    '{str(b.resolve()).replace('\'', '\'\'')}'" for b in binaries]) + "\n)"
+    escaped_paths = []
+    for b in binaries:
+        escaped_p = str(b.resolve()).replace("'", "''")
+        escaped_paths.append(f"    '{escaped_p}'")
+    file_paths_str = "@(\n" + ",\n".join(escaped_paths) + "\n)"
     cer_path_escaped = str(cer_path.resolve()).replace("'", "''")
     pfx_path_escaped = pfx_path_str.replace("'", "''")
 
