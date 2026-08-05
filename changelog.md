@@ -1,3 +1,11 @@
+## [v3.2.6] - Pure-Python Fernet Engine & Windows Application Control Resiliency
+
+- **Pure-Python Fernet Encryption & Zero-Crash Fallback**:
+  - Implemented a self-contained, 100% pure-Python AES-128-CBC + HMAC-SHA256 Fernet symmetric encryption engine in `netstrip/core/crypto_utils.py`.
+  - Added seamless fallback when `cryptography` or `_cffi_backend` C-extensions are blocked by Windows Defender Application Control (WDAC), AppLocker, or minimal environments.
+- **Windows Safe DLL Search Path Configuration**:
+  - Replaced restrictive `SetDefaultDllDirectories(0x00000800)` with `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` (0x00001000) and PyInstaller `_MEIPASS` dynamic directory registration, preventing DLL loading blocks on frozen executables.
+
 ## [v3.2.5] - Public IP Watchdog False Alarm Fix & Cripple Branding Window Icons
 
 - **Public IP & Network Anomaly False-Positive Elimination**:

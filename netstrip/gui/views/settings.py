@@ -529,7 +529,7 @@ class SettingsView(ctk.CTkFrame):
                 _show_psk_status("Invalid key — must be a 44-char Fernet key", is_error=True)
                 return
             try:
-                from cryptography.fernet import Fernet
+                from netstrip.core.crypto_utils import Fernet
                 Fernet(raw.encode('utf-8'))  # Validates key structure
             except Exception:
                 _show_psk_status("Invalid Fernet key format", is_error=True)
@@ -544,7 +544,7 @@ class SettingsView(ctk.CTkFrame):
             try:
                 if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
                     self.engine.lan_shield._psk = raw.encode('utf-8')
-                    from cryptography.fernet import Fernet as F
+                    from netstrip.core.crypto_utils import Fernet as F
                     self.engine.lan_shield._fernet = F(raw.encode('utf-8'))
             except Exception:
                 pass
@@ -553,7 +553,7 @@ class SettingsView(ctk.CTkFrame):
         def _regen_psk():
             """Generate a fresh Fernet key."""
             try:
-                from cryptography.fernet import Fernet
+                from netstrip.core.crypto_utils import Fernet
                 new_key = Fernet.generate_key().decode('utf-8')
                 psk_entry.configure(state="normal")
                 psk_entry.delete(0, "end")

@@ -24,13 +24,16 @@ if "--parent-pid" in sys.argv:
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Anti-Exploit Mitigation: Enforce strict DLL directory search path on Windows (LOAD_LIBRARY_SEARCH_SYSTEM32)
+# Windows App User Model ID & Safe DLL Search Path
 try:
     if sys.platform == 'win32':
         import ctypes
         myappid = 'NetStrip.app.1.0'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        ctypes.windll.kernel32.SetDefaultDllDirectories(0x00000800)
+        # Safe DLL search path: LOAD_LIBRARY_SEARCH_DEFAULT_DIRS (app dir + system32 + user dirs)
+        ctypes.windll.kernel32.SetDefaultDllDirectories(0x00001000)
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            ctypes.windll.kernel32.AddDllDirectory(sys._MEIPASS)
 except Exception:
     pass
 
@@ -189,7 +192,7 @@ def main():
                 print("Error: PSK must be a 44-character Fernet key (base64 ending with '=').")
                 sys.exit(1)
             try:
-                from cryptography.fernet import Fernet
+                from netstrip.core.crypto_utils import Fernet
                 Fernet(psk.encode('utf-8'))  # Validates structure
             except Exception:
                 print("Error: Invalid Fernet key format.")

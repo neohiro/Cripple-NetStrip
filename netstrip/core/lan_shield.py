@@ -10,7 +10,7 @@ import json
 import time
 import os
 import sys
-from cryptography.fernet import Fernet
+from netstrip.core.crypto_utils import Fernet, InvalidToken
 from netstrip.platform.base import get_platform
 from netstrip.core.modes import ProtectionLevel, get_mode
 
