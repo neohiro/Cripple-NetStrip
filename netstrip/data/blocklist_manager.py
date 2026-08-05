@@ -60,7 +60,7 @@ SYSTEM_DOMAINS = frozenset({
     'google.com', 'google.co.uk', 'google.de', 'google.fr', 'google.ca',
     'google.com.au', 'google.co.jp', 'google.es', 'google.it', 'google.nl',
     'google.pl', 'google.com.br', 'google.co.in',
-    'bing.com', 'live.com', 'office.com', 'microsoftonline.com',
+    'bing.com', 'bingapis.com', 'msn.com', 'live.com', 'office.com', 'microsoftonline.com',
     'duckduckgo.com', 'yahoo.com', 'wikipedia.org', 'wikimedia.org',
     # Microsoft OS & Windows System Infrastructure
     'azure.com',
@@ -68,12 +68,22 @@ SYSTEM_DOMAINS = frozenset({
     'windows.net',
     'microsoft.com',
     'msftconnecttest.com',
+    'msftncsi.com',
+    'trafficmanager.net',
+    'skype.com',
+    'visualstudio.com',
+    'windowsphone.com',
+    'xboxlive.com',
+    's-microsoft.com',
+    'onedrive.live.com',
     # Apple Ecosystem (macOS & iOS System Infrastructure)
     'apple.com',
     'icloud.com',
     'apple-dns.net',
     'cdn-apple.com',
     'mzstatic.com',
+    'push.apple.com',
+    'aaplimg.com',
     # Android & Google Cloud Infrastructure
     'android.com',
     'ggpht.com',
@@ -90,6 +100,7 @@ SYSTEM_DOMAINS = frozenset({
     'akamaiedge.net',
     'akamaihd.net',
     'edgekey.net',
+    'akadns.net',
     'cloudflare.com',
     'cloudflare-dns.com',
     # Major Cloud Host Platforms
@@ -397,35 +408,45 @@ class BlocklistManager:
                 self.stats = new_stats
                 self.sources_metadata = new_sources_metadata
                         
-            # Atomic save to user cache directory
+            # Decouple and save cache asynchronously in background thread to avoid freezing GUI
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
             save_targets = [os.path.join(user_dir, "NetStrip_cache.json")]
             if self.lists_dir and os.path.exists(self.lists_dir):
                 save_targets.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
 
-            cache_payload = {
-                "hash": current_hash,
-                "domain_map": {k: getattr(v, 'value', v) for k, v in self.domain_map.items()},
-                "identity_map": self.identity_map,
-                "stats": {getattr(k, 'value', k): v for k, v in self.stats.items()},
-                "sources_metadata": {getattr(k, 'value', k): v for k, v in self.sources_metadata.items()}
-            }
-
-            for target in save_targets:
-                temp_target = target + ".tmp"
+            def _save_cache_worker(targets, c_hash, d_map, i_map, st, sm):
                 try:
-                    with open(temp_target, "w", encoding="utf-8") as f:
-                        json.dump(cache_payload, f)
-                    if os.path.exists(target):
-                        try: os.remove(target)
-                        except Exception: pass
-                    os.replace(temp_target, target)
+                    cache_payload = {
+                        "hash": c_hash,
+                        "domain_map": {k: getattr(v, 'value', v) for k, v in d_map.items()},
+                        "identity_map": i_map,
+                        "stats": {getattr(k, 'value', k): v for k, v in st.items()},
+                        "sources_metadata": {getattr(k, 'value', k): v for k, v in sm.items()}
+                    }
+                    for target in targets:
+                        temp_target = target + ".tmp"
+                        try:
+                            with open(temp_target, "w", encoding="utf-8") as f:
+                                json.dump(cache_payload, f)
+                            if os.path.exists(target):
+                                try: os.remove(target)
+                                except Exception: pass
+                            os.replace(temp_target, target)
+                        except Exception as e:
+                            logger.debug(f"Could not write cache to {target}: {e}")
+                            if os.path.exists(temp_target):
+                                try: os.remove(temp_target)
+                                except Exception: pass
                 except Exception as e:
-                    logger.debug(f"Could not write cache to {target}: {e}")
-                    if os.path.exists(temp_target):
-                        try: os.remove(temp_target)
-                        except Exception: pass
+                    logger.debug(f"Async cache save worker encountered error: {e}")
+
+            threading.Thread(
+                target=_save_cache_worker,
+                args=(save_targets, current_hash, new_domain_map, new_identity_map, new_stats, new_sources_metadata),
+                daemon=True
+            ).start()
+
         finally:
             self.is_loading = False
 
@@ -581,89 +602,142 @@ class BlocklistManager:
             return dict(self.stats)
 
     def search(self, query: str = "", limit: int = 50, category_filter=None, offset: int = 0) -> List[dict]:
-        """Search domains using partial match, returns up to `limit` results after skipping `offset`. Lock-free to prevent network hangs."""
+        """
+        Search domains using partial match, returns up to `limit` results after skipping `offset`.
+        Lock-free iteration with retry mechanism for real-time responsiveness.
+        """
         if not query and not category_filter:
             return []
             
         query = query.lower() if query else ""
-        results = []
         
+        # Normalize category filter
+        target_cat = None
+        if category_filter:
+            if hasattr(category_filter, 'value'):
+                target_cat = category_filter.value.lower()
+            else:
+                target_cat = str(category_filter).lower()
+                
+            # Map common aliases
+            if target_cat in ('ad', 'ads'):
+                target_cat = 'ad'
+            elif target_cat in ('user_blocked', 'blocked'):
+                target_cat = 'user_blocked'
+            elif target_cat in ('user_allowed', 'allowed', 'whitelist'):
+                target_cat = 'user_allowed'
+            elif target_cat in ('tracker', 'trackers'):
+                target_cat = 'tracker'
+
+        results = []
+        seen = set()
         skipped = 0
         
-        # We can read user rules without a lock safely enough for search purposes
-        if not category_filter or category_filter == ConnectionCategory.USER_ALLOWED.value:
+        # 1. Check User Whitelist
+        if not target_cat or target_cat == 'user_allowed':
             for domain in list(self.whitelist):
                 if not query or query in domain:
-                    if skipped < offset:
-                        skipped += 1
-                        continue
-                    results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
-                    if len(results) >= limit: break
-        
-        if len(results) < limit and (not category_filter or category_filter == 'user_blocked'):
-            # Convert dictionary keys to list to avoid RuntimeError during concurrent mutation
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
+                            if len(results) >= limit:
+                                return results
+                                
+        # 2. Check User Blacklist
+        if not target_cat or target_cat == 'user_blocked':
             for domain in list(self.blacklist.keys()):
                 if not query or query in domain:
-                    if skipped < offset:
-                        skipped += 1
-                        continue
-                    results.append({'domain': domain, 'category': 'user_blocked'})
-                    if len(results) >= limit: break
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({'domain': domain, 'category': ConnectionCategory.USER_BLOCKED.value})
+                            if len(results) >= limit:
+                                return results
 
-        if len(results) < limit and (not category_filter or category_filter == 'essential'):
-            for d in ESSENTIAL_DOMAINS:
-                if not query or query in d:
-                    if skipped < offset:
-                        skipped += 1
-                        continue
-                    results.append({'domain': d, 'category': 'essential'})
-                    if len(results) >= limit: break
+        # 3. Check System Domains Set
+        if not target_cat or target_cat == 'system':
+            for domain in SYSTEM_DOMAINS:
+                if not query or query in domain:
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({'domain': domain, 'category': ConnectionCategory.SYSTEM.value})
+                            if len(results) >= limit:
+                                return results
 
-        if len(results) < limit and (not category_filter or category_filter == 'system'):
-            for d in ('microsoft.com', 'windowsupdate.com', 'msftconnecttest.com', 'apple.com', 'ubuntu.com', 'debian.org'):
-                if not query or query in d:
-                    if skipped < offset:
-                        skipped += 1
-                        continue
-                    results.append({'domain': d, 'category': 'system'})
-                    if len(results) >= limit: break
+        # 4. Check Essential Domains Set
+        if not target_cat or target_cat == 'essential':
+            for domain in ESSENTIAL_DOMAINS:
+                if not query or query in domain:
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({'domain': domain, 'category': ConnectionCategory.ESSENTIAL.value})
+                            if len(results) >= limit:
+                                return results
 
-        if len(results) >= limit:
-            return results
-            
-        # Lock-free iteration of domain_map. 
-        # Python dictionaries are thread-safe for reading. If the dict changes size, it raises RuntimeError.
-        initial_skipped = skipped
+        # 5. Check Update Domains Set
+        if not target_cat or target_cat == 'update':
+            for domain in UPDATE_DOMAINS:
+                if not query or query in domain:
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({'domain': domain, 'category': ConnectionCategory.UPDATE.value})
+                            if len(results) >= limit:
+                                return results
+
+        # 6. Lock-free iteration of domain_map
         retry_count = 0
         while retry_count < 5:
             try:
-                skipped = initial_skipped
                 for domain, category in self.domain_map.items():
                     cat_val = getattr(category, 'value', category)
-                    if category_filter and cat_val != category_filter:
+                    if isinstance(cat_val, str):
+                        cat_val_lower = cat_val.lower()
+                        if cat_val_lower in ('ad', 'ads'):
+                            cat_val_norm = 'ad'
+                        elif cat_val_lower in ('user_blocked', 'blocked'):
+                            cat_val_norm = 'user_blocked'
+                        elif cat_val_lower in ('user_allowed', 'allowed', 'whitelist'):
+                            cat_val_norm = 'user_allowed'
+                        elif cat_val_lower in ('tracker', 'trackers'):
+                            cat_val_norm = 'tracker'
+                        else:
+                            cat_val_norm = cat_val_lower
+                    else:
+                        cat_val_norm = str(cat_val)
+
+                    if target_cat and cat_val_norm != target_cat:
                         continue
+
                     if not query or query in domain:
-                        # If we haven't reached our global offset yet
-                        if skipped < offset:
-                            skipped += 1
-                            continue
-                            
-                        # Avoid duplicates
-                        if not any(r['domain'] == domain for r in results):
-                            results.append({
-                                'domain': domain,
-                                'category': cat_val
-                            })
-                        if len(results) >= limit:
-                            return results
-                break # Iteration completed successfully
+                        if domain not in seen:
+                            seen.add(domain)
+                            if skipped < offset:
+                                skipped += 1
+                            else:
+                                results.append({
+                                    'domain': domain,
+                                    'category': cat_val
+                                })
+                                if len(results) >= limit:
+                                    return results
+                break
             except RuntimeError:
-                # Dictionary changed size during iteration, just retry.
+                # Dictionary size changed during concurrent update, retry
                 retry_count += 1
-                # We don't truncate results, we just let the while loop start over for domain_map
-                # But we must clear results added FROM domain_map, which is tricky.
-                # Actually, if we just clear results and start the WHOLE method over it's easier.
-                return self.search(query, limit, category_filter, offset)
                 import time
                 time.sleep(0.01)
                 

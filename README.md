@@ -375,8 +375,8 @@ pip install -r requirements.txt
 **Core Technologies:**  
 [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) • [dnslib](https://github.com/paulc/dnslib) • [psutil](https://github.com/giampaolo/psutil) • [WinDivert](https://github.com/basil00/Divert) • [cryptography](https://github.com/pyca/cryptography)
 
-**Blocklists & Threat Feeds:**  
-[HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists) • [AdGuard Filters](https://adguard.com/) • [OISD](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [URLhaus](https://urlhaus.abuse.ch/) • [Feodo Tracker](https://feodotracker.abuse.ch/) • [PhishTank](https://phishing.army/) • [DShield](https://www.dshield.org/) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [v2fly](https://github.com/v2fly/domain-list-community) • [Peter Lowe](https://pgl.yoyo.org/adservers/) • [Dan Pollock](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [EasyList](https://easylist.to/)
+**Blocklists, Threat Feeds & Identity Lists:**  
+[HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists) • [AdGuard Filters](https://adguard.com/) • [OISD](https://oisd.nl/) • [Steven Black Hosts](https://github.com/StevenBlack/hosts) • [URLhaus](https://urlhaus.abuse.ch/) • [Feodo Tracker](https://feodotracker.abuse.ch/) • [PhishTank / Phishing Army](https://phishing.army/) • [DShield / SANS ISC](https://www.dshield.org/) • [WindowsSpyBlocker](https://github.com/crazy-max/WindowsSpyBlocker) • [v2fly Domain Community](https://github.com/v2fly/domain-list-community) • [Peter Lowe's AdServers](https://pgl.yoyo.org/adservers/) • [Dan Pollock's Hosts](https://someonewhocares.org/hosts/) • [AdAway](https://adaway.org/) • [EasyList](https://easylist.to/) • [YousList](https://github.com/yous/YousList)
 
 ---
 

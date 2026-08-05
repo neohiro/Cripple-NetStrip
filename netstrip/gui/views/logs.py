@@ -248,27 +248,27 @@ class LogView(ctk.CTkFrame):
         lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
         lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
 
-        # Stable rounded pill badge frames (corner_radius=11 for height=22) prevent text flicker & canvas thrashing
-        cat_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=96, height=22, corner_radius=11)
-        cat_badge.grid_propagate(False)
-        cat_badge.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
-        lbl_cat = ctk.CTkLabel(cat_badge, text="", text_color="white", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
-        lbl_cat.pack(fill="both", expand=True)
+        # True curved rounded pill badges with zero nested canvas overlap
+        lbl_cat = ctk.CTkLabel(
+            frame, text="", text_color="white",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            width=96, height=22, corner_radius=11, fg_color=Colors.BG_INPUT
+        )
+        lbl_cat.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
 
-        act_badge = ctk.CTkFrame(frame, fg_color=Colors.BG_INPUT, width=80, height=22, corner_radius=11)
-        act_badge.grid_propagate(False)
-        act_badge.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
-        lbl_act = ctk.CTkLabel(act_badge, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD), anchor="center")
-        lbl_act.pack(fill="both", expand=True)
+        lbl_act = ctk.CTkLabel(
+            frame, text="",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            width=80, height=22, corner_radius=11, fg_color=Colors.BG_INPUT
+        )
+        lbl_act.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
 
         return frame, {
             'time': lbl_time,
             'dot': lbl_dot,
             'proc': lbl_proc,
             'domain': lbl_domain,
-            'cat_badge': cat_badge,
             'cat': lbl_cat,
-            'act_badge': act_badge,
             'act': lbl_act
         }
 
@@ -332,11 +332,9 @@ class LogView(ctk.CTkFrame):
                 bind_copy_tooltip(lbls['domain'], raw_domain)
             
         cat_text = get_category_label(cat).upper()
-        if getattr(lbls['cat_badge'], '_last_color', None) != c_color:
-            lbls['cat_badge'].configure(fg_color=c_color)
-            lbls['cat_badge']._last_color = c_color
-        if getattr(lbls['cat'], '_last_val', None) != cat_text:
-            lbls['cat'].configure(text=cat_text)
+        if getattr(lbls['cat'], '_last_color', None) != c_color or getattr(lbls['cat'], '_last_val', None) != cat_text:
+            lbls['cat'].configure(text=cat_text, fg_color=c_color)
+            lbls['cat']._last_color = c_color
             lbls['cat']._last_val = cat_text
             
         action = (row['action'] or '').lower()
@@ -349,12 +347,10 @@ class LogView(ctk.CTkFrame):
             act_fg = "#4a1525"
             act_color = "#f43f5e"
 
-        if getattr(lbls['act_badge'], '_last_fg', None) != act_fg:
-            lbls['act_badge'].configure(fg_color=act_fg)
-            lbls['act_badge']._last_fg = act_fg
-        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_color', None) != act_color:
-            lbls['act'].configure(text=act_text, text_color=act_color)
+        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_fg', None) != act_fg or getattr(lbls['act'], '_last_color', None) != act_color:
+            lbls['act'].configure(text=act_text, fg_color=act_fg, text_color=act_color)
             lbls['act']._last_val = act_text
+            lbls['act']._last_fg = act_fg
             lbls['act']._last_color = act_color
 
     def destroy(self):

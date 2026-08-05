@@ -270,14 +270,14 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_TERTIARY,
             justify="left",
             anchor="w",
-            wraplength=540
+            wraplength=460
         )
         lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=pady)
         
         def _update_wrap(event):
             try:
                 if lbl.winfo_exists():
-                    new_wrap = max(280, event.width - (Spacing.LG * 2 + 10))
+                    new_wrap = max(260, event.width - (Spacing.LG * 2 + 24))
                     lbl.configure(wraplength=new_wrap)
             except Exception:
                 pass
@@ -487,34 +487,47 @@ class SettingsView(ctk.CTkFrame):
         self._add_switch_row(card, "Inbound Block Notifications", 'inbound_notifications', tooltip_text="Use Case: Auditing. Visually tells you when someone is trying to port-scan or connect to your machine.")
         self._add_subtitle(card, "Show a popup notification when an inbound connection attempt is dropped.")
 
-        # LAN Shield PSK
-        psk_row = ctk.CTkFrame(card, fg_color=Colors.BG_PANEL)
-        psk_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.SM))
+        # LAN Shield Pre-Shared Key Section
+        psk_card = ctk.CTkFrame(card, fg_color=Colors.BG_DARK, corner_radius=8, border_width=1, border_color=Colors.BORDER_SUBTLE)
+        psk_card.pack(fill="x", padx=Spacing.LG, pady=(Spacing.MD, Spacing.SM))
         
-        header_left = ctk.CTkFrame(psk_row, fg_color="transparent")
-        header_left.pack(side="left")
+        # Header Row: Title & Quantum Badge
+        psk_hdr = ctk.CTkFrame(psk_card, fg_color="transparent")
+        psk_hdr.pack(fill="x", padx=Spacing.MD, pady=(Spacing.MD, Spacing.SM))
 
         ctk.CTkLabel(
-            header_left, text="🔑  LAN Shield Pre-Shared Key",
+            psk_hdr, text="🔑  LAN Shield Pre-Shared Key",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY
         ).pack(side="left")
 
         # Post-Quantum Protection Badge
         pq_badge = ctk.CTkLabel(
-            header_left, text="  🛡️ QUANTUM-PROOF  ",
+            psk_hdr, text="  🛡️ QUANTUM-PROOF AES-256 / SHA-512  ",
             font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
             text_color=Colors.SUCCESS,
             fg_color=Colors.SUCCESS_DIM,
-            corner_radius=6
+            corner_radius=6,
+            height=24
         )
         pq_badge.pack(side="left", padx=(Spacing.SM, 0))
 
         psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
 
-        # Button row (right-aligned): Regenerate | Paste | Copy
-        btn_frame = ctk.CTkFrame(psk_row, fg_color="transparent")
-        btn_frame.pack(side="right")
+        # Key display — clean monospace entry
+        psk_entry = ctk.CTkEntry(
+            psk_card, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM),
+            height=38, state="normal",
+            fg_color=Colors.BG_INPUT,
+            border_color=Colors.BORDER_DEFAULT
+        )
+        psk_entry.pack(fill="x", padx=Spacing.MD, pady=(0, Spacing.SM))
+        psk_entry.insert(0, psk_val)
+        psk_entry.configure(state="readonly")
+
+        # Action Buttons Toolbar
+        action_bar = ctk.CTkFrame(psk_card, fg_color="transparent")
+        action_bar.pack(fill="x", padx=Spacing.MD, pady=(0, Spacing.SM))
 
         def _copy_psk():
             """Copy PSK to clipboard with visual feedback."""
@@ -523,7 +536,7 @@ class SettingsView(ctk.CTkFrame):
                 self.clipboard_append(psk_entry.get())
                 btn_copy.configure(text="Copied ✓", fg_color=Colors.SUCCESS_DIM, text_color=Colors.SUCCESS)
                 self.after(2000, lambda: btn_copy.configure(
-                    text="📋 Copy", fg_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_PRIMARY
+                    text="📋 Copy Key", fg_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_PRIMARY
                 ))
             except Exception:
                 pass
@@ -535,23 +548,20 @@ class SettingsView(ctk.CTkFrame):
             except Exception:
                 _show_psk_status("Nothing in clipboard", is_error=True)
                 return
-            # Validate: Key must be 44 or 88 char URL-safe base64
             if len(raw) not in (44, 88) or not raw.endswith('='):
                 _show_psk_status("Invalid key — must be 44-char or 88-char Quantum key", is_error=True)
                 return
             try:
                 from netstrip.core.crypto_utils import Fernet
-                Fernet(raw.encode('utf-8'))  # Validates key structure
+                Fernet(raw.encode('utf-8'))
             except Exception:
                 _show_psk_status("Invalid Quantum key format", is_error=True)
                 return
-            # Valid — save
             psk_entry.configure(state="normal")
             psk_entry.delete(0, "end")
             psk_entry.insert(0, raw)
             psk_entry.configure(state="readonly")
             self.engine.db.set_setting("lan_shield_psk", raw)
-            # Hot-reload the LAN Shield with the new key
             try:
                 if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
                     self.engine.lan_shield._psk = raw.encode('utf-8')
@@ -571,7 +581,6 @@ class SettingsView(ctk.CTkFrame):
                 psk_entry.insert(0, new_key)
                 psk_entry.configure(state="readonly")
                 self.engine.db.set_setting("lan_shield_psk", new_key)
-                # Hot-reload
                 if hasattr(self.engine, 'lan_shield') and self.engine.lan_shield:
                     self.engine.lan_shield._psk = new_key.encode('utf-8')
                     self.engine.lan_shield._fernet = Fernet(new_key.encode('utf-8'))
@@ -579,47 +588,40 @@ class SettingsView(ctk.CTkFrame):
             except Exception:
                 _show_psk_status("Key generation failed", is_error=True)
 
+        btn_copy = ctk.CTkButton(
+            action_bar, text="📋 Copy Key", width=110, height=32,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
+            text_color=Colors.TEXT_PRIMARY,
+            command=_copy_psk
+        )
+        btn_copy.pack(side="left", padx=(0, Spacing.SM))
+
+        btn_paste = ctk.CTkButton(
+            action_bar, text="📥 Paste Key", width=110, height=32,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
+            text_color=Colors.TEXT_PRIMARY,
+            command=_paste_psk
+        )
+        btn_paste.pack(side="left", padx=(0, Spacing.SM))
+
         btn_regen = ctk.CTkButton(
-            btn_frame, text="🔄 New Key", width=80, height=28,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            action_bar, text="🔄 Generate New Key", width=160, height=32,
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
             fg_color=Colors.WARNING_DIM, hover_color=Colors.WARNING,
             text_color=Colors.TEXT_PRIMARY,
             command=_regen_psk
         )
-        btn_regen.pack(side="right", padx=(4, 0))
-
-        btn_paste = ctk.CTkButton(
-            btn_frame, text="📥 Paste", width=70, height=28,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
-            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
-            command=_paste_psk
-        )
-        btn_paste.pack(side="right", padx=(4, 0))
-
-        btn_copy = ctk.CTkButton(
-            btn_frame, text="📋 Copy", width=70, height=28,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
-            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
-            command=_copy_psk
-        )
-        btn_copy.pack(side="right", padx=(4, 0))
-
-        # Key display — readonly to prevent accidental corruption
-        psk_entry = ctk.CTkEntry(
-            card, font=(Fonts.FAMILY_MONO[0], Fonts.SIZE_SM),
-            height=36, state="normal"
-        )
-        psk_entry.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
-        psk_entry.insert(0, psk_val)
-        psk_entry.configure(state="readonly")
+        btn_regen.pack(side="left")
 
         # Status label for feedback messages
         psk_status = ctk.CTkLabel(
-            card, text="", height=18,
+            psk_card, text="", height=20,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
             text_color=Colors.TEXT_SECONDARY
         )
-        psk_status.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.XS))
+        psk_status.pack(fill="x", padx=Spacing.MD, pady=(0, Spacing.XS))
 
         def _show_psk_status(msg, is_error=False):
             psk_status.configure(
@@ -628,7 +630,7 @@ class SettingsView(ctk.CTkFrame):
             )
             self.after(4000, lambda: psk_status.configure(text=""))
 
-        self._add_subtitle(card, "Copy this 512-bit Post-Quantum key to other Cripple / NetStrip devices on your LAN for AES-256 / SHA-512 encrypted broadcast lockdown signals. Replay-proof and immune to Grover's quantum attack.", pady=(0, Spacing.LG))
+        self._add_subtitle(psk_card, "Pair this 512-bit Post-Quantum key across your local devices for tamper-proof, zero-trust LAN lockdown orchestration. Immune to replay attacks and quantum decryption.", pady=(0, Spacing.MD))
 
         # Home Automation & IoT Integrations
         self._add_title(card, "Home Automation & IoT Integrations", icon="🏠", pady=(Spacing.LG, Spacing.SM))
@@ -1111,22 +1113,37 @@ class SettingsView(ctk.CTkFrame):
         self._build_credits()
 
     def _build_credits(self):
-        credits_frame = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL)
-        credits_frame.pack(fill="x", pady=Spacing.MD)
-        
-        credits_text = (
-            "POWERED BY & CREDITS TO OPEN SOURCE:\n"
-            "Python 3 • CustomTkinter (Tom Schimansky) • dnslib (PaulC) • psutil (Giampaolo Rodola)\n"
-            "BCC (iovisor) • SQLite3 • AdGuard Blocklists • oisd (sjhgvr) • Steven Black Hosts • HaGeZi\n"
-            "WindowsSpyBlocker (crazy-max) • URLHaus (abuse.ch)"
-        )
+        credits_frame = ctk.CTkFrame(self.scroll_frame, fg_color=Colors.BG_PANEL, corner_radius=10, border_width=1, border_color=Colors.BORDER_SUBTLE)
+        credits_frame.pack(fill="x", padx=Spacing.LG, pady=Spacing.MD)
         
         ctk.CTkLabel(
-            credits_frame, text=credits_text,
-            font=(Fonts.FAMILY_PRIMARY[0], 9), # Micro-font
-            text_color=Colors.TEXT_TERTIARY,
-            justify="center"
-        ).pack(anchor="center")
+            credits_frame, text="OPEN SOURCE CREDITS & INTEGRATED FILTER LISTS",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_SECONDARY,
+        ).pack(anchor="center", pady=(Spacing.MD, Spacing.XS))
+        
+        credits_sections = [
+            ("Core Architecture & Libraries", "Python 3 • CustomTkinter (Tom Schimansky) • dnslib (PaulC) • psutil (Giampaolo Rodola)\neBPF / BCC (iovisor) • SQLite3 • Dulwich • Cryptography / Fernet • Requests"),
+            ("Ad & Privacy Blocklists", "AdGuard (Base, Tracking Protection, Mobile Ads, International Registry)\nHaGeZi DNS Blocklists (Pro Plus, Ultimate, DoH/DoT Tracker, OEM Telemetry Feeds)\nOISD Big (sjhgvr) • Steven Black Hosts (Unified) • AdAway Default\nDan Pollock (someonewhocares.org) • Peter Lowe's Ad & Tracking Server List (pgl.yoyo.org)\nEasyList (Germany, Italy, Dutch, Arabic) • YousList Korean"),
+            ("Security & Threat Intelligence", "URLhaus & Feodo Tracker Botnet C2 (abuse.ch) • WindowsSpyBlocker (crazy-max)\nDShield Suspicious Domains (SANS ISC) • PhishTank (phishing.army) • v2fly Domain Community"),
+        ]
+        
+        for title, text in credits_sections:
+            ctk.CTkLabel(
+                credits_frame, text=title,
+                font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
+                text_color=Colors.ACCENT_PRIMARY,
+            ).pack(anchor="center", pady=(Spacing.XS, 0))
+            
+            ctk.CTkLabel(
+                credits_frame, text=text,
+                font=(Fonts.FAMILY_PRIMARY[0], 9),
+                text_color=Colors.TEXT_TERTIARY,
+                justify="center"
+            ).pack(anchor="center", pady=(0, Spacing.XS))
+            
+        # Bottom spacer
+        ctk.CTkFrame(credits_frame, height=Spacing.SM, fg_color="transparent").pack()
 
     def destroy(self):
         self._destroyed = True

@@ -451,16 +451,50 @@ class BlocklistView(ctk.CTkFrame):
         # Scrollable inner results list with dedicated scrollbar
         self._results_scroll = ctk.CTkScrollableFrame(
             self._results_container, fg_color=Colors.BG_DARK,
-            height=420, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
+            height=440, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
         )
         self._results_scroll.pack(fill="both", expand=True)
         enable_smooth_scrolling(self._results_scroll)
         
-        self._current_results = []
+        self._loaded_results = []
         self._results_row_pool = []
+        self._has_more = False
+        self._is_fetching = False
+        self._page_size = 50
         
-        # Pre-allocate 100 reusable result row widgets (0 widget creation thrashing)
-        for _ in range(100):
+        # Load more button container
+        self._load_more_frame = ctk.CTkFrame(self._results_scroll, fg_color="transparent")
+        self._btn_load_more = ctk.CTkButton(
+            self._load_more_frame, text="Load More Domains...",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
+            text_color=Colors.TEXT_SECONDARY, height=32, corner_radius=6,
+            command=self._load_next_page
+        )
+        self._btn_load_more.pack(pady=Spacing.MD)
+
+        # Hook canvas scroll listener for smooth infinite scrolling
+        try:
+            canvas = getattr(self._results_scroll, '_parent_canvas', None)
+            if canvas:
+                def _on_canvas_scroll(event=None):
+                    if getattr(self, '_destroyed', False):
+                        return
+                    try:
+                        _, y_bottom = canvas.yview()
+                        if y_bottom > 0.88 and getattr(self, '_has_more', False) and not getattr(self, '_is_fetching', False):
+                            self._load_next_page()
+                    except Exception:
+                        pass
+                canvas.bind("<MouseWheel>", _on_canvas_scroll, add="+")
+                canvas.bind("<Configure>", _on_canvas_scroll, add="+")
+        except Exception:
+            pass
+            
+        self._restore_empty_state()
+
+    def _get_or_create_row(self, index):
+        while len(self._results_row_pool) <= index:
             row = ctk.CTkFrame(self._results_scroll, fg_color=Colors.BG_ELEVATED, corner_radius=6, height=36)
             row.pack_propagate(False)
             
@@ -472,7 +506,7 @@ class BlocklistView(ctk.CTkFrame):
             
             cat_badge = ctk.CTkLabel(
                 row, text="", font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
-                corner_radius=11, height=22
+                corner_radius=11, height=22, width=96
             )
             cat_badge.pack(side="left", padx=Spacing.SM)
             
@@ -488,10 +522,14 @@ class BlocklistView(ctk.CTkFrame):
                 'cat_badge': cat_badge,
                 'btn': btn
             })
-            
-        self._restore_empty_state()
+        return self._results_row_pool[index]
 
     def _restore_empty_state(self):
+        self._has_more = False
+        self._is_fetching = False
+        if hasattr(self, '_load_more_frame') and self._load_more_frame.winfo_ismapped():
+            self._load_more_frame.pack_forget()
+            
         for item in self._results_row_pool:
             if item['frame'].winfo_ismapped():
                 item['frame'].pack_forget()
@@ -514,7 +552,7 @@ class BlocklistView(ctk.CTkFrame):
         self._current_search_id = getattr(self, '_current_search_id', 0) + 1
         current_search_id = self._current_search_id
 
-        # Keep stats container visible at top so user can click other categories easily
+        # Keep stats container visible at top
         if hasattr(self, '_stats_container') and not self._stats_container.winfo_ismapped():
             self._stats_container.pack(fill="x", pady=(0, Spacing.SM))
 
@@ -522,93 +560,161 @@ class BlocklistView(ctk.CTkFrame):
             self._restore_empty_state()
             return
 
-        # Background thread search query execution (limit=100)
+        self._loaded_results = []
+        self._has_more = True
+        self._is_fetching = True
+
         import threading
         def search_task():
             try:
-                results = self.engine.blocklist.search(query, limit=100, category_filter=cat_filter)
+                results = self.engine.blocklist.search(query, limit=self._page_size, category_filter=cat_filter, offset=0)
             except Exception:
                 results = []
             
             if not self._destroyed and getattr(self, '_current_search_id', 0) == current_search_id:
-                self.after(0, lambda: self._init_render(results, query, current_search_id))
+                self.after(0, lambda: self._handle_first_page(results, query, current_search_id))
                 
         threading.Thread(target=search_task, daemon=True).start()
 
-    def _init_render(self, results, query, search_id):
+    def _handle_first_page(self, results, query, search_id):
         if self._destroyed or getattr(self, '_current_search_id', 0) != search_id:
             return
+
+        self._is_fetching = False
+        self._loaded_results = list(results)
+        self._has_more = len(results) >= self._page_size
 
         if hasattr(self, '_empty_lbl') and self._empty_lbl.winfo_exists():
             self._empty_lbl.pack_forget()
 
-        if hasattr(self, '_lbl_results_count'):
-            self._lbl_results_count.configure(text=f"Showing {len(results)} results")
+        # Unpack all old pool items beyond current results
+        for i in range(len(results), len(self._results_row_pool)):
+            if self._results_row_pool[i]['frame'].winfo_ismapped():
+                self._results_row_pool[i]['frame'].pack_forget()
 
+        self._render_batch(0, len(results))
+        self._update_footer_and_count()
+
+    def _load_next_page(self):
+        if self._is_fetching or not self._has_more or self._destroyed:
+            return
+
+        self._is_fetching = True
+        query = self._search_entry.get().strip()
+        cat_filter = getattr(self, '_active_category_filter', None)
+        current_search_id = getattr(self, '_current_search_id', 0)
+        current_offset = len(self._loaded_results)
+
+        if hasattr(self, '_btn_load_more'):
+            self._btn_load_more.configure(text="Loading more...", state="disabled")
+
+        import threading
+        def load_task():
+            try:
+                more_results = self.engine.blocklist.search(
+                    query, limit=self._page_size, category_filter=cat_filter, offset=current_offset
+                )
+            except Exception:
+                more_results = []
+
+            if not self._destroyed and getattr(self, '_current_search_id', 0) == current_search_id:
+                self.after(0, lambda: self._handle_next_page(more_results, current_search_id))
+
+        threading.Thread(target=load_task, daemon=True).start()
+
+    def _handle_next_page(self, more_results, search_id):
+        if self._destroyed or getattr(self, '_current_search_id', 0) != search_id:
+            return
+
+        self._is_fetching = False
+        start_idx = len(self._loaded_results)
+        self._loaded_results.extend(more_results)
+        self._has_more = len(more_results) >= self._page_size
+
+        self._render_batch(start_idx, len(self._loaded_results))
+        self._update_footer_and_count()
+
+    def _render_batch(self, start_idx, end_idx):
         from netstrip.core.modes import ConnectionCategory
         from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
 
-        for i, item in enumerate(self._results_row_pool):
-            if i < len(results):
-                r = results[i]
-                domain = r.get('domain', 'Unknown')
-                cat = r.get('category', 'unknown')
-                
-                # Dynamic row background color for crisp alternate contrast
-                bg_color = "#181824" if i % 2 == 0 else "#14141f"
-                item['frame'].configure(fg_color=bg_color)
-                item['domain_lbl'].configure(text=domain)
-                
-                try:
-                    cat_enum = ConnectionCategory(cat)
-                except ValueError:
-                    cat_enum = ConnectionCategory.UNKNOWN
-                    
-                cat_color = get_category_color(cat_enum)
-                cat_label = get_category_label(cat_enum)
-                cat_icon = get_category_icon(cat_enum)
-                
-                item['cat_badge'].configure(
-                    text=f" {cat_icon} {cat_label.upper()} ",
-                    text_color=cat_color,
-                    fg_color=Colors.BG_ELEVATED
-                )
-                
-                is_allowed = cat in ('user_allowed', 'essential')
-                btn_text = "Block" if is_allowed else "Whitelist"
-                btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
-                btn_hover = "#be123c" if is_allowed else Colors.SUCCESS
-                act_val = 'block' if is_allowed else 'allow'
+        # Hide load more while packing new rows
+        if hasattr(self, '_load_more_frame') and self._load_more_frame.winfo_ismapped():
+            self._load_more_frame.pack_forget()
 
-                def make_action(d=domain, act=act_val):
-                    mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
-                    self.engine.db.add_user_rule({
-                        'pattern': d,
-                        'action': act,
-                        'scope': 'global',
-                        'app_name': None,
-                        'category': f'user_{act}ed',
-                        'note': f"Manual {act} from search",
-                        'mode_scope': mode_scope
-                    })
-                    rules = self.engine.db.get_user_rules(mode_scope=mode_scope)
-                    if hasattr(self.engine.blocklist, 'sync_user_rules'):
-                        self.engine.blocklist.sync_user_rules(rules)
-                    if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                        self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
-                    self._refresh_stats_grid()
-                    self._do_search()
-
-                item['btn'].configure(
-                    text=btn_text, fg_color=btn_color, hover_color=btn_hover,
-                    command=make_action
-                )
+        for i in range(start_idx, end_idx):
+            item = self._get_or_create_row(i)
+            r = self._loaded_results[i]
+            domain = r.get('domain', 'Unknown')
+            cat = r.get('category', 'unknown')
+            
+            # Dynamic row background color for alternating contrast
+            bg_color = "#181824" if i % 2 == 0 else "#14141f"
+            item['frame'].configure(fg_color=bg_color)
+            item['domain_lbl'].configure(text=domain)
+            
+            try:
+                cat_enum = ConnectionCategory(cat)
+            except ValueError:
+                cat_enum = ConnectionCategory.UNKNOWN
                 
-                if not item['frame'].winfo_ismapped():
-                    item['frame'].pack(fill="x", pady=2, padx=4)
-            else:
-                if item['frame'].winfo_ismapped():
-                    item['frame'].pack_forget()
+            cat_color = get_category_color(cat_enum)
+            cat_label = get_category_label(cat_enum)
+            cat_icon = get_category_icon(cat_enum)
+            
+            item['cat_badge'].configure(
+                text=f" {cat_icon} {cat_label.upper()} ",
+                text_color=cat_color,
+                fg_color=Colors.BG_ELEVATED
+            )
+            
+            is_allowed = cat in ('user_allowed', 'essential')
+            btn_text = "Block" if is_allowed else "Whitelist"
+            btn_color = Colors.DANGER if is_allowed else Colors.SUCCESS_DIM
+            btn_hover = "#be123c" if is_allowed else Colors.SUCCESS
+            act_val = 'block' if is_allowed else 'allow'
+
+            def make_action(d=domain, act=act_val):
+                mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
+                self.engine.db.add_user_rule({
+                    'pattern': d,
+                    'action': act,
+                    'scope': 'global',
+                    'app_name': None,
+                    'category': f'user_{act}ed',
+                    'note': f"Manual {act} from search",
+                    'mode_scope': mode_scope
+                })
+                rules = self.engine.db.get_user_rules(mode_scope=mode_scope)
+                if hasattr(self.engine.blocklist, 'sync_user_rules'):
+                    self.engine.blocklist.sync_user_rules(rules)
+                if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                    self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
+                self._refresh_stats_grid()
+                self._do_search()
+
+            item['btn'].configure(
+                text=btn_text, fg_color=btn_color, hover_color=btn_hover,
+                command=make_action
+            )
+            
+            if not item['frame'].winfo_ismapped():
+                item['frame'].pack(fill="x", pady=2, padx=4)
+
+    def _update_footer_and_count(self):
+        count = len(self._loaded_results)
+        if hasattr(self, '_lbl_results_count'):
+            more_suffix = "+" if self._has_more else ""
+            self._lbl_results_count.configure(text=f"Showing {count:,}{more_suffix} results")
+
+        if self._has_more:
+            if hasattr(self, '_btn_load_more'):
+                self._btn_load_more.configure(text="Load More Domains...", state="normal")
+            if hasattr(self, '_load_more_frame'):
+                self._load_more_frame.pack(fill="x", pady=Spacing.SM)
+        else:
+            if hasattr(self, '_load_more_frame') and self._load_more_frame.winfo_ismapped():
+                self._load_more_frame.pack_forget()
 
     def destroy(self):
         self._destroyed = True

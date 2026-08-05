@@ -196,6 +196,7 @@ class BlocklistUpdater:
                 
             # Fetch DNSCrypt resolvers to build dynamic upstream options
             self._fetch_dnscrypt_resolvers()
+            return any_updated
                         
         finally:
             self.is_updating = False

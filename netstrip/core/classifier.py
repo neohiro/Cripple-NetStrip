@@ -48,12 +48,20 @@ class TrafficClassifier:
         if process_name:
             p_lower = process_name.lower()
             system_processes = (
-                # Windows Core
+                # Windows Core & System Subsystems
                 'svchost.exe', 'explorer.exe', 'searchapp.exe', 'system', 'lsass.exe', 'services.exe',
                 'spoolsv.exe', 'wermgr.exe', 'taskhostw.exe', 'smss.exe', 'csrss.exe', 'wininit.exe',
                 'winlogon.exe', 'fontdrvhost.exe', 'dwm.exe', 'sihost.exe', 'ctfmon.exe', 'taskmgr.exe',
                 'dllhost.exe', 'conhost.exe', 'runtimebroker.exe', 'applicationframehost.exe',
                 'systemsettings.exe', 'securityhealthsystray.exe', 'sgrmbroker.exe',
+                'wuauserv.exe', 'mousocoreworker.exe', 'usoclient.exe', 'trustedinstaller.exe',
+                'tiworker.exe', 'sedlauncher.exe', 'remsh.exe', 'waasmedicagent.exe',
+                'compattelrunner.exe', 'devicecensus.exe', 'invagent.dll', 'diagtrack.exe',
+                'device-census.exe', 'wsappx.exe', 'appinstaller.exe', 'winstore.app.exe',
+                'microsoft.photos.exe', 'yourphone.exe', 'phoneexperiencehost.exe', 'searchhost.exe',
+                'shellexperiencehost.exe', 'gamebar.exe', 'gamebarftserver.exe', 'xboxpcapp.exe',
+                'xboxpcappft.exe', 'feedsinfobar.exe', 'widgets.exe', 'copilot.exe', 'onedrive.exe',
+                'onedrivestandaloneupdater.exe', 'settingsynchost.exe',
                 
                 # Windows Defender & Security
                 'msmpeng.exe', 'nissrv.exe', 'smartscreen.exe', 'securityhealthservice.exe',
@@ -62,11 +70,11 @@ class TrafficClassifier:
                 'msedge.exe', 'msedgewebview2.exe', 'backgroundtaskhost.exe',
                 'startmenuexperiencehost.exe', 'textinputhost.exe', 'widgetservice.exe',
                 
-                # Linux
+                # Linux System Daemons
                 'systemd-resolved', 'systemd-timesyncd', 'networkmanager', 'dhclient', 'avahi-daemon', 'cupsd', 'packagekitd', 'snapd', 'fwupd',
                 'chronyd', 'ntpd', 'dbus-daemon', 'rpcbind', 'systemd-networkd', 'unattended-upgrades', 'apt', 'dpkg', 'yum', 'dnf', 'zypper', 'pacman', 'dockerd', 'containerd', 'kubelet',
                 
-                # macOS
+                # macOS Daemons & System
                 'mdnsresponder', 'kernel_task', 'configd', 'syspolicyd', 'networkd', 'nsurlsessiond', 'apsd', 'softwareupdated', 'trustd', 'rapportd'
             )
             

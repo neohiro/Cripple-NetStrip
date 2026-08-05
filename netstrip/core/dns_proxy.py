@@ -55,10 +55,7 @@ DNS_UPSTREAM_OPTIONS = {
 
 # Dynamically load the online providers list if available
 try:
-    import json
-    import os
-    # lists_dir is typically at C:\Users\Wout\.gemini\antigravity\scratch\NetStrip\netstrip\data\lists
-    # So we compute it dynamically
+    # Load online DoH providers list dynamically from the data directory
     _current_dir = os.path.dirname(os.path.abspath(__file__))
     _doh_file = os.path.join(_current_dir, '..', 'data', 'lists', 'doh_providers_online.json')
     if os.path.exists(_doh_file):
