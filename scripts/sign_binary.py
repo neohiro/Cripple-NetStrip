@@ -33,6 +33,8 @@ def sign_and_package():
 
     # 1. Create or get FrenzyPenguin Media code signing certificate in CurrentUser\My
     ps_cert_script = """
+    Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
+    Import-Module PKI -ErrorAction SilentlyContinue
     $ErrorActionPreference = 'Stop'
     $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My | Where-Object { $_.Subject -like '*FrenzyPenguin Media*' } | Select-Object -First 1
     if (-not $cert) {
@@ -60,6 +62,8 @@ def sign_and_package():
     for bin_file in binaries:
         file_path_str = str(bin_file.resolve()).replace("'", "''")
         ps_sign_script = f"""
+        Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
+        Import-Module PKI -ErrorAction SilentlyContinue
         $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
         $signResult = Set-AuthenticodeSignature -FilePath '{file_path_str}' -Certificate $cert -HashAlgorithm SHA256
         Write-Output $signResult.Status
@@ -75,6 +79,8 @@ def sign_and_package():
     # 3. Export Certificate .cer
     cer_path_str = str(cer_path.resolve()).replace("'", "''")
     ps_export_script = f"""
+    Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue
+    Import-Module PKI -ErrorAction SilentlyContinue
     $cert = Get-ChildItem -Path Cert:\\CurrentUser\\My\\{thumbprint}
     Export-Certificate -Cert $cert -FilePath '{cer_path_str}' -Force | Out-Null
     """
