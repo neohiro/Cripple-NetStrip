@@ -170,12 +170,14 @@ class Icons:
     SETTINGS = "⚙"        # Gear
 
     # Status
+    SHIELD = "🛡"          # Shield (alias)
     SHIELD_ON = "🛡"       # Shield
     SHIELD_OFF = "⊗"      # Crossed circle
     BLOCKED = "✕"         # X mark
     ALLOWED = "✓"         # Checkmark
     PENDING = "◌"         # Dotted circle
     WARNING = "⚠"         # Warning triangle
+    UPDATE = "↻"          # Update / Sync
 
     # Mode
     PARANOID = "🔒"        # Lock

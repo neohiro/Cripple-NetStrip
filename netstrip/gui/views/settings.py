@@ -270,14 +270,15 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_TERTIARY,
             justify="left",
             anchor="w",
-            wraplength=460
+            wraplength=340
         )
         lbl.pack(anchor="w", fill="x", padx=Spacing.LG, pady=pady)
         
         def _update_wrap(event):
             try:
                 if lbl.winfo_exists():
-                    new_wrap = max(260, event.width - (Spacing.LG * 2 + 24))
+                    # Wrap onto 2nd or 3rd line faster; leave ample right-margin buffer
+                    new_wrap = max(180, min(event.width - (Spacing.LG * 2 + 60), 380))
                     lbl.configure(wraplength=new_wrap)
             except Exception:
                 pass
@@ -1135,12 +1136,22 @@ class SettingsView(ctk.CTkFrame):
                 text_color=Colors.ACCENT_PRIMARY,
             ).pack(anchor="center", pady=(Spacing.XS, 0), padx=Spacing.LG)
             
-            ctk.CTkLabel(
+            lbl_credits = ctk.CTkLabel(
                 credits_frame, text=text,
                 font=(Fonts.FAMILY_PRIMARY[0], 9),
                 text_color=Colors.TEXT_TERTIARY,
-                justify="center"
-            ).pack(anchor="center", pady=(0, Spacing.XS), padx=Spacing.LG)
+                justify="center",
+                wraplength=380
+            )
+            lbl_credits.pack(anchor="center", pady=(0, Spacing.XS), padx=Spacing.LG)
+            
+            def _update_cred_wrap(event, l=lbl_credits):
+                try:
+                    if l.winfo_exists():
+                        l.configure(wraplength=max(180, min(event.width - 48, 420)))
+                except Exception:
+                    pass
+            credits_frame.bind("<Configure>", _update_cred_wrap, add="+")
             
         # Bottom spacer
         ctk.CTkFrame(credits_frame, height=Spacing.SM, fg_color="transparent").pack()

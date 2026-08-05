@@ -324,14 +324,13 @@ class BlocklistView(ctk.CTkFrame):
                 else:
                     cat_val = getattr(cat_enum, 'value', str(cat_enum))
                     sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
-                    if not sources and cat_val == 'ad':
-                        sources = metadata.get('ads') or []
                     cnt = sum(s.get('size', 0) for s in sources)
-                    if cnt == 0 and stats:
-                        cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0)
-                    if cnt == 0 and domain_map:
+                    if not cnt and stats:
+                        cnt = stats.get(cat_enum) or stats.get(cat_val) or (stats.get('ads') if cat_val == 'ad' else 0) or 0
+                    if not cnt and domain_map:
                         cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
                         
+                cnt = int(cnt or 0)
                 lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:
             import logging

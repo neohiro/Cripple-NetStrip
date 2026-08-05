@@ -540,15 +540,20 @@ class NetStripApp(ctk.CTk):
         self.update_idletasks() # Force UI update immediately
         
         def _build_and_show():
-            if view_class not in self._cached_views:
-                self._cached_views[view_class] = view_class(self.main_frame, self.engine)
-            self._tab_loading_overlay.grid_remove()
-            self.current_view = self._cached_views[view_class]
-            
-            if view_class.__name__ == 'DashboardView':
-                self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-            else:
-                self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+            try:
+                if view_class not in self._cached_views:
+                    self._cached_views[view_class] = view_class(self.main_frame, self.engine)
+                self.current_view = self._cached_views[view_class]
+                
+                if view_class.__name__ == 'DashboardView':
+                    self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+                else:
+                    self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+            except Exception as e:
+                logger.error(f"Failed to load view {view_class}: {e}", exc_info=True)
+            finally:
+                if hasattr(self, '_tab_loading_overlay'):
+                    self._tab_loading_overlay.grid_remove()
             
         self.after(20, _build_and_show)
 
