@@ -105,7 +105,7 @@ class ModeSelector(ctk.CTkFrame):
         self.grid_columnconfigure((0,1,2), weight=1)
         
         self.buttons = {}
-        for i, val in enumerate(["Paranoid", "Normal", "Loose"]):
+        for i, val in enumerate(["Ghost", "Normal", "Loose"]):
             btn = ctk.CTkButton(
                 self, text=val,
                 command=lambda v=val: self._handle_change(v),
@@ -130,6 +130,8 @@ class ModeSelector(ctk.CTkFrame):
         return self.current_value
         
     def set(self, value):
+        if value == "Paranoid":
+            value = "Ghost"
         self.current_value = value
         for val, btn in self.buttons.items():
             if val == value:
@@ -158,9 +160,9 @@ class ShieldIndicator(ctk.CTkFrame):
 
     def set_state(self, is_active: bool, mode_name: str = "Normal"):
         if is_active:
-            if mode_name == "Paranoid":
-                color = Colors.MODE_PARANOID
-                status = "Maximum Protection"
+            if mode_name in ("Ghost", "Paranoid"):
+                color = Colors.MODE_GHOST
+                status = "Ghost Mode (Maximum Stealth)"
             elif mode_name == "Loose":
                 color = Colors.MODE_LOOSE
                 status = "Minimal Protection"

@@ -329,6 +329,8 @@ def _ask_crash_report_consent() -> bool:
     Show a tkinter popup asking the user if they consent to sending a crash report.
     Only shown when analytics is OFF. Returns True if the user consents.
     """
+    if os.environ.get("NETSTRIP_HEADLESS") == "1" or os.environ.get("NETSTRIP_NON_INTERACTIVE") == "1":
+        return False
     try:
         import tkinter as tk
         from tkinter import messagebox

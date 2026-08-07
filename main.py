@@ -696,11 +696,15 @@ def main():
     import threading
     engine_instance = None
     
+    def splash_progress_callback(text: str, progress_val: float):
+        if not is_headless and splash and splash.winfo_exists():
+            app.after(0, lambda: splash.update_status(text, progress_val))
+
     def boot_thread():
         nonlocal engine_instance
         try:
-            # Initialize Engine exactly ONCE in the correct privilege context
-            engine_instance = NetStripEngine(is_headless=is_headless)
+            # Initialize Engine with live splash progress callback
+            engine_instance = NetStripEngine(is_headless=is_headless, progress_callback=splash_progress_callback if not is_headless else None)
             
             # Apply CLI Boot Overrides natively
             if "--blockinbound" in sys.argv:
@@ -716,6 +720,22 @@ def main():
             sound_manager.set_muted(True)
             
             engine_instance.start()
+            
+            # Register atexit and signal handlers to ensure OS settings are restored on any exit
+            import atexit
+            atexit.register(lambda: engine_instance.stop() if engine_instance and engine_instance.is_running else None)
+            
+            def _sig_handler(signum, frame):
+                logger.info(f"Signal {signum} received, stopping engine gracefully...")
+                if engine_instance and engine_instance.is_running:
+                    engine_instance.stop()
+                sys.exit(0)
+                
+            try:
+                signal.signal(signal.SIGINT, _sig_handler)
+                signal.signal(signal.SIGTERM, _sig_handler)
+            except Exception:
+                pass
             
             # Defer back to main thread to build UI and finalize
             app.after(0, lambda: finalize_boot(engine_instance, initial_mute_state))
@@ -808,14 +828,14 @@ def main():
                     on_transition_done()
                     return
     
-                # Enforce minimum 1.2s display duration and wait for blocklist ready (or 3.0s safety timeout)
+                # Wait for blocklist ready and minimum 1.2s display duration (or 30.0s safety timeout)
                 is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
-                if (is_blocklist_ready and elapsed >= 1.2) or elapsed >= 3.0:
+                if (is_blocklist_ready and elapsed >= 1.2) or elapsed >= 30.0:
                     transition_started = True
                     if splash and splash.winfo_exists():
                         try:
                             splash.progress.set(1.0)
-                            splash.status_label.configure(text="Ready")
+                            splash.status_label.configure(text="Protection Active")
                         except Exception:
                             pass
                     app.after(50, cross_fade)

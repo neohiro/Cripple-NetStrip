@@ -59,6 +59,14 @@ class MacOSPlatform(PlatformBase):
     def get_default_gateway(self) -> Optional[str]:
         return "192.168.1.1"
 
+    def get_current_ssid(self) -> str:
+        # Default for macOS airport CLI query
+        res = self._run_cmd(["/System/Library/PrivateFrameworks/Apple80211.framework/Resources/airport", "-I"])
+        for line in res.stdout.splitlines():
+            if " SSID:" in line:
+                return line.split(":", 1)[1].strip()
+        return ""
+
     def add_firewall_rule(self, rule_name: str, direction: str, action: str, 
                           remote_ip: Optional[str] = None, remote_port: Optional[int] = None, 
                           protocol: Optional[str] = None, program: Optional[str] = None) -> bool:
@@ -81,10 +89,20 @@ class MacOSPlatform(PlatformBase):
             for ip in ips:
                 self._run_cmd(["route", "delete", "-host", ip])
             del self._route_rules[rule_name]
+    def remove_all_NetStrip_rules(self) -> bool:
+        rules_to_remove = [k for k in list(self._route_rules.keys()) if k.startswith("NetStrip_")]
+        for rule in rules_to_remove:
+            self.remove_firewall_rule(rule)
+        return True
+
+    def remove_all_app_block_rules(self) -> bool:
+        rules_to_remove = [k for k in list(self._route_rules.keys()) if k.startswith("NetStrip_AppBlock_")]
+        for rule in rules_to_remove:
+            self.remove_firewall_rule(rule)
         return True
 
     def rule_exists(self, rule_name: str) -> bool:
-        return rule_name in self._pf_rules
+        return rule_name in self._pf_rules or rule_name in self._route_rules
 
     def enable_killswitch(self) -> bool:
         # Absolute ghost mode for macOS using pfctl
@@ -218,3 +236,19 @@ class MacOSPlatform(PlatformBase):
     def is_autostart_installed(self) -> bool:
         import os
         return os.path.exists("/Library/LaunchDaemons/com.netstrip.daemon.plist")
+
+    def disable_protocol_bindings(self) -> bool:
+        """Disable redundant, privacy-leaking protocol daemons and mDNS advertising on macOS."""
+        self._run_cmd(["defaults", "write", "/Library/Preferences/com.apple.mDNSResponder.plist", "NoMulticastAdvertisements", "-bool", "YES"])
+        self._run_cmd(["launchctl", "unload", "-w", "/System/Library/LaunchDaemons/com.apple.netbiosd.plist"])
+        self._run_cmd(["launchctl", "unload", "-w", "/System/Library/LaunchDaemons/com.apple.smbd.plist"])
+        self._run_cmd(["sysctl", "-w", "net.inet.icmp.drop_redirect=1"])
+        self._run_cmd(["sysctl", "-w", "net.inet.ip.redirect=0"])
+        return True
+
+    def restore_protocol_bindings(self) -> bool:
+        """Restore standard protocol bindings on macOS."""
+        self._run_cmd(["defaults", "write", "/Library/Preferences/com.apple.mDNSResponder.plist", "NoMulticastAdvertisements", "-bool", "NO"])
+        self._run_cmd(["sysctl", "-w", "net.inet.icmp.drop_redirect=0"])
+        self._run_cmd(["sysctl", "-w", "net.inet.ip.redirect=1"])
+        return True

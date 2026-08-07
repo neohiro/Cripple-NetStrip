@@ -46,11 +46,13 @@ class Colors:
     BORDER_HOVER = "#3a3a55"     # Hover state borders
 
     # Mode colors
-    MODE_PARANOID = "#ef4444"    # Red — maximum protection
+    MODE_GHOST = "#ef4444"       # Red — maximum protection
+    MODE_PARANOID = "#ef4444"    # Alias
     MODE_NORMAL = "#eab308"      # Yellow — balanced
     MODE_LOOSE = "#22c55e"       # Green — permissive
 
     # Mode glow colors (for animated effects)
+    MODE_GHOST_GLOW = "#dc2626"
     MODE_PARANOID_GLOW = "#dc2626"
     MODE_NORMAL_GLOW = "#ca8a04"
     MODE_LOOSE_GLOW = "#16a34a"
@@ -180,7 +182,8 @@ class Icons:
     UPDATE = "↻"          # Update / Sync
 
     # Mode
-    PARANOID = "🔒"        # Lock
+    GHOST = "👻"          # Ghost
+    PARANOID = "👻"       # Alias
     NORMAL = "🔰"          # Shield with check
     LOOSE = "🔓"           # Unlock
 

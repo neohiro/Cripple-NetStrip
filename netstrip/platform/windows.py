@@ -259,3 +259,31 @@ class WindowsPlatform(PlatformBase):
         res = self._run_cmd(cmd)
         return res.returncode == 0
 
+    def disable_protocol_bindings(self) -> bool:
+        """Disable redundant, privacy-leaking protocol bindings and autodiscovery on Windows."""
+        ps_script = (
+            "Disable-NetAdapterBinding -ComponentID ms_lldp, ms_lltdio, ms_rspndr, ms_msclient, ms_server, ms_netbios -Name '*' -ErrorAction SilentlyContinue; "
+            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 1 -Type DWord -ErrorAction SilentlyContinue; "
+            "New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Force -ErrorAction SilentlyContinue | Out-Null; "
+            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
+            "Set-NetIsatapConfiguration -State Disabled -ErrorAction SilentlyContinue; "
+            "Set-NetTeredoConfiguration -Type Disabled -ErrorAction SilentlyContinue; "
+            "Set-Net6to4Configuration -State Disabled -ErrorAction SilentlyContinue"
+        )
+        cmd = ["powershell", "-Command", ps_script]
+        res = self._run_cmd(cmd)
+        return res.returncode == 0
+
+    def restore_protocol_bindings(self) -> bool:
+        """Restore standard adapter protocol bindings on Windows."""
+        ps_script = (
+            "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_server -Name '*' -ErrorAction SilentlyContinue; "
+            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
+            "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -ErrorAction SilentlyContinue; "
+            "Set-NetIsatapConfiguration -State Default -ErrorAction SilentlyContinue; "
+            "Set-NetTeredoConfiguration -Type Default -ErrorAction SilentlyContinue"
+        )
+        cmd = ["powershell", "-Command", ps_script]
+        res = self._run_cmd(cmd)
+        return res.returncode == 0
+

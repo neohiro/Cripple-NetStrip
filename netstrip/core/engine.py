@@ -32,8 +32,9 @@ from netstrip.core.iot_sync import IoTTelemetrySync
 logger = logging.getLogger(__name__)
 
 class NetStripEngine:
-    def __init__(self, is_headless=False):
+    def __init__(self, is_headless=False, progress_callback: Optional[Callable[[str, float], None]] = None):
         self.is_headless = is_headless
+        self.progress_callback = progress_callback
         self.is_running = False
         self._stop_event = threading.Event()
         import datetime
@@ -45,7 +46,7 @@ class NetStripEngine:
         # Platform layer
         self.platform = get_platform()
         
-        self.blocklist = BlocklistManager(db=self.db)
+        self.blocklist = BlocklistManager(db=self.db, progress_callback=self.progress_callback)
         self.classifier = TrafficClassifier(self.blocklist, db=self.db)
         
         # On Android, binding to port 53 is forbidden without root. Bind to 5353 instead.
@@ -175,7 +176,7 @@ class NetStripEngine:
             'note': threat_data.get('note', '')
         })
         # Set modes
-        self.set_mode(ProtectionLevel.PARANOID)
+        self.set_mode(ProtectionLevel.GHOST)
         self.set_killswitch(True)
         # Broadcast via LAN Shield
         if hasattr(self, 'lan_shield') and hasattr(self.lan_shield, 'broadcast_anomaly'):
@@ -506,6 +507,14 @@ class NetStripEngine:
             except Exception as e:
                 logger.error(f"Failed to re-apply global IPv4 block: {e}")
 
+        # Apply system connection / protocol binding hardening if enabled
+        if self.db.get_setting("block_system_connections", "false") == "true":
+            try:
+                if hasattr(self.platform, 'harden_network_adapters'):
+                    self.platform.harden_network_adapters(enable_hardening=True)
+            except Exception as e:
+                logger.error(f"Failed to apply adapter hardening: {e}")
+
         # Mark engine as running and ready BEFORE starting the interceptor
         # so _evaluate_packet doesn't block everything
         self.is_running = True
@@ -705,9 +714,20 @@ class NetStripEngine:
                 self.platform.enable_ipv4()
             except Exception as e:
                 logger.error(f"Failed to restore global IPv4: {e}")
+
+        # Restore network adapter protocol bindings and system autodiscovery
+        try:
+            if hasattr(self.platform, 'harden_network_adapters'):
+                self.platform.harden_network_adapters(enable_hardening=False)
+        except Exception as e:
+            logger.error(f"Failed to restore network adapter protocol bindings: {e}")
             
         if self.watchdog_thread:
-            self.watchdog_thread.join(timeout=1.0)
+            try:
+                if hasattr(self.watchdog_thread, 'poll') and self.watchdog_thread.poll() is None:
+                    self.watchdog_thread.terminate()
+            except Exception:
+                pass
         if self.route_monitor_thread:
             self.route_monitor_thread.join(timeout=1.0)
             

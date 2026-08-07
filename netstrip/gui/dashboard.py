@@ -82,7 +82,7 @@ class DashboardView(ctk.CTkScrollableFrame):
             FadingHovertip(self.stat_queries, "Total number of outbound packets intercepted and evaluated by Cripple in the last 24 hours.", hover_delay=400)
             FadingHovertip(self.stat_active, "The number of distinct applications that have made a connection recently.", hover_delay=400)
             FadingHovertip(self.system_toggle, "Toggle whether to block native Windows/OS background connections.", hover_delay=400)
-            FadingHovertip(self.smart_toggle, "When enabled, Paranoid mode dynamically alerts you to background malware domains.", hover_delay=400)
+            FadingHovertip(self.smart_toggle, "When enabled, Ghost mode dynamically alerts you to background malware domains.", hover_delay=400)
         except Exception as e:
             print("Failed to attach hovertips:", e)
         
@@ -203,7 +203,15 @@ class DashboardView(ctk.CTkScrollableFrame):
 
     def _on_mode_change(self, mode_name: str):
         from netstrip.core.modes import ProtectionLevel
-        level = ProtectionLevel[mode_name.upper()]
+        mode_upper = mode_name.upper()
+        if mode_upper in ("GHOST", "PARANOID"):
+            level = ProtectionLevel.GHOST
+        elif mode_upper in ("NORMAL", "STANDARD"):
+            level = ProtectionLevel.NORMAL
+        elif mode_upper == "LOOSE":
+            level = ProtectionLevel.LOOSE
+        else:
+            level = ProtectionLevel[mode_upper]
         self.engine.set_mode(level)
         self.shield.set_state(self.engine.is_running, mode_name)
 

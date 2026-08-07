@@ -162,6 +162,17 @@ def restore_network():
             )
             subprocess.run(["powershell", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
             
+            # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
+            logging.info("Restoring Windows network adapter protocol bindings and discovery...")
+            ps_restore_bindings = (
+                "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_server, ms_lldp, ms_lltdio, ms_rspndr, ms_netbios -Name '*' -ErrorAction SilentlyContinue; "
+                "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
+                "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -ErrorAction SilentlyContinue; "
+                "Set-NetIsatapConfiguration -State Default -ErrorAction SilentlyContinue; "
+                "Set-NetTeredoConfiguration -Type Default -ErrorAction SilentlyContinue"
+            )
+            subprocess.run(["powershell", "-Command", ps_restore_bindings], creationflags=subprocess.CREATE_NO_WINDOW)
+
             if get_db_setting("disable_ipv6_globally") == "true":
                 logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
                 subprocess.run(["powershell", "-Command",
@@ -195,6 +206,9 @@ def restore_network():
                     subprocess.run(["networksetup", "-setv6automatic", interface])
                 
             subprocess.run(["sysctl", "-w", "net.inet6.ip6.accept_rtadv=1"])
+            subprocess.run(["sysctl", "-w", "net.inet.icmp.drop_redirect=0"])
+            subprocess.run(["sysctl", "-w", "net.inet.ip.redirect=1"])
+            subprocess.run(["defaults", "write", "/Library/Preferences/com.apple.mDNSResponder.plist", "NoMulticastAdvertisements", "-bool", "NO"])
             
             clear_db_setting("disable_ipv6_globally")
             clear_db_setting("killswitch_active")
@@ -209,6 +223,10 @@ def restore_network():
                 subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
             
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
+            subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.accept_ra=1"])
+            subprocess.run(["sysctl", "-w", "net.ipv4.conf.all.accept_redirects=1"])
+            subprocess.run(["sysctl", "-w", "net.ipv4.conf.default.accept_redirects=1"])
+            subprocess.run(["sysctl", "-w", "net.ipv4.conf.all.drop_unicast_in_l2_multicast=0"])
             
             clear_db_setting("disable_ipv6_globally")
             clear_db_setting("killswitch_active")

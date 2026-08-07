@@ -87,7 +87,7 @@ You can customize everything: add your own blocklists (paste any URL), create pe
 |---|---|---|
 | **🔓 Loose** | Blocks confirmed bad domains only | Maximum compatibility, minimal friction |
 | **🔰 Normal** | Blocks ads + trackers + telemetry | Daily use (recommended) |
-| **🔒 Paranoid** | Blocks everything not explicitly whitelisted | Maximum security, hardened environments |
+| **👻 Ghost** | Blocks all non-essential traffic, sinkholes discovery queries (WPAD, NetBIOS, AD SRV), & hardens adapter bindings | Maximum privacy, zero-leak stealth |
 
 ---
 
@@ -317,6 +317,14 @@ pip install -r requirements.txt
 ---
 
 ## 🚀 Release Notes
+
+### v3.3.8 — Ghost Mode, Zero-Leak Discovery Sinkholing, Cross-Platform Hardening & Fail-Safe Restoration
+- **Ghost Mode Overhaul**: Rebranded Paranoid Mode fully to Ghost Mode with `#ef4444` theme accents, ghost icons, and zero-leak privacy enforcement.
+- **Discovery Sinkholing**: Automatic interception of WPAD (`wpad.*`), ISATAP, NetBIOS, and Active Directory SRV queries (`_ldap._tcp.dc._msdcs.*`) with `NXDOMAIN`/`0.0.0.0` responses.
+- **Cross-Platform Network Adapter Hardening**: Disables privacy-sensitive protocol bindings (LLDP, LLMNR, NetBIOS over TCP/IP, SMB broadcasts, mDNS) on Windows, Linux, and macOS.
+- **Dual-Layer Restoration**: Guaranteed fail-safe restoration of all network settings and bindings on both clean shutdown (`Engine.stop()`, `atexit`, `SIGINT`/`SIGTERM`) and abrupt crash recovery via detached watchdog.
+- **Instant Tab Pre-warming**: Zero-delay UI tab navigation with background pre-warming.
+- **Online Filter Feeds Sync**: Dynamic custom online blocklist addition and live inverted index synchronization.
 
 ### v3.3.3 — Privacy Audit, Upstream Credits, Boot Bottleneck Fix & Filter Pagination
 - **Comprehensive Privacy Audit & Spec Sanitization**: Cleaned hardcoded developer paths in `Cripple.spec` and `dns_proxy.py`. Replaced with dynamic PyInstaller hook collection (`collect_all('customtkinter')`). 0 privacy leaks repository-wide.

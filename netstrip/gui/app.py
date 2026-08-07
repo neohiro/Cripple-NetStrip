@@ -325,7 +325,7 @@ class NetStripApp(ctk.CTk):
         logo_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 8))
         
         # Add the requested quote
-        ctk.CTkLabel(logo_frame, text="Blocking over a million domains,\nupdated daily!",
+        ctk.CTkLabel(logo_frame, text="Blocking millions of domains.",
                      font=(Fonts.FAMILY_PRIMARY[0], 9, "italic"),
                      justify="center", text_color=Colors.TEXT_TERTIARY).pack(anchor="center", pady=(0, 10))
         
@@ -449,8 +449,23 @@ class NetStripApp(ctk.CTk):
         self._cached_views = {}
         self._select_nav(self.nav_btns[0])
         
-        # Lazy pre-load disabled: views are instantiated on-demand when clicked
-        pass
+        # Silently pre-warm unshown tabs in idle background time for instant switching
+        self.after(1000, self._prewarm_views)
+
+    def _prewarm_views(self):
+        """Silently instantiate un-cached views during idle time so tab switching is instantaneous."""
+        if getattr(self, '_destroyed', False):
+            return
+        for btn in self.nav_btns:
+            v_cls = getattr(btn, '_view_class', None)
+            if v_cls and v_cls not in self._cached_views:
+                try:
+                    self._cached_views[v_cls] = v_cls(self.main_frame, self.engine)
+                except Exception as e:
+                    logger.debug(f"Pre-warm view error for {v_cls}: {e}")
+                # Schedule next view after delay to avoid UI blocking
+                self.after(200, self._prewarm_views)
+                return
 
     def _preload_next_view(self, index):
         pass
@@ -531,13 +546,22 @@ class NetStripApp(ctk.CTk):
 
         view_class = selected_btn._view_class
         
-        # Immediate UI feedback
+        # If view is already cached, show it instantly with zero overlay latency
+        if view_class in self._cached_views:
+            self.current_view = self._cached_views[view_class]
+            if view_class.__name__ == 'DashboardView':
+                self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+            else:
+                self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+            return
+        
+        # First-time load on-demand
         if not hasattr(self, '_tab_loading_overlay'):
             self._tab_loading_overlay = ctk.CTkFrame(self.main_frame, fg_color=Colors.BG_DARK)
             ctk.CTkLabel(self._tab_loading_overlay, text="Loading Tab...", font=(Fonts.FAMILY_PRIMARY[0], 20)).place(relx=0.5, rely=0.5, anchor="center")
             
         self._tab_loading_overlay.grid(row=0, column=0, sticky="nsew")
-        self.update_idletasks() # Force UI update immediately
+        self.update_idletasks()
         
         def _build_and_show():
             try:
@@ -555,11 +579,11 @@ class NetStripApp(ctk.CTk):
                 if hasattr(self, '_tab_loading_overlay'):
                     self._tab_loading_overlay.grid_remove()
             
-        self.after(20, _build_and_show)
+        self.after(10, _build_and_show)
 
     def _show_smart_modal(self, conn_data):
         # Must run in main thread
-        self.after(0, lambda: SmartParanoidModal(self, self.engine, conn_data))
+        self.after(0, lambda: SmartGhostModal(self, self.engine, conn_data))
 
     def _update_geoip_ui(self, old_ip: str, geo_data: dict):
         def update_ui():
@@ -705,15 +729,15 @@ class NetStripApp(ctk.CTk):
                         self.btn_killswitch.configure(text="CRIPPLE: ACTIVE", fg_color=Colors.SUCCESS_DIM)
             self.after(0, update_ui)
 
-        def is_paranoid_active(item):
+        def is_ghost_active(item):
             mode = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
-            return mode and mode.name == "PARANOID"
+            return mode and mode.name in ("GHOST", "PARANOID")
 
-        def toggle_paranoid(icon, item):
-            if is_paranoid_active(item):
+        def toggle_ghost(icon, item):
+            if is_ghost_active(item):
                 self.engine.classifier.set_mode("STANDARD")
             else:
-                self.engine.classifier.set_mode("PARANOID")
+                self.engine.classifier.set_mode("GHOST")
 
         def is_lan_shield_active(item):
             return self.engine.db.get_setting("lan_shield_enabled", "true") == "true"
@@ -762,7 +786,7 @@ class NetStripApp(ctk.CTk):
                 
             items.extend([
                 pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
-                pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
+                pystray.MenuItem('Ghost Mode', toggle_ghost, checked=is_ghost_active),
                 pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
                 pystray.MenuItem('Quit', on_quit)
             ])

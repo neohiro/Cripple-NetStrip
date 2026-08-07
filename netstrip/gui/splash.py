@@ -65,16 +65,27 @@ class SplashScreen(ctk.CTkToplevel):
 
     def update_status(self, text, progress_val):
         """Update the loading text and progress bar."""
+        import time
+        self._last_custom_update = time.time()
         if self.winfo_exists():
-            self.status_label.configure(text=text)
-            self.progress.set(progress_val)
-            self.update()
+            try:
+                self.status_label.configure(text=text)
+                self.progress.set(progress_val)
+                self.update_idletasks()
+            except Exception:
+                pass
             
     def _cycle_loading_text(self):
         if not self.winfo_exists():
             return
             
+        import time
         import random
+        # If we received a live progress update within the last 3.0 seconds, don't overwrite it
+        if time.time() - getattr(self, '_last_custom_update', 0) < 3.0:
+            self._cycle_id = self.after(500, self._cycle_loading_text)
+            return
+
         if not hasattr(self, '_phrases'):
             self._phrases = [
                 "Initializing deep packet inspection...",
@@ -96,14 +107,11 @@ class SplashScreen(ctk.CTkToplevel):
             random.shuffle(self._phrases)
             self._phrase_idx = 0
         
-        # Don't overwrite if it's a specific engine broadcast
         try:
-            current = self.status_label.cget("text")
-            if current.endswith("..."):
-                self.status_label.configure(text=self._phrases[self._phrase_idx])
-                self._phrase_idx = (self._phrase_idx + 1) % len(self._phrases)
-                
-            # Slightly advance progress bar artificially
+            self.status_label.configure(text=self._phrases[self._phrase_idx])
+            self._phrase_idx = (self._phrase_idx + 1) % len(self._phrases)
+            
+            # Slightly advance progress bar artificially if below 0.9
             current_prog = self.progress.get()
             if current_prog < 0.9:
                 self.progress.set(current_prog + 0.05)

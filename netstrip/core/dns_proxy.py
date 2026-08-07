@@ -375,17 +375,47 @@ class NetStripResolver(BaseResolver):
                     logger.debug(f"DoH error for {ip}: {e}")
         return None
 
+    @staticmethod
+    def _is_ghost_privacy_query(domain: str) -> bool:
+        """Identify OS network topology / discovery queries that leak identity to ISP/WAN DNS."""
+        d_lower = domain.lower().strip('.')
+        # 1. WPAD proxy auto-discovery
+        if d_lower == "wpad" or d_lower.startswith("wpad.") or ".wpad." in d_lower:
+            return True
+        # 2. ISATAP tunnel auto-discovery
+        if d_lower == "isatap" or d_lower.startswith("isatap.") or ".isatap." in d_lower:
+            return True
+        # 3. Directory Services / LDAP / Kerberos SRV discovery queries (e.g. _ldap._tcp.dc._msdcs.dynamic.ziggo.nl)
+        if any(srv in d_lower for srv in ("_msdcs", "_ldap._tcp", "_kerberos._tcp", "_kpasswd._tcp", "_gc._tcp", "_sip._tls", "_ldap._tcp.dc")):
+            return True
+        # 4. NetBIOS / local broadcast leak queries
+        if d_lower.startswith("netbios.") or ".netbios." in d_lower or d_lower.endswith(".corp") or d_lower.endswith(".internal"):
+            return True
+        return False
+
     def resolve(self, request, handler):
+        from netstrip.core.modes import ProtectionLevel, ConnectionCategory, ConnectionAction
+        from dnslib import RCODE
+        
         qname = str(request.q.qname)
         # Strip trailing dot for processing
         domain = qname.rstrip('.') if qname.endswith('.') else qname
         qtype = QTYPE[request.q.qtype]
 
-        # 1. Classify
-        category = self.classifier.classify_domain(domain)
+        # 1. Ghost Mode & System Connection Privacy Sinkhole Check:
+        # Prevents Windows/OS leaks like WPAD, _ldap._tcp.dc._msdcs, ISATAP, NetBIOS from escaping to upstream WAN/ISP DNS.
+        is_ghost = hasattr(self.classifier, 'mode') and getattr(self.classifier.mode, 'level', None) in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT)
+        block_sys = self.db.get_setting("block_system_connections", "false") == "true"
         
-        # 2. Get action from mode
-        action = self.classifier.mode.get_action_for_category(category, self.db)
+        if (is_ghost or block_sys) and self._is_ghost_privacy_query(domain):
+            category = ConnectionCategory.SYSTEM
+            action = ConnectionAction.BLOCK
+        else:
+            # 1. Classify
+            category = self.classifier.classify_domain(domain)
+            
+            # 2. Get action from mode
+            action = self.classifier.mode.get_action_for_category(category, self.db)
 
         src_port = getattr(handler, 'client_address', (None, None))[1]
         process_name = self._infer_process(domain, src_port)
@@ -413,13 +443,16 @@ class NetStripResolver(BaseResolver):
                     'protocol': 'DNS',
                     'category': category.value,
                     'action': action.value,
-                    'mode': self.classifier.mode.name
+                    'mode': getattr(getattr(self.classifier, 'mode', None), 'name', 'GHOST')
                 })
                 self.db.update_daily_stats(action.value, category.value)
                 
-            # Always return Sinkhole IP
+            # For SRV / discovery queries, return NXDOMAIN immediately so OS ceases probing
             reply = request.reply()
-            reply.add_answer(RR(qname, rdata=A("0.0.0.0")))
+            if "_msdcs" in domain or "_ldap" in domain or "_kerberos" in domain:
+                reply.header.rcode = RCODE.NXDOMAIN
+            else:
+                reply.add_answer(RR(qname, rdata=A("0.0.0.0")))
             return reply
 
         # 4. Handle Allow (Check LRU cache first for instant resolution)

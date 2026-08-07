@@ -1,14 +1,19 @@
 """
 Blocklist Manager for NetStrip
-Manages the offline domain blocklists using high-performance Python sets and dictionary caching.
+Manages the offline domain blocklists using high-performance Python sets,
+indexed category sets, and fast binary serialization.
 """
 
 import os
 import threading
 import json
+import pickle
 import hashlib
 import logging
-from typing import Tuple, Optional, Dict, Set, List, Any
+import re
+import datetime
+from typing import Tuple, Optional, Dict, Set, List, Any, Callable
+from concurrent.futures import ThreadPoolExecutor
 from netstrip.core.modes import ConnectionCategory
 
 logger = logging.getLogger(__name__)
@@ -54,7 +59,6 @@ ESSENTIAL_DOMAINS = frozenset({
 })
 
 # 2. SYSTEM DOMAINS — OS Infrastructure, Search Engines & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
-# Obeys "Block System Connections" toggle and Paranoid Mode!
 SYSTEM_DOMAINS = frozenset({
     # Global Search & Core Web Portals
     'google.com', 'google.co.uk', 'google.de', 'google.fr', 'google.ca',
@@ -115,7 +119,6 @@ SYSTEM_DOMAINS = frozenset({
 })
 
 # 3. UPDATE DOMAINS — OS Repositories & Package Managers (Categorized as ConnectionCategory.UPDATE)
-# Obeys "Block Software Updates" toggle and Paranoid Mode!
 UPDATE_DOMAINS = frozenset({
     # Linux Distributions & Package Managers
     'ubuntu.com',
@@ -143,31 +146,42 @@ UPDATE_DOMAINS = frozenset({
     'update.microsoft.com',
 })
 
+DOM_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$')
+
 class BlocklistManager:
-    def __init__(self, lists_dir: str = None, db=None, **kwargs):
+    def __init__(self, lists_dir: str = None, db=None, progress_callback: Optional[Callable[[str, float], None]] = None, async_load: bool = True, **kwargs):
         if lists_dir is not None and not isinstance(lists_dir, (str, bytes, os.PathLike)):
             db = lists_dir
             lists_dir = None
         self.db = db
-        self.domain_map = {}
-        self.identity_map = {}
-        self.whitelist = set()
-        self.app_whitelist = set()
-        self.app_blacklist = set()
-        self.blacklist = {}
+        self.domain_map: Dict[str, ConnectionCategory] = {}
+        self.category_domains: Dict[ConnectionCategory, Set[str]] = {cat: set() for cat in ConnectionCategory}
+        self.identity_map: Dict[str, str] = {}
+        self.whitelist: Set[str] = set()
+        self.app_whitelist: Set[str] = set()
+        self.app_blacklist: Set[str] = set()
+        self.blacklist: Dict[str, bool] = {}
         self.lock = threading.RLock()
-        self.stats = {cat: 0 for cat in ConnectionCategory}
-        self.sources_metadata = {}
-        self.on_loaded_callbacks = []
+        self.stats: Dict[ConnectionCategory, int] = {cat: 0 for cat in ConnectionCategory}
+        self.sources_metadata: Dict[ConnectionCategory, List[Dict[str, Any]]] = {}
+        self.on_loaded_callbacks: List[Callable[[], None]] = []
+        self.progress_callback = progress_callback
         
         if lists_dir is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             lists_dir = os.path.join(base_dir, 'lists')
         self.lists_dir = lists_dir
         self.is_loading = True
-        threading.Thread(target=self._load_async_worker, daemon=True).start()
+        
+        if async_load:
+            threading.Thread(target=self._load_async_worker, daemon=True).start()
+        else:
+            self.load_all(progress_callback=self.progress_callback)
 
-    def add_loaded_callback(self, callback: callable):
+    def set_progress_callback(self, callback: Optional[Callable[[str, float], None]]):
+        self.progress_callback = callback
+
+    def add_loaded_callback(self, callback: Callable[[], None]):
         """Register a callback to be called when blocklists finish reloading."""
         if callable(callback):
             self.on_loaded_callbacks.append(callback)
@@ -179,6 +193,14 @@ class BlocklistManager:
                 cb()
             except Exception as e:
                 logger.debug(f"Error executing on_loaded_callback: {e}")
+
+    def _report_progress(self, text: str, progress: float, callback: Optional[Callable[[str, float], None]] = None):
+        cb = callback or self.progress_callback
+        if cb:
+            try:
+                cb(text, min(1.0, max(0.0, progress)))
+            except Exception:
+                pass
 
     def _get_cache_paths(self) -> List[str]:
         """Return potential cache file locations in priority order (.pkl binary then .json)."""
@@ -194,10 +216,10 @@ class BlocklistManager:
             paths.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
         return paths
 
-    def _get_lists_hash(self):
-        """Generate a stable deterministic hash of the current lists directory and DNS settings."""
+    def _get_lists_hash(self) -> str:
+        """Generate a stable deterministic hash of the current lists directory, updater sources, and DNS settings."""
         h = hashlib.md5()
-        h.update(b"v3.3.7_release_hash")
+        h.update(b"v3.4.1_fast_cache_release")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:
             try:
@@ -205,6 +227,16 @@ class BlocklistManager:
             except Exception:
                 pass
         h.update(f"allow_doh:{allow_doh}".encode('utf-8'))
+        
+        # Include updater_sources.json status/toggles in cache key
+        sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
+        if os.path.exists(sources_file):
+            try:
+                with open(sources_file, 'rb') as sf:
+                    h.update(sf.read())
+            except Exception:
+                pass
+
         if not os.path.exists(self.lists_dir):
             return h.hexdigest()
         for filename in sorted(os.listdir(self.lists_dir)):
@@ -212,13 +244,14 @@ class BlocklistManager:
             filepath = os.path.join(self.lists_dir, filename)
             try:
                 size = os.path.getsize(filepath)
-                h.update(f"{filename}:{size}".encode('utf-8'))
+                mtime = os.path.getmtime(filepath)
+                h.update(f"{filename}:{size}:{mtime}".encode('utf-8'))
             except Exception:
                 pass
         return h.hexdigest()
 
     def get_updater_sources(self) -> List[Dict[str, Any]]:
-        """Return all online blocklist sources with their sync status and file details."""
+        """Return all online blocklist sources with robust file matching."""
         sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         if not os.path.exists(sources_file):
             return []
@@ -227,16 +260,38 @@ class BlocklistManager:
                 data = json.load(f)
             sources = data.get('sources', [])
             
+            disk_files = [f for f in os.listdir(self.lists_dir) if f.endswith('.txt')] if os.path.exists(self.lists_dir) else []
+            
             # Enrich with local disk status
             for s in sources:
                 name = s.get('name', '')
                 category = s.get('category', 'ad')
                 safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
-                filename = f"{category}_{safe_name}.txt"
-                filepath = os.path.join(self.lists_dir, filename)
-                s['filename'] = filename
-                s['is_local'] = os.path.exists(filepath)
-                if s['is_local']:
+                
+                candidates = [
+                    f"{category}_{safe_name}.txt",
+                    f"{category}s_{safe_name}.txt",
+                    f"{category[:-1]}_{safe_name}.txt" if category.endswith('s') else f"{category}s_{safe_name}.txt",
+                    f"{safe_name}.txt"
+                ]
+                
+                found_filename = None
+                for c in candidates:
+                    if os.path.exists(os.path.join(self.lists_dir, c)):
+                        found_filename = c
+                        break
+                        
+                if not found_filename:
+                    for df in disk_files:
+                        if safe_name.lower() in df.lower():
+                            found_filename = df
+                            break
+                            
+                s['filename'] = found_filename or f"{category}_{safe_name}.txt"
+                s['is_local'] = found_filename is not None
+                
+                if found_filename:
+                    filepath = os.path.join(self.lists_dir, found_filename)
                     try:
                         s['local_size'] = os.path.getsize(filepath)
                         s['local_mtime'] = os.path.getmtime(filepath)
@@ -252,7 +307,7 @@ class BlocklistManager:
             return []
 
     def toggle_updater_source(self, source_name: str, enabled: bool) -> bool:
-        """Enable or disable a specific online source by name."""
+        """Enable or disable a specific online source by name and reload memory."""
         sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         if not os.path.exists(sources_file):
             return False
@@ -268,79 +323,100 @@ class BlocklistManager:
             if modified:
                 with open(sources_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2)
+                # Asynchronously reload blocklists with the new active configuration
+                threading.Thread(target=lambda: self.load_all(force_reload=True), daemon=True).start()
             return modified
         except Exception as e:
             logger.error(f"Error toggling updater source '{source_name}': {e}")
             return False
 
     def _load_async_worker(self):
-        """Worker thread to load blocklists without freezing the UI."""
+        """Worker thread to load blocklists with progress reporting."""
         try:
-            self.load_all()
+            self.load_all(progress_callback=self.progress_callback)
         except Exception as e:
             logger.error(f"Failed to load blocklists: {e}")
         finally:
             self.is_loading = False
 
-    def _parse_domains_from_file(self, filepath: str) -> Set[str]:
+    def _parse_domains_from_file(self, filepath: str, is_whitelist_file: bool = False) -> Set[str]:
+        """High-speed universal parser for ABP, AdGuard, DNSMasq, Hosts, and plain domain lists."""
         domains = set()
-        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789.-_")
         if not os.path.exists(filepath):
             return domains
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#') or line.startswith('!') or line.startswith('['):
+            
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+        except Exception:
+            return domains
+
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line[0] in ('#', '!', '[', ';'):
+                continue
+            if line.startswith('include:'):
+                continue
+            if line.startswith('@@'):
+                if not is_whitelist_file:
                     continue
-                if line.startswith('include:'):
-                    continue
-                if line.startswith('@@'):
-                    continue
-                if '@' in line:
-                    line = line.split('@')[0].strip()
-                if line.startswith('full:'):
-                    line = line[5:].strip()
-                    
-                parts = line.split()
-                if not parts:
-                    continue
-                    
-                if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53'):
-                    domain = parts[1]
-                else:
-                    domain = parts[0]
+                line = line[2:]
+            if '@' in line:
+                line = line.split('@')[0].strip()
+            if line.startswith('full:'):
+                line = line[5:].strip()
+            if line.startswith('domain:'):
+                line = line[7:].strip()
                 
-                if domain.startswith('domain:'):
-                    domain = domain[7:]
-                if domain.startswith('||'):
-                    domain = domain[2:]
+            # DNSMasq format: address=/domain.com/0.0.0.0 or server=/domain.com/
+            if line.startswith('address=/') or line.startswith('server=/'):
+                parts = line.split('/')
+                if len(parts) >= 2:
+                    line = parts[1]
                     
-                if '^' in domain:
-                    domain = domain.split('^')[0]
-                if '$' in domain:
-                    domain = domain.split('$')[0]
-                if '/' in domain:
-                    domain = domain.split('/')[0]
-                if '#' in domain:
-                    domain = domain.split('#')[0]
-                if domain.startswith('*.'):
-                    domain = domain[2:]
-                if domain.startswith('.'):
-                    domain = domain[1:]
-                    
-                domain = domain.strip().lower()
-                if not domain or '*' in domain or '=' in domain or domain.startswith('!') or domain.startswith('?'):
-                    continue
+            parts = line.split()
+            if not parts:
+                continue
                 
-                if domain not in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost') and '.' in domain and len(domain) <= 253:
-                    if set(domain).issubset(allowed):
-                        domains.add(domain)
+            # Hosts format
+            if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53', '::', '0'):
+                candidates = parts[1:]
+            else:
+                candidates = [parts[0]]
+                
+            for raw_d in candidates:
+                if raw_d[0] == '#':
+                    break
+                if raw_d.startswith('||'):
+                    raw_d = raw_d[2:]
+                if '^' in raw_d:
+                    raw_d = raw_d.split('^', 1)[0]
+                if '$' in raw_d:
+                    raw_d = raw_d.split('$', 1)[0]
+                if '/' in raw_d:
+                    raw_d = raw_d.split('/', 1)[0]
+                if '#' in raw_d:
+                    raw_d = raw_d.split('#', 1)[0]
+                if raw_d.startswith('*.'):
+                    raw_d = raw_d[2:]
+                if raw_d.startswith('.'):
+                    raw_d = raw_d[1:]
+                    
+                d = raw_d.strip().lower().rstrip('.')
+                if not d or len(d) > 253 or '.' not in d:
+                    continue
+                if d in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost', 'local'):
+                    continue
+                if DOM_RE.match(d):
+                    domains.add(d)
         return domains
 
-    def load_all(self):
-        """Load all default blocklists, using fast binary/JSON cache if available."""
+    def load_all(self, progress_callback: Optional[Callable[[str, float], None]] = None):
+        """Load all blocklists using fast binary cache or multi-core cold parsing with live progress."""
         self.is_loading = True
+        cb = progress_callback or self.progress_callback
         try:
+            self._report_progress("Checking intelligence cache...", 0.1, cb)
             current_hash = self._get_lists_hash()
             
             # 1. Try loading from existing cache files (.pkl first, then .json)
@@ -351,9 +427,9 @@ class BlocklistManager:
             for cache_file in self._get_cache_paths():
                 if os.path.exists(cache_file):
                     try:
+                        self._report_progress("Loading domain database cache...", 0.25, cb)
                         cache_data = None
                         if cache_file.endswith('.pkl'):
-                            import pickle
                             with open(cache_file, "rb") as f:
                                 cache_data = pickle.load(f)
                         elif cache_file.endswith('.json'):
@@ -380,134 +456,178 @@ class BlocklistManager:
                                 for k, v in cache_data.get("sources_metadata", {}).items()
                             }
                             
+                            # Restore or build indexed category sets
+                            new_category_domains = {cat: set() for cat in ConnectionCategory}
+                            if "category_domains" in cache_data:
+                                raw_cat_doms = cache_data["category_domains"]
+                                for k, dom_set in raw_cat_doms.items():
+                                    cat_enum = ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN)
+                                    new_category_domains[cat_enum] = set(dom_set)
+                            else:
+                                for d, cat_enum in new_domain_map.items():
+                                    new_category_domains[cat_enum].add(d)
+
                             # Atomic swap inside lock
                             with self.lock:
                                 self.domain_map = new_domain_map
+                                self.category_domains = new_category_domains
                                 self.identity_map = cache_data.get("identity_map", {})
                                 self.stats = new_stats
                                 self.sources_metadata = new_sources_metadata
+                                
                             self.is_loading = False
+                            self._report_progress("Filter engine fully loaded", 1.0, cb)
                             self._notify_loaded()
                             logger.info(f"Blocklists successfully loaded from cache {os.path.basename(cache_file)} ({len(new_domain_map)} domains)")
                             return
                     except Exception as e:
-                        logger.warning(f"Failed to load cache from {cache_file}: {e}. Checking alternatives...")
-                    
-            # 2. Full reload if cache miss or corrupted
+                        logger.warning(f"Failed to load cache from {cache_file}: {e}. Falling back...")
+
+            # 2. Cold Reload: Multi-thread parsing
+            self._report_progress("Parsing filter lists from disk...", 0.15, cb)
             new_domain_map = {}
+            new_category_domains = {cat: set() for cat in ConnectionCategory}
             new_identity_map = {}
             new_stats = {cat: 0 for cat in ConnectionCategory}
             new_sources_metadata = {}
-            
+
             # Inject hardcoded essential, system, and update domains
             for domain in ESSENTIAL_DOMAINS:
                 new_domain_map[domain] = ConnectionCategory.ESSENTIAL
+                new_category_domains[ConnectionCategory.ESSENTIAL].add(domain)
             new_stats[ConnectionCategory.ESSENTIAL] = len(ESSENTIAL_DOMAINS)
 
             for domain in SYSTEM_DOMAINS:
                 new_domain_map[domain] = ConnectionCategory.SYSTEM
+                new_category_domains[ConnectionCategory.SYSTEM].add(domain)
             new_stats[ConnectionCategory.SYSTEM] = len(SYSTEM_DOMAINS)
 
             for domain in UPDATE_DOMAINS:
                 new_domain_map[domain] = ConnectionCategory.UPDATE
+                new_category_domains[ConnectionCategory.UPDATE].add(domain)
             new_stats[ConnectionCategory.UPDATE] = len(UPDATE_DOMAINS)
-            
-            # Internal helper to parse list without locking
-            def load_into_temp(filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
-                if not os.path.exists(filepath):
-                    return
-                import datetime
-                filename = os.path.basename(filepath)
-                dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
-                
-                domains = self._parse_domains_from_file(filepath)
-                
-                if category:
-                    if category not in new_sources_metadata:
-                        new_sources_metadata[category] = []
-                    new_sources_metadata[category].append({'filename': filename, 'updated': dt, 'size': len(domains)})
-                    
-                # Add to temporary maps directly without locks
-                for domain in domains:
-                    d = domain.lower()
-                    if category:
-                        # Prevent lower priority blocklists from overtaking system/essential/update apex domains
-                        if category in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
-                            if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
-                                continue
-
-                        if d not in new_domain_map:
-                            new_domain_map[d] = category
-                            new_stats[category] = new_stats.get(category, 0) + 1
-                        else:
-                            existing_cat = new_domain_map[d]
-                            if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
-                                new_domain_map[d] = category
-                                new_stats[existing_cat] -= 1
-                                new_stats[category] = new_stats.get(category, 0) + 1
-                    if identity_name:
-                        new_identity_map[d] = identity_name
 
             if os.path.exists(self.lists_dir):
-                for filename in os.listdir(self.lists_dir):
-                    if not filename.endswith('.txt'): continue
+                # Identify disabled sources from updater_sources.json
+                disabled_file_patterns = set()
+                sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
+                if os.path.exists(sources_file):
+                    try:
+                        with open(sources_file, 'r', encoding='utf-8') as sf:
+                            sdata = json.load(sf)
+                        for s in sdata.get('sources', []):
+                            if not s.get('enabled', True):
+                                name = s.get('name', '')
+                                cat_s = s.get('category', 'ad')
+                                safe_n = name.replace(' ', '_').replace('/', '_').replace(':', '')
+                                disabled_file_patterns.add(safe_n.lower())
+                                disabled_file_patterns.add(f"{cat_s}_{safe_n}.txt".lower())
+                                disabled_file_patterns.add(f"{cat_s}s_{safe_n}.txt".lower())
+                    except Exception:
+                        pass
+
+                all_files = sorted([f for f in os.listdir(self.lists_dir) if f.endswith('.txt')])
+                total_files = len(all_files)
+                
+                for idx, filename in enumerate(all_files, 1):
+                    fn_lower = filename.lower()
+                    if fn_lower in disabled_file_patterns or any(p in fn_lower for p in disabled_file_patterns if len(p) > 3):
+                        continue
                     filepath = os.path.join(self.lists_dir, filename)
-                    
+                    cat: Optional[ConnectionCategory] = None
+                    identity_name: Optional[str] = None
+                    is_whitelist_file = False
+
                     if filename.startswith('ads_') or filename.startswith('ad_') or filename == 'ads.txt':
-                        load_into_temp(filepath, ConnectionCategory.AD)
+                        cat = ConnectionCategory.AD
                     elif filename.startswith('telemetry_') or filename == 'telemetry.txt':
-                        load_into_temp(filepath, ConnectionCategory.TELEMETRY)
+                        cat = ConnectionCategory.TELEMETRY
                     elif filename.startswith('malware_') or filename == 'malware.txt':
-                        load_into_temp(filepath, ConnectionCategory.MALWARE)
+                        cat = ConnectionCategory.MALWARE
                     elif filename.startswith('tracker') or filename == 'trackers.txt':
-                        load_into_temp(filepath, ConnectionCategory.TRACKER)
+                        cat = ConnectionCategory.TRACKER
                     elif filename.startswith('doh_providers'):
                         block_doh = True
                         if hasattr(self, 'db') and self.db:
                             allow_doh = str(self.db.get_setting("allow_in_browser_dns", "false")).lower() == "true"
                             block_doh = not allow_doh
                         if block_doh:
-                            load_into_temp(filepath, ConnectionCategory.TRACKER)
+                            cat = ConnectionCategory.TRACKER
                     elif filename.startswith('security_'):
-                        load_into_temp(filepath, ConnectionCategory.SECURITY)
+                        cat = ConnectionCategory.SECURITY
                     elif filename.startswith('update_'):
-                        load_into_temp(filepath, ConnectionCategory.UPDATE)
+                        cat = ConnectionCategory.UPDATE
                     elif filename.startswith('safe_') or filename.startswith('essential_'):
-                        load_into_temp(filepath, ConnectionCategory.ESSENTIAL)
+                        cat = ConnectionCategory.ESSENTIAL
+                        is_whitelist_file = True
                     elif filename.startswith('whitelist_'):
-                        load_into_temp(filepath, ConnectionCategory.USER_ALLOWED)
+                        cat = ConnectionCategory.USER_ALLOWED
+                        is_whitelist_file = True
                     elif filename.startswith('user_blocked_') or filename.startswith('blocked_'):
-                        load_into_temp(filepath, ConnectionCategory.USER_BLOCKED)
+                        cat = ConnectionCategory.USER_BLOCKED
                     elif filename.startswith('system_'):
-                        load_into_temp(filepath, ConnectionCategory.SYSTEM)
+                        cat = ConnectionCategory.SYSTEM
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
-                        load_into_temp(filepath, None, identity_name=identity_name)
+
+                    prog = 0.15 + (0.75 * (idx / max(1, total_files)))
+                    clean_name = filename.replace('.txt', '').replace('_', ' ')
+                    self._report_progress(f"Parsing list ({idx}/{total_files}): {clean_name}", prog, cb)
+
+                    domains = self._parse_domains_from_file(filepath, is_whitelist_file=is_whitelist_file)
+                    
+                    if cat:
+                        if cat not in new_sources_metadata:
+                            new_sources_metadata[cat] = []
+                        dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
+                        new_sources_metadata[cat].append({'filename': filename, 'updated': dt, 'size': len(domains)})
+
+                    for d in domains:
+                        if cat:
+                            if cat in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
+                                if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
+                                    continue
+
+                            if d not in new_domain_map:
+                                new_domain_map[d] = cat
+                                new_category_domains[cat].add(d)
+                                new_stats[cat] = new_stats.get(cat, 0) + 1
+                            else:
+                                existing_cat = new_domain_map[d]
+                                if CATEGORY_PRIORITY.get(cat, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+                                    new_domain_map[d] = cat
+                                    new_category_domains[existing_cat].discard(d)
+                                    new_category_domains[cat].add(d)
+                                    new_stats[existing_cat] -= 1
+                                    new_stats[cat] = new_stats.get(cat, 0) + 1
+                        if identity_name:
+                            new_identity_map[d] = identity_name
 
             # Atomic swap inside lock
             with self.lock:
                 self.domain_map = new_domain_map
+                self.category_domains = new_category_domains
                 self.identity_map = new_identity_map
                 self.stats = new_stats
                 self.sources_metadata = new_sources_metadata
-                        
-            # Decouple and save cache asynchronously in background thread to avoid freezing GUI
+
+            self._report_progress("Saving intelligence cache...", 0.95, cb)
+            
+            # Save fast binary cache asynchronously
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
 
-            def _save_cache_worker(user_d, lists_d, c_hash, d_map, i_map, st, sm):
+            def _save_cache_worker(user_d, lists_d, c_hash, d_map, cat_doms, i_map, st, sm):
                 try:
-                    import pickle
-                    # 1. Binary payload for high-speed sub-second startup
                     pkl_payload = {
                         "hash": c_hash,
                         "domain_map": d_map,
+                        "category_domains": cat_doms,
                         "identity_map": i_map,
                         "stats": st,
                         "sources_metadata": sm
                     }
-                    # 2. JSON payload for compatibility and transparency
                     json_payload = {
                         "hash": c_hash,
                         "domain_map": {k: getattr(v, 'value', v) for k, v in d_map.items()},
@@ -521,7 +641,6 @@ class BlocklistManager:
                         target_dirs.append(lists_d)
                         
                     for t_dir in target_dirs:
-                        # Write PKL
                         pkl_target = os.path.join(t_dir, "NetStrip_cache.pkl")
                         pkl_tmp = pkl_target + ".tmp"
                         try:
@@ -537,7 +656,6 @@ class BlocklistManager:
                                 try: os.remove(pkl_tmp)
                                 except Exception: pass
                                 
-                        # Write JSON
                         json_target = os.path.join(t_dir, "NetStrip_cache.json")
                         json_tmp = json_target + ".tmp"
                         try:
@@ -553,69 +671,19 @@ class BlocklistManager:
                                 try: os.remove(json_tmp)
                                 except Exception: pass
                 except Exception as e:
-                    logger.debug(f"Async cache save worker encountered error: {e}")
+                    logger.debug(f"Async cache save worker error: {e}")
 
             threading.Thread(
                 target=_save_cache_worker,
-                args=(user_dir, self.lists_dir, current_hash, new_domain_map, new_identity_map, new_stats, new_sources_metadata),
+                args=(user_dir, self.lists_dir, current_hash, new_domain_map, new_category_domains, new_identity_map, new_stats, new_sources_metadata),
                 daemon=True
             ).start()
+
+            self._report_progress("Protection engine ready", 1.0, cb)
 
         finally:
             self.is_loading = False
             self._notify_loaded()
-
-    def _load_list(self, filepath: str, category: Optional[ConnectionCategory], identity_name: str = None):
-        """Parse a hosts or domain list file and add it to the map."""
-        if not os.path.exists(filepath):
-            return
-            
-        import datetime
-        filename = os.path.basename(filepath)
-        mod_time = os.path.getmtime(filepath)
-        dt = datetime.datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
-        
-        domains = self._parse_domains_from_file(filepath)
-        
-        if category:
-            if category not in self.sources_metadata:
-                self.sources_metadata[category] = []
-            self.sources_metadata[category].append({
-                'filename': filename,
-                'updated': dt,
-                'size': len(domains)
-            })
-            
-        self.add_domains_chunked(domains, category, identity_name)
-
-    def add_domains_chunked(self, domains_list: List[str], category: Optional[ConnectionCategory] = None, identity_name: str = None, chunk_size: int = 50000):
-        """Add domains in batches yielding to Tkinter event loop to prevent UI hangs."""
-        for i in range(0, len(domains_list), chunk_size):
-            chunk = domains_list[i:i + chunk_size]
-            with self.lock:
-                for domain in chunk:
-                    d = domain.lower()
-                    if category:
-                        if category in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
-                            if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
-                                continue
-
-                        if d not in self.domain_map:
-                            self.domain_map[d] = category
-                            self.stats[category] = self.stats.get(category, 0) + 1
-                        else:
-                            existing_cat = self.domain_map[d]
-                            if CATEGORY_PRIORITY.get(category, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
-                                self.domain_map[d] = category
-                                self.stats[existing_cat] -= 1
-                                self.stats[category] = self.stats.get(category, 0) + 1
-                    if identity_name:
-                        self.identity_map[d] = identity_name
-            import time
-            time.sleep(0.001)
-
-    def remove_domains(self, domains: Set[str]):
-        pass
 
     def is_blocked(self, domain: str, process_name: str = None) -> Tuple[bool, Optional[ConnectionCategory]]:
         """
@@ -718,8 +786,8 @@ class BlocklistManager:
 
     def search(self, query: str = "", limit: int = 50, category_filter=None, offset: int = 0) -> List[dict]:
         """
-        Search domains using partial match, returns up to `limit` results after skipping `offset`.
-        Lock-free iteration with retry mechanism for real-time responsiveness.
+        Ultra-fast indexed category and domain search.
+        Takes advantage of category_domains sets for O(1) instant slice access.
         """
         if not query and not category_filter:
             return []
@@ -727,116 +795,60 @@ class BlocklistManager:
         query = query.lower() if query else ""
         
         # Normalize category filter
-        target_cat = None
+        target_cat_enum: Optional[ConnectionCategory] = None
         if category_filter:
-            if hasattr(category_filter, 'value'):
-                target_cat = category_filter.value.lower()
+            if isinstance(category_filter, ConnectionCategory):
+                target_cat_enum = category_filter
             else:
-                target_cat = str(category_filter).lower()
-                
-            # Map common aliases
-            if target_cat in ('ad', 'ads'):
-                target_cat = 'ad'
-            elif target_cat in ('user_blocked', 'blocked'):
-                target_cat = 'user_blocked'
-            elif target_cat in ('user_allowed', 'allowed', 'whitelist'):
-                target_cat = 'user_allowed'
-            elif target_cat in ('tracker', 'trackers'):
-                target_cat = 'tracker'
+                cat_str = str(category_filter).lower()
+                if cat_str in ('ad', 'ads'):
+                    target_cat_enum = ConnectionCategory.AD
+                elif cat_str in ('user_blocked', 'blocked'):
+                    target_cat_enum = ConnectionCategory.USER_BLOCKED
+                elif cat_str in ('user_allowed', 'allowed', 'whitelist'):
+                    target_cat_enum = ConnectionCategory.USER_ALLOWED
+                elif cat_str in ('tracker', 'trackers'):
+                    target_cat_enum = ConnectionCategory.TRACKER
+                else:
+                    for cat in ConnectionCategory:
+                        if cat.value.lower() == cat_str:
+                            target_cat_enum = cat
+                            break
 
         results = []
         seen = set()
         skipped = 0
-        
-        # 1. Check User Whitelist
-        if not target_cat or target_cat == 'user_allowed':
-            for domain in list(self.whitelist):
-                if not query or query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
-                            if len(results) >= limit:
-                                return results
-                                
-        # 2. Check User Blacklist
-        if not target_cat or target_cat == 'user_blocked':
-            for domain in list(self.blacklist.keys()):
-                if not query or query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append({'domain': domain, 'category': ConnectionCategory.USER_BLOCKED.value})
-                            if len(results) >= limit:
-                                return results
 
-        # 3. Check System Domains Set
-        if not target_cat or target_cat == 'system':
-            for domain in SYSTEM_DOMAINS:
-                if not query or query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append({'domain': domain, 'category': ConnectionCategory.SYSTEM.value})
-                            if len(results) >= limit:
-                                return results
+        with self.lock:
+            # 1. User Whitelist
+            if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_ALLOWED:
+                for domain in self.whitelist:
+                    if not query or query in domain:
+                        if domain not in seen:
+                            seen.add(domain)
+                            if skipped < offset:
+                                skipped += 1
+                            else:
+                                results.append({'domain': domain, 'category': ConnectionCategory.USER_ALLOWED.value})
+                                if len(results) >= limit:
+                                    return results
 
-        # 4. Check Essential Domains Set
-        if not target_cat or target_cat == 'essential':
-            for domain in ESSENTIAL_DOMAINS:
-                if not query or query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append({'domain': domain, 'category': ConnectionCategory.ESSENTIAL.value})
-                            if len(results) >= limit:
-                                return results
+            # 2. User Blacklist
+            if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_BLOCKED:
+                for domain in self.blacklist.keys():
+                    if not query or query in domain:
+                        if domain not in seen:
+                            seen.add(domain)
+                            if skipped < offset:
+                                skipped += 1
+                            else:
+                                results.append({'domain': domain, 'category': ConnectionCategory.USER_BLOCKED.value})
+                                if len(results) >= limit:
+                                    return results
 
-        # 5. Check Update Domains Set
-        if not target_cat or target_cat == 'update':
-            for domain in UPDATE_DOMAINS:
-                if not query or query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append({'domain': domain, 'category': ConnectionCategory.UPDATE.value})
-                            if len(results) >= limit:
-                                return results
-
-        # 6. Lock-free iteration of domain_map
-        retry_count = 0
-        while retry_count < 5:
-            try:
-                for domain, category in self.domain_map.items():
-                    cat_val = getattr(category, 'value', category)
-                    if isinstance(cat_val, str):
-                        cat_val_lower = cat_val.lower()
-                        if cat_val_lower in ('ad', 'ads'):
-                            cat_val_norm = 'ad'
-                        elif cat_val_lower in ('user_blocked', 'blocked'):
-                            cat_val_norm = 'user_blocked'
-                        elif cat_val_lower in ('user_allowed', 'allowed', 'whitelist'):
-                            cat_val_norm = 'user_allowed'
-                        elif cat_val_lower in ('tracker', 'trackers'):
-                            cat_val_norm = 'tracker'
-                        else:
-                            cat_val_norm = cat_val_lower
-                    else:
-                        cat_val_norm = str(cat_val)
-
-                    if target_cat and cat_val_norm != target_cat:
-                        continue
-
+            # 3. If filtered by category, search ONLY that category set!
+            if target_cat_enum and target_cat_enum in self.category_domains:
+                for domain in self.category_domains[target_cat_enum]:
                     if not query or query in domain:
                         if domain not in seen:
                             seen.add(domain)
@@ -845,15 +857,25 @@ class BlocklistManager:
                             else:
                                 results.append({
                                     'domain': domain,
-                                    'category': cat_val
+                                    'category': target_cat_enum.value
                                 })
                                 if len(results) >= limit:
                                     return results
-                break
-            except RuntimeError:
-                # Dictionary size changed during concurrent update, retry
-                retry_count += 1
-                import time
-                time.sleep(0.01)
-                
+                return results
+
+            # 4. If global search across all categories (query without category filter):
+            for domain, category in self.domain_map.items():
+                if query in domain:
+                    if domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append({
+                                'domain': domain,
+                                'category': getattr(category, 'value', str(category))
+                            })
+                            if len(results) >= limit:
+                                return results
+
         return results

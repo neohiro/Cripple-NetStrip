@@ -1,6 +1,6 @@
 """
 Smart Modal for Cripple GUI
-Displays a critical alert when Smart Paranoid Mode is triggered.
+Displays a critical alert when Smart Ghost Mode is triggered.
 """
 
 import customtkinter as ctk
@@ -51,7 +51,7 @@ class SmartParanoidModal(ctk.CTkToplevel):
         lbl_desc = ctk.CTkLabel(inner, text=(
             "CRITICAL SECURITY EVENT INTERCEPTED.\n\n"
             "> Threat detected automatically.\n"
-            "> Forcing lock-down to PARANOID mode...\n\n"
+            "> Forcing lock-down to GHOST mode...\n\n"
             f"Process: {process}\nTarget: {target}"
         ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
         lbl_desc.pack(anchor="w", pady=(0, 20))
@@ -78,3 +78,6 @@ class SmartParanoidModal(ctk.CTkToplevel):
         # Revert mode to Normal
         self.engine.set_mode(ProtectionLevel.NORMAL)
         self.destroy()
+
+# Alias
+SmartGhostModal = SmartParanoidModal

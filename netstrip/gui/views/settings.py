@@ -250,11 +250,11 @@ class SettingsView(ctk.CTkFrame):
 
         # Smart Shield
         self._add_switch_row(card, "Smart Shield", 'smart_paranoid_mode', tooltip_text="Use Case: Essential endpoint protection. Automatically escalates security levels when an intrusion is detected.")
-        self._add_subtitle(card, "Auto-escalates to Paranoid mode on malware detection, and instantly engages the Master Killswitch upon sudden VPN drops or kernel route shifts.")
+        self._add_subtitle(card, "Auto-escalates to Ghost mode on malware detection, and instantly engages the Master Killswitch upon sudden VPN drops or kernel route shifts.")
         
         # Block System Connections
-        self._add_switch_row(card, "Block System Connections", 'block_system_connections', tooltip_text="Use Case: Ultimate privacy. Kills Microsoft/Apple telemetry, but breaks Windows Update and OS synchronization.")
-        self._add_subtitle(card, "Disable all non-vital background OS services globally (can disrupt updates).")
+        self._add_switch_row(card, "Block System Connections", 'block_system_connections', tooltip_text="Use Case: Ultimate privacy. Strips redundant OS bindings (LLDP, NetBIOS, WPAD, SRV, ISATAP) and blocks background OS telemetry.")
+        self._add_subtitle(card, "Disable redundant OS bindings and all background OS telemetry services globally.")
         
         # Allow in-browser DNS
         self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns', tooltip_text="Use Case: If you use Chrome/Firefox DoH features and don't want NetStrip filtering your web browsing.")
@@ -431,7 +431,13 @@ class SettingsView(ctk.CTkFrame):
                     self.engine.classifier._domain_cache.clear()
 
             if setting_key == 'block_system_connections':
-                # Flush classifier caches so system connection rules apply immediately
+                # Flush classifier caches and harden/restore network adapter bindings
+                from netstrip.platform.base import get_platform
+                api = get_platform()
+                is_blocking = (value == 'true')
+                if hasattr(api, 'harden_network_adapters'):
+                    import threading
+                    threading.Thread(target=lambda: api.harden_network_adapters(enable_hardening=is_blocking), daemon=True).start()
                 if hasattr(self.engine, 'classifier'):
                     self.engine.classifier._domain_cache.clear()
                     if hasattr(self.engine.classifier, '_ip_cache'):

@@ -1,3 +1,25 @@
+## [v3.3.8] - Ghost Mode Overhaul, Zero-Leak Discovery Sinkholing, Cross-Platform Protocol Hardening & Fail-Safe Restoration
+
+- **Ghost Mode Branding & Complete UI Harmonization**:
+  - Rebranded Paranoid Mode fully to **Ghost Mode** across the entire UI, theme engine (`#ef4444` accent), dashboard widgets, mode switches, settings, and CLI arguments.
+  - Updated left pane branding text to `"Blocking millions of domains."`
+  - In Ghost Mode, all non-whitelisted tracking, telemetry, ad, malware, and system connections are completely blocked with zero cloud leaks.
+- **Zero-Leak OS Discovery & Privacy Sinkholing**:
+  - Implemented automatic privacy sinkholing in `NetStripResolver` for sensitive OS auto-discovery vectors (`wpad.*`, `isatap.*`, `netbios.*`, and Active Directory SRV queries `_ldap._tcp.dc._msdcs.*`, `_kerberos._tcp.*`).
+  - Returns `NXDOMAIN` for Active Directory SRV discovery lookups to terminate network topology probing cleanly and `0.0.0.0` for auto-discovery host lookups.
+- **Cross-Platform Network Adapter & Protocol Hardening**:
+  - **Windows**: Hardened network adapter bindings via PowerShell to disable `ms_msclient`, `ms_server`, `ms_lldp`, `ms_lltdio`, `ms_rspndr`, and `ms_netbios`; disabled WinHTTP WPAD autoproxy (`DisableWpad=1`), LLMNR multicast (`EnableMulticast=0`), and NetBIOS over TCP/IP (`NetbiosOptions=2`).
+  - **Linux**: Hardened kernel network parameters via `sysctl` (`accept_redirects=0`, `drop_unicast_in_l2_multicast=1`, `accept_ra=0`) and disabled mDNS/discovery daemons (`avahi-daemon`, `lldpd`, `smbd`, `nmbd`).
+  - **macOS**: Disabled mDNS / Bonjour multicast announcements (`NoMulticastAdvertisements=YES`), ICMP redirects, and local SMB/NetBIOS discovery daemons.
+- **Dual-Layer Graceful & Emergency Crash Restoration**:
+  - **Graceful Shutdown**: Wired `Engine.stop()` to restore all platform protocol bindings, reset DNS servers, flush firewall rules, and re-enable global IPv6/IPv4 stacks. Added `atexit` and OS signal (`SIGINT`/`SIGTERM`) hooks.
+  - **Emergency Crash Recovery**: Detached background watchdog (`watchdog.py`) monitors parent process PID and executes automated fail-open recovery (`restore_network()`) upon detecting sudden terminations or crashes, guaranteeing zero network lockouts.
+- **Instant Tab Switching & Pre-warming Engine**:
+  - Implemented asynchronous non-blocking background tab pre-warming on application boot, completely eliminating the "loading tab" overlay during view navigation.
+  - Fixed nested mousewheel scroll propagation on listframes, dropdowns, and online feed managers.
+- **Dynamic Online Feeds & Category Stats Sync**:
+  - Integrated custom online blocklist addition directly into `updater_sources.json` with deterministic checksum tracking and instant inverted index rebuilding.
+
 ## [v3.3.7] - 1-Second Instant Binary Caching, Non-Blocking Splash Boot, Threat Feeds & Online Source Manager
 
 - **1-Second Instant Startup via Binary Pickle Cache**:

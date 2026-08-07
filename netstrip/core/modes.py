@@ -10,8 +10,9 @@ from typing import List
 
 class ProtectionLevel(Enum):
     """The core protection modes."""
-    PARANOID = auto()
-    STRICT = auto()     # Alias for PARANOID (CLI compatibility)
+    GHOST = auto()
+    PARANOID = auto()   # Alias for GHOST (CLI/API compatibility)
+    STRICT = auto()     # Alias for GHOST (CLI compatibility)
     NORMAL = auto()
     STANDARD = auto()   # Alias for NORMAL (CLI compatibility)
     LOOSE = auto()
@@ -83,7 +84,7 @@ class ModeConfig:
 
     def get_action_for_category(self, category: ConnectionCategory, db=None) -> ConnectionAction:
         """Determine what action to take for a given connection category."""
-        if self.level == ProtectionLevel.PARANOID:
+        if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT):
             if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL):
                 return ConnectionAction.ALLOW
             return ConnectionAction.BLOCK
@@ -97,7 +98,7 @@ class ModeConfig:
             return ConnectionAction.BLOCK
             
         if category in (ConnectionCategory.SECURITY, ConnectionCategory.SYSTEM):
-            if self.level == ProtectionLevel.PARANOID and category == ConnectionCategory.SYSTEM:
+            if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT) and category == ConnectionCategory.SYSTEM:
                 return ConnectionAction.BLOCK
             if hasattr(db, 'get_setting'):
                 sys_val = db.get_setting("block_system_connections", "false")
@@ -135,13 +136,13 @@ class ModeConfig:
 #  Pre-configured modes
 # ──────────────────────────────────────────────
 
-PARANOID_MODE = ModeConfig(
-    level=ProtectionLevel.PARANOID,
-    name="Paranoid",
-    description="Maximum protection. Blocks ALL connections not explicitly "
-                "whitelisted. OS updates paused. Every unknown connection "
-                "requires manual approval. Full LAN isolation.",
-    icon="🔒",
+GHOST_MODE = ModeConfig(
+    level=ProtectionLevel.GHOST,
+    name="Ghost",
+    description="Maximum privacy & stealth protection. Blocks ALL connections not "
+                "explicitly whitelisted. WPAD/Active Directory discovery leaks and OS "
+                "telemetry blocked. OS updates paused. Full LAN isolation.",
+    icon="👻",
     color="#ef4444",
     block_ads=True,
     block_trackers=True,
@@ -157,6 +158,9 @@ PARANOID_MODE = ModeConfig(
     lan_allow_dhcp=True,
     lan_allow_dns=True,
 )
+
+# Compatibility alias
+PARANOID_MODE = GHOST_MODE
 
 NORMAL_MODE = ModeConfig(
     level=ProtectionLevel.NORMAL,
@@ -206,8 +210,9 @@ LOOSE_MODE = ModeConfig(
 
 # Mode lookup
 MODES = {
-    ProtectionLevel.PARANOID: PARANOID_MODE,
-    ProtectionLevel.STRICT: PARANOID_MODE,    # STRICT is an alias for PARANOID
+    ProtectionLevel.GHOST: GHOST_MODE,
+    ProtectionLevel.PARANOID: GHOST_MODE,
+    ProtectionLevel.STRICT: GHOST_MODE,    # STRICT is an alias for GHOST/PARANOID
     ProtectionLevel.NORMAL: NORMAL_MODE,
     ProtectionLevel.STANDARD: NORMAL_MODE,    # STANDARD is an alias for NORMAL
     ProtectionLevel.LOOSE: LOOSE_MODE,
@@ -216,4 +221,12 @@ MODES = {
 
 def get_mode(level: ProtectionLevel) -> ModeConfig:
     """Get the mode configuration for a given protection level."""
-    return MODES[level]
+    if isinstance(level, str):
+        level_str = level.upper()
+        if level_str in ("GHOST", "PARANOID", "STRICT"):
+            return GHOST_MODE
+        elif level_str in ("NORMAL", "STANDARD"):
+            return NORMAL_MODE
+        elif level_str == "LOOSE":
+            return LOOSE_MODE
+    return MODES.get(level, NORMAL_MODE)

@@ -266,11 +266,21 @@ class BlocklistView(ctk.CTkFrame):
                     with open(target_file, 'wb') as f:
                         f.write(content)
                         
-                    # Reload core memory
+                    # Reload core memory with new source
                     self.engine.blocklist.load_all()
                     
                     if not self._destroyed:
-                        self.after(0, lambda: self._refresh_stats_grid(f"Added permanent blocklist: {name}"))
+                        def on_success():
+                            self._refresh_stats_grid(f"Added permanent blocklist: {name}")
+                            sources = self.engine.blocklist.get_updater_sources()
+                            count = len(sources) if sources else 36
+                            if not self._sources_expanded:
+                                self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
+                            else:
+                                self._populate_sources_list()
+                            if self._active_category_filter or (hasattr(self, '_search_entry') and self._search_entry.get().strip()):
+                                self._do_search()
+                        self.after(0, on_success)
                         
                 except Exception as e:
                     if hasattr(self.engine, 'on_status') and self.engine.on_status:
@@ -316,7 +326,6 @@ class BlocklistView(ctk.CTkFrame):
         try:
             metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
             stats = getattr(self.engine.blocklist, 'stats', {})
-            domain_map = getattr(self.engine.blocklist, 'domain_map', {})
             
             whitelist_size = len(self.engine.blocklist.whitelist)
             app_whitelist_size = len(self.engine.blocklist.app_whitelist)
@@ -337,8 +346,6 @@ class BlocklistView(ctk.CTkFrame):
                         or (stats.get('ads') if cat_val in ('ad', 'ads') else 0)
                         or 0
                     )
-                if not cnt and domain_map:
-                    cnt = sum(1 for c in domain_map.values() if c == cat_enum or getattr(c, 'value', str(c)) == cat_val)
                     
                 if cat_enum == ConnectionCategory.USER_ALLOWED or cat_val == 'user_allowed':
                     cnt += whitelist_size + app_whitelist_size
@@ -446,8 +453,6 @@ class BlocklistView(ctk.CTkFrame):
                 total_size = sum(s.get('size', 0) for s in sources)
                 if total_size == 0 and stats:
                     total_size = stats.get(category, 0)
-                if total_size == 0 and domain_map:
-                    total_size = sum(1 for c in domain_map.values() if c == category)
 
             lbl_count = ctk.CTkLabel(
                 inner,
@@ -650,6 +655,42 @@ class BlocklistView(ctk.CTkFrame):
                 **CTK_SWITCH_STYLE
             )
             switch.pack(side="right", padx=Spacing.MD)
+
+        # Isolate scroll events on the sources list frame so mouse wheel does not scroll the outer tab
+        self._isolate_sources_scroll()
+
+    def _isolate_sources_scroll(self):
+        """Bind mouse wheel events to scroll only the inner sources list and halt propagation."""
+        def _on_wheel(event):
+            try:
+                canvas = getattr(self._sources_list_frame, '_parent_canvas', None)
+                if canvas:
+                    if event.delta:
+                        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+                    elif event.num == 4:
+                        canvas.yview_scroll(-1, "units")
+                    elif event.num == 5:
+                        canvas.yview_scroll(1, "units")
+            except Exception:
+                pass
+            return "break"
+
+        def _bind_all(widget):
+            try:
+                widget.bind("<MouseWheel>", _on_wheel)
+                widget.bind("<Button-4>", _on_wheel)
+                widget.bind("<Button-5>", _on_wheel)
+            except Exception:
+                pass
+            try:
+                for child in widget.winfo_children():
+                    _bind_all(child)
+            except Exception:
+                pass
+
+        _bind_all(self._sources_list_frame)
+        if hasattr(self._sources_list_frame, '_parent_canvas'):
+            _bind_all(self._sources_list_frame._parent_canvas)
 
     def _build_results_area(self):
         self._results_container = ctk.CTkFrame(self._main_scroll, fg_color="transparent")

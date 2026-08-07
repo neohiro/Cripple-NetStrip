@@ -160,6 +160,23 @@ class PlatformBase(ABC):
         """Check if registered for autostart."""
         pass
 
+    def harden_network_adapters(self, enable_hardening: bool = True) -> bool:
+        """Harden adapter protocol bindings, WPAD, LLMNR, NetBIOS, and discovery."""
+        if enable_hardening:
+            return self.disable_protocol_bindings()
+        else:
+            return self.restore_protocol_bindings()
+
+    @abstractmethod
+    def disable_protocol_bindings(self) -> bool:
+        """Disable redundant and privacy-sensitive adapter protocols (WPAD, LLDP, LLMNR, NetBIOS, SMB)."""
+        pass
+
+    @abstractmethod
+    def restore_protocol_bindings(self) -> bool:
+        """Restore standard adapter protocol bindings."""
+        pass
+
 
 def get_platform() -> PlatformBase:
     """Factory function to get the correct platform implementation."""

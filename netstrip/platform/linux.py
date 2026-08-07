@@ -124,6 +124,31 @@ class LinuxPlatform(PlatformBase):
     def rule_exists(self, rule_name: str) -> bool:
         return rule_name in self._iptables_rules
 
+    def remove_all_NetStrip_rules(self) -> bool:
+        rules_to_remove = [k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_")]
+        for rule in rules_to_remove:
+            self.remove_firewall_rule(rule)
+        return True
+
+    def remove_all_app_block_rules(self) -> bool:
+        rules_to_remove = [k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_AppBlock_")]
+        for rule in rules_to_remove:
+            self.remove_firewall_rule(rule)
+        return True
+
+    def disable_ipv4(self) -> bool:
+        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-p", "ip", "-j", "DROP"])
+        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-p", "ip", "-j", "DROP"])
+        return res1.returncode == 0 and res2.returncode == 0
+
+    def enable_ipv4(self) -> bool:
+        self._run_cmd(["iptables", "-D", "INPUT", "-p", "ip", "-j", "DROP"])
+        self._run_cmd(["iptables", "-D", "OUTPUT", "-p", "ip", "-j", "DROP"])
+        return True
+
+    def is_ipv4_enabled(self) -> bool:
+        return True
+
     def enable_killswitch(self) -> bool:
         # Absolute ghost mode - block everything unconditionally
         res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
@@ -242,3 +267,34 @@ WantedBy=multi-user.target
     def is_autostart_installed(self) -> bool:
         import os
         return os.path.exists("/etc/systemd/system/netstrip.service")
+
+    def disable_protocol_bindings(self) -> bool:
+        """Disable redundant, privacy-leaking protocol daemons and sysctl bindings on Linux."""
+        sysctl_params = [
+            ("net.ipv4.conf.all.accept_redirects", "0"),
+            ("net.ipv4.conf.default.accept_redirects", "0"),
+            ("net.ipv4.conf.all.send_redirects", "0"),
+            ("net.ipv4.conf.default.send_redirects", "0"),
+            ("net.ipv4.conf.all.drop_unicast_in_l2_multicast", "1"),
+            ("net.ipv6.conf.all.accept_ra", "0"),
+            ("net.ipv6.conf.default.accept_ra", "0"),
+        ]
+        for key, val in sysctl_params:
+            self._run_cmd(["sysctl", "-w", f"{key}={val}"])
+
+        # Stop discovery and broadcast daemons (avahi/mDNS, lldp, smb/nmb)
+        for svc in ["avahi-daemon", "lldpd", "lldpad", "smbd", "nmbd"]:
+            self._run_cmd(["systemctl", "stop", svc])
+        return True
+
+    def restore_protocol_bindings(self) -> bool:
+        """Restore standard protocol bindings on Linux."""
+        sysctl_params = [
+            ("net.ipv4.conf.all.accept_redirects", "1"),
+            ("net.ipv4.conf.default.accept_redirects", "1"),
+            ("net.ipv6.conf.all.accept_ra", "1"),
+            ("net.ipv6.conf.default.accept_ra", "1"),
+        ]
+        for key, val in sysctl_params:
+            self._run_cmd(["sysctl", "-w", f"{key}={val}"])
+        return True
