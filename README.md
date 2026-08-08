@@ -318,6 +318,11 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.9 — Multi-Core Parallel Parsing, Widget-Pool List Virtualization & UI Fluency
+- **Multi-Core Parallel List Parsing & Fast Tokenizer**: Parallelized cold filter compilation across all CPU cores with `concurrent.futures.ThreadPoolExecutor` and C-speed tokenizing. Bundled pre-indexed binary cache database (`NetStrip_cache.pkl`) loading 3.25+ million rules in ~2.9s.
+- **Widget-Pool List Virtualization**: Replaced UI row destructions with persistent object recycling pools and tuple signature diffing across Rules, Blocklists, Feeds, and Logs.
+- **Fluid & Responsive UX**: Eliminates UI micro-stutters, enables silky-smooth list interactions and instantaneous view navigation.
+
 ### v3.3.8 — Ghost Mode, Zero-Leak Discovery Sinkholing, Cross-Platform Hardening & Fail-Safe Restoration
 - **Ghost Mode Overhaul**: Rebranded Paranoid Mode fully to Ghost Mode with `#ef4444` theme accents, ghost icons, and zero-leak privacy enforcement.
 - **Discovery Sinkholing**: Automatic interception of WPAD (`wpad.*`), ISATAP, NetBIOS, and Active Directory SRV queries (`_ldap._tcp.dc._msdcs.*`) with `NXDOMAIN`/`0.0.0.0` responses.

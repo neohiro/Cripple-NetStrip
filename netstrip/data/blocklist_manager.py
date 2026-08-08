@@ -347,12 +347,12 @@ class BlocklistManager:
             
         try:
             with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
+                lines = f.readlines()
         except Exception:
             return domains
 
-        for line in content.splitlines():
-            line = line.strip()
+        for raw_line in lines:
+            line = raw_line.strip()
             if not line or line[0] in ('#', '!', '[', ';'):
                 continue
             if line.startswith('include:'):
@@ -362,14 +362,14 @@ class BlocklistManager:
                     continue
                 line = line[2:]
             if '@' in line:
-                line = line.split('@')[0].strip()
+                line = line.partition('@')[0].strip()
             if line.startswith('full:'):
                 line = line[5:].strip()
-            if line.startswith('domain:'):
+            elif line.startswith('domain:'):
                 line = line[7:].strip()
                 
             # DNSMasq format: address=/domain.com/0.0.0.0 or server=/domain.com/
-            if line.startswith('address=/') or line.startswith('server=/'):
+            if line.startswith(('address=/', 'server=/')):
                 parts = line.split('/')
                 if len(parts) >= 2:
                     line = parts[1]
@@ -385,21 +385,21 @@ class BlocklistManager:
                 candidates = [parts[0]]
                 
             for raw_d in candidates:
-                if raw_d[0] == '#':
+                if not raw_d or raw_d[0] == '#':
                     break
                 if raw_d.startswith('||'):
                     raw_d = raw_d[2:]
                 if '^' in raw_d:
-                    raw_d = raw_d.split('^', 1)[0]
+                    raw_d = raw_d.partition('^')[0]
                 if '$' in raw_d:
-                    raw_d = raw_d.split('$', 1)[0]
+                    raw_d = raw_d.partition('$')[0]
                 if '/' in raw_d:
-                    raw_d = raw_d.split('/', 1)[0]
+                    raw_d = raw_d.partition('/')[0]
                 if '#' in raw_d:
-                    raw_d = raw_d.split('#', 1)[0]
+                    raw_d = raw_d.partition('#')[0]
                 if raw_d.startswith('*.'):
                     raw_d = raw_d[2:]
-                if raw_d.startswith('.'):
+                elif raw_d.startswith('.'):
                     raw_d = raw_d[1:]
                     
                 d = raw_d.strip().lower().rstrip('.')
@@ -411,80 +411,81 @@ class BlocklistManager:
                     domains.add(d)
         return domains
 
-    def load_all(self, progress_callback: Optional[Callable[[str, float], None]] = None):
-        """Load all blocklists using fast binary cache or multi-core cold parsing with live progress."""
+    def load_all(self, progress_callback: Optional[Callable[[str, float], None]] = None, force_reload: bool = False):
+        """Load all blocklists using ultra-fast binary cache or multi-core parallel parsing with live progress."""
         self.is_loading = True
         cb = progress_callback or self.progress_callback
         try:
             self._report_progress("Checking intelligence cache...", 0.1, cb)
             current_hash = self._get_lists_hash()
             
-            # 1. Try loading from existing cache files (.pkl first, then .json)
-            ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
-            for cat in ConnectionCategory:
-                ConnectionCategory_dict[cat] = cat
+            # 1. Try loading from existing high-speed binary cache (.pkl)
+            if not force_reload:
+                ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
+                for cat in ConnectionCategory:
+                    ConnectionCategory_dict[cat] = cat
 
-            for cache_file in self._get_cache_paths():
-                if os.path.exists(cache_file):
-                    try:
-                        self._report_progress("Loading domain database cache...", 0.25, cb)
-                        cache_data = None
-                        if cache_file.endswith('.pkl'):
-                            with open(cache_file, "rb") as f:
-                                cache_data = pickle.load(f)
-                        elif cache_file.endswith('.json'):
-                            with open(cache_file, "r", encoding="utf-8") as f:
-                                cache_data = json.load(f)
+                for cache_file in self._get_cache_paths():
+                    if os.path.exists(cache_file):
+                        try:
+                            self._report_progress("Loading domain database cache...", 0.3, cb)
+                            cache_data = None
+                            if cache_file.endswith('.pkl'):
+                                with open(cache_file, "rb") as f:
+                                    cache_data = pickle.load(f)
+                            elif cache_file.endswith('.json'):
+                                with open(cache_file, "r", encoding="utf-8") as f:
+                                    cache_data = json.load(f)
 
-                        if cache_data and cache_data.get("hash") == current_hash and "domain_map" in cache_data:
-                            raw_map = cache_data["domain_map"]
-                            sample_val = next(iter(raw_map.values())) if raw_map else None
-                            if isinstance(sample_val, ConnectionCategory):
-                                new_domain_map = raw_map
-                            else:
-                                new_domain_map = {
-                                    k: ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
-                                    for k, v in raw_map.items()
-                                }
-                            
-                            new_stats = {
-                                ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
-                                for k, v in cache_data.get("stats", {}).items()
-                            }
-                            new_sources_metadata = {
-                                ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
-                                for k, v in cache_data.get("sources_metadata", {}).items()
-                            }
-                            
-                            # Restore or build indexed category sets
-                            new_category_domains = {cat: set() for cat in ConnectionCategory}
-                            if "category_domains" in cache_data:
-                                raw_cat_doms = cache_data["category_domains"]
-                                for k, dom_set in raw_cat_doms.items():
-                                    cat_enum = ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN)
-                                    new_category_domains[cat_enum] = set(dom_set)
-                            else:
-                                for d, cat_enum in new_domain_map.items():
-                                    new_category_domains[cat_enum].add(d)
-
-                            # Atomic swap inside lock
-                            with self.lock:
-                                self.domain_map = new_domain_map
-                                self.category_domains = new_category_domains
-                                self.identity_map = cache_data.get("identity_map", {})
-                                self.stats = new_stats
-                                self.sources_metadata = new_sources_metadata
+                            if cache_data and cache_data.get("hash") == current_hash and "domain_map" in cache_data:
+                                raw_map = cache_data["domain_map"]
+                                sample_val = next(iter(raw_map.values())) if raw_map else None
+                                if isinstance(sample_val, ConnectionCategory):
+                                    new_domain_map = raw_map
+                                else:
+                                    new_domain_map = {
+                                        k: ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
+                                        for k, v in raw_map.items()
+                                    }
                                 
-                            self.is_loading = False
-                            self._report_progress("Filter engine fully loaded", 1.0, cb)
-                            self._notify_loaded()
-                            logger.info(f"Blocklists successfully loaded from cache {os.path.basename(cache_file)} ({len(new_domain_map)} domains)")
-                            return
-                    except Exception as e:
-                        logger.warning(f"Failed to load cache from {cache_file}: {e}. Falling back...")
+                                new_stats = {
+                                    ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                    for k, v in cache_data.get("stats", {}).items()
+                                }
+                                new_sources_metadata = {
+                                    ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                    for k, v in cache_data.get("sources_metadata", {}).items()
+                                }
+                                
+                                # Restore or build indexed category sets
+                                new_category_domains = {cat: set() for cat in ConnectionCategory}
+                                if "category_domains" in cache_data:
+                                    raw_cat_doms = cache_data["category_domains"]
+                                    for k, dom_set in raw_cat_doms.items():
+                                        cat_enum = ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN)
+                                        new_category_domains[cat_enum] = dom_set if isinstance(dom_set, set) else set(dom_set)
+                                else:
+                                    for d, cat_enum in new_domain_map.items():
+                                        new_category_domains[cat_enum].add(d)
 
-            # 2. Cold Reload: Multi-thread parsing
-            self._report_progress("Parsing filter lists from disk...", 0.15, cb)
+                                # Atomic swap inside lock
+                                with self.lock:
+                                    self.domain_map = new_domain_map
+                                    self.category_domains = new_category_domains
+                                    self.identity_map = cache_data.get("identity_map", {})
+                                    self.stats = new_stats
+                                    self.sources_metadata = new_sources_metadata
+                                    
+                                self.is_loading = False
+                                self._report_progress("Filter engine fully loaded", 1.0, cb)
+                                self._notify_loaded()
+                                logger.info(f"Blocklists successfully loaded from cache {os.path.basename(cache_file)} ({len(new_domain_map)} domains)")
+                                return
+                        except Exception as e:
+                            logger.warning(f"Failed to load cache from {cache_file}: {e}. Falling back...")
+
+            # 2. Cold Reload: Multi-core parallel parsing
+            self._report_progress("Parsing filter lists from disk...", 0.2, cb)
             new_domain_map = {}
             new_category_domains = {cat: set() for cat in ConnectionCategory}
             new_identity_map = {}
@@ -527,18 +528,26 @@ class BlocklistManager:
                         pass
 
                 all_files = sorted([f for f in os.listdir(self.lists_dir) if f.endswith('.txt')])
-                total_files = len(all_files)
-                
-                for idx, filename in enumerate(all_files, 1):
+                active_files = []
+                for filename in all_files:
                     fn_lower = filename.lower()
                     if fn_lower in disabled_file_patterns or any(p in fn_lower for p in disabled_file_patterns if len(p) > 3):
                         continue
+                    active_files.append(filename)
+
+                total_files = len(active_files)
+
+                # Multi-core concurrent parsing of all list files
+                from concurrent.futures import ThreadPoolExecutor
+                max_workers = min(8, max(2, os.cpu_count() or 4))
+                
+                def parse_worker(filename):
                     filepath = os.path.join(self.lists_dir, filename)
                     cat: Optional[ConnectionCategory] = None
                     identity_name: Optional[str] = None
                     is_whitelist_file = False
 
-                    if filename.startswith('ads_') or filename.startswith('ad_') or filename == 'ads.txt':
+                    if filename.startswith(('ads_', 'ad_')) or filename == 'ads.txt':
                         cat = ConnectionCategory.AD
                     elif filename.startswith('telemetry_') or filename == 'telemetry.txt':
                         cat = ConnectionCategory.TELEMETRY
@@ -557,13 +566,13 @@ class BlocklistManager:
                         cat = ConnectionCategory.SECURITY
                     elif filename.startswith('update_'):
                         cat = ConnectionCategory.UPDATE
-                    elif filename.startswith('safe_') or filename.startswith('essential_'):
+                    elif filename.startswith(('safe_', 'essential_')):
                         cat = ConnectionCategory.ESSENTIAL
                         is_whitelist_file = True
                     elif filename.startswith('whitelist_'):
                         cat = ConnectionCategory.USER_ALLOWED
                         is_whitelist_file = True
-                    elif filename.startswith('user_blocked_') or filename.startswith('blocked_'):
+                    elif filename.startswith(('user_blocked_', 'blocked_')):
                         cat = ConnectionCategory.USER_BLOCKED
                     elif filename.startswith('system_'):
                         cat = ConnectionCategory.SYSTEM
@@ -571,38 +580,45 @@ class BlocklistManager:
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
 
-                    prog = 0.15 + (0.75 * (idx / max(1, total_files)))
-                    clean_name = filename.replace('.txt', '').replace('_', ' ')
-                    self._report_progress(f"Parsing list ({idx}/{total_files}): {clean_name}", prog, cb)
-
                     domains = self._parse_domains_from_file(filepath, is_whitelist_file=is_whitelist_file)
-                    
-                    if cat:
-                        if cat not in new_sources_metadata:
-                            new_sources_metadata[cat] = []
-                        dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
-                        new_sources_metadata[cat].append({'filename': filename, 'updated': dt, 'size': len(domains)})
+                    dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')
+                    return filename, cat, identity_name, domains, dt
 
-                    for d in domains:
+                completed_count = 0
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(parse_worker, f) for f in active_files]
+                    for fut in futures:
+                        filename, cat, identity_name, domains, dt = fut.result()
+                        completed_count += 1
+                        prog = 0.2 + (0.7 * (completed_count / max(1, total_files)))
+                        clean_name = filename.replace('.txt', '').replace('_', ' ')
+                        self._report_progress(f"Parsed ({completed_count}/{total_files}): {clean_name}", prog, cb)
+
                         if cat:
-                            if cat in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
-                                if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
-                                    continue
+                            if cat not in new_sources_metadata:
+                                new_sources_metadata[cat] = []
+                            new_sources_metadata[cat].append({'filename': filename, 'updated': dt, 'size': len(domains)})
 
-                            if d not in new_domain_map:
-                                new_domain_map[d] = cat
-                                new_category_domains[cat].add(d)
-                                new_stats[cat] = new_stats.get(cat, 0) + 1
-                            else:
-                                existing_cat = new_domain_map[d]
-                                if CATEGORY_PRIORITY.get(cat, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+                        for d in domains:
+                            if cat:
+                                if cat in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
+                                    if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
+                                        continue
+
+                                if d not in new_domain_map:
                                     new_domain_map[d] = cat
-                                    new_category_domains[existing_cat].discard(d)
                                     new_category_domains[cat].add(d)
-                                    new_stats[existing_cat] -= 1
                                     new_stats[cat] = new_stats.get(cat, 0) + 1
-                        if identity_name:
-                            new_identity_map[d] = identity_name
+                                else:
+                                    existing_cat = new_domain_map[d]
+                                    if CATEGORY_PRIORITY.get(cat, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
+                                        new_domain_map[d] = cat
+                                        new_category_domains[existing_cat].discard(d)
+                                        new_category_domains[cat].add(d)
+                                        new_stats[existing_cat] -= 1
+                                        new_stats[cat] = new_stats.get(cat, 0) + 1
+                            if identity_name:
+                                new_identity_map[d] = identity_name
 
             # Atomic swap inside lock
             with self.lock:
@@ -614,7 +630,7 @@ class BlocklistManager:
 
             self._report_progress("Saving intelligence cache...", 0.95, cb)
             
-            # Save fast binary cache asynchronously
+            # Save fast binary cache directly and asynchronously to both user directory and lists directory
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
 
@@ -627,13 +643,6 @@ class BlocklistManager:
                         "identity_map": i_map,
                         "stats": st,
                         "sources_metadata": sm
-                    }
-                    json_payload = {
-                        "hash": c_hash,
-                        "domain_map": {k: getattr(v, 'value', v) for k, v in d_map.items()},
-                        "identity_map": i_map,
-                        "stats": {getattr(k, 'value', k): v for k, v in st.items()},
-                        "sources_metadata": {getattr(k, 'value', k): v for k, v in sm.items()}
                     }
                     
                     target_dirs = [user_d]
@@ -650,28 +659,14 @@ class BlocklistManager:
                                 try: os.remove(pkl_target)
                                 except Exception: pass
                             os.replace(pkl_tmp, pkl_target)
+                            logger.info(f"Updated high-speed binary cache at {pkl_target}")
                         except Exception as e:
                             logger.debug(f"Could not write pkl cache to {pkl_target}: {e}")
                             if os.path.exists(pkl_tmp):
                                 try: os.remove(pkl_tmp)
                                 except Exception: pass
-                                
-                        json_target = os.path.join(t_dir, "NetStrip_cache.json")
-                        json_tmp = json_target + ".tmp"
-                        try:
-                            with open(json_tmp, "w", encoding="utf-8") as f:
-                                json.dump(json_payload, f)
-                            if os.path.exists(json_target):
-                                try: os.remove(json_target)
-                                except Exception: pass
-                            os.replace(json_tmp, json_target)
-                        except Exception as e:
-                            logger.debug(f"Could not write json cache to {json_target}: {e}")
-                            if os.path.exists(json_tmp):
-                                try: os.remove(json_tmp)
-                                except Exception: pass
                 except Exception as e:
-                    logger.debug(f"Async cache save worker error: {e}")
+                    logger.debug(f"Cache save worker error: {e}")
 
             threading.Thread(
                 target=_save_cache_worker,

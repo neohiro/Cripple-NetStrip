@@ -1,3 +1,17 @@
+## [v3.3.9] - High-Performance Multi-Core Parallel Parsing, Widget-Pool List Virtualization & UI Fluency
+
+- **High-Performance Multi-Core Parallel List Parsing & Fast Tokenizer**:
+  - Parallelized cold filter parsing across all CPU cores with `concurrent.futures.ThreadPoolExecutor`, speeding up initial 45-file / 132MB list compilation.
+  - Implemented high-speed C-optimized line-by-line tokenizing and domain extraction, eliminating costly regex overhead.
+  - Pre-generated bundled `NetStrip_cache.pkl` binary database (3.25+ million keys loaded in ~2.9s) directly in `netstrip/data/lists/` and user directory.
+  - Removed slow synchronous 109MB JSON cache dumps, replacing them with asynchronous protocol-5 binary serialization.
+- **Widget-Pool List Virtualization & Zero-Flicker Differential Rendering**:
+  - Eliminated UI redraw stutter in `AppRulesView`, `BlocklistView`, and `LogView` by implementing object recycling pools (`_rule_widgets_pool`, `_sources_row_pool`, `_results_row_pool`).
+  - Added cryptographic tuple signature diffing to skip redundant repaints during periodical polling and view switches.
+  - Instantaneous view transitions and buttery-smooth list scrolling with zero row-by-row widget destruction overhead.
+- **Ultra-Smooth Splash Screen Boot Sequence**:
+  - Refined boot progress reporting to deliver fine-grained, continuous progress updates across all startup subsystems without visual pauses.
+
 ## [v3.3.8] - Ghost Mode Overhaul, Zero-Leak Discovery Sinkholing, Cross-Platform Protocol Hardening & Fail-Safe Restoration
 
 - **Ghost Mode Branding & Complete UI Harmonization**:

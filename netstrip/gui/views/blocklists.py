@@ -552,43 +552,42 @@ class BlocklistView(ctk.CTkFrame):
             self._sources_expanded = True
 
     def _populate_sources_list(self):
-        for child in self._sources_list_frame.winfo_children():
-            child.destroy()
-
         sources = self.engine.blocklist.get_updater_sources()
         from netstrip.core.modes import ConnectionCategory
         from netstrip.gui.theme import get_category_color, get_category_label, get_category_icon
 
+        if not hasattr(self, '_sources_row_pool'):
+            self._sources_row_pool = []
+
         if not sources:
-            ctk.CTkLabel(
-                self._sources_list_frame, text="No online sources configured.",
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic"),
-                text_color=Colors.TEXT_TERTIARY
-            ).pack(pady=Spacing.MD)
+            for item in self._sources_row_pool:
+                item['frame'].pack_forget()
+            if not hasattr(self, '_lbl_no_sources'):
+                self._lbl_no_sources = ctk.CTkLabel(
+                    self._sources_list_frame, text="No online sources configured.",
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "italic"),
+                    text_color=Colors.TEXT_TERTIARY
+                )
+            self._lbl_no_sources.pack(pady=Spacing.MD)
             return
+        else:
+            if hasattr(self, '_lbl_no_sources'):
+                self._lbl_no_sources.destroy()
+                delattr(self, '_lbl_no_sources')
 
-        for idx, src in enumerate(sources):
-            name = src.get('name', 'Unknown Source')
-            url = src.get('url', '')
-            cat_str = src.get('category', 'ad')
-            enabled = src.get('enabled', True)
-            is_local = src.get('is_local', False)
-            local_size = src.get('local_size', 0)
-
-            # Row container
+        # Grow pool if needed
+        while len(self._sources_row_pool) < len(sources):
+            idx = len(self._sources_row_pool)
             row_bg = "#181824" if idx % 2 == 0 else "#14141f"
             row = ctk.CTkFrame(self._sources_list_frame, fg_color=row_bg, corner_radius=6, height=42)
-            row.pack(fill="x", pady=2, padx=4)
             row.pack_propagate(False)
 
-            # Left: Status indicator dot + Name & URL
             left_frame = ctk.CTkFrame(row, fg_color="transparent")
             left_frame.pack(side="left", fill="both", expand=True, padx=Spacing.SM)
 
-            status_dot_color = Colors.SUCCESS if (enabled and is_local) else (Colors.WARNING if enabled else Colors.TEXT_TERTIARY)
             dot_lbl = ctk.CTkLabel(
                 left_frame, text="●", font=(Fonts.FAMILY_PRIMARY[0], 12),
-                text_color=status_dot_color, width=16
+                text_color=Colors.SUCCESS, width=16
             )
             dot_lbl.pack(side="left", padx=(0, Spacing.XS))
 
@@ -596,24 +595,73 @@ class BlocklistView(ctk.CTkFrame):
             info_frame.pack(side="left", fill="both", expand=True)
 
             name_lbl = ctk.CTkLabel(
-                info_frame, text=name,
+                info_frame, text="",
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
-                text_color=Colors.TEXT_PRIMARY if enabled else Colors.TEXT_TERTIARY,
+                text_color=Colors.TEXT_PRIMARY,
                 anchor="w"
             )
             name_lbl.pack(anchor="w")
 
-            url_short = url[:65] + "..." if len(url) > 65 else url
-            size_str = f" • {local_size / 1024:.1f} KB" if (is_local and local_size > 0) else ""
             sub_lbl = ctk.CTkLabel(
-                info_frame, text=f"{url_short}{size_str}",
+                info_frame, text="",
                 font=(Fonts.FAMILY_PRIMARY[0], 10),
                 text_color=Colors.TEXT_TERTIARY,
                 anchor="w"
             )
             sub_lbl.pack(anchor="w")
 
-            # Center: Category badge
+            badge = ctk.CTkLabel(
+                row, text="",
+                font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
+                fg_color=Colors.BG_ELEVATED,
+                corner_radius=8,
+                height=22,
+                width=90
+            )
+            badge.pack(side="left", padx=Spacing.MD)
+
+            switch_var = ctk.BooleanVar(value=True)
+            switch = ctk.CTkSwitch(
+                row, text="", variable=switch_var,
+                width=45, height=22,
+                **CTK_SWITCH_STYLE
+            )
+            switch.pack(side="right", padx=Spacing.MD)
+
+            self._sources_row_pool.append({
+                'frame': row,
+                'dot_lbl': dot_lbl,
+                'name_lbl': name_lbl,
+                'sub_lbl': sub_lbl,
+                'badge': badge,
+                'switch_var': switch_var,
+                'switch': switch
+            })
+
+        for idx, src in enumerate(sources):
+            item = self._sources_row_pool[idx]
+            name = src.get('name', 'Unknown Source')
+            url = src.get('url', '')
+            cat_str = src.get('category', 'ad')
+            enabled = src.get('enabled', True)
+            is_local = src.get('is_local', False)
+            local_size = src.get('local_size', 0)
+
+            row_bg = "#181824" if idx % 2 == 0 else "#14141f"
+            item['frame'].configure(fg_color=row_bg)
+
+            status_dot_color = Colors.SUCCESS if (enabled and is_local) else (Colors.WARNING if enabled else Colors.TEXT_TERTIARY)
+            item['dot_lbl'].configure(text_color=status_dot_color)
+
+            item['name_lbl'].configure(
+                text=name,
+                text_color=Colors.TEXT_PRIMARY if enabled else Colors.TEXT_TERTIARY
+            )
+
+            url_short = url[:65] + "..." if len(url) > 65 else url
+            size_str = f" • {local_size / 1024:.1f} KB" if (is_local and local_size > 0) else ""
+            item['sub_lbl'].configure(text=f"{url_short}{size_str}")
+
             try:
                 norm_cat = "ad" if cat_str == "ads" else cat_str
                 cat_enum = ConnectionCategory(norm_cat)
@@ -624,21 +672,14 @@ class BlocklistView(ctk.CTkFrame):
             cat_label = get_category_label(cat_enum)
             cat_icon = get_category_icon(cat_enum)
 
-            badge = ctk.CTkLabel(
-                row, text=f" {cat_icon} {cat_label.upper()} ",
-                font=(Fonts.FAMILY_PRIMARY[0], 10, Fonts.WEIGHT_BOLD),
-                text_color=cat_color,
-                fg_color=Colors.BG_ELEVATED,
-                corner_radius=8,
-                height=22,
-                width=90
+            item['badge'].configure(
+                text=f" {cat_icon} {cat_label.upper()} ",
+                text_color=cat_color
             )
-            badge.pack(side="left", padx=Spacing.MD)
 
-            # Right: Enable/Disable Switch
-            switch_var = ctk.BooleanVar(value=enabled)
+            item['switch_var'].set(enabled)
 
-            def make_toggle_handler(src_name=name, var=switch_var, n_lbl=name_lbl, d_lbl=dot_lbl):
+            def make_toggle_handler(src_name=name, var=item['switch_var'], n_lbl=item['name_lbl'], d_lbl=item['dot_lbl']):
                 def on_toggle():
                     val = var.get()
                     self.engine.blocklist.toggle_updater_source(src_name, val)
@@ -648,13 +689,14 @@ class BlocklistView(ctk.CTkFrame):
                         self.engine.on_status(f"{'Enabled' if val else 'Disabled'} feed: {src_name}")
                 return on_toggle
 
-            switch = ctk.CTkSwitch(
-                row, text="", variable=switch_var,
-                command=make_toggle_handler(),
-                width=45, height=22,
-                **CTK_SWITCH_STYLE
-            )
-            switch.pack(side="right", padx=Spacing.MD)
+            item['switch'].configure(command=make_toggle_handler())
+
+            if not item['frame'].winfo_ismapped():
+                item['frame'].pack(fill="x", pady=2, padx=4)
+
+        for j in range(len(sources), len(self._sources_row_pool)):
+            if self._sources_row_pool[j]['frame'].winfo_ismapped():
+                self._sources_row_pool[j]['frame'].pack_forget()
 
         # Isolate scroll events on the sources list frame so mouse wheel does not scroll the outer tab
         self._isolate_sources_scroll()

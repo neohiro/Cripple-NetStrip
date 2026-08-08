@@ -244,128 +244,149 @@ class AppRulesView(ctk.CTkFrame):
         self._refresh_pending()
         self._refresh_rules()
 
-    # ── Rules refresh ───────────────────────────────────
+    # ── Rules refresh with widget recycling & signature diffing ────────
 
     def _refresh_rules(self):
-        if self._destroyed:
+        if getattr(self, '_destroyed', False):
             return
-
-        for w in self._rules_scroll.winfo_children():
-            w.destroy()
 
         try:
             rules = list(self.engine.db.get_user_rules())
         except Exception:
             rules = []
 
-        if not rules:
-            loading_frame = ctk.CTkFrame(self._rules_scroll, fg_color=Colors.BG_PANEL)
-            loading_frame.pack(pady=Spacing.XL, expand=True)
-            ctk.CTkLabel(loading_frame, text="⏳", font=(Fonts.FAMILY_PRIMARY[0], 36)).pack()
-            ctk.CTkLabel(
-                loading_frame, text="No rules defined yet",
-                text_color=Colors.TEXT_TERTIARY,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-            ).pack(pady=Spacing.XS)
-            return
-
-        for rule in rules:
-            self._create_rule_row(rule)
-
-    def _create_rule_row(self, rule):
-        row = ctk.CTkFrame(
-            self._rules_scroll,
-            fg_color=Colors.BG_ELEVATED, corner_radius=0,
-        )
-        row.pack(fill="x", pady=2, padx=4)
-
-        # Left color accent bar
-        action = rule['action'] if isinstance(rule, dict) else rule[1]
-        accent = Colors.SUCCESS if action == 'allow' else Colors.CAT_USER_BLOCKED
-        ctk.CTkFrame(row, width=3, fg_color=accent, corner_radius=0).pack(
-            side="left", fill="y",
-        )
-
-        # Content area
-        content = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
-        content.pack(side="left", fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
-        content.grid_columnconfigure(0, weight=1)
-
-        # Pattern
-        pattern = rule['pattern'] if isinstance(rule, dict) else rule[1]
-        try:
-            pattern = rule['pattern']
-        except (KeyError, TypeError):
-            pattern = str(rule)
-            
+        # Fast signature diffing to skip redundant repainting
         privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
-        if privacy_on:
-            from netstrip.gui.utils import mask_ip_string
-            pattern = mask_ip_string(pattern)
-        
-        pattern_lbl = ctk.CTkLabel(
-            content, text=pattern,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE, Fonts.WEIGHT_BOLD),
-            text_color=Colors.TEXT_PRIMARY,
-        )
-        pattern_lbl.grid(row=0, column=0, sticky="w")
-        if pattern:
-            bind_copy_tooltip(pattern_lbl, pattern)
+        sig = (privacy_on, [(r.get('id'), r.get('pattern'), r.get('action'), r.get('app_name'), r.get('scope'), r.get('mode_scope')) if isinstance(r, dict) else (r[0], r[1], r[2], r[3], r[4]) for r in rules])
+        if getattr(self, '_last_rules_sig', None) == sig:
+            return
+        self._last_rules_sig = sig
 
-        # App + scope info
-        try:
-            app = rule['app_name'] or "All Apps"
-            scope = rule['scope'] or "global"
-            mode_scope = rule.get('mode_scope', 'STANDARD') if isinstance(rule, dict) else (rule['mode_scope'] if 'mode_scope' in rule.keys() else 'STANDARD')
-            
-            # Format the sub_text nicely
-            if mode_scope == "PARANOID":
-                mode_str = "🔒 PARANOID Mode Only"
-            elif mode_scope == "ALL":
-                mode_str = "🌐 ALL Modes"
-            else:
-                mode_str = "🛡️ STANDARD Mode Only"
-                
-            sub_text = f"{app} • {scope}  |  {mode_str}"
-        except (KeyError, TypeError, IndexError):
-            sub_text = ""
-        if sub_text:
-            ctk.CTkLabel(
-                content, text=sub_text,
+        if not hasattr(self, '_rule_widgets_pool'):
+            self._rule_widgets_pool = []
+
+        if not rules:
+            for w_tuple in self._rule_widgets_pool:
+                w_tuple[0].pack_forget()
+            if not hasattr(self, 'lbl_no_rules'):
+                loading_frame = ctk.CTkFrame(self._rules_scroll, fg_color=Colors.BG_PANEL)
+                loading_frame.pack(pady=Spacing.XL, expand=True)
+                ctk.CTkLabel(loading_frame, text="⏳", font=(Fonts.FAMILY_PRIMARY[0], 36)).pack()
+                ctk.CTkLabel(
+                    loading_frame, text="No rules defined yet",
+                    text_color=Colors.TEXT_TERTIARY,
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+                ).pack(pady=Spacing.XS)
+                self.lbl_no_rules = loading_frame
+            return
+        else:
+            if hasattr(self, 'lbl_no_rules'):
+                self.lbl_no_rules.destroy()
+                delattr(self, 'lbl_no_rules')
+
+        # Grow pool if needed
+        while len(self._rule_widgets_pool) < len(rules):
+            row = ctk.CTkFrame(self._rules_scroll, fg_color=Colors.BG_ELEVATED, corner_radius=0)
+            accent = ctk.CTkFrame(row, width=3, corner_radius=0)
+            accent.pack(side="left", fill="y")
+
+            content = ctk.CTkFrame(row, fg_color=Colors.BG_PANEL)
+            content.pack(side="left", fill="both", expand=True, padx=Spacing.SM, pady=Spacing.SM)
+            content.grid_columnconfigure(0, weight=1)
+
+            pattern_lbl = ctk.CTkLabel(
+                content, text="",
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE, Fonts.WEIGHT_BOLD),
+                text_color=Colors.TEXT_PRIMARY,
+            )
+            pattern_lbl.grid(row=0, column=0, sticky="w")
+
+            sub_lbl = ctk.CTkLabel(
+                content, text="",
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
                 text_color=Colors.TEXT_SECONDARY,
-            ).grid(row=1, column=0, sticky="w")
+            )
+            sub_lbl.grid(row=1, column=0, sticky="w")
 
-        # Created date
-        try:
-            created = rule['created_at']
-            if isinstance(created, str):
-                dt = datetime.fromisoformat(created)
-                date_str = dt.strftime("%b %d, %Y")
-            else:
-                date_str = str(created)
-        except Exception:
-            date_str = ""
-        if date_str:
-            ctk.CTkLabel(
-                content, text=date_str,
+            date_lbl = ctk.CTkLabel(
+                content, text="",
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
                 text_color=Colors.TEXT_TERTIARY,
-            ).grid(row=0, column=1, rowspan=2, padx=Spacing.SM)
+            )
+            date_lbl.grid(row=0, column=1, rowspan=2, padx=Spacing.SM)
 
-        # Delete button
-        try:
-            rule_id = rule['id']
-        except (KeyError, TypeError):
-            rule_id = None
+            del_btn = ctk.CTkButton(
+                content, text=Icons.TRASH,
+                fg_color=Colors.BG_PANEL, hover_color=Colors.DANGER_DIM,
+                width=30, height=30, corner_radius=6,
+                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
+            )
+            del_btn.grid(row=0, column=2, rowspan=2, padx=(Spacing.XS, 0))
 
-        ctk.CTkButton(
-            content, text=Icons.TRASH,
-            fg_color=Colors.BG_PANEL, hover_color=Colors.DANGER_DIM,
-            width=30, height=30, corner_radius=6,
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
-            command=lambda rid=rule_id: self._delete_rule(rid),
-        ).grid(row=0, column=2, rowspan=2, padx=(Spacing.XS, 0))
+            self._rule_widgets_pool.append((row, accent, content, pattern_lbl, sub_lbl, date_lbl, del_btn))
+
+        # Update and map active rows in place
+        for i, rule in enumerate(rules):
+            row, accent, content, pattern_lbl, sub_lbl, date_lbl, del_btn = self._rule_widgets_pool[i]
+
+            action = rule.get('action') if isinstance(rule, dict) else rule[1]
+            accent_color = Colors.SUCCESS if action == 'allow' else Colors.CAT_USER_BLOCKED
+            accent.configure(fg_color=accent_color)
+
+            # Pattern
+            pattern = rule.get('pattern') if isinstance(rule, dict) else rule[1]
+            if privacy_on:
+                from netstrip.gui.utils import mask_ip_string
+                display_pattern = mask_ip_string(str(pattern))
+            else:
+                display_pattern = str(pattern)
+
+            pattern_lbl.configure(text=display_pattern)
+            if pattern:
+                bind_copy_tooltip(pattern_lbl, str(pattern))
+
+            # App + scope
+            try:
+                app = rule.get('app_name') or "All Apps"
+                scope = rule.get('scope') or "global"
+                mode_scope = rule.get('mode_scope', 'STANDARD') if isinstance(rule, dict) else (rule['mode_scope'] if 'mode_scope' in rule.keys() else 'STANDARD')
+                
+                if mode_scope == "PARANOID":
+                    mode_str = "🔒 PARANOID Mode Only"
+                elif mode_scope == "ALL":
+                    mode_str = "🌐 ALL Modes"
+                else:
+                    mode_str = "🛡️ STANDARD Mode Only"
+                    
+                sub_text = f"{app} • {scope}  |  {mode_str}"
+            except Exception:
+                sub_text = ""
+            sub_lbl.configure(text=sub_text)
+
+            # Created date
+            try:
+                created = rule.get('created_at', '')
+                if isinstance(created, str) and created:
+                    dt = datetime.fromisoformat(created)
+                    date_str = dt.strftime("%b %d, %Y")
+                else:
+                    date_str = str(created) if created else ""
+            except Exception:
+                date_str = ""
+            date_lbl.configure(text=date_str)
+
+            # Delete button
+            rule_id = rule.get('id') if isinstance(rule, dict) else rule[0]
+            del_btn.configure(command=lambda rid=rule_id: self._delete_rule(rid))
+
+            if not row.winfo_ismapped():
+                row.pack(fill="x", pady=2, padx=4)
+
+        # Unmap surplus rows
+        for j in range(len(rules), len(self._rule_widgets_pool)):
+            surplus_row = self._rule_widgets_pool[j][0]
+            if surplus_row.winfo_ismapped():
+                surplus_row.pack_forget()
 
     def _delete_rule(self, rule_id):
         if rule_id is not None:
@@ -373,6 +394,7 @@ class AppRulesView(ctk.CTkFrame):
                 self.engine.db.delete_user_rule(rule_id)
             except Exception:
                 pass
+        self._last_rules_sig = None
         self._refresh_rules()
 
     # ── Lifecycle ───────────────────────────────────────
