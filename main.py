@@ -24,7 +24,7 @@ if "--parent-pid" in sys.argv:
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Windows App User Model ID, Mark-of-the-Web unblocker, & Safe DLL Search Paths
+# Windows App User Model ID & NTFS Mark-of-the-Web (Zone.Identifier) Auto-Unblocker
 try:
     if sys.platform == 'win32':
         import ctypes
@@ -37,10 +37,21 @@ try:
         base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
         internal_dir = os.path.join(base_dir, '_internal')
 
-        # Automatically strip NTFS Zone.Identifier (Mark of the Web) from all files in app directory
+        # Automatically strip NTFS Zone.Identifier (Mark of the Web) from all files and directories
+        # to ensure seamless execution under Smart App Control / AppLocker
         try:
             kernel32 = ctypes.windll.kernel32
+            # Unblock main executable and directory
+            if getattr(sys, 'frozen', False) and sys.executable:
+                kernel32.DeleteFileW(f"\\\\?\\{sys.executable}:Zone.Identifier")
+            kernel32.DeleteFileW(f"\\\\?\\{base_dir}:Zone.Identifier")
+
             for root, dirs, files in os.walk(base_dir):
+                for d in dirs:
+                    try:
+                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, d)}:Zone.Identifier")
+                    except Exception:
+                        pass
                 for f in files:
                     try:
                         kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, f)}:Zone.Identifier")
@@ -49,14 +60,10 @@ try:
         except Exception:
             pass
 
-        # Safe DLL search path: app dir + _internal dir + system32 + user dirs
+        # Ensure base and internal directories are on PATH for standard Windows DLL resolution
         try:
-            os.environ['PATH'] = f"{base_dir};{internal_dir};" + os.environ.get('PATH', '')
-            ctypes.windll.kernel32.SetDefaultDllDirectories(0x00001000)
             if os.path.exists(internal_dir):
-                ctypes.windll.kernel32.AddDllDirectory(internal_dir)
-            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-                ctypes.windll.kernel32.AddDllDirectory(sys._MEIPASS)
+                os.environ['PATH'] = f"{base_dir};{internal_dir};" + os.environ.get('PATH', '')
         except Exception:
             pass
 except Exception:
