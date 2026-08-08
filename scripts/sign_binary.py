@@ -105,9 +105,25 @@ def sign_and_package():
 
     $files = {file_paths_str}
     $signed = 0
+    $tsUrls = @('http://timestamp.digicert.com', 'http://timestamp.sectigo.com', 'http://timestamp.globalsign.com/scripts/timstamp.dll')
+
     foreach ($f in $files) {{
         if (Test-Path $f) {{
-            $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256
+            $ok = $false
+            foreach ($ts in $tsUrls) {{
+                try {{
+                    $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $ts -ErrorAction Stop
+                    if ($res.Status -eq 'Valid' -or $res.Status -eq 'UnknownError') {{
+                        $ok = $true
+                        break
+                    }}
+                }} catch {{
+                    # Try next timestamp server
+                }}
+            }}
+            if (-not $ok) {{
+                Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -ErrorAction SilentlyContinue | Out-Null
+            }}
             $signed++
         }}
     }}
@@ -135,12 +151,22 @@ def sign_and_package():
         except Exception:
             pass
 
-    # 4. Copy Install_Certificate.bat
+    # 4. Copy Install_Certificate.bat and create Run_Cripple.bat
     cert_installer = Path("scripts/Install_Certificate.bat")
     if cert_installer.exists():
         dest_installer = dist_cripple / "Install_Certificate.bat"
         shutil.copy2(cert_installer, dest_installer)
         print(f"[+] Bundled Certificate Installer to {dest_installer}")
+
+    run_cripple_bat = dist_cripple / "Run_Cripple.bat"
+    run_cripple_bat.write_text(
+        "@echo off\n"
+        "title Starting Cripple NetStrip...\n"
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-ChildItem -Path '%~dp0' -Recurse -File | Unblock-File -ErrorAction SilentlyContinue\"\n"
+        "start \"\" \"%~dp0Cripple.exe\" %*\n",
+        encoding="utf-8"
+    )
+    print(f"[+] Created Smart Unblock Launcher at {run_cripple_bat}")
 
     print("=" * 60)
     print(" FrenzyPenguin Media Code Signing Complete!")
