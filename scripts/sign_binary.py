@@ -111,20 +111,10 @@ def sign_and_package():
 
     ps_sign_batch = f"""
     $pfxPath = '{pfx_path_escaped}'
-    $pfxPass = '{pfx_pass}'
-    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
-    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
-        $pfxPath,
-        $pfxPass,
-        $flags
-    )
+    $pass = ConvertTo-SecureString '{pfx_pass}' -AsPlainText -Force
+    $imported = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\\CurrentUser\\My -Password $pass -Exportable
+    $cert = Get-Item "Cert:\\CurrentUser\\My\\$($imported.Thumbprint)"
     Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
-
-    # Ensure certificate with private key is in CurrentUser\\My store for signing APIs
-    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My", "CurrentUser")
-    $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-    $store.Add($cert)
-    $store.Close()
 
     $files = {file_paths_str}
     $signed = 0
@@ -146,8 +136,13 @@ def sign_and_package():
             }}
             if (-not $ok) {{
                 $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -ErrorAction SilentlyContinue
+                if ($res.Status -eq 'Valid' -or $res.Status -eq 'UnknownError') {{
+                    $ok = $true
+                }}
             }}
-            $signed++
+            if ($ok) {{
+                $signed++
+            }}
         }}
     }}
     Write-Output "SIGNED_COUNT:$signed"
