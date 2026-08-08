@@ -100,76 +100,133 @@ def sign_and_package():
     binaries = list(dist_cripple.rglob("*.exe")) + list(dist_cripple.rglob("*.dll")) + list(dist_cripple.rglob("*.pyd"))
     print(f"[+] Found {len(binaries)} binary files to sign in {dist_cripple}")
 
-    # 3. Batch Sign all binaries using .NET X509Certificate2 & Set-AuthenticodeSignature
-    escaped_paths = []
-    for b in binaries:
-        escaped_p = str(b.resolve()).replace("'", "''")
-        escaped_paths.append(f"    '{escaped_p}'")
-    file_paths_str = "@(\n" + ",\n".join(escaped_paths) + "\n)"
-    cer_path_escaped = str(cer_path.resolve()).replace("'", "''")
-    pfx_path_escaped = pfx_path_str.replace("'", "''")
+    # 3. Locate signtool.exe if available in Windows SDK
+    import glob
+    sdk_signtools = glob.glob("C:/Program Files (x86)/Windows Kits/10/bin/*/x64/signtool.exe")
+    signtool_exe = sdk_signtools[-1] if sdk_signtools else None
 
-    ps_sign_batch = f"""
-    $pfxPath = '{pfx_path_escaped}'
-    $pfxPass = '{pfx_pass}'
-    $pass = ConvertTo-SecureString $pfxPass -AsPlainText -Force
-    $imported = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\\CurrentUser\\My -Password $pass -Exportable)
-    $cert = $null
-    if ($imported.Count -gt 0) {{
-        $cert = $imported[0]
-    }}
-    if (-not $cert -or -not $cert.Thumbprint) {{
-        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
+    if signtool_exe and os.path.exists(signtool_exe):
+        print(f"[+] Found Windows SDK signtool: {signtool_exe}")
+        signed_count = 0
+        ts_urls = ["http://timestamp.digicert.com", "http://timestamp.sectigo.com", "http://timestamp.globalsign.com/scripts/timstamp.dll"]
+        for b in binaries:
+            signed = False
+            for ts in ts_urls:
+                cmd = [
+                    signtool_exe, "sign",
+                    "/f", pfx_path_str,
+                    "/p", pfx_pass,
+                    "/fd", "SHA256",
+                    "/tr", ts,
+                    "/td", "SHA256",
+                    str(b.resolve())
+                ]
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                if r.returncode == 0:
+                    signed = True
+                    break
+            if not signed:
+                cmd_notime = [
+                    signtool_exe, "sign",
+                    "/f", pfx_path_str,
+                    "/p", pfx_pass,
+                    "/fd", "SHA256",
+                    str(b.resolve())
+                ]
+                r = subprocess.run(cmd_notime, capture_output=True, text=True)
+                if r.returncode == 0:
+                    signed = True
+            if signed:
+                signed_count += 1
+        print(f"[+] Successfully signed {signed_count} binaries with signtool Authenticode SHA-256.")
+
+        # Export Public Certificate
+        ps_export = f"""
+        $pfxPath = '{pfx_path_escaped}'
+        $pfxPass = '{pfx_pass}'
+        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
         $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($pfxPath, $pfxPass, $flags)
-    }}
-    Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
+        $cerPath = '{cer_path_escaped}'
+        [System.IO.File]::WriteAllBytes($cerPath, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+        Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
+        Write-Output "EXPORTED_CER:$cerPath"
+        """
+        res = run_powershell(ps_export)
+        for line in res.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("CERT_THUMBPRINT:"):
+                print(f"[+] Certificate Thumbprint: {line.split(':', 1)[1]}")
+            elif line.startswith("EXPORTED_CER:"):
+                print(f"[+] Exported Public Certificate to {cer_path}")
+    else:
+        # Fallback: PowerShell Set-AuthenticodeSignature
+        escaped_paths = []
+        for b in binaries:
+            escaped_p = str(b.resolve()).replace("'", "''")
+            escaped_paths.append(f"    '{escaped_p}'")
+        file_paths_str = "@(\n" + ",\n".join(escaped_paths) + "\n)"
 
-    $files = {file_paths_str}
-    $signed = 0
-    $tsUrls = @('http://timestamp.digicert.com', 'http://timestamp.sectigo.com', 'http://timestamp.globalsign.com/scripts/timstamp.dll')
+        ps_sign_batch = f"""
+        $pfxPath = '{pfx_path_escaped}'
+        $pfxPass = '{pfx_pass}'
+        $pass = ConvertTo-SecureString $pfxPass -AsPlainText -Force
+        $imported = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\\CurrentUser\\My -Password $pass -Exportable)
+        $cert = $null
+        if ($imported.Count -gt 0) {{
+            $cert = $imported[0]
+        }}
+        if (-not $cert -or -not $cert.Thumbprint) {{
+            $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
+            $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($pfxPath, $pfxPass, $flags)
+        }}
+        Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
 
-    foreach ($f in $files) {{
-        if (Test-Path $f) {{
-            $ok = $false
-            foreach ($ts in $tsUrls) {{
-                try {{
-                    $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $ts -ErrorAction Stop
-                    if ($res.Status -eq 'Valid' -or $res.Status -eq 'UnknownError') {{
-                        $ok = $true
-                        break
+        $files = {file_paths_str}
+        $signed = 0
+        $tsUrls = @('http://timestamp.digicert.com', 'http://timestamp.sectigo.com', 'http://timestamp.globalsign.com/scripts/timstamp.dll')
+
+        foreach ($f in $files) {{
+            if (Test-Path $f) {{
+                $ok = $false
+                foreach ($ts in $tsUrls) {{
+                    try {{
+                        $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $ts -ErrorAction Stop
+                        if ($res.Status -in @('Valid', 'UnknownError', 'NotTrusted')) {{
+                            $ok = $true
+                            break
+                        }}
+                    }} catch {{
+                        # Try next timestamp server
                     }}
-                }} catch {{
-                    # Try next timestamp server
                 }}
-            }}
-            if (-not $ok) {{
-                $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -ErrorAction SilentlyContinue
-                if ($res.Status -eq 'Valid' -or $res.Status -eq 'UnknownError') {{
-                    $ok = $true
+                if (-not $ok) {{
+                    $res = Set-AuthenticodeSignature -FilePath $f -Certificate $cert -HashAlgorithm SHA256 -ErrorAction SilentlyContinue
+                    if ($res.Status -in @('Valid', 'UnknownError', 'NotTrusted')) {{
+                        $ok = $true
+                    }}
                 }}
-            }}
-            if ($ok) {{
-                $signed++
+                if ($ok) {{
+                    $signed++
+                }}
             }}
         }}
-    }}
-    Write-Output "SIGNED_COUNT:$signed"
+        Write-Output "SIGNED_COUNT:$signed"
 
-    # Export Public .cer Certificate
-    $cerPath = '{cer_path_escaped}'
-    [System.IO.File]::WriteAllBytes($cerPath, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
-    Write-Output "EXPORTED_CER:$cerPath"
-    """
+        # Export Public .cer Certificate
+        $cerPath = '{cer_path_escaped}'
+        [System.IO.File]::WriteAllBytes($cerPath, $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+        Write-Output "EXPORTED_CER:$cerPath"
+        """
 
-    res = run_powershell(ps_sign_batch)
-    for line in res.stdout.splitlines():
-        line = line.strip()
-        if line.startswith("CERT_THUMBPRINT:"):
-            print(f"[+] Certificate Thumbprint: {line.split(':', 1)[1]}")
-        elif line.startswith("SIGNED_COUNT:"):
-            print(f"[+] Successfully signed {line.split(':', 1)[1]} binaries with Authenticode SHA-256.")
-        elif line.startswith("EXPORTED_CER:"):
-            print(f"[+] Exported Public Certificate to {cer_path}")
+        res = run_powershell(ps_sign_batch)
+        for line in res.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("CERT_THUMBPRINT:"):
+                print(f"[+] Certificate Thumbprint: {line.split(':', 1)[1]}")
+            elif line.startswith("SIGNED_COUNT:"):
+                print(f"[+] Successfully signed {line.split(':', 1)[1]} binaries with Authenticode SHA-256.")
+            elif line.startswith("EXPORTED_CER:"):
+                print(f"[+] Exported Public Certificate to {cer_path}")
 
     if temp_pfx_file and os.path.exists(temp_pfx_file):
         try:
