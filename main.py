@@ -719,28 +719,17 @@ def main():
         
         # Create hidden main app immediately
         app = NetStripApp()
-    except (ImportError, Exception) as e:
+    except Exception as e:
         logger.error(f"GUI Subsystem Initialization Failed: {e}")
-        if sys.platform == 'win32' and ('control policy' in str(e).lower() or 'blocked' in str(e).lower() or '_tkinter' in str(e).lower()):
+        if sys.platform == 'win32':
             try:
                 import ctypes
-                base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-                installer = os.path.join(base_dir, "Install_Certificate.bat")
-                res = ctypes.windll.user32.MessageBoxW(
+                ctypes.windll.user32.MessageBoxW(
                     0,
-                    "Windows Smart App Control or Application Control blocked loading GUI modules (_tkinter.pyd).\n\n"
-                    "Would you like to run the automated Certificate & Security Installer now to trust Cripple NetStrip?",
-                    "Cripple NetStrip - Security & Certificate Helper",
-                    0x24 # MB_ICONQUESTION | MB_YESNO
+                    f"Error initializing Cripple GUI: {e}\n\nPlease ensure display drivers and system prerequisites are up to date.",
+                    "Cripple Initialization Error",
+                    0x10 # MB_ICONERROR
                 )
-                if res == 6: # IDYES
-                    if os.path.exists(installer):
-                        ctypes.windll.shell32.ShellExecuteW(None, "runas", installer, None, None, 1)
-                    else:
-                        runner = os.path.join(base_dir, "Run_Cripple.bat")
-                        if os.path.exists(runner):
-                            ctypes.windll.shell32.ShellExecuteW(None, "runas", runner, None, None, 1)
-                sys.exit(1)
             except Exception:
                 pass
         raise
