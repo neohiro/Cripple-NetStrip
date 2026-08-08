@@ -15,12 +15,20 @@ import tempfile
 from pathlib import Path
 
 def run_powershell(script: str) -> subprocess.CompletedProcess:
-    encoded = base64.b64encode(script.encode('utf-16le')).decode('ascii')
-    return subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
-        capture_output=True,
-        text=True
-    )
+    with tempfile.NamedTemporaryFile(suffix=".ps1", delete=False, mode="w", encoding="utf-8") as tf:
+        tf.write(script)
+        temp_ps1 = tf.name
+    try:
+        return subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", temp_ps1],
+            capture_output=True,
+            text=True
+        )
+    finally:
+        try:
+            os.remove(temp_ps1)
+        except Exception:
+            pass
 
 def sign_and_package():
     print("=" * 60)
