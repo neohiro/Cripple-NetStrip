@@ -50,6 +50,14 @@ def sign_and_package():
     elif Path("scripts/frenzy_signing.pfx").exists():
         print("[+] Found local scripts/frenzy_signing.pfx certificate.")
         pfx_path_str = str(Path("scripts/frenzy_signing.pfx").resolve())
+    elif Path("scripts/frenzy_signing_pfx_base64.txt").exists():
+        print("[+] Found scripts/frenzy_signing_pfx_base64.txt, restoring official FrenzyPenguin Media certificate.")
+        b64_content = Path("scripts/frenzy_signing_pfx_base64.txt").read_text(encoding="utf-8").strip()
+        temp_pfx = tempfile.NamedTemporaryFile(suffix=".pfx", delete=False)
+        temp_pfx.write(base64.b64decode(b64_content))
+        temp_pfx.close()
+        pfx_path_str = temp_pfx.name
+        temp_pfx_file = temp_pfx.name
     else:
         print("[+] Generating fresh FrenzyPenguin Media Code Signing Certificate via .NET...")
         pfx_temp = Path("scripts/frenzy_signing.pfx").resolve()
