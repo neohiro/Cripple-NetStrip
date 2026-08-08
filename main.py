@@ -24,18 +24,44 @@ if "--parent-pid" in sys.argv:
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Windows App User Model ID & Safe DLL Search Path
+# Windows App User Model ID, Mark-of-the-Web unblocker, & Safe DLL Search Paths
 try:
     if sys.platform == 'win32':
         import ctypes
         myappid = 'NetStrip.app.1.0'
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        # Safe DLL search path: LOAD_LIBRARY_SEARCH_DEFAULT_DIRS (app dir + system32 + user dirs)
-        ctypes.windll.kernel32.SetDefaultDllDirectories(0x00001000)
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            ctypes.windll.kernel32.AddDllDirectory(sys._MEIPASS)
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+
+        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        internal_dir = os.path.join(base_dir, '_internal')
+
+        # Automatically strip NTFS Zone.Identifier (Mark of the Web) from all files in app directory
+        try:
+            kernel32 = ctypes.windll.kernel32
+            for root, dirs, files in os.walk(base_dir):
+                for f in files:
+                    try:
+                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, f)}:Zone.Identifier")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Safe DLL search path: app dir + _internal dir + system32 + user dirs
+        try:
+            os.environ['PATH'] = f"{base_dir};{internal_dir};" + os.environ.get('PATH', '')
+            ctypes.windll.kernel32.SetDefaultDllDirectories(0x00001000)
+            if os.path.exists(internal_dir):
+                ctypes.windll.kernel32.AddDllDirectory(internal_dir)
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                ctypes.windll.kernel32.AddDllDirectory(sys._MEIPASS)
+        except Exception:
+            pass
 except Exception:
     pass
+
 
 def setup_logging():
     logging.basicConfig(
@@ -69,15 +95,21 @@ def check_dependencies():
         missing.append("dnslib")
         
     if missing:
-        if "--service" not in sys.argv:
-            import tkinter as tk
-            from tkinter import messagebox
-            root = tk.Tk()
-            root.withdraw()
-            messagebox.showerror("Missing Dependencies", f"Please install required dependencies: {', '.join(missing)}")
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0,
+                    f"Please install required dependencies: {', '.join(missing)}",
+                    "Missing Dependencies",
+                    0x10 # MB_ICONERROR
+                )
+            except Exception:
+                print(f"Missing Dependencies: {', '.join(missing)}")
         else:
             print(f"Missing Dependencies: {', '.join(missing)}")
         sys.exit(1)
+
 
 def is_server_or_embedded():
     """Detects if we are running on a server OS, or a low-resource embedded system like a Raspberry Pi."""
@@ -303,12 +335,8 @@ def main():
 
     # If we are NOT admin, and we haven't already tried elevating...
     if not platform.is_admin() and not is_elevated_retry and not is_fallback:
-        # We need to elevate IMMEDIATELY before loading heavy engine components.
-        import tkinter as tk
-        from tkinter import messagebox
-        import subprocess
-        
-        # Request elevation. This will spawn a new process.
+        # Request elevation IMMEDIATELY before loading any heavy or non-core modules.
+        # DO NOT import tkinter or any external DLLs here so standard user launches cleanly.
         success = platform.request_admin(os.path.abspath(__file__))
         
         if success:
@@ -316,13 +344,23 @@ def main():
             time.sleep(10)
             sys.exit(0)
         else:
-            # User declined UAC or it failed. Continue in restricted mode. # Re-show for restricted loading
-            messagebox.showwarning(
-                "Elevation Declined", 
-                "Cripple will run in restricted mode. Core firewall and DNS sinkhole features will be disabled or limited."
-            )
+            # User declined UAC or it failed. Continue in restricted mode.
+            if sys.platform == 'win32':
+                try:
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(
+                        0,
+                        "Cripple will run in restricted mode. Core firewall and DNS sinkhole features will be disabled or limited.",
+                        "Elevation Declined",
+                        0x30 # MB_ICONWARNING
+                    )
+                except Exception:
+                    pass
+            else:
+                print("Elevation Declined: Cripple will run in restricted mode.")
     elif not is_fallback:
         pass
+
 
     setup_logging()
     logger = logging.getLogger("Cripple")
@@ -670,17 +708,43 @@ def main():
     # Standard GUI Boot Path (used for both desktop AND --service to get tray icon)
     is_android_mode = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel') or '--android' in sys.argv
     
-    if is_android_mode:
-        from netstrip.gui.app_android import NetStripApp
-    else:
-        from netstrip.gui.app import NetStripApp
+    try:
+        if is_android_mode:
+            from netstrip.gui.app_android import NetStripApp
+        else:
+            from netstrip.gui.app import NetStripApp
+            
+        from netstrip.gui.splash import SplashScreen
+        from netstrip.core.engine import NetStripEngine
         
-    from netstrip.gui.splash import SplashScreen
-    from netstrip.core.engine import NetStripEngine
-    
-    # Create hidden main app immediately
-    app = NetStripApp()
-    
+        # Create hidden main app immediately
+        app = NetStripApp()
+    except (ImportError, Exception) as e:
+        logger.error(f"GUI Subsystem Initialization Failed: {e}")
+        if sys.platform == 'win32' and ('control policy' in str(e).lower() or 'blocked' in str(e).lower() or '_tkinter' in str(e).lower()):
+            try:
+                import ctypes
+                base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+                installer = os.path.join(base_dir, "Install_Certificate.bat")
+                res = ctypes.windll.user32.MessageBoxW(
+                    0,
+                    "Windows Smart App Control or Application Control blocked loading GUI modules (_tkinter.pyd).\n\n"
+                    "Would you like to run the automated Certificate & Security Installer now to trust Cripple NetStrip?",
+                    "Cripple NetStrip - Security & Certificate Helper",
+                    0x24 # MB_ICONQUESTION | MB_YESNO
+                )
+                if res == 6: # IDYES
+                    if os.path.exists(installer):
+                        ctypes.windll.shell32.ShellExecuteW(None, "runas", installer, None, None, 1)
+                    else:
+                        runner = os.path.join(base_dir, "Run_Cripple.bat")
+                        if os.path.exists(runner):
+                            ctypes.windll.shell32.ShellExecuteW(None, "runas", runner, None, None, 1)
+                sys.exit(1)
+            except Exception:
+                pass
+        raise
+        
     # Suppress Tkinter's noisy callback exception reporting in headless/service mode
     if is_headless:
         app.report_callback_exception = lambda exc, val, tb: None
@@ -690,6 +754,7 @@ def main():
         app.update() # Force draw the splash screen to the OS NOW!
     else:
         splash = None
+
         
     start_time = time.time()
     
