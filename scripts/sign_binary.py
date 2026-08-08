@@ -111,9 +111,17 @@ def sign_and_package():
 
     ps_sign_batch = f"""
     $pfxPath = '{pfx_path_escaped}'
-    $pass = ConvertTo-SecureString '{pfx_pass}' -AsPlainText -Force
-    $imported = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\\CurrentUser\\My -Password $pass -Exportable
-    $cert = Get-Item "Cert:\\CurrentUser\\My\\$($imported.Thumbprint)"
+    $pfxPass = '{pfx_pass}'
+    $pass = ConvertTo-SecureString $pfxPass -AsPlainText -Force
+    $imported = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\\CurrentUser\\My -Password $pass -Exportable)
+    $cert = $null
+    if ($imported.Count -gt 0) {{
+        $cert = $imported[0]
+    }}
+    if (-not $cert -or -not $cert.Thumbprint) {{
+        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::UserKeySet
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($pfxPath, $pfxPass, $flags)
+    }}
     Write-Output "CERT_THUMBPRINT:$($cert.Thumbprint)"
 
     $files = {file_paths_str}
