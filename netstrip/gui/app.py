@@ -75,12 +75,27 @@ ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
 import logging
 from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
-from netstrip.gui.dashboard import DashboardView
-from netstrip.gui.connections_sidebar import ConnectionsSidebar
-from netstrip.gui.views import AppRulesView, BlocklistView, LogView, SettingsView
-from netstrip.gui.smart_modal import SmartParanoidModal
-from netstrip.gui.killswitch_modal import ManualKillswitchModal, CriticalRecoveryModal
 from netstrip.core.engine import NetStripEngine
+
+def _resolve_view_class(view_target):
+    if isinstance(view_target, str):
+        if view_target == "DashboardView":
+            from netstrip.gui.dashboard import DashboardView
+            return DashboardView
+        elif view_target == "LogView":
+            from netstrip.gui.views.logs import LogView
+            return LogView
+        elif view_target == "BlocklistView":
+            from netstrip.gui.views.blocklists import BlocklistView
+            return BlocklistView
+        elif view_target == "SettingsView":
+            from netstrip.gui.views.settings import SettingsView
+            return SettingsView
+        elif view_target == "AppRulesView":
+            from netstrip.gui.views.rules import AppRulesView
+            return AppRulesView
+    return view_target
+
 
 class DraggableSash(ctk.CTkFrame):
     def __init__(self, master, engine, right_frame, **kwargs):
@@ -359,10 +374,10 @@ class NetStripApp(ctk.CTk):
         # Nav buttons
         self.nav_btns = []
         self.badge_label = None
-        self._add_nav_btn(2, "Dashboard", Icons.DASHBOARD, DashboardView)
-        self._add_nav_btn(3, "Logs", Icons.LOGS, LogView)
-        self._add_nav_btn(4, "Filter Lists", Icons.BLOCKLIST, BlocklistView)
-        self._add_nav_btn(5, "Settings", Icons.SETTINGS, SettingsView)
+        self._add_nav_btn(2, "Dashboard", Icons.DASHBOARD, "DashboardView")
+        self._add_nav_btn(3, "Logs", Icons.LOGS, "LogView")
+        self._add_nav_btn(4, "Filter Lists", Icons.BLOCKLIST, "BlocklistView")
+        self._add_nav_btn(5, "Settings", Icons.SETTINGS, "SettingsView")
 
         # Expand button
         self.btn_expand = ctk.CTkButton(
@@ -442,12 +457,14 @@ class NetStripApp(ctk.CTk):
 
     def _deferred_init(self):
         # Instantiate the ConnectionsSidebar widget inside the right sidebar
+        from netstrip.gui.connections_sidebar import ConnectionsSidebar
         self.connections_list = ConnectionsSidebar(self.right_sidebar, self.engine)
         self.connections_list.pack(fill="both", expand=True)
 
         self.current_view = None
         self._cached_views = {}
         self._select_nav(self.nav_btns[0])
+
         
         # Silently pre-warm unshown tabs in idle background time for instant switching
         self.after(1000, self._prewarm_views)
@@ -457,7 +474,8 @@ class NetStripApp(ctk.CTk):
         if getattr(self, '_destroyed', False):
             return
         for btn in self.nav_btns:
-            v_cls = getattr(btn, '_view_class', None)
+            v_raw = getattr(btn, '_view_class', None)
+            v_cls = _resolve_view_class(v_raw)
             if v_cls and v_cls not in self._cached_views:
                 try:
                     self._cached_views[v_cls] = v_cls(self.main_frame, self.engine)
@@ -544,12 +562,12 @@ class NetStripApp(ctk.CTk):
         if self.current_view:
             self.current_view.grid_remove() # Hide the old view instead of destroying it
 
-        view_class = selected_btn._view_class
+        view_class = _resolve_view_class(selected_btn._view_class)
         
         # If view is already cached, show it instantly with zero overlay latency
         if view_class in self._cached_views:
             self.current_view = self._cached_views[view_class]
-            if view_class.__name__ == 'DashboardView':
+            if getattr(view_class, '__name__', '') == 'DashboardView':
                 self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
             else:
                 self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
@@ -569,7 +587,7 @@ class NetStripApp(ctk.CTk):
                     self._cached_views[view_class] = view_class(self.main_frame, self.engine)
                 self.current_view = self._cached_views[view_class]
                 
-                if view_class.__name__ == 'DashboardView':
+                if getattr(view_class, '__name__', '') == 'DashboardView':
                     self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
                 else:
                     self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
@@ -583,7 +601,10 @@ class NetStripApp(ctk.CTk):
 
     def _show_smart_modal(self, conn_data):
         # Must run in main thread
-        self.after(0, lambda: SmartGhostModal(self, self.engine, conn_data))
+        def _show():
+            from netstrip.gui.smart_modal import SmartGhostModal
+            SmartGhostModal(self, self.engine, conn_data)
+        self.after(0, _show)
 
     def _update_geoip_ui(self, old_ip: str, geo_data: dict):
         def update_ui():
@@ -616,6 +637,7 @@ class NetStripApp(ctk.CTk):
         if current_state == "CRIPPLE: ON":
             # State 1 -> 2: Engage Killswitch
             try:
+                from netstrip.gui.killswitch_modal import ManualKillswitchModal
                 self.after(0, lambda: ManualKillswitchModal(self, self.engine, self._execute_manual_killswitch))
             except Exception:
                 self._execute_manual_killswitch(True) # Fallback to engaging without warning
@@ -667,10 +689,12 @@ class NetStripApp(ctk.CTk):
 
     def _show_critical_recovery_modal(self, message: str):
         try:
+            from netstrip.gui.killswitch_modal import CriticalRecoveryModal
             self.after(0, lambda: CriticalRecoveryModal(self, self.engine, message))
         except Exception as e:
             logger.error(f"Failed to spawn recovery modal: {e}")
         self.after(0, lambda: self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d"))
+
 
     def _perform_clean_exit(self):
         import pathlib

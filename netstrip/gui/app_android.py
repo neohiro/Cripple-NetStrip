@@ -75,11 +75,30 @@ ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
 import logging
 from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
-from netstrip.gui.dashboard import DashboardView
-from netstrip.gui.views import AppRulesView, BlocklistView, LogView, SettingsView
-from netstrip.gui.smart_modal import SmartParanoidModal
-from netstrip.gui.killswitch_modal import ManualKillswitchModal, CriticalRecoveryModal
 from netstrip.core.engine import NetStripEngine
+
+def _resolve_view_class(view_target):
+    if isinstance(view_target, str):
+        if view_target == "DashboardView":
+            from netstrip.gui.dashboard import DashboardView
+            return DashboardView
+        elif view_target == "LogView":
+            from netstrip.gui.views.logs import LogView
+            return LogView
+        elif view_target == "BlocklistView":
+            from netstrip.gui.views.blocklists import BlocklistView
+            return BlocklistView
+        elif view_target == "SettingsView":
+            from netstrip.gui.views.settings import SettingsView
+            return SettingsView
+        elif view_target == "AppRulesView":
+            from netstrip.gui.views.rules import AppRulesView
+            return AppRulesView
+        elif view_target == "ConnectionsView":
+            from netstrip.gui.views.connections import ConnectionsView
+            return ConnectionsView
+    return view_target
+
 
 
 
@@ -240,19 +259,18 @@ class NetStripApp(ctk.CTk):
 
         self.nav_btns = []
         
-        from netstrip.gui.views import AppRulesView, BlocklistView, LogView, SettingsView, ConnectionsView
         # 1. Connections (Live App Connections prioritized as primary upper tab)
-        self._add_bottom_nav_btn(0, "Connections", Icons.CONNECTIONS, ConnectionsView)
+        self._add_bottom_nav_btn(0, "Connections", Icons.CONNECTIONS, "ConnectionsView")
         # 2. Dashboard
-        self._add_bottom_nav_btn(1, "Dashboard", Icons.DASHBOARD, DashboardView)
+        self._add_bottom_nav_btn(1, "Dashboard", Icons.DASHBOARD, "DashboardView")
         # 3. App Rules
-        self._add_bottom_nav_btn(2, "App Rules", Icons.APPS, AppRulesView)
+        self._add_bottom_nav_btn(2, "App Rules", Icons.APPS, "AppRulesView")
         # 4. Filters (Blocklists)
-        self._add_bottom_nav_btn(3, "Filters", Icons.BLOCKLIST, BlocklistView)
+        self._add_bottom_nav_btn(3, "Filters", Icons.BLOCKLIST, "BlocklistView")
         # 5. Logs
-        self._add_bottom_nav_btn(4, "Logs", Icons.LOGS, LogView)
+        self._add_bottom_nav_btn(4, "Logs", Icons.LOGS, "LogView")
         # 6. Settings
-        self._add_bottom_nav_btn(5, "Settings", Icons.SETTINGS, SettingsView)
+        self._add_bottom_nav_btn(5, "Settings", Icons.SETTINGS, "SettingsView")
 
         # Badge Label (for updates/notifications) attached to settings icon implicitly
         self.badge_label = ctk.CTkLabel(self.nav_btns[-1], text="1", width=18, height=18, corner_radius=9, 
@@ -276,8 +294,9 @@ class NetStripApp(ctk.CTk):
         
     def _preload_next_view(self, index):
         if index < len(self.nav_btns):
-            view_class = self.nav_btns[index]._view_class
-            if view_class not in self._cached_views:
+            v_raw = self.nav_btns[index]._view_class
+            view_class = _resolve_view_class(v_raw)
+            if view_class and view_class not in self._cached_views:
                 self._cached_views[view_class] = view_class(self.main_frame, self.engine)
             self.after(300, self._preload_next_view, index + 1)
 
@@ -324,7 +343,7 @@ class NetStripApp(ctk.CTk):
         if self.current_view:
             self.current_view.grid_remove() # Hide the old view instead of destroying it
 
-        view_class = selected_btn._view_class
+        view_class = _resolve_view_class(selected_btn._view_class)
         
         # Immediate UI feedback
         if not hasattr(self, '_tab_loading_overlay'):
@@ -349,7 +368,10 @@ class NetStripApp(ctk.CTk):
 
     def _show_smart_modal(self, conn_data):
         # Must run in main thread
-        self.after(0, lambda: SmartParanoidModal(self, self.engine, conn_data))
+        def _show():
+            from netstrip.gui.smart_modal import SmartGhostModal
+            SmartGhostModal(self, self.engine, conn_data)
+        self.after(0, _show)
 
     def _update_geoip_ui(self, old_ip: str, geo_data: dict):
         def update_ui():
@@ -382,6 +404,7 @@ class NetStripApp(ctk.CTk):
         if current_state == "CRIPPLE: ON":
             # State 1 -> 2: Engage Killswitch
             try:
+                from netstrip.gui.killswitch_modal import ManualKillswitchModal
                 self.after(0, lambda: ManualKillswitchModal(self, self.engine, self._execute_manual_killswitch))
             except Exception:
                 self._execute_manual_killswitch(True) # Fallback to engaging without warning
@@ -433,6 +456,7 @@ class NetStripApp(ctk.CTk):
 
     def _show_critical_recovery_modal(self, message: str):
         try:
+            from netstrip.gui.killswitch_modal import CriticalRecoveryModal
             self.after(0, lambda: CriticalRecoveryModal(self, self.engine, message))
         except Exception as e:
             logger.error(f"Failed to spawn recovery modal: {e}")

@@ -834,11 +834,11 @@ def main():
                     transition_started = True
                     if splash and splash.winfo_exists():
                         try:
-                            splash.progress.set(1.0)
-                            splash.status_label.configure(text="Protection Active")
+                            splash.update_status("Protection Active", 1.0)
                         except Exception:
                             pass
                     app.after(50, cross_fade)
+
                 else:
                     app.after(30, check_engine_ready)
                     
