@@ -96,9 +96,13 @@ def sign_and_package():
         run_powershell(ps_gen_script)
         pfx_path_str = str(pfx_temp)
 
+    pfx_path_escaped = pfx_path_str.replace("'", "''")
+    cer_path_escaped = str(cer_path.resolve()).replace("'", "''")
+
     # 2. Collect all binary files in dist/Cripple (.exe, .dll, .pyd)
     binaries = list(dist_cripple.rglob("*.exe")) + list(dist_cripple.rglob("*.dll")) + list(dist_cripple.rglob("*.pyd"))
     print(f"[+] Found {len(binaries)} binary files to sign in {dist_cripple}")
+
 
     # 3. Locate signtool.exe if available in Windows SDK
     import glob
