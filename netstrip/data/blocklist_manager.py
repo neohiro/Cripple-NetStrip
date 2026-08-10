@@ -815,9 +815,9 @@ class BlocklistManager:
         skipped = 0
 
         with self.lock:
-            # 1. User Whitelist
+            # 1. User Whitelist (Global Domains + App Rules)
             if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_ALLOWED:
-                for domain in self.whitelist:
+                for domain in (self.whitelist | self.app_whitelist):
                     if not query or query in domain:
                         if domain not in seen:
                             seen.add(domain)
@@ -828,9 +828,10 @@ class BlocklistManager:
                                 if len(results) >= limit:
                                     return results
 
-            # 2. User Blacklist
+            # 2. User Blacklist (Global Domains + App Rules)
             if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_BLOCKED:
-                for domain in self.blacklist.keys():
+                blocked_items = set(self.blacklist.keys()) | self.app_blacklist
+                for domain in blocked_items:
                     if not query or query in domain:
                         if domain not in seen:
                             seen.add(domain)
