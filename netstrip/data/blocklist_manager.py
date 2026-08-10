@@ -440,20 +440,26 @@ class BlocklistManager:
                             if cache_data and cache_data.get("hash") == current_hash and "domain_map" in cache_data:
                                 raw_map = cache_data["domain_map"]
                                 sample_val = next(iter(raw_map.values())) if raw_map else None
+                                
+                                # Robust Enum normalizer to handle PyInstaller / Pickle module path mismatches
+                                def _norm_enum(k):
+                                    if isinstance(k, ConnectionCategory): return k
+                                    return ConnectionCategory_dict.get(getattr(k, 'value', str(k)), ConnectionCategory.UNKNOWN)
+
                                 if isinstance(sample_val, ConnectionCategory):
                                     new_domain_map = raw_map
                                 else:
                                     new_domain_map = {
-                                        k: ConnectionCategory_dict.get(v, ConnectionCategory.UNKNOWN)
+                                        k: _norm_enum(v)
                                         for k, v in raw_map.items()
                                     }
                                 
                                 new_stats = {
-                                    ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                    _norm_enum(k): v 
                                     for k, v in cache_data.get("stats", {}).items()
                                 }
                                 new_sources_metadata = {
-                                    ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN): v 
+                                    _norm_enum(k): v 
                                     for k, v in cache_data.get("sources_metadata", {}).items()
                                 }
                                 
@@ -462,7 +468,7 @@ class BlocklistManager:
                                 if "category_domains" in cache_data:
                                     raw_cat_doms = cache_data["category_domains"]
                                     for k, dom_set in raw_cat_doms.items():
-                                        cat_enum = ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN)
+                                        cat_enum = _norm_enum(k)
                                         new_category_domains[cat_enum] = dom_set if isinstance(dom_set, set) else set(dom_set)
                                 else:
                                     for d, cat_enum in new_domain_map.items():
@@ -843,21 +849,29 @@ class BlocklistManager:
                                     return results
 
             # 3. If filtered by category, search ONLY that category set!
-            if target_cat_enum and target_cat_enum in self.category_domains:
-                for domain in self.category_domains[target_cat_enum]:
-                    if not query or query in domain:
-                        if domain not in seen:
-                            seen.add(domain)
-                            if skipped < offset:
-                                skipped += 1
-                            else:
-                                results.append({
-                                    'domain': domain,
-                                    'category': target_cat_enum.value
-                                })
-                                if len(results) >= limit:
-                                    return results
-                return results
+            if target_cat_enum:
+                cat_set = self.category_domains.get(target_cat_enum)
+                if cat_set is None:
+                    for k, v in self.category_domains.items():
+                        if getattr(k, 'value', str(k)) == target_cat_enum.value:
+                            cat_set = v
+                            break
+
+                if cat_set:
+                    for domain in cat_set:
+                        if not query or query in domain:
+                            if domain not in seen:
+                                seen.add(domain)
+                                if skipped < offset:
+                                    skipped += 1
+                                else:
+                                    results.append({
+                                        'domain': domain,
+                                        'category': target_cat_enum.value
+                                    })
+                                    if len(results) >= limit:
+                                        return results
+                    return results
 
             # 4. If global search across all categories (query without category filter):
             for domain, category in self.domain_map.items():
