@@ -61,7 +61,8 @@ APP_ICONS = {
     'lsass': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'spoolsv': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'wermgr': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64'
+    'system': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'system idle process': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64'
 }
 
 class AppIdentifier:
@@ -184,13 +185,21 @@ class IconManager:
                 except Exception: pass
 
         # 3. Check disk cache for App Fallback
-        path_base = os.path.basename(process_path).lower().replace('.exe', '') if process_path and os.path.isabs(process_path) else ''
+        path_base = os.path.basename(process_path).lower().replace('.exe', '') if process_path else ''
         
         possible_app_paths = [os.path.join(self.cache_dir, f"app_{app_name_base}.png")]
         if path_base:
             possible_app_paths.append(os.path.join(self.cache_dir, f"app_{path_base}.png"))
             possible_app_paths.append(os.path.join(self.cache_dir, f"app_guess_{path_base}.png"))
             
+        # Add reverse-mapping paths
+        display_lower = process_name.lower()
+        if "chrome" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_chrome.png"))
+        if "edge" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_msedge.png"))
+        if "service host" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_svchost.png"))
+        if "code" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_code.png"))
+            
+        possible_app_paths.append(os.path.join(self.cache_dir, "app_default_globe.png"))
         for app_icon_path in possible_app_paths:
             if os.path.exists(app_icon_path):
                 try:
@@ -296,6 +305,21 @@ class IconManager:
             self._download_icon(APP_ICONS[app_name_base], app_icon_path, process_path, callback)
             return
             
+        # 2.5 Reverse map known display names
+        display_lower = process_name.lower()
+        if "chrome" in display_lower:
+            self._download_icon(APP_ICONS['chrome'], os.path.join(self.cache_dir, "app_chrome.png"), process_path, callback)
+            return
+        if "edge" in display_lower:
+            self._download_icon(APP_ICONS['msedge'], os.path.join(self.cache_dir, "app_msedge.png"), process_path, callback)
+            return
+        if "service host" in display_lower:
+            self._download_icon(APP_ICONS['svchost'], os.path.join(self.cache_dir, "app_svchost.png"), process_path, callback)
+            return
+        if "code" in display_lower:
+            self._download_icon(APP_ICONS['code'], os.path.join(self.cache_dir, "app_code.png"), process_path, callback)
+            return
+            
         # 3. Try OS icons
         os_type = AppIdentifier.identify(process_path)
         if os_type in OS_ICONS:
@@ -305,14 +329,17 @@ class IconManager:
             
         # 4. Try guessing from a clean domain using the executable name (e.g. 'brave' -> 'brave.com')
         # This catches tons of apps without needing them hardcoded in APP_ICONS
-        if path_base and path_base not in ('unknown', 'system', 'svchost', 'explorer'):
+        if path_base and path_base not in ('unknown', 'system', 'svchost', 'explorer') and " " not in path_base:
             guess_url = f"https://www.google.com/s2/favicons?domain={path_base}.com&sz=64"
             app_icon_path = os.path.join(self.cache_dir, f"app_guess_{path_base}.png")
             self._download_icon(guess_url, app_icon_path, process_path, callback)
             return
             
-        if process_path in self._in_progress:
-            self._in_progress.remove(process_path)
+        # 5. Catch-all: default globe icon (using w3.org as a generic globe fallback to prevent 404s)
+        guess_url = f"https://www.google.com/s2/favicons?domain=w3.org&sz=64"
+        app_icon_path = os.path.join(self.cache_dir, "app_default_globe.png")
+        self._download_icon(guess_url, app_icon_path, process_path, callback)
+        return
 
     def _download_icon(self, url: str, save_path: str, process_path: str, callback):
         try:
