@@ -1,0 +1,221 @@
+# FPM video catalogue — the real, verifiable back catalogue.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# assets/js/main.js used to build the homepage video grid from a hard-coded
+# array in which all six entries carried the same id, dQw4w9WgXcQ — which
+# YouTube's oEmbed API resolves to "Rick Astley – Never Gonna Give You Up".
+# Every card paired that placeholder with an invented title, an invented
+# duration and an invented view count ("Windows Hardening Deep Dive · 124K
+# views"). It rendered as a plausible, finished media wall and was entirely
+# fictional. That is precisely the failure this project documents elsewhere:
+# "an honest blank is more useful than a placeholder sentence, because a
+# placeholder looks finished."
+#
+# So the wall below is the actual catalogue, and it is not a security
+# tutorial channel. FPM is an audiovisual studio in Belgium (founded 2015):
+# DJ-set livestreams, one showreel, a numbered radio series and a pyro short.
+# The site's old copy promised "weekly security engineering content" that does
+# not exist on the channel. The homepage no longer claims it.
+#
+# PROVENANCE / HOW TO VERIFY
+# --------------------------
+# Every id below was resolved through YouTube's own oEmbed endpoint, which
+# returns server-side metadata and cannot report an author it does not own:
+#
+#   https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=VIDEO_ID&format=json
+#
+# All 22 returned author_name "FrenzyPenguin Media" and
+# author_url https://www.youtube.com/@FrenzyPenguinMedia. Re-run that call to
+# re-verify any row; if it 404s, the id is wrong and the row must go.
+#
+# `views` is a rounded, human-facing figure scraped at verification time and is
+# therefore approximate and will age. It is presentation only — never sort on it
+# and never treat it as exact. `year` comes from the title where the uploader
+# put it there ("… 2019 …"); `featured` is editorial ordering by hand.
+#
+# `duration` is deliberately absent: YouTube's oEmbed does not return duration,
+# and guessing it would repeat the sin this file exists to fix. The player shows
+# real duration once loaded; the facade does not claim one.
+
+channel:
+  name: "FrenzyPenguin Media"
+  handle: "https://www.youtube.com/@FrenzyPenguinMedia"
+  gaming_handle: "https://www.youtube.com/@FrenzyPenguinGaming"
+  # Second channel, shown on the channel row. 176 subs vs 1.27K on the main one.
+  bluesky: "https://bsky.app/profile/frenzypenguin.media"
+  linkedin: "https://linkedin.com/company/frenzypenguin-media"
+
+# Ordered by hand, not by scraped views: the reel leads because it is the only
+# thing on the channel that represents the whole studio, then the three Triquetra
+# hardware/analog live sets (the actual core of the catalogue), then one set
+# from each other billing so no era or genre is unrepresented.
+videos:
+
+  - id: tULwnXVgHug
+    title: "FRENZYPENGUIN MEDIA ● 2019 [Show Reel]"
+    billing: "Showreel"
+    year: 2019
+    genre: "Reel"
+    views: "231"
+    featured: true
+    note: "The one minute that actually shows the studio. Starts the wall."
+
+  - id: wLAYeYhFxPg
+    title: "Triquetra — Full Hardware Live ● 2019 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2019
+    genre: "Goa Trance"
+    views: "32K"
+    featured: true
+    note: "Most-watched thing we have ever published. Pure hardware, no laptop in sight."
+
+  - id: AasQuFMRB9M
+    title: "Triquetra — Sunstream Hardware Live ● 2020 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2020
+    genre: "Goa Trance"
+    views: "13K"
+    featured: true
+
+  - id: KfhRLWFEYiw
+    title: "Triquetra — First Analog Live ● 2018 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2018
+    genre: "Goa Trance"
+    views: "6.9K"
+    featured: true
+    note: "Where the analogue rig started, two years before the pandemic era sets."
+
+  - id: W7-qAoZkCRo
+    title: "Anoebis — Ohm Gathering ● 2020 [Goa Trance]"
+    billing: "Anoebis"
+    year: 2020
+    genre: "Goa Trance"
+    views: "5.6K"
+
+  - id: NKajxMh1v54
+    title: "Triquetra — Home Studio Live ● 2019 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2019
+    genre: "Goa Trance"
+    views: "5.2K"
+
+  - id: xF-tm-ag9M4
+    title: "Triquetra — Ohm Gathering ● 2020 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2020
+    genre: "Goa Trance"
+    views: "4.6K"
+
+  - id: NbOU3Rimki8
+    title: "Herton — Zodiak hosts DJ Emerson & Cleymoore ● 2019 [Techno]"
+    billing: "Herton"
+    year: 2019
+    genre: "Techno"
+    views: "3.1K"
+    note: "Guest techno slot at Zodiak Brussels. Herton programmed the club and DJ'd there regularly."
+
+  - id: C9wYIwFaYog
+    title: "Triquetra — Euro Space Center ● 2020 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2020
+    genre: "Goa Trance"
+    views: "2.6K"
+    note: "The one that escaped the screen. A real room, real rig, real air."
+
+  - id: BXOjm_QAgM4
+    title: "Ohm Mind — Ohm Gathering ● 2020 [Goa Trance]"
+    billing: "Ohm Mind"
+    year: 2020
+    genre: "Goa Trance"
+    views: "2.3K"
+
+  - id: X7R7xiNmxe8
+    title: "Visitors ● 2026 [Psytrance]"
+    billing: "FrenzyPenguin Media"
+    year: 2026
+    genre: "Psytrance"
+    views: null
+    featured: true
+    note: "The most recent upload. Newest thing on the channel."
+
+  - id: uKc-wI8Jf30
+    title: "Amare — Nightfall in Isolation ● 2020 [House/Techno]"
+    billing: "Amare"
+    year: 2020
+    genre: "House/Techno"
+    views: "837"
+
+  - id: EbE_DQxtUhM
+    title: "JahOn Firedancer ● 2018 [Pyrotechnics]"
+    billing: "JahOn"
+    year: 2018
+    genre: "Pyrotechnics"
+    views: "473"
+    note: "Not a DJ set. Fire, and a short film about it."
+
+  - id: 59yHqMhrQaU
+    title: "Kosmos — Kabaal in Sofia, Bulgary ● 2018 [Techno]"
+    billing: "Kosmos"
+    year: 2018
+    genre: "Techno"
+    views: "213"
+    note: "Sofia. Spelled as the venue spelled it."
+
+  - id: a6b9qKf6BFA
+    title: "Your Personal Christmas Radio (YPCR004)"
+    billing: "FrenzyPenguin Media"
+    year: null
+    genre: "Radio"
+    views: "21"
+    note: "The YPCR series. Catalogue-numbered, and still going."
+
+  - id: iK2VlgeKtkg
+    title: "Your Personal Christmas Radio YPCR006 ● 2018 [House]"
+    billing: "FrenzyPenguin Media"
+    year: 2018
+    genre: "House"
+    views: null
+
+  - id: ZhVrH48Tyy8
+    title: "Andreas Annaert — YPCR009 ● 2018 [Hard Techno]"
+    billing: "FrenzyPenguin Media"
+    year: 2018
+    genre: "Hard Techno"
+    views: null
+
+  - id: TiY59yjjKuI
+    title: "Andreas Annaert — Nightfall ● 2018 [Hard Techno]"
+    billing: "FrenzyPenguin Media"
+    year: 2018
+    genre: "Hard Techno"
+    views: "48"
+
+  - id: ezwENA0p-zk
+    title: "Kevin Vanbecelaere — Fernweh ● 2018 [House]"
+    billing: "FrenzyPenguin Media"
+    year: 2018
+    genre: "House"
+    views: "45"
+
+  - id: fYRZbbAvUtI
+    title: "Rolling Maffia ● 2018 [Drum n Bass]"
+    billing: "FrenzyPenguin Media"
+    year: 2018
+    genre: "Drum n Bass"
+    views: "43"
+
+  - id: ihMfFYIhLv0
+    title: "Triquetra — Human Control ● 2020 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2020
+    genre: "Goa Trance"
+    views: null
+
+  - id: gTnn7yYW9dw
+    title: "Triquetra — Trancidelia Livestream ● 2020 [Goa Trance]"
+    billing: "Triquetra"
+    year: 2020
+    genre: "Goa Trance"
+    views: null

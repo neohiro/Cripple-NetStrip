@@ -1,0 +1,16 @@
+{% comment %} social-links.html — single source of truth for "find us on" block.
+
+   Used in READMEs and site footers. Heartbeat fills _data/social.yml
+   with current handles; this include falls back to neohiro defaults. {% endcomment %}
+
+{%- assign s = site.data.social -%}
+<span class="social-links">
+  {%- if s.github %}<a href="https://github.com/{{ s.github }}" rel="me noopener">{% include svg-icon.html name="github" %} GitHub</a>{% endif %}
+  {%- if s.sponsors %}<a href="https://github.com/sponsors/{{ s.sponsors }}" rel="noopener">♥ Sponsor</a>{% endif %}
+  {%- if s.youtube %}<a href="https://youtube.com/@{{ s.youtube }}" rel="noopener">{% include svg-icon.html name="youtube" %} YouTube</a>{% endif %}
+  {%- if s.mastodon %}<a href="{{ s.mastodon }}" rel="me noopener">{% include svg-icon.html name="mastodon" %} Mastodon</a>{% endif %}
+  {%- if s.bluesky %}<a href="https://bsky.app/profile/{{ s.bluesky }}" rel="noopener">{% include svg-icon.html name="bluesky" %} Bluesky</a>{% endif %}
+  {%- if s.twitter %}<a href="https://twitter.com/{{ s.twitter }}" rel="noopener">{% include svg-icon.html name="twitter" %} X</a>{% endif %}
+  {%- if s.discord %}<a href="{{ s.discord }}" rel="noopener">{% include svg-icon.html name="discord" %} Discord</a>{% endif %}
+  {%- if s.website %}<a href="{{ s.website }}" rel="noopener">{% include svg-icon.html name="globe" %} Website</a>{% endif %}
+</span>

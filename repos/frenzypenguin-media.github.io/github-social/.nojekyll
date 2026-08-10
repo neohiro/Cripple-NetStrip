@@ -1,0 +1,3 @@
+# Skip Jekyll processing for the entire github-social/ PWA directory.
+# The SPA (built by GitHub Actions from github-social/) is copied here as-is.
+# DO NOT remove this file or Jekyll will try to process the SPA HTML and break it.

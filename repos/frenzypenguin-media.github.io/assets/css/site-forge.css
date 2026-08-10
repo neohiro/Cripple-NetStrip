@@ -1,0 +1,303 @@
+/* site-forge.css — decor presets and the shared page shell.
+ *
+ * GENERATED-COMPANION FILE (hand-editable).
+ * Pairs with `assets/css/site-tokens.css`, which site_forge.py generates from
+ * `template-shared/sites.yaml`. This file holds no colours of its own: every
+ * value is a custom property, so switching a site to a different palette or a
+ * different decor preset never touches this stylesheet.
+ *
+ * Load order matters. site-tokens.css must come first so the generated custom
+ * properties win; this file only consumes them.
+ *
+ * Performance notes, because a background is the easiest place to tank a page:
+ *   - The grid and scanlines are two `repeating-linear-gradient` layers on a
+ *     single fixed-position pseudo-element. One composited layer, no repaint on
+ *     scroll, no JS.
+ *   - The grain is a 96x96 inline SVG data URI tiled by the browser. It costs
+ *     one decode and never touches the network.
+ *   - The aurora glow animates `transform` on a blurred layer only. Nothing
+ *     here animates layout properties.
+ *   - `content-visibility: auto` on lower page sections keeps a long article off
+ *     the critical rendering path.
+ *   - Every animation is disabled wholesale under prefers-reduced-motion, not
+ *     merely shortened.
+ */
+
+/* --------------------------------------------------------------------------
+ * Decor presets
+ *
+ * The class is applied to <body> by _layouts/default.html, taken from
+ * `page.decor_class` (a single page) or `site.decor_class` (site default). The
+ * names match `presets.decor` in sites.yaml.
+ * -------------------------------------------------------------------------- */
+
+.decor-matrix::before,
+.decor-aurora::before,
+.decor-plain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* Both matrix and aurora sit on an opaque base so the page never shows a
+ * white flash before the palette loads. */
+.decor-matrix,
+.decor-aurora,
+.decor-plain {
+  background-color: var(--bg);
+  background-repeat: no-repeat;
+}
+
+/* --- matrix: the reference look. Perspective grid + drifting glow. --------- */
+.decor-matrix::before {
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      var(--decor-grid-color, rgba(124, 77, 255, 0.1)) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--decor-grid-color, rgba(124, 77, 255, 0.1)) 0 1px,
+      transparent 1px 72px
+    );
+  /* Fade the grid out toward the bottom so it reads as depth, not a table. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 78%);
+}
+
+/* The glow is its own element so it can drift without moving the grid. */
+.decor-matrix::after {
+  content: "";
+  position: fixed;
+  top: -20vh;
+  left: 50%;
+  width: min(120vw, 1400px);
+  height: 70vh;
+  z-index: -3;
+  pointer-events: none;
+  translate: -50% 0;
+  background: radial-gradient(
+    ellipse 60% 60% at 50% 40%,
+    var(--decor-glow, rgba(124, 77, 255, 0.22)) 0%,
+    transparent 70%
+  );
+  animation: decorDrift 24s ease-in-out infinite alternate;
+}
+
+/* --- scanlines: opt-in texture layer, on for matrix only ---------------- */
+.decor-scanlines::before {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.16) 0 1px,
+    transparent 1px 3px
+  );
+  opacity: 0.55;
+}
+
+/* --- grain: opt-in noise, breaks up the gradient banding ---------------- */
+.decor-grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- aurora: soft drifting blooms, no grid ------------------------------ */
+.decor-aurora::before {
+  background-image:
+    radial-gradient(
+      ellipse 70% 50% at 18% 8%,
+      var(--decor-glow, rgba(157, 122, 255, 0.2)) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 88% 22%,
+      color-mix(in srgb, var(--accent, #7c4dff) 16%, transparent) 0%,
+      transparent 60%
+    );
+  animation: decorAurora 30s ease-in-out infinite alternate;
+}
+
+/* --- plain: opaque, no layers. Still gets the base colour. --------------- */
+.decor-plain::before {
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-elevated) 100%);
+}
+
+/* `.decor-matrix::after` is the glow; `.decor-grain::after` is the noise. When
+ * both apply, the noise wins the ::after slot, so the glow falls back to ::before
+ * being the grid. Rather than fight for the pseudo-element, the glow is layered
+ * into the matrix grid element's own background when grain is on. */
+.decor-matrix.decor-grain::before {
+  background-image:
+    radial-gradient(
+      ellipse 60% 40% at 50% 0%,
+      var(--decor-glow, rgba(124, 77, 255, 0.22)) 0%,
+      transparent 70%
+    ),
+    repeating-linear-gradient(
+      to right,
+      var(--decor-grid-color, rgba(124, 77, 255, 0.1)) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--decor-grid-color, rgba(124, 77, 255, 0.1)) 0 1px,
+      transparent 1px 72px
+    );
+}
+
+@keyframes decorDrift {
+  from { translate: -50% 0; opacity: 0.85; }
+  to   { translate: -46% 3vh; opacity: 1; }
+}
+
+@keyframes decorAurora {
+  from { background-position: 0% 0%, 0% 0%; opacity: 0.9; }
+  to   { background-position: 6% 4%, -6% -3%; opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+ * The page shell. `page.html` inherits each site's own default layout, so this
+ * is the only styling a generated page needs.
+ * -------------------------------------------------------------------------- */
+
+#matrix-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -5;
+  pointer-events: none;
+}
+
+.site-header,
+.hero-avatar-tags,
+.mhero {
+  position: relative;
+  z-index: 5;
+}
+
+.page-shell {
+  /* Clear the fixed assistant bar (auth-bar.css) plus a little breathing room.
+   * The bar is ~52px tall; --ai-dock-h is set by auth-bar when the dock is up. */
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Deliberately NOT `.container`. Three of the four sites define that class with
+ * this exact geometry, but Open Stage Island does not define it at all, so
+ * reusing it would leave generated pages full-bleed there. Declaring our own
+ * wrapper keeps every generated page aligned to --max-width on all four sites
+ * without overriding a site's existing `.container` rule. */
+.page-wrap {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (max-width: 680px) {
+  .page-wrap { padding: 0 16px; }
+}
+
+.page-hero {
+  position: relative;
+  margin: 0 0 40px;
+  padding: 48px 0 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Accent hairline along the top of the hero, the same device the tool cards
+ * use, so a generated page reads as part of the site rather than a bolt-on. */
+.page-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(180px, 40%);
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong, var(--accent)));
+}
+
+.page-hero h1 {
+  margin: 0 0 10px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(1.9rem, 1.35rem + 2.4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.page-hero .lede {
+  margin: 0;
+  max-width: 62ch;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
+  line-height: 1.6;
+  color: var(--fg-muted);
+}
+
+/* Long articles: skip layout for anything below the fold. */
+.page-body > section {
+  content-visibility: auto;
+  /* Without an explicit size the browser cannot estimate the skipped box and
+   * scrollbar length jumps around; 600px tracks the section rhythm closely. */
+  contain-intrinsic-size: auto 600px;
+}
+
+.page-body h2 {
+  font-family: var(--font-ui, system-ui, sans-serif);
+  letter-spacing: -0.01em;
+}
+
+.page-body code,
+.page-body pre {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* --------------------------------------------------------------------------
+ * Motion + paint preferences. Honoured wholesale, not shortened.
+ * -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .decor-matrix::after,
+  .decor-aurora::before,
+  .decor-grain::after {
+    animation: none !important;
+  }
+  .decor-matrix.decor-grain::before,
+  .decor-aurora::before {
+    background-position: 50% 0%, 50% 0% !important;
+  }
+  /* The drift leaves ::after mid-transform; pin it so the glow stays put. */
+  .decor-matrix::after {
+    translate: -50% 0;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Print: drop every decorative layer. A grid and a glow cost ink and nothing
+ * else on paper.
+ * -------------------------------------------------------------------------- */
+@media print {
+  .decor-matrix::before,
+  .decor-matrix::after,
+  .decor-aurora::before,
+  .decor-grain::after {
+    display: none !important;
+  }
+  .page-shell {
+    padding-bottom: 0;
+  }
+}

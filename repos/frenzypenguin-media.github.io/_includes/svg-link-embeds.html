@@ -1,0 +1,56 @@
+{%- comment -%}
+  Reusable cross-repo SVG card embed.
+
+  Usage:
+    include svg-link-embeds.html id="worldmap" %}
+    include svg-link-embeds.html id="llm" %}
+    include svg-link-embeds.html id="transhumanists-map" %}
+    include svg-link-embeds.html id="network" %}
+
+  `id` selects a known card. The included markup produces a labelled
+  <figure> wrapping the SVG/PNG; captions are filled automatically.
+
+{%- endcomment -%}
+
+{%- case include.id -%}
+{%- when 'worldmap' -%}
+  <figure class="svg-embed svg-embed--worldmap">
+    <img src="https://raw.githubusercontent.com/neohiro/worldmap/main/assets/world-map-inline.svg"
+         alt="World map of progress, events, aerial, orbital, identity" loading="lazy">
+    <figcaption>neohiro/worldmap · 5 dimensions, updated every 6h</figcaption>
+  </figure>
+{%- when 'llm' -%}
+  <figure class="svg-embed svg-embed--llm">
+    <img src="https://neohiro.github.io/LLM/assets/llm-card.svg"
+         alt="Free Models Router — live count" loading="lazy">
+    <figcaption>neohiro/LLM · Free Models Router live card</figcaption>
+  </figure>
+{%- when 'transhumanists-map' -%}
+  <figure class="svg-embed svg-embed--transhumanists">
+    <img src="https://transhumanists.github.io/assets/world-map-inline.svg"
+         alt="World map of transhumanist breakthroughs" loading="lazy">
+    <figcaption>transhumanists · 80+ RSS feeds, 6h cadence</figcaption>
+  </figure>
+{%- when 'network' -%}
+  <figure class="svg-embed svg-embed--network">
+    <img src="https://api.neohiro.io/dashboard/api/card/public.svg"
+         alt="Tailnet card — exit nodes, peers, subnets" loading="lazy">
+    <figcaption>neohiro/network · Tailnet health, 15-min cache</figcaption>
+  </figure>
+{%- when 'milestones' -%}
+  <figure class="svg-embed svg-embed--milestones">
+    <img src="https://transhumanists.github.io/assets/milestones-card.svg"
+         alt="Daily milestone count by category" loading="lazy">
+    <figcaption>transhumanists/milestones · daily, 6h cadence</figcaption>
+  </figure>
+{%- when 'opencode' -%}
+  <figure class="svg-embed svg-embed--opencode">
+    <img src="https://neohiro.github.io/dashboard/assets/opencode-metrics.svg"
+         alt="OpenCode session metrics" loading="lazy">
+    <figcaption>opencode-hub · CPU, RAM, sessions, tool invocations</figcaption>
+  </figure>
+{%- else -%}
+  <figure class="svg-embed">
+    <p class="muted">Unknown SVG embed id: <code>{{ include.id }}</code></p>
+  </figure>
+{%- endcase -%}

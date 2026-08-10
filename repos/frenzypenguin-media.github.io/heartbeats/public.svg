@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="120" viewBox="0 0 600 120">
+  <rect width="600" height="120" fill="#0b0e12"/>
+  <text x="20" y="22" font-size="14" fill="#7c4dff" font-family="monospace" font-weight="bold">FrenzyPenguin Media &#8212; Heartbeat</text>
+  <text x="20" y="40" font-size="10" fill="#888" font-family="monospace">FPM score: 90/100 &#183; 6 repos &#183; 6 CI green</text>
+  <rect x="20" y="46" width="560" height="6" fill="#1a1a1a"/>
+  <rect x="20" y="46" width="504" height="6" fill="#7c4dff"/>
+  <text x="20" y="70" font-size="9" fill="#7c4dff" font-family="monospace">windows: 95</text>
+  <text x="110" y="70" font-size="9" fill="#7c4dff" font-family="monospace">ubuntu: 92</text>
+  <text x="200" y="70" font-size="9" fill="#7c4dff" font-family="monospace">linux: 90</text>
+  <text x="290" y="70" font-size="9" fill="#7c4dff" font-family="monospace">Cripple-NetStrip: 90</text>
+  <text x="380" y="70" font-size="9" fill="#7c4dff" font-family="monospace">dnscrypt-proxy-gui: 88</text>
+  <text x="470" y="70" font-size="9" fill="#7c4dff" font-family="monospace">frenzypenguin-media.github.io: 87</text>
+  <text x="20" y="92" font-size="9" fill="#888" font-family="monospace">FB feed: synced 25 posts (last 7d) &#183; next poll 30m</text>
+  <text x="20" y="108" font-size="7" fill="#444" font-family="monospace">updated: 2026-10-19T02:37:44.607Z &#8212; CNS/Neurotransmitter</text>
+</svg>

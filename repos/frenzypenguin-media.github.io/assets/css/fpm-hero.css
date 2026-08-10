@@ -1,0 +1,1025 @@
+/* fpm-hero.css — the 2080 design system for frenzypenguin.media.
+ *
+ * Opt-in: only the homepage loads it, via `extra_css` in its front matter.
+ * Everything is scoped under .fpm-* so it cannot collide with main.css or the
+ * shared network-ux / auth-bar layers.
+ *
+ * DARKER BY CONSTRUCTION.
+ * The shared token layer (site-tokens.css) puts --bg at #0b0e12. This sheet
+ * drops the hero zone to #04060a and keeps the page body a step below that, so
+ * the wordmark and the media plate sit on true near-black rather than on a
+ * slate that already reads as "dark grey" once a bloom passes over it.
+ *
+ * TECHNIQUE NOTES, because the effects are the point and each one is load-bearing:
+ *   1. Scroll-driven animations (`animation-timeline: view()`) replace scroll
+ *      listeners for the narrative. They run on the compositor, so the beats
+ *      track the scrollbar exactly, cost no main-thread work, and cannot jank.
+ *      Behind @supports, an IntersectionObserver adds .is-in for older engines,
+ *      so the page degrades to a plain fade-in rather than to nothing.
+ *   2. `@property` registers --fpm-sweep as <angle>, which makes a conic
+ *      gradient genuinely interpolatable. Unregistered custom properties snap,
+ *      so a sweep would jump instead of sweep.
+ *   3. The narrative is a PINNED stage with beats alternating left and right
+ *      around it, not a stack of rows. One media element is shared by every
+ *      beat: that is the "paragraphs share a video" behaviour, and it also means
+ *      one decoder instead of four.
+ *   4. Nothing animates layout. Only transform, opacity, filter and
+ *      custom-property-driven paint.
+ *   5. Every effect is disabled wholesale under prefers-reduced-motion.
+ */
+
+/* --------------------------------------------------------------------------
+ * Registered properties. Interpolation requires the type to be declared.
+ * -------------------------------------------------------------------------- */
+@property --fpm-sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --fpm-glow {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Zone tokens. Scoped to .fpm-hero / .fpm-stage so the rest of the site keeps
+ * the shared palette and nothing else on the page shifts.
+ * -------------------------------------------------------------------------- */
+.fpm-hero,
+.fpm-stage {
+  --fpm-void: #04060a;
+  --fpm-abyss: #070b12;
+  --fpm-line: rgba(124, 77, 255, 0.14);
+  --fpm-line-hot: rgba(0, 229, 255, 0.34);
+  --fpm-sig: #00e5ff;
+  --fpm-mint: #66ffcc;
+  --fpm-violet: #7c4dff;
+  --fpm-ember: #ff4fd8;
+}
+
+/* --------------------------------------------------------------------------
+ * Global scroll progress rail. One fixed 2px line, driven by scroll().
+ * -------------------------------------------------------------------------- */
+.fpm-rail {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 120;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--fpm-violet), var(--fpm-sig) 55%, var(--fpm-mint));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+@supports (animation-timeline: scroll()) {
+  .fpm-rail {
+    animation: fpm-rail-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes fpm-rail-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ==========================================================================
+ * HERO — full viewport, org plate, wordmark, shield badges.
+ * ========================================================================== */
+.fpm-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: clamp(84px, 12vh, 140px) 0 0;
+  background: var(--fpm-void);
+  overflow: clip;
+}
+
+/* Perspective floor grid. Two repeating gradients on one composited layer,
+ * faded out toward the horizon so it reads as depth rather than graph paper. */
+.fpm-hero__floor {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--fpm-line) 0 1px, transparent 1px 84px),
+    linear-gradient(to bottom, var(--fpm-line) 0 1px, transparent 1px 84px);
+  -webkit-mask-image: radial-gradient(120% 78% at 50% 12%, #000 12%, transparent 74%);
+  mask-image: radial-gradient(120% 78% at 50% 12%, #000 12%, transparent 74%);
+}
+
+/* Two counter-drifting blooms. Transform-only, so they never repaint. */
+.fpm-hero__bloom {
+  position: absolute;
+  z-index: -2;
+  width: 62vmax;
+  height: 62vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+.fpm-hero__bloom--a {
+  top: -26vmax;
+  left: -14vmax;
+  background: radial-gradient(circle, rgba(124, 77, 255, 0.5), transparent 62%);
+  animation: fpm-bloom-a 34s ease-in-out infinite alternate;
+}
+.fpm-hero__bloom--b {
+  bottom: -30vmax;
+  right: -18vmax;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.26), transparent 62%);
+  animation: fpm-bloom-b 41s ease-in-out infinite alternate;
+}
+@keyframes fpm-bloom-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(7%, 5%, 0) scale(1.12); }
+}
+@keyframes fpm-bloom-b {
+  from { transform: translate3d(0, 0, 0) scale(1.06); }
+  to   { transform: translate3d(-8%, -4%, 0) scale(0.94); }
+}
+
+/* --- the org plate -------------------------------------------------------
+ * A skewed, masked frame holding the org picture. The conic sweep is the
+ * --fpm-sweep registered property: it walks the border once on entry, which is
+ * the only "expensive" paint on the page and happens exactly once.
+ * -------------------------------------------------------------------------- */
+.fpm-plate {
+  position: relative;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--fpm-abyss);
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+/* Sweeping border, drawn as a padded gradient masked to a 1px ring. */
+.fpm-plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--fpm-sweep),
+    transparent 0deg,
+    transparent 300deg,
+    var(--fpm-sig) 340deg,
+    var(--fpm-mint) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.75;
+}
+@supports (animation-timeline: view()) {
+  .fpm-plate::after {
+    animation: fpm-sweep 1s linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 90%;
+  }
+}
+@keyframes fpm-sweep {
+  from { --fpm-sweep: 0deg; }
+  to   { --fpm-sweep: 360deg; }
+}
+/* Corner ticks: four L-shapes, the cheapest possible "targeting" language. */
+.fpm-plate__tick {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--fpm-line-hot);
+  pointer-events: none;
+}
+.fpm-plate__tick--tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; }
+.fpm-plate__tick--tr { top: 10px; right: 10px; border-left: 0; border-bottom: 0; }
+.fpm-plate__tick--bl { bottom: 10px; left: 10px; border-right: 0; border-top: 0; }
+.fpm-plate__tick--br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+
+.fpm-plate__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  aspect-ratio: 2 / 1;
+  /* Slow push-in. Compositor-only, and it stops under reduced motion. */
+  animation: fpm-plate-drift 38s ease-in-out infinite alternate;
+}
+@keyframes fpm-plate-drift {
+  from { transform: scale(1.04) translate3d(0, 0, 0); }
+  to   { transform: scale(1.14) translate3d(-1.5%, -1%, 0); }
+}
+/* Legibility scrim. A single gradient, no blur — blurring a 30KB image every
+ * frame is the one thing that would actually cost frames here. */
+.fpm-plate__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(4, 6, 10, 0.94) 2%, rgba(4, 6, 10, 0.18) 46%, transparent 72%),
+    linear-gradient(105deg, rgba(4, 6, 10, 0.72) 0%, transparent 44%);
+}
+
+/* --- hero body ----------------------------------------------------------- */
+.fpm-hero__body {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  max-width: var(--max-width, 1120px);
+  margin: 0 auto;
+  padding: 0 24px clamp(28px, 5vh, 52px);
+}
+@media (max-width: 680px) {
+  .fpm-hero__body { padding-inline: 16px; }
+}
+
+.fpm-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 7px 16px 7px 12px;
+  border: 1px solid var(--fpm-line);
+  border-radius: 999px;
+  background: rgba(124, 77, 255, 0.08);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--fpm-mint);
+}
+.fpm-hero__eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fpm-mint);
+  box-shadow: 0 0 10px var(--fpm-mint);
+  animation: fpm-beacon 2.6s ease-in-out infinite;
+}
+@keyframes fpm-beacon {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--fpm-mint); }
+  50%      { opacity: 0.35; box-shadow: 0 0 2px var(--fpm-mint); }
+}
+
+/* The wordmark. Chromatic split is two stacked pseudo-elements offset by a
+ * couple of pixels and coloured cyan/magenta — the "misregistered channel"
+ * look, at zero cost and with no filter repaint. */
+.fpm-wordmark {
+  position: relative;
+  margin: 0 0 18px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(2.9rem, 1.2rem + 7.4vw, 7.5rem);
+  font-weight: 700;
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  color: var(--fpm-void);
+  text-shadow: 0 0 44px rgba(124, 77, 255, 0.5);
+}
+.fpm-wordmark > span {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(178deg, #ffffff 8%, #cfe6ff 42%, var(--fpm-violet) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.fpm-wordmark::before,
+.fpm-wordmark::after {
+  content: attr(data-t);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.fpm-wordmark::before {
+  color: var(--fpm-sig);
+  animation: fpm-split-a 7s steps(1) infinite;
+}
+.fpm-wordmark::after {
+  color: var(--fpm-ember);
+  animation: fpm-split-b 9s steps(1) infinite;
+}
+@keyframes fpm-split-a {
+  0%, 88%, 100% { transform: none; opacity: 0; }
+  90%           { transform: translate(-2px, 1px); opacity: 0.5; }
+  92%           { transform: translate(2px, -1px); opacity: 0.34; }
+  94%           { transform: none; opacity: 0; }
+}
+@keyframes fpm-split-b {
+  0%, 91%, 100% { transform: none; opacity: 0; }
+  93%           { transform: translate(2px, 1px); opacity: 0.42; }
+  95%           { transform: translate(-2px, -1px); opacity: 0.28; }
+  97%           { transform: none; opacity: 0; }
+}
+
+.fpm-hero__lede {
+  max-width: 54ch;
+  margin: 0 0 10px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(1.02rem, 0.96rem + 0.35vw, 1.3rem);
+  line-height: 1.62;
+  color: var(--fg-muted, #96a8b8);
+  text-wrap: balance;
+}
+.fpm-hero__lede b {
+  color: var(--fg, #eceff1);
+  font-weight: 600;
+}
+
+/* Typewriter line. Height is reserved so the hero never reflows mid-type. */
+.fpm-hero__typed {
+  display: block;
+  min-height: 1.7em;
+  margin: 0 0 30px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: clamp(0.82rem, 0.76rem + 0.28vw, 0.98rem);
+  color: var(--fpm-sig);
+  text-shadow: 0 0 18px rgba(0, 229, 255, 0.32);
+}
+.fpm-hero__caret {
+  display: inline-block;
+  width: 9px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  border-radius: 1px;
+  background: var(--fpm-sig);
+  animation: fpm-blink 1.05s steps(1) infinite;
+}
+@keyframes fpm-blink { 50% { opacity: 0; } }
+
+/* --- calls to action ----------------------------------------------------- */
+.fpm-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 34px;
+}
+.fpm-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.94rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+.fpm-btn:hover { transform: translateY(-2px); }
+.fpm-btn:focus-visible {
+  outline: 2px solid var(--fpm-sig);
+  outline-offset: 3px;
+}
+.fpm-btn--primary {
+  background: linear-gradient(140deg, var(--fpm-violet), #4b2bd6 70%);
+  color: #fff;
+  box-shadow: 0 10px 34px rgba(124, 77, 255, 0.34);
+}
+.fpm-btn--primary:hover { box-shadow: 0 16px 46px rgba(124, 77, 255, 0.5); }
+.fpm-btn--ghost {
+  border-color: var(--fpm-line-hot);
+  color: var(--fpm-sig);
+  background: rgba(0, 229, 255, 0.05);
+}
+.fpm-btn--ghost:hover { background: rgba(0, 229, 255, 0.11); }
+
+/* --- shield badges -------------------------------------------------------
+ * `.fpm-shields` is a clipped-corner plate, not a rounded pill: the corners are
+ * cut with clip-path so the shape is one composited operation rather than four
+ * border-radius joins. The visitor counter arrives through the shared
+ * _includes/counter-widget.html partial and is framed here rather than
+ * reimplemented, so the counting rule stays in one place.
+ * ----------------------------------------------------------------------- */
+.fpm-shields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 30px;
+  padding: 0;
+  list-style: none;
+}
+.fpm-shields__item {
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  background: linear-gradient(150deg, rgba(124, 77, 255, 0.14), rgba(0, 229, 255, 0.06));
+}
+.fpm-shields__item > * {
+  display: block;
+  margin: 7px 13px;
+  /* Flat-square shields sit on a white plate; invert it so the row reads as one
+   * dark system instead of a strip of light rectangles. */
+  filter: invert(1) hue-rotate(180deg);
+  opacity: 0.9;
+}
+.fpm-shields__item img { border: 0; }
+/* The counter partial emits a bare <div align=center>; flatten its wrapper so
+ * the flex row above governs the geometry. */
+.fpm-shields__item > div { display: contents; }
+.fpm-shields__item a { display: block; }
+
+/* A chip carries its own text, so it has no child element to hang padding off.
+ * Same plate as the badges, same clip, so the row still reads as one system. */
+.fpm-shields__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 13px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fpm-mint);
+}
+
+/* --- corner telemetry ---------------------------------------------------- */
+.fpm-hero__hud {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fpm-sig);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.fpm-hero__hud--tl { top: 108px; left: 24px; }
+.fpm-hero__hud--br { right: 24px; bottom: 26px; text-align: right; }
+.fpm-hero__hud span { display: block; }
+.fpm-hero__hud b { color: var(--fpm-mint); font-weight: 500; }
+@media (max-width: 900px) {
+  .fpm-hero__hud { display: none; }
+}
+
+/* --- scroll cue ---------------------------------------------------------- */
+.fpm-hero__cue {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--max-width, 1120px);
+  margin: 0 auto;
+  padding: 16px 24px 22px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #6d7f8f);
+  text-decoration: none;
+}
+@media (max-width: 680px) {
+  .fpm-hero__cue { padding-inline: 16px; }
+}
+.fpm-hero__cue:hover { color: var(--fpm-sig); }
+.fpm-hero__cue i {
+  position: relative;
+  width: 1px;
+  height: 34px;
+  background: linear-gradient(to bottom, var(--fpm-line-hot), transparent);
+}
+.fpm-hero__cue i::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fpm-sig);
+  animation: fpm-cue 2.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes fpm-cue {
+  0%       { top: 0; opacity: 0; }
+  22%      { opacity: 1; }
+  100%     { top: 30px; opacity: 0; }
+}
+
+/* ==========================================================================
+ * BADGE MARQUEE — the shields row, scrolling. Pauses on hover and on focus so
+ * it is never a moving target for a keyboard or a screen reader.
+ * ========================================================================== */
+.fpm-marquee {
+  position: relative;
+  z-index: 5;
+  padding: 22px 0;
+  border-block: 1px solid var(--fpm-line);
+  background: var(--fpm-abyss);
+  overflow: clip;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
+}
+.fpm-marquee__track {
+  display: flex;
+  width: max-content;
+  gap: 34px;
+  padding-right: 34px;
+  animation: fpm-slide 46s linear infinite;
+}
+.fpm-marquee:hover .fpm-marquee__track,
+.fpm-marquee:focus-within .fpm-marquee__track {
+  animation-play-state: paused;
+}
+@keyframes fpm-slide {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+.fpm-marquee__group {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  padding-right: 34px;
+}
+.fpm-marquee__group img {
+  display: block;
+  height: 20px;
+  filter: invert(1) hue-rotate(180deg);
+  opacity: 0.82;
+}
+
+/* ==========================================================================
+ * SCROLL NARRATIVE — pinned stage, beats alternating around it.
+ * ========================================================================== */
+.fpm-stage {
+  position: relative;
+  background: var(--fpm-void);
+  padding: clamp(70px, 12vh, 130px) 0 clamp(70px, 12vh, 130px);
+}
+.fpm-stage__head {
+  width: 100%;
+  max-width: var(--max-width, 1120px);
+  margin: 0 auto clamp(34px, 6vh, 64px);
+  padding: 0 24px;
+}
+@media (max-width: 680px) {
+  .fpm-stage__head { padding-inline: 16px; }
+}
+.fpm-kicker {
+  margin: 0 0 14px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--fpm-mint);
+}
+.fpm-stage__head h2,
+.fpm-doctrine h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(1.9rem, 1.3rem + 2.6vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  color: var(--fg, #eceff1);
+  text-wrap: balance;
+}
+.fpm-stage__head p {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--fg-muted, #96a8b8);
+  line-height: 1.65;
+}
+
+/* The grid is three columns: [text] [stage] [text]. Beats occupy the outer
+ * columns alternately; the stage sits in the middle and is sticky. On narrow
+ * screens the grid collapses to one column and the stage pins to the top. */
+.fpm-stage__grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 1.06fr) 1fr;
+  gap: clamp(24px, 4vw, 60px);
+  align-items: start;
+  width: 100%;
+  max-width: var(--max-width, 1120px);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (max-width: 680px) {
+  .fpm-stage__grid { padding-inline: 16px; }
+}
+
+/* --- the shared media panel --------------------------------------------- */
+/* grid-row is set explicitly on BOTH this and .fpm-beats. Auto-placement would
+ * otherwise drop the panel into row 1 and the beat list into row 2, and a
+ * sticky element is confined to its own grid area -- the panel would then have
+ * exactly its own height to travel through and would scroll straight past the
+ * beats. Pinning both to row 1 makes the row as tall as the beats, so the panel
+ * is pinned for the whole passage. */
+.fpm-stage__media {
+  position: sticky;
+  /* 50vh, not 50%: a percentage sticky offset resolves against the containing
+   * block, which here is the grid area -- some hundreds of vh tall -- so 50%
+   * would peg the panel near the top of a very long row. The translate then
+   * halves its own height, leaving it optically centred. */
+  top: 50vh;
+  grid-column: 2;
+  grid-row: 1;
+  transform: translateY(-50%);
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--fpm-line);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--fpm-abyss);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+@media (max-width: 900px) {
+  .fpm-stage__media {
+    grid-column: 1;
+    grid-row: 1;
+    position: sticky;
+    top: 76px;
+    transform: none;
+    aspect-ratio: 16 / 10;
+    z-index: 3;
+  }
+}
+
+/* Generative signal field. Always painted, and the reason the panel is never
+ * empty: if no video is present the canvas IS the visual, so there is no
+ * broken-box state and nothing to detect. */
+.fpm-stage__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The video rides above the canvas and cross-fades in only once it has decoded
+ * a frame. Before that the canvas shows through, so the swap is invisible. */
+.fpm-stage__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 620ms ease;
+}
+.fpm-stage__media[data-video-ready="1"] .fpm-stage__video { opacity: 1; }
+.fpm-stage__media[data-video-ready="1"] .fpm-stage__canvas { opacity: 0.25; }
+
+/* Corner ticks + a scanline sweep across the panel, one pass per beat. */
+.fpm-stage__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 229, 255, 0.09) 48%, transparent 52%);
+  transform: translateY(-100%);
+}
+.fpm-stage__media.is-sweeping::after {
+  animation: fpm-sweep-pass 1.5s cubic-bezier(0.33, 0, 0.2, 1) 1;
+}
+@keyframes fpm-sweep-pass {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100%); }
+}
+
+/* A caption strip along the bottom of the panel naming the active beat. */
+.fpm-stage__caption {
+  position: absolute;
+  z-index: 5;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(to top, rgba(4, 6, 10, 0.94), transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--fpm-mint);
+}
+.fpm-stage__caption::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: var(--fpm-sig);
+  box-shadow: 0 0 10px var(--fpm-sig);
+}
+
+/* --- the beats ----------------------------------------------------------- */
+.fpm-beats {
+  /* Shares row 1 with the panel; see .fpm-stage__media for why. */
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: subgrid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 900px) {
+  .fpm-beats { grid-column: 1; grid-row: 2; grid-template-columns: 1fr; gap: 0; }
+}
+
+.fpm-beat {
+  /* Each beat reserves a full viewport of scroll so the pinned panel has room
+   * to be read alongside it. */
+  min-height: 88svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(28px, 6vh, 64px) 0;
+}
+.fpm-beat:nth-child(even) { grid-column: 3; }
+.fpm-beat:nth-child(odd)  { grid-column: 1; }
+@media (max-width: 900px) {
+  .fpm-beat,
+  .fpm-beat:nth-child(even),
+  .fpm-beat:nth-child(odd) { grid-column: 1; min-height: auto; padding: 30px 0; }
+}
+
+.fpm-beat__index {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: var(--fpm-sig);
+}
+.fpm-beat__index::before { content: "▚ "; color: var(--fpm-violet); }
+
+.fpm-beat h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(1.35rem, 1.1rem + 1.1vw, 2rem);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+  color: var(--fg, #eceff1);
+  text-wrap: balance;
+}
+.fpm-beat p {
+  margin: 0 0 16px;
+  max-width: 42ch;
+  color: var(--fg-muted, #96a8b8);
+  line-height: 1.72;
+}
+.fpm-beat__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fpm-beat__tags li {
+  padding: 4px 10px;
+  border: 1px solid var(--fpm-line);
+  border-radius: 999px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #6d7f8f);
+}
+.fpm-beat__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--fpm-sig);
+  text-decoration: none;
+}
+.fpm-beat__link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* Entrance. Scroll-driven where available, class-based otherwise. The beat
+ * travels 34px and fades — short enough to feel responsive, long enough to
+ * read as a deliberate arrival. */
+@supports (animation-timeline: view()) {
+  .fpm-beat {
+    animation: fpm-beat-in linear both;
+    animation-timeline: view();
+    animation-range: entry 4% cover 26%;
+  }
+}
+@keyframes fpm-beat-in {
+  from { opacity: 0; transform: translate3d(-18px, 34px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.fpm-beat:nth-child(even) { --fpm-beat-dir: 18px; }
+@keyframes fpm-beat-in-r {
+  from { opacity: 0; transform: translate3d(18px, 34px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@supports (animation-timeline: view()) {
+  .fpm-beat:nth-child(even) {
+    animation-name: fpm-beat-in-r;
+  }
+}
+/* Fallback path for engines without scroll-driven animations: JS adds .is-in. */
+.fpm-beat { opacity: 0; }
+.fpm-beat.is-in { opacity: 1; transform: none; transition: opacity 620ms ease, transform 620ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@supports (animation-timeline: view()) {
+  .fpm-beat { opacity: 1; }
+  .fpm-beat.is-in { transition: none; }
+}
+
+/* ==========================================================================
+ * DOCTRINE — capability cards. Deliberately a small fixed set: the repo
+ * overview grid that used to live here was removed, because a wall of
+ * repository tiles is a directory, not a statement, and this page is the
+ * statement.
+ * ========================================================================== */
+.fpm-doctrine {
+  position: relative;
+  padding: clamp(70px, 11vh, 120px) 0;
+  background: var(--fpm-abyss);
+  border-top: 1px solid var(--fpm-line);
+}
+.fpm-doctrine__inner {
+  width: 100%;
+  max-width: var(--max-width, 1120px);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (max-width: 680px) {
+  .fpm-doctrine__inner { padding-inline: 16px; }
+}
+.fpm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--fpm-line);
+  border: 1px solid var(--fpm-line);
+}
+.fpm-card {
+  position: relative;
+  padding: 30px 26px 28px;
+  background: var(--fpm-void);
+  transition: background 240ms ease;
+}
+.fpm-card:hover { background: #0a0e16; }
+/* Corner accent that grows on hover. Transform-only. */
+.fpm-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 1px;
+  background: var(--fpm-sig);
+  transform: scaleX(0.22);
+  transform-origin: 0 50%;
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.fpm-card:hover::after { transform: scaleX(1); }
+.fpm-card h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 1.06rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg, #eceff1);
+}
+.fpm-card p {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  line-height: 1.68;
+  color: var(--fg-muted, #96a8b8);
+}
+.fpm-card__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fpm-mint);
+}
+.fpm-card__stat b {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fpm-sig);
+}
+
+/* ==========================================================================
+ * SIGNAL — closing call to action.
+ * ========================================================================== */
+.fpm-signal {
+  position: relative;
+  padding: clamp(80px, 14vh, 150px) 0;
+  background: var(--fpm-void);
+  text-align: center;
+  overflow: clip;
+}
+.fpm-signal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 60% at 50% 0%, rgba(124, 77, 255, 0.22), transparent 70%),
+    radial-gradient(ellipse 46% 46% at 50% 100%, rgba(0, 229, 255, 0.14), transparent 70%);
+}
+.fpm-signal__inner {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.fpm-signal h2 {
+  margin: 0 0 16px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: clamp(2rem, 1.3rem + 3.4vw, 4rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: var(--fg, #eceff1);
+  text-wrap: balance;
+}
+.fpm-signal p {
+  max-width: 56ch;
+  margin: 0 auto 32px;
+  color: var(--fg-muted, #96a8b8);
+  line-height: 1.66;
+}
+.fpm-signal .fpm-cta { justify-content: center; margin-bottom: 0; }
+
+/* ==========================================================================
+ * MOTION, PAINT AND PRINT PREFERENCES.
+ * Honoured wholesale rather than shortened: a shorter animation is still an
+ * animation, and for some visitors any motion at all is the problem.
+ * ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .fpm-rail,
+  .fpm-hero__bloom,
+  .fpm-plate__img,
+  .fpm-plate::after,
+  .fpm-hero__eyebrow::before,
+  .fpm-hero__cue i::after,
+  .fpm-wordmark::before,
+  .fpm-wordmark::after,
+  .fpm-stage__caption::before,
+  .fpm-stage__media::after,
+  .fpm-marquee__track,
+  .fpm-hero__caret {
+    animation: none !important;
+  }
+  /* The rail would otherwise sit at scaleX(0) forever with its animation off. */
+  .fpm-rail { transform: scaleX(1); opacity: 0.25; }
+  /* Beats must be visible without their entrance. */
+  .fpm-beat { opacity: 1 !important; transform: none !important; }
+  .fpm-btn,
+  .fpm-card,
+  .fpm-card::after,
+  .fpm-stage__video {
+    transition: none !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+@media print {
+  .fpm-rail,
+  .fpm-hero__floor,
+  .fpm-hero__bloom,
+  .fpm-marquee,
+  .fpm-stage__media,
+  .fpm-hero__cue {
+    display: none !important;
+  }
+  .fpm-hero,
+  .fpm-stage,
+  .fpm-doctrine,
+  .fpm-signal {
+    background: #fff;
+    color: #000;
+    min-height: 0;
+    padding: 12px 0;
+  }
+  .fpm-beat { min-height: 0; opacity: 1 !important; transform: none !important; }
+  .fpm-wordmark > span { -webkit-text-fill-color: #000; color: #000; }
+}

@@ -1,0 +1,29 @@
+{% comment %} repo-list.md — single source of truth for "all repos in this org".
+
+   Heartbeat writes /shared/repos/{org}.yaml. This include reads via a
+   per-site _data/repos.yml that Heart publishes (see publish-shared.ps1).
+
+   Falls back to a hardcoded list if the data file is missing so builds
+   never break. {% endcomment %}
+{%- assign repos = site.data.repos[include.org] -%}
+{%- unless repos -%}
+  {%- case include.org -%}
+  {%- when 'neohiro' -%}
+    {%- assign repos = "neohiro/LLM|neohiro/network|neohiro/doctor|neohiro/Voicemail|neohiro/Mind|neohiro/iot|neohiro/userdata|neohiro/monetization|neohiro/private-assistant" | split: '|' -%}
+  {%- when 'fpm' -%}
+    {%- assign repos = "frenzypenguin-media/content-creator|frenzypenguin-media/dashboard" | split: '|' -%}
+  {%- when 'osi' -%}
+    {%- assign repos = "openstageisland/openstageisland.github.io" | split: '|' -%}
+  {%- when 'hplus' -%}
+    {%- assign repos = "transhumanists/milestones|transhumanists/apis" | split: '|' -%}
+  {%- else -%}
+    {%- assign repos = "" | split: "" -%}
+  {%- endcase -%}
+{%- endunless -%}
+
+| Repo | Description |
+|------|-------------|
+{%- for r in repos %}
+{%- assign parts = r | split: '/' %}
+| [{{ parts[1] }}](https://github.com/{{ r }}) | {% if include.descriptions and include.descriptions[r] %}{{ include.descriptions[r] }}{% else %}{{ parts[1] | replace: '-', ' ' | capitalize }}{% endif %} |
+{%- endfor %}

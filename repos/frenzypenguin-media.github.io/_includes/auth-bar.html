@@ -1,0 +1,120 @@
+{% comment %} auth-bar.html — the persistent lower bar ("dock").
+
+   CONTRACT (keep in sync across neohiro / frenzypenguin-media / openstageisland /
+   transhumanists):
+
+   1. AI and Contact are ONE thing here. There is no separate Contact tab and no
+      separate chat form. The only composer is the assistant ask bar that
+      network-ux.js mounts (#ai-bar), which talks to the real Mouth endpoint via
+      /.well-known/ask. The previous dock-local form POSTed to '/api/contact',
+      which does not exist on GitHub Pages, so every message silently failed.
+   2. Login lives in the TOP bar (see nav.html). The dock only surfaces the
+      signed-in state (Dashboard / avatar) and the sign-out control.
+   3. Selecting "Assistant" hands off to network-ux.js, which slides this dock
+      down and slides the screenwide conversation sheet up behind it. The page
+      behind stays scrollable and interactive.
+
+   The remaining panels are kept because auth-bar.js wires them by id and the
+   top-bar Login button calls AuthBar.selectTab('login'). {% endcomment %}
+<div class="ai-dock" id="ai-dock" role="navigation" aria-label="Assistant and account">
+  <div class="ai-dock__rail">
+
+    <button class="ai-dock__tab ai-dock__tab--ai"
+            role="tab"
+            aria-selected="false"
+            aria-controls="ai-dock__panel--ai"
+            id="ai-dock__tab--ai"
+            title="Talk to the assistant — questions, bug reports, access requests">
+      <span class="ai-dock__tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+          <path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 2a8 8 0 110 16 8 8 0 010-16zm-1 3v4.586l-2.707 2.707-1.414-1.414L11.293 9.88 8.586 7.172A1 1 0 009.586 6.172l3 3A1 1 0 0112 10.586V7a1 1 0 012 0v3a1 1 0 01-1 1h-3z"/>
+        </svg>
+      </span>
+      <span class="ai-dock__tab-label">Assistant</span>
+    </button>
+
+    <div class="ai-dock__sep" aria-hidden="true"></div>
+
+    <a class="ai-dock__tab ai-dock__tab--dashboard hidden"
+       id="ai-dock__tab--dashboard"
+       title="Dashboard"
+       href="https://github.com/neohiro/dashboard" target="_blank" rel="noopener">
+      <span class="ai-dock__tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+          <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+      </span>
+      <span class="ai-dock__tab-label">Dashboard</span>
+    </a>
+
+    <button class="ai-dock__tab ai-dock__tab--user hidden"
+            role="tab"
+            aria-selected="false"
+            aria-controls="ai-dock__panel--user"
+            id="ai-dock__tab--user">
+      <img id="ai-dock__avatar" src="" alt="" width="20" height="20" style="border-radius:50%" loading="lazy">
+      <span id="ai-dock__username"></span>
+      <span class="ai-dock__role-badge" id="ai-dock__role"></span>
+    </button>
+
+  </div>
+
+  <div class="ai-dock__panels">
+
+    {% comment %} Placeholder panel — the real conversation UI is the screenwide sheet that
+       network-ux.js mounts (#ai-conv). Kept so aria-controls resolves. {% endcomment %}
+    <div class="ai-dock__panel ai-dock__panel--ai"
+         id="ai-dock__panel--ai"
+         role="tabpanel"
+         aria-labelledby="ai-dock__tab--ai"
+         hidden>
+      <div class="ai-dock__ai-chat">
+        <p>The assistant opens as a full-width sheet above this bar. The site stays scrollable behind it.</p>
+      </div>
+    </div>
+
+    <div class="ai-dock__panel ai-dock__panel--login"
+         id="ai-dock__panel--login"
+         role="tabpanel"
+         aria-labelledby="nav-auth__login"
+         hidden>
+      <div class="ai-dock__login">
+        <p>Sign in with GitHub to reach the dashboard, request features, or let the assistant know who you are.</p>
+        <button id="ai-dock__gh-btn" class="ai-dock__btn ai-dock__btn--github">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+            <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+          </svg>
+          Continue with GitHub
+        </button>
+        <p class="ai-dock__login-note">Read-only access to your GitHub profile. No write permissions.</p>
+      </div>
+    </div>
+
+    <div class="ai-dock__panel ai-dock__panel--user"
+         id="ai-dock__panel--user"
+         role="tabpanel"
+         aria-labelledby="ai-dock__tab--user"
+         hidden>
+      <div class="ai-dock__user-menu">
+        <div class="ai-dock__user-info">
+          <img id="ai-dock__user-avatar-lg" src="" alt="" width="36" height="36" style="border-radius:50%">
+          <div>
+            <div id="ai-dock__user-name"></div>
+            <div class="ai-dock__user-login" id="ai-dock__user-login"></div>
+          </div>
+        </div>
+        <div class="ai-dock__user-actions">
+          <a id="ai-dock__user-dashboard-link" href="https://github.com/neohiro/dashboard" class="ai-dock__btn ai-dock__btn--ghost" target="_blank" rel="noopener">
+            Dashboard
+          </a>
+          <button id="ai-dock__user-logout" class="ai-dock__btn ai-dock__btn--ghost">
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ai-dock__backdrop" id="ai-dock__backdrop" hidden></div>
+</div>

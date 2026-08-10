@@ -1,0 +1,637 @@
+/* neohiro shared AI dock — bottom bar + sway panels
+   SSOT: template-shared/assets/css/auth-bar.css
+   Updated: 2026-08-31 — full redesign from right-floating → bottom dock */
+
+:root {
+  --ai-dock-z:        1000;
+  --ai-dock-radius:   12px;
+  --ai-dock-shadow:   0 -4px 32px rgba(0, 0, 0, 0.3);
+  --ai-dock-fg:       var(--fg, #e6edf3);
+  --ai-dock-bg:       var(--bg-card, #161b22);
+  --ai-dock-border:   var(--border, #30363d);
+  --ai-dock-muted:    var(--fg-subtle, #6e7681);
+  --ai-dock-accent:   var(--accent, #58a6ff);
+  --ai-dock-red:      var(--red, #f85149);
+  --ai-dock-green:    var(--green, #3fb950);
+  --ai-dock-h:        52px;
+  --ai-dock-panel-h: 360px;
+}
+
+/* ── Bottom dock shell ───────────────────────────────────────────── */
+.ai-dock {
+  /* Retired dock. Its rail moved to bottom-bar.html and the conversation is
+     the screenwide `ai-conv` sheet that network-ux.js mounts. The markup keeps
+     the id because auth-bar.js wires the login panel, so the element stays in
+     the DOM but must never render.
+
+     `display: flex` used to sit here and silently defeated the `hidden`
+     attribute in the markup: an author-level `display` beats the UA
+     stylesheet's `[hidden] { display: none }`, so the dock painted at the
+     bottom of every page as an empty panel strip whose inner panels were all
+     individually hidden, while `.ai-dock__panels { pointer-events: auto }`
+     swallowed clicks over the real bar. Re-honouring the attribute fixes
+     both, and `display: none` here makes it the default rather than something
+     that depends on the attribute being present. */
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--ai-dock-z);
+  
+  flex-direction: column;
+  align-items: stretch;
+  font-family: var(--font-ui, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  pointer-events: none;
+  transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* A conversation is open: get out of the way so the screenwide sheet can take
+   the full bottom edge. The page behind stays scrollable and interactive. */
+body.ai-conv-active .ai-dock {
+  transform: translateY(115%);
+  pointer-events: none;
+}
+
+.ai-dock__rail,
+.ai-dock__panels {
+  /* Retired dock: never capture clicks, even if a script un-hides the element,
+     so nothing can intercept pointer events meant for the live bottom bar. */
+  pointer-events: none;
+}
+
+.ai-dock[hidden] {
+  display: none !important;
+}
+
+/* ── Persistent rail (the sway bar itself) ──────────────────────── */
+.ai-dock__rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--ai-dock-h);
+  background: var(--ai-dock-bg);
+  border-top: 1px solid var(--ai-dock-border);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.ai-dock:hover .ai-dock__rail {
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--ai-dock-accent);
+  border-color: var(--ai-dock-accent);
+}
+
+/* ── Separator ─────────────────────────────────────────────────── */
+.ai-dock__sep {
+  width: 1px;
+  height: 28px;
+  background: var(--ai-dock-border);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── Dock tabs ─────────────────────────────────────────────────── */
+.ai-dock__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  height: 38px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ai-dock-fg);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  white-space: nowrap;
+  text-decoration: none;
+  transform-origin: center bottom;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-dock__tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ai-dock-accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-radius: inherit;
+}
+
+.ai-dock__tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 4px 16px rgba(88, 166, 255, 0.2);
+}
+
+.ai-dock__tab:hover::before { opacity: 0.08; }
+
+.ai-dock__tab.active {
+  background: var(--ai-dock-accent);
+  color: #fff;
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 6px 20px rgba(88, 166, 255, 0.35);
+  border-color: transparent;
+}
+
+.ai-dock__tab-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ai-dock__tab:hover .ai-dock__tab-icon {
+  transform: scale(1.15) rotate(-5deg);
+}
+
+.ai-dock__tab.active .ai-dock__tab-icon {
+  transform: scale(1.2);
+}
+
+.ai-dock__tab--ai { color: var(--ai-dock-accent); }
+.ai-dock__tab--ai:hover { background: rgba(88, 166, 255, 0.12); }
+.ai-dock__tab--ai.active { background: var(--ai-dock-accent); color: #fff; }
+
+.ai-dock__tab--contact.active { background: var(--ai-dock-accent); color: #fff; }
+.ai-dock__tab--login.active { background: var(--ai-dock-green); color: #fff; }
+.ai-dock__tab--login:hover { background: rgba(63, 185, 80, 0.1); }
+
+/* ── Sway keyframes ───────────────────────────────────────────── */
+@keyframes sway-left {
+  0%   { transform: translateY(-4px) rotate(-2deg) scale(1.05); }
+  40%  { transform: translateY(-6px) rotate(1.5deg) scale(1.08); }
+  70%  { transform: translateY(-3px) rotate(-0.5deg) scale(1.03); }
+  100% { transform: translateY(-4px) rotate(0deg) scale(1); }
+}
+
+@keyframes sway-right {
+  0%   { transform: translateY(-4px) rotate(2deg) scale(1.05); }
+  40%  { transform: translateY(-6px) rotate(-1.5deg) scale(1.08); }
+  70%  { transform: translateY(-3px) rotate(0.5deg) scale(1.03); }
+  100% { transform: translateY(-4px) rotate(0deg) scale(1); }
+}
+
+@keyframes panel-sway-in {
+  0%   { opacity: 0; transform: translateY(20px) scaleX(0.96); }
+  30%  { opacity: 1; transform: translateY(-8px) scaleX(1.02); }
+  60%  { transform: translateY(3px) scaleX(0.995); }
+  80%  { transform: translateY(-2px) scaleX(1.003); }
+  100% { opacity: 1; transform: translateY(0) scaleX(1); }
+}
+
+@keyframes panel-sway-out {
+  0%   { opacity: 1; transform: translateY(0) scaleX(1); }
+  20%  { opacity: 0.8; transform: translateY(-4px) scaleX(1.01); }
+  100% { opacity: 0; transform: translateY(20px) scaleX(0.96); }
+}
+
+/* ── Panels (slide up from dock) ──────────────────────────────── */
+.ai-dock__panels {
+  position: relative;
+}
+
+.ai-dock__panel {
+  position: absolute;
+  bottom: var(--ai-dock-h);
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  width: min(480px, calc(100vw - 32px));
+  background: var(--ai-dock-bg);
+  border: 1px solid var(--ai-dock-border);
+  border-bottom: none;
+  border-radius: var(--ai-dock-radius) var(--ai-dock-radius) 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: panel-sway-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center bottom;
+  max-height: var(--ai-dock-panel-h);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@keyframes panel-sway-in {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(20px) scaleX(0.94) rotate(-1.5deg); }
+  35%  { opacity: 1; transform: translateX(-50%) translateY(-10px) scaleX(1.03) rotate(1deg); }
+  60%  { transform: translateX(-50%) translateY(4px) scaleX(0.995) rotate(-0.3deg); }
+  80%  { transform: translateX(-50%) translateY(-3px) scaleX(1.005) rotate(0.1deg); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scaleX(1) rotate(0deg); }
+}
+
+@keyframes panel-sway-out {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0) scaleX(1) rotate(0deg); }
+  25%  { opacity: 0.7; transform: translateX(-50%) translateY(-4px) scaleX(1.01) rotate(0.5deg); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(20px) scaleX(0.94) rotate(-1.5deg); }
+}
+
+.ai-dock__panel[data-closing="true"] {
+  animation: panel-sway-out 0.25s ease-in forwards;
+}
+
+.ai-dock__panel[hidden] {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Panel content padding ────────────────────────────────────── */
+.ai-dock__panel > * {
+  padding: 16px 18px;
+}
+
+.ai-dock__panel p {
+  margin: 0 0 12px;
+  font-size: 0.84rem;
+  color: var(--ai-dock-fg);
+  line-height: 1.5;
+}
+
+/* ── AI Chat ─────────────────────────────────────────────────── */
+.ai-dock__ai-chat { display: flex; flex-direction: column; gap: 12px; }
+
+.ai-dock__chat-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 80px;
+}
+
+.ai-dock__chat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 90%;
+}
+
+.ai-dock__chat-msg--bot { align-self: flex-start; }
+.ai-dock__chat-msg--user { align-self: flex-end; flex-direction: row-reverse; }
+
+.ai-dock__chat-avatar {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ai-dock-accent);
+  border-radius: 50%;
+}
+
+.ai-dock__chat-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ai-dock-muted);
+  margin-bottom: 2px;
+}
+
+.ai-dock__chat-text {
+  font-size: 0.82rem;
+  color: var(--ai-dock-fg);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--ai-dock-border);
+  border-radius: 10px 10px 10px 2px;
+  padding: 7px 11px;
+  line-height: 1.45;
+}
+
+.ai-dock__chat-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--ai-dock-border);
+}
+
+.ai-dock__chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--bg, #0d1117);
+  border: 1px solid var(--ai-dock-border);
+  border-radius: 8px;
+  color: var(--ai-dock-fg);
+  font-family: inherit;
+  font-size: 0.84rem;
+  transition: border-color 0.2s;
+}
+
+.ai-dock__chat-form input:focus {
+  outline: none;
+  border-color: var(--ai-dock-accent);
+}
+
+.ai-dock__chat-form button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ai-dock-accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.ai-dock__chat-form button:hover {
+  filter: brightness(1.15);
+  transform: scale(1.08);
+}
+
+/* ── Contact form ─────────────────────────────────────────────── */
+.ai-dock__contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-dock__contact-form textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 200px;
+  background: var(--bg, #0d1117);
+  border: 1px solid var(--ai-dock-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--ai-dock-fg);
+  font-family: inherit;
+  font-size: 0.84rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.ai-dock__contact-form textarea:focus {
+  outline: none;
+  border-color: var(--ai-dock-accent);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.ai-dock__contact-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-dock__char-count {
+  font-size: 0.73rem;
+  color: var(--ai-dock-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.ai-dock__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--ai-dock-accent);
+  border: 1px solid var(--ai-dock-accent);
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.ai-dock__btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.25);
+}
+
+.ai-dock__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.ai-dock__btn--github {
+  background: #238636;
+  border-color: #238636;
+  width: 100%;
+  justify-content: center;
+  padding: 10px 16px;
+}
+
+.ai-dock__btn--github:hover {
+  background: #2ea043;
+  border-color: #2ea043;
+  box-shadow: 0 4px 12px rgba(35, 134, 54, 0.25);
+}
+
+.ai-dock__btn--ghost {
+  background: transparent;
+  color: var(--ai-dock-fg);
+  border-color: var(--ai-dock-border);
+}
+
+.ai-dock__btn--ghost:hover {
+  border-color: var(--ai-dock-accent);
+  color: var(--ai-dock-accent);
+  background: transparent;
+  filter: none;
+}
+
+.ai-dock__login-note {
+  font-size: 0.73rem;
+  color: var(--ai-dock-muted);
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+/* ── Contact success / error ──────────────────────────────────── */
+.ai-dock__contact-success,
+.ai-dock__contact-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.ai-dock__contact-success {
+  color: var(--ai-dock-green);
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.ai-dock__contact-error {
+  color: var(--ai-dock-red);
+  background: rgba(248, 81, 73, 0.1);
+}
+
+/* ── User menu ────────────────────────────────────────────────── */
+.ai-dock__user-menu { display: flex; flex-direction: column; gap: 12px; }
+
+.ai-dock__user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-dock__user-info > div {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.84rem;
+}
+
+.ai-dock__user-login { color: var(--ai-dock-muted); font-size: 0.75rem; }
+
+.ai-dock__user-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ai-dock__user-actions .ai-dock__btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 0.8rem;
+  padding: 7px 10px;
+}
+
+/* ── Role badge ───────────────────────────────────────────────── */
+.ai-dock__role-badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ai-dock-muted);
+  margin-left: 2px;
+}
+
+.ai-dock__role-badge--godadmin {
+  background: var(--ai-dock-red);
+  color: #fff;
+}
+
+.ai-dock__role-badge--admin {
+  background: var(--ai-dock-accent);
+  color: #fff;
+}
+
+.ai-dock__role-badge--user {
+  background: transparent;
+  border: 1px solid var(--ai-dock-border);
+}
+
+/* ── Backdrop ─────────────────────────────────────────────────── */
+.ai-dock__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--ai-dock-z) - 1);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  pointer-events: auto;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.ai-dock__backdrop[hidden] { display: none; }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .ai-dock__tab-label { display: none; }
+  .ai-dock__tab { padding: 6px 10px; }
+  .ai-dock__tab--login .ai-dock__tab-label { display: inline; }
+  .ai-dock__tab--user .ai-dock__tab-label { display: none; }
+  .ai-dock__sep { height: 22px; margin: 0 2px; }
+  .ai-dock__panel {
+    width: calc(100vw - 16px);
+    left: 8px;
+    right: 8px;
+    transform: none;
+  }
+  @keyframes panel-sway-in {
+    0%   { opacity: 0; transform: translateY(20px) scaleX(0.94); }
+    40%  { opacity: 1; transform: translateY(-8px) scaleX(1.02); }
+    70%  { transform: translateY(3px) scaleX(0.995); }
+    100% { opacity: 1; transform: translateY(0) scaleX(1); }
+  }
+  @keyframes panel-sway-out {
+    0%   { opacity: 1; transform: translateY(0) scaleX(1); }
+    30%  { opacity: 0.5; transform: translateY(-3px) scaleX(1.01); }
+    100% { opacity: 0; transform: translateY(20px) scaleX(0.94); }
+  }
+}
+
+/* ── Nav LOGIN slot (synced by auth-bar.js) ──────────────────── */
+/* nav-login-slot is in site-nav; auth-bar.js toggles its children  */
+.nav-login-slot { display: inline-flex; align-items: center; }
+.nav-login-out { }
+.nav-login-in { display: inline-flex; align-items: center; }
+.nav-login-in-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 8px;
+  color: var(--fg-muted, #96a8b8);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nav-login-in-btn:hover {
+  border-color: var(--accent, #58a6ff);
+  color: var(--accent, #58a6ff);
+  background: rgba(88, 166, 255, 0.08);
+}
+.nav-login-avatar { flex-shrink: 0; }
+.nav-login-role {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg-subtle, #6e7681);
+}
+.nav-login-role--godadmin { background: var(--red, #f85149); color: #fff; }
+.nav-login-role--admin    { background: var(--accent, #58a6ff); color: #fff; }
+
+/* ── svg-embed cross-repo truth (preserve from old file) ─────── */
+.svg-embed {
+  margin: 1rem 0;
+  text-align: center;
+}
+.svg-embed img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border, #30363d);
+  border-radius: 6px;
+  display: block;
+  margin: 0 auto;
+}
+.svg-embed figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted, #6e7681);
+}

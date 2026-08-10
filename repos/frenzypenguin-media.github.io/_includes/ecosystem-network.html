@@ -1,0 +1,178 @@
+<!-- ecosystem-network.html — the unified Ecosystem Network frame.
+     SSOT: template-shared/_includes/ecosystem-network.html
+
+     Every *.github.io site includes this once per page, after
+     footer-button-row.html, so the frame sits at the very bottom of the
+     footer with clear space above it. It lists all four network sites in a
+     fixed order, including the one the visitor is already on.
+
+     Parameter:
+       current — the site rendering this file. One of: neohiro | fpm |
+                 transhumanists | openstageisland. Omit it and every card
+                 links out normally.
+
+     The matching card drops its links (name and host become plain text) and
+     gains .is-current, so "you are here" is conveyed by the card's shape
+     rather than by colour alone.
+
+     The frame's own heading is an <h2>, not an <h3>. The frame is a sibling of
+     the page's content sections, not a subsection of the last one, and <h3>
+     only passed the heading-order gate on pages whose content happened to end
+     in an <h2> — on a page ending in the <h1> it read as a skipped level.
+     Every page has exactly one <h1> and uses <h2> for sections, so <h2> is
+     correct everywhere.
+
+     Cross-site links are absolute on purpose: the frame is a directory of
+     other origins, so a relative_url would resolve against whichever site
+     happens to be rendering it. -->
+
+{%- comment -%}
+   Copied out of `include` under a distinct name on purpose. Assigning straight
+   to `current` would shadow any variable a caller happens to have set by that
+   name, and this file is rendered by a layout that may well have one.
+{%- endcomment -%}
+{%- assign eco_site = include.current -%}
+
+<!-- Ecosystem Network -->
+<section class="footer-ecosystem" aria-labelledby="ecosystem-network-title">
+  <div class="footer-ecosystem-header">
+    <span class="footer-badge">ECOSYSTEM NETWORK</span>
+    <h2 class="footer-ecosystem-title" id="ecosystem-network-title">Interconnected Media, Research &amp; Tooling</h2>
+  </div>
+
+  <div class="footer-ecosystem-grid">
+
+    <!-- neohiro -->
+    {%- assign is_current = false -%}
+    {%- if eco_site == 'neohiro' -%}{%- assign is_current = true -%}{%- endif %}
+    <div class="ecosystem-card{% if is_current %} is-current{% endif %}">
+      <div class="ecosystem-card-top">
+        <div class="ecosystem-icon" aria-hidden="true">👽</div>
+        <div class="ecosystem-info">
+          <div class="ecosystem-name-row">
+            {%- if is_current -%}
+            <span class="ecosystem-name">neohiro</span>
+            {%- else -%}
+            <a href="https://neohiro.github.io/" target="_blank" rel="noopener" class="ecosystem-name">neohiro</a>
+            {%- endif %}
+            <span class="ecosystem-pill ecosystem-pill-hub">Hardening Hub</span>
+          </div>
+          {%- if is_current -%}
+          <span class="ecosystem-url">neohiro.github.io</span>
+          {%- else -%}
+          <a href="https://neohiro.github.io/" target="_blank" rel="noopener" class="ecosystem-url">neohiro.github.io</a>
+          {%- endif %}
+        </div>
+      </div>
+      <p class="ecosystem-desc">Production-grade security hardening for Windows &amp; Linux. STIG compliance and zero telemetry.</p>
+      <div class="ecosystem-links">
+        <a href="https://neohiro.github.io/repositories/" class="ecosystem-action-btn ecosystem-btn-main">
+          All Repositories &rarr;
+        </a>
+        <a href="https://github.com/neohiro" target="_blank" rel="noopener" class="ecosystem-action-btn ecosystem-btn-alt" title="GitHub Organization">
+          github.com/neohiro &rarr;
+        </a>
+      </div>
+    </div>
+
+    <!-- FrenzyPenguin Media -->
+    {%- assign is_current = false -%}
+    {%- if eco_site == 'fpm' -%}{%- assign is_current = true -%}{%- endif %}
+    <div class="ecosystem-card{% if is_current %} is-current{% endif %}">
+      <div class="ecosystem-card-top">
+        <div class="ecosystem-icon" aria-hidden="true">🎬</div>
+        <div class="ecosystem-info">
+          <div class="ecosystem-name-row">
+            {%- if is_current -%}
+            <span class="ecosystem-name">FrenzyPenguin Media</span>
+            {%- else -%}
+            <a href="https://frenzypenguin.media" target="_blank" rel="noopener" class="ecosystem-name">FrenzyPenguin Media</a>
+            {%- endif %}
+            <span class="ecosystem-pill ecosystem-pill-primary">Main Domain</span>
+          </div>
+          {%- if is_current -%}
+          <span class="ecosystem-url">frenzypenguin.media</span>
+          {%- else -%}
+          <a href="https://frenzypenguin.media" target="_blank" rel="noopener" class="ecosystem-url">frenzypenguin.media</a>
+          {%- endif %}
+        </div>
+      </div>
+      <p class="ecosystem-desc">Music artist recordings, creative projects, and multimedia content from the makers of neohiro.</p>
+      <div class="ecosystem-links">
+        <a href="https://frenzypenguin.media" class="ecosystem-action-btn ecosystem-btn-main">
+          frenzypenguin.media &rarr;
+        </a>
+        <a href="https://frenzypenguin-media.github.io/" target="_blank" rel="noopener" class="ecosystem-action-btn ecosystem-btn-alt" title="GitHub Pages / Repository Source">
+          gh-pages &rarr;
+        </a>
+      </div>
+    </div>
+
+    <!-- Transhumanists (H+) -->
+    {%- assign is_current = false -%}
+    {%- if eco_site == 'transhumanists' -%}{%- assign is_current = true -%}{%- endif %}
+    <div class="ecosystem-card{% if is_current %} is-current{% endif %}">
+      <div class="ecosystem-card-top">
+        <div class="ecosystem-icon" aria-hidden="true">🧬</div>
+        <div class="ecosystem-info">
+          <div class="ecosystem-name-row">
+            {%- if is_current -%}
+            <span class="ecosystem-name">Transhumanists (H+)</span>
+            {%- else -%}
+            <a href="https://transhumanists.github.io/" target="_blank" rel="noopener" class="ecosystem-name">Transhumanists (H+)</a>
+            {%- endif %}
+            <span class="ecosystem-pill ecosystem-pill-network">Research Portal</span>
+          </div>
+          {%- if is_current -%}
+          <span class="ecosystem-url">transhumanists.github.io</span>
+          {%- else -%}
+          <a href="https://transhumanists.github.io/" target="_blank" rel="noopener" class="ecosystem-url">transhumanists.github.io</a>
+          {%- endif %}
+        </div>
+      </div>
+      <p class="ecosystem-desc">Evolutionary technology, longevity architectures, cognitive research, and transhumanism.</p>
+      <div class="ecosystem-links">
+        <a href="https://transhumanists.github.io/" class="ecosystem-action-btn ecosystem-btn-main">
+          transhumanists.github.io &rarr;
+        </a>
+        <a href="https://github.com/transhumanists" target="_blank" rel="noopener" class="ecosystem-action-btn ecosystem-btn-alt" title="GitHub Organization">
+          GitHub Org &rarr;
+        </a>
+      </div>
+    </div>
+
+    <!-- Open Stage Island -->
+    {%- assign is_current = false -%}
+    {%- if eco_site == 'openstageisland' -%}{%- assign is_current = true -%}{%- endif %}
+    <div class="ecosystem-card{% if is_current %} is-current{% endif %}">
+      <div class="ecosystem-card-top">
+        <div class="ecosystem-icon" aria-hidden="true">🏝️</div>
+        <div class="ecosystem-info">
+          <div class="ecosystem-name-row">
+            {%- if is_current -%}
+            <span class="ecosystem-name">Open Stage Island</span>
+            {%- else -%}
+            <a href="https://openstageis.land/" target="_blank" rel="noopener" class="ecosystem-name">Open Stage Island</a>
+            {%- endif %}
+            <span class="ecosystem-pill ecosystem-pill-stage">Second Life Venue</span>
+          </div>
+          {%- if is_current -%}
+          <span class="ecosystem-url">openstageis.land</span>
+          {%- else -%}
+          <a href="https://openstageis.land/" target="_blank" rel="noopener" class="ecosystem-url">openstageis.land</a>
+          {%- endif %}
+        </div>
+      </div>
+      <p class="ecosystem-desc">Free 24/7 open-air electronic music stage in Second Life. Any artist can take the stage — no booking, no fee.</p>
+      <div class="ecosystem-links">
+        <a href="https://openstageis.land/" class="ecosystem-action-btn ecosystem-btn-main">
+          {%- if is_current -%}Visitor Guide{%- else -%}openstageis.land{%- endif %} &rarr;
+        </a>
+        <a href="https://github.com/openstageisland" target="_blank" rel="noopener" class="ecosystem-action-btn ecosystem-btn-alt" title="GitHub Organization">
+          GitHub Org &rarr;
+        </a>
+      </div>
+    </div>
+
+  </div>
+</section>

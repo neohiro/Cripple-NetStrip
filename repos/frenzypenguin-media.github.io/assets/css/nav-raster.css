@@ -1,0 +1,266 @@
+/* ==========================================================================
+   nav-raster.css — the top bar's fitting model.
+
+   WHY THIS FILE EXISTS
+   The bar used to be a single non-wrapping flex row whose only defence against
+   a narrow viewport was a set of hard-coded "drop this link" breakpoints
+   (1180 / 1000 / 820px in main.css). Those numbers were never checked against
+   the real 1120px container, and .site-nav is a flex item, so its min-width
+   defaults to auto and it refuses to shrink. The result was a horizontal
+   scrollbar on every page at every width: 41px of overflow at 1920, 281px at
+   1440, 469px at 1100. Hiding links is also the wrong answer, because the
+   hidden ones are the ones a visitor most wanted.
+
+   THE MODEL
+   Two states, chosen at runtime by assets/js/nav-rail.js:
+
+   1. RASTER (default). The links are compact tiles in a flex raster that WRAPS.
+      Wrapping is what makes overflow structurally impossible: a row that cannot
+      fit becomes two rows instead of a scrollbar. This is the "invisible raster"
+      — the tiles are individually bordered, the grid between them is not.
+
+   2. RAIL. When there are too many links for the raster to stay legible, or the
+      screen is too small for the raster to be worth reading, the bar becomes a
+      two-row horizontally scrollable rail with large dark arrows at both ends
+      that advance exactly one item per press. Nothing is dropped and nothing is
+      truncated; you pan instead.
+
+   In rail mode only .nav-rail__track scrolls. Hosts, Community, the auth slot,
+   Sponsor and the GitHub glyph sit in .nav-rail__fixed, outside the scroller, so
+   that no dropdown menu is ever trapped inside an overflow box. The arrows are
+   in-flow rather than overlaid, so no tile can hide underneath one.
+
+   This file only styles. It never decides the state, and it works standalone:
+   with no JS the bar stays in raster mode, which fits.
+
+   LOAD ORDER
+   After main.css, and it deliberately overrides it. The drop-priority rules in
+   main.css are neutralised below rather than deleted, because main.css is a
+   synced file and editing it in one site would drift the network.
+   ========================================================================== */
+
+/* --- the header row ------------------------------------------------------ */
+/* min-height instead of the fixed 68px height: a wrapped raster is two rows
+ * tall, and a fixed height would clip it instead of growing. */
+.site-header .container {
+  height: auto;
+  min-height: 68px;
+  padding-block: 10px;
+  row-gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The brand yields space rather than pushing the bar off-screen. */
+.site-brand {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.site-brand .site-brand-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- raster mode --------------------------------------------------------- */
+.site-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* The two properties that end the overflow: wrap, and permission to shrink. */
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* Compact tiles. Small enough that the common case fits on one line at 1120px,
+ * still a comfortable 12px hit target. */
+.site-nav .nav-link,
+.site-nav .nav-dropdown-btn,
+.site-nav .nav-auth {
+  padding: 6px 11px;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255, 255, 255, 0.02);
+  transition: background var(--transition, 150ms ease),
+              border-color var(--transition, 150ms ease),
+              color var(--transition, 150ms ease);
+}
+
+.site-nav .nav-link:hover,
+.site-nav .nav-dropdown-btn:hover,
+.site-nav .nav-auth:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.site-nav .nav-link:focus-visible,
+.site-nav .nav-dropdown-btn:focus-visible,
+.site-nav .nav-auth:focus-visible {
+  outline: 2px solid var(--accent, #00e5ff);
+  outline-offset: 2px;
+}
+
+/* Undo the drop-priority breakpoints. The raster and the rail handle scarcity
+ * by reflowing, so a link must never disappear just because the viewport is
+ * narrow — the rail will pan to it instead. Specificity is raised one step so
+ * this wins regardless of how the synced file orders its own media queries. */
+.site-nav .nav-optional {
+  display: inline-flex;
+}
+
+/* --- the buckets --------------------------------------------------------- */
+/* Transparent to layout in raster mode, so .site-nav keeps behaving exactly as
+ * it did and every .site-nav selector in the synced stylesheets still matches
+ * through them. */
+.site-nav .nav-rail__track-wrapper,
+.site-nav .nav-rail__track,
+.site-nav .nav-rail__fixed {
+  display: contents;
+}
+
+/* --- the arrows ---------------------------------------------------------- */
+/* Hidden in raster mode, where there is nothing to pan to. */
+.nav-rail__arrow {
+  display: none;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 58px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm, 6px);
+  /* Big and dark, per the design: a slab that reads as a transport control
+   * rather than as another link. */
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+.nav-rail__arrow::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+}
+.nav-rail__arrow--prev::before {
+  border-right: 14px solid currentColor;
+  margin-right: 4px;
+}
+.nav-rail__arrow--next::before {
+  border-left: 14px solid currentColor;
+  margin-left: 4px;
+}
+.nav-rail__arrow:hover:not(:disabled) {
+  background: #111;
+  border-color: rgba(255, 255, 255, 0.34);
+}
+.nav-rail__arrow:focus-visible {
+  outline: 2px solid var(--accent, #00e5ff);
+  outline-offset: 2px;
+}
+/* Disabled means "you are already at that end", so it is dimmed rather than
+ * removed: the rail keeps its shape and the control does not jump around. */
+.nav-rail__arrow:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
+/* --- rail mode ----------------------------------------------------------- */
+.site-nav.site-nav--rail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.site-nav.site-nav--rail .nav-rail__arrow {
+  display: flex;
+}
+
+/* The scrollable wrapper: grows to fill available space, provides the
+ * horizontal scroll viewport. flex-basis: 0% forces it to start at zero and
+ * claim all free space; min-width gives it a floor so it never fully collapses
+ * before the flex algorithm runs. display: block overrides the raster-mode
+ * display:contents. */
+.site-nav.site-nav--rail .nav-rail__track-wrapper {
+  display: block;
+  flex: 1 1 0%;
+  min-width: 200px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+.site-nav.site-nav--rail .nav-rail__track-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+/* The inner grid: two rows, column flow, max-content columns. Width is
+ * max-content so it sizes to its tiles; the wrapper scrolls it. */
+.site-nav.site-nav--rail .nav-rail__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, max-content);
+  grid-auto-columns: max-content;
+  gap: 6px;
+  align-items: center;
+  justify-content: start;
+  width: max-content;
+}
+.site-nav.site-nav--rail .nav-rail__track > * {
+  scroll-snap-align: start;
+}
+
+/* The pinned cluster. Deliberately outside the scroller: .nav-dropdown-menu in
+ * main.css is position:absolute; top:calc(100% + 8px), and inside an overflow-x
+ * box that clips it (making Hosts and Community impossible to open) and adds its
+ * width to scrollWidth (inventing empty track past the last real tile). */
+.site-nav.site-nav--rail .nav-rail__fixed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* --- narrow screens ------------------------------------------------------ */
+/* The rail keeps its two rows on a phone, but the arrow slabs shrink so they
+ * cannot eat the width they are meant to navigate. */
+@media (max-width: 620px) {
+  .nav-rail__arrow {
+    width: 32px;
+    height: 46px;
+  }
+  .nav-rail__arrow--prev::before {
+    border-right-width: 11px;
+  }
+  .nav-rail__arrow--next::before {
+    border-left-width: 11px;
+  }
+  .site-nav .nav-link,
+  .site-nav .nav-dropdown-btn,
+  .site-nav .nav-auth {
+    padding: 5px 9px;
+    font-size: 0.6875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-nav.site-nav--rail .nav-rail__track {
+    scroll-behavior: auto;
+  }
+  .nav-rail__arrow {
+    transition: none;
+  }
+}

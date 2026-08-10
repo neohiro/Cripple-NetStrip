@@ -1,0 +1,71 @@
+name: Refresh repos.json snapshot
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # Required by the "Rebuild Pages" step below. `gh workflow run` is a call to
+  # the Actions API, not a git push, so `contents: write` does not cover it -
+  # without `actions: write` the dispatch is rejected with
+  # "HTTP 403: Resource not accessible by integration" and the job fails after
+  # the snapshot commit has already been made.
+  actions: write
+
+concurrency:
+  group: refresh-snapshot
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Regenerate snapshot
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/update-snapshot.ps1 -NoDeploy -OutFile ./repos.json
+
+      - name: Commit snapshot if changed
+        id: commit
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          . ./tools/gh-commit.ps1
+          $generated = [IO.File]::ReadAllText("./repos.json", [Text.Encoding]::UTF8)
+          $existing = ""
+          # gh is a native command: a non-zero exit does NOT raise, so without
+          # this check a failed read silently compared against "" and committed
+          # a duplicate of the current snapshot.
+          $b64Lines = @(gh api "/repos/frenzypenguin-media/frenzypenguin-media.github.io/contents/repos.json" --jq ".content")
+          if ($LASTEXITCODE -ne 0) { throw "could not read existing repos.json (gh exit $LASTEXITCODE)" }
+          # gh --jq emits one array element per output LINE; must join before decoding
+          $clean = ($b64Lines -join '') -replace '\s', ''
+          $existing = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($clean))
+          if ($generated.Trim() -eq $existing.Trim()) {
+            Write-Host "Snapshot unchanged - skipping commit"
+            "changed=false" >> $env:GITHUB_OUTPUT
+          } else {
+            Commit-Files -Repo "frenzypenguin-media.github.io" -Owner "frenzypenguin-media" `
+              -Message "chore: weekly repos.json refresh" `
+              -Changes @(@{ path = "repos.json"; content = $generated })
+            "changed=true" >> $env:GITHUB_OUTPUT
+          }
+
+      # GitHub does not raise a push event for commits authored with
+      # GITHUB_TOKEN, so committing repos.json never rebuilds the site and the
+      # homepage kept serving a months-old snapshot even on successful runs.
+      # Explicitly dispatch the Pages build to publish it.
+      - name: Rebuild Pages to publish the new snapshot
+        if: steps.commit.outputs.changed == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref ${{ github.ref_name }}

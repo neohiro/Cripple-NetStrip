@@ -1,0 +1,30 @@
+# This repository is PUBLIC and there is deliberately no doctor job here.
+#
+# It previously called neohiro/doctor - a private repo owned by a different
+# account. Two separate GitHub rules make that impossible from here:
+#
+#   1. private reusable workflows cannot be called across accounts, and
+#   2. a public repository cannot call a private reusable workflow at all
+#
+# Either way the refusal is "error parsing called workflow": a failed run with
+# zero jobs and no logs.
+#
+# Coverage comes from frenzypenguin-media/doctor's own scheduled account scan,
+# which is private-to-private and covers this repository. Per-PR feedback would
+# require a public doctor, which is a visibility decision left to the owner.
+on:
+  schedule:
+    - cron: '42 5,14,22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  account-doctor-is-scheduled-elsewhere:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain
+        run: |
+          echo "This repository is public; its doctor is private and cannot be called from here."
+          echo "Coverage: https://github.com/frenzypenguin-media/doctor (scheduled account scan)"

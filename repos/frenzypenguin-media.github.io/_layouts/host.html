@@ -1,0 +1,178 @@
+---
+layout: default
+---
+{%- comment -%}
+  _layouts/host.html — one page per subdomain in the frenzypenguin.media zone.
+
+  Uses the extra_css / extra_js hooks in default.html to pull in the directory
+  styling and the swirl controller. It deliberately does NOT fork default.html:
+  every byte of the site chrome stays in one place, so a change to the header or
+  the footer reaches these pages too.
+
+  FRONT MATTER EXPECTED
+    slug        the key in _data/hosts.yml. Required — the layout looks the
+                record up by slug rather than accepting it as a parameter,
+                because a page that can be handed a record it does not match is
+                a page that can render the wrong bio.
+    title       page title. Falls back to the record's title.
+    description meta description. Falls back to the record's blurb.
+
+  OPTIONAL
+    extra_note  a paragraph appended under the status block, for the pages that
+                need to say something the data file cannot.
+
+  A NOTE ON extra_css / extra_js
+    This layout deliberately does NOT declare extra_css / extra_js in its own
+    front matter, because it would not work. Jekyll merges a layout's front
+    matter into the payload, not into `page`, and default.html reads
+    page.extra_css. A page using this layout must therefore declare both keys
+    itself; every generated host page does, and .github/scripts/check_host_pages.py
+    fails the build if one does not.
+  WHY THE RECORD IS THE CONTENT
+    hosts.yml is the single source of truth. Editing this page's front matter
+    changes the title and nothing else; to change what the page says about a
+    host, edit hosts.yml, so the directory, the status report and this page can
+    never disagree.
+{%- endcomment -%}
+
+{%- assign h = site.data.hosts.hosts | where: "slug", page.slug | first -%}
+{%- assign cats = site.data.hosts.categories -%}
+{%- assign cat = cats[h.category] -%}
+
+{%- comment -%}
+  A slug with no matching record is a build error, not a blank page. Rendering an
+  unexplained empty page would be indistinguishable from a host that was
+  deliberately retired. There is no assert in Liquid, so the check is done by
+  emitting a marker into the HTML and letting the CI greps catch it — see
+  .github/scripts/check_rendered_html.py.
+{%- endcomment -%}
+{%- if h == nil -%}
+  <p data-build-error="unknown-host-slug">{{ page.slug }} is not in _data/hosts.yml. Add the record before publishing this page.</p>
+{%- endif -%}
+
+{%- assign status_label = "Unverified" -%}
+{%- assign status_verb = "This record has not been probed yet." -%}
+{%- assign pill = "ok" -%}
+{%- if h.status == "ok" -%}
+  {%- assign status_label = "Live" -%}
+  {%- assign status_verb = "Answered a plain GET with a browser user agent." -%}
+{%- elsif h.status == "guarded" -%}
+  {%- assign status_label = "Live (guarded)" -%}
+  {%- assign status_verb = "Reachable, but it answers automated requests with a bot wall. A person in a browser gets through, so this is unverified rather than broken." -%}
+  {%- assign pill = "guarded" -%}
+{%- elsif h.status == "down" -%}
+  {%- assign status_label = "Down" -%}
+  {%- assign status_verb = "No answer at all: the connection was refused, the port is closed, or the address serves 404. The record is kept because it is the thing that needs repairing." -%}
+  {%- assign pill = "down" -%}
+{%- elsif h.status == "broken-dns" -%}
+  {%- assign status_label = "Broken DNS" -%}
+  {%- assign status_verb = "The name resolves but cannot be served, so nothing behind this record is reachable by name. See the note." -%}
+  {%- assign pill = "broken" -%}
+{%- endif -%}
+
+<header class="host-hero" role="banner">
+  <p class="host-kicker">
+    {%- if cat -%}{{ cat.symbol | strip_html }} {{ cat.title | escape }}{%- else -%}Host{%- endif -%}
+    &middot; <code>{{ page.slug | escape }}</code>
+  </p>
+  <h1>
+    <span aria-hidden="true" style="font-size: 0.7em; vertical-align: 0.12em;">{{ h.symbol | strip_html }}</span>
+    {{ h.title | escape }}
+  </h1>
+  <p class="host-lede">{{ h.blurb | escape }}</p>
+
+  <p style="margin: 0;">
+    <span class="pill pill--{{ pill }}">{{ status_label }}</span>
+  </p>
+
+  {%- comment -%}
+    The DJ-desk reference: an equaliser, a platter and a waveform divider. All
+    three are decoration — aria-hidden at the call site and inert under reduced
+    motion — but they are what makes the page read as a music page rather than a
+    form.
+  {%- endcomment -%}
+  <div style="display: flex; align-items: center; gap: 14px;" aria-hidden="true">
+    <span class="eq"><span></span><span></span><span></span><span></span><span></span></span>
+    <span class="platter"></span>
+  </div>
+  <div class="waveform" aria-hidden="true"></div>
+
+  {% include host-actions.html host=h %}
+
+  {%- comment -%}
+    This is the "opens from another source" trigger: the hero opens the frame
+    further down the page. hosts.js only swallows the click when the frame is
+    already on screen, so on a narrow layout where it is not, this stays a link
+    and scrolls instead of swallowing the tap.
+  {%- endcomment -%}
+  <p style="margin-top: 18px;">
+    <button class="host-action" type="button"
+            data-swirl-open="swirl-{{ page.slug | escape }}-card"
+            aria-controls="swirl-{{ page.slug | escape }}-card">
+      <span aria-hidden="true">◈</span> Open the {{ h.title | default: page.slug | escape }} frame
+    </button>
+  </p>
+</header>
+
+{%- comment -%}
+  show_actions is deliberately off. The hero above already renders the full
+  action row, and a second copy inside the card meant every host page offered
+  "Book a slot" twice with nothing to indicate which one was the real one.
+{%- endcomment -%}
+{% include host-swirl.html host=h eid="swirl" %}
+
+<div class="waveform" aria-hidden="true"></div>
+
+<section aria-labelledby="raw-heading">
+  <h2 id="raw-heading">The address</h2>
+  {%- if page.extra_note %}<p>{{ page.extra_note }}</p>{% endif %}
+  {%- comment -%}
+    raw_mod is mapped separately from the pill: broken-dns shortens to `broken`
+    for both, but emitting the raw status produced raw--broken-dns, which matches
+    no rule, and the strikethrough marking a dead address silently vanished from
+    the largest failure class on every host page.
+  {%- endcomment -%}
+  {%- assign raw_mod = h.status -%}
+  {%- if h.status == "broken-dns" -%}{%- assign raw_mod = "broken" -%}{%- endif -%}
+  <div class="raw raw--{{ raw_mod }}">
+    <div class="raw-head">
+      <span>As recorded in DNS</span>
+      <span class="pill pill--{{ pill }}">{{ status_label }}</span>
+    </div>
+    <code class="raw-value">{{ h.raw | default: h.url | escape }}</code>
+  </div>
+  <p>
+    <a href="{{ h.url | escape }}" rel="noopener noreferrer">{{ h.url | escape }}</a>
+    &nbsp;
+    <a href="/hosts/">Back to the host directory</a>
+    {%- if cat %} &nbsp; <a href="/hosts/#{{ h.category }}">All {{ cat.title | escape | downcase }}</a>{% endif %}
+  </p>
+</section>
+
+<section aria-labelledby="status-heading">
+  <h2 id="status-heading">Status</h2>
+  <p><strong>{{ status_verb }}</strong></p>
+  <dl class="host-dl">
+    <div class="host-dl-row">
+      <dt>Zone type</dt>
+      <dd><code>{% if h.type == "url301" %}URL301{% else %}URL{% endif %}</code></dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Last probed</dt>
+      <dd>{{ h.checked | default: "never" }}{% if h.code and h.code != "" %} &middot; <code>{{ h.code | escape }}</code>{% endif %}</dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Category</dt>
+      <dd><a href="/hosts/#{{ h.category }}">{{ cat.title | escape }}</a></dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Direct page</dt>
+      <dd><code>/{{ page.slug }}/</code></dd>
+    </div>
+  </dl>
+  {%- if h.note and h.note != "" %}
+  <p>{{ h.note | strip_newlines | escape }}</p>
+  {%- endif %}
+</section>
+
+{{ content }}

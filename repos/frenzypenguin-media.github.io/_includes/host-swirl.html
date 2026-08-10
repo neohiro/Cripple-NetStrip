@@ -1,0 +1,145 @@
+{%- comment -%}
+  _includes/host-swirl.html — the swirl-open frame, one per host.
+
+  PARAMETERS (assign before including):
+    include.host        the record from _data/hosts.yml — required
+    include.category    optional; forces the category blurb off the top
+    include.eid         element id prefix, defaults to "swirl". Set it to the
+                        slug when including more than one card on a page so two
+                        cards do not share an id.
+    include.show_actions pass 1 to render the action buttons inside the card
+    include.eid_prefix  alias of eid, kept because both spellings read
+                        naturally at different call sites.
+
+  OUTPUT is a self-contained <article>. The source disc is a real <button> with
+  a real aria-expanded, so the card is operable by keyboard and announced
+  correctly with JS off. See assets/js/hosts.js for the state contract.
+
+  THE BIO FRAME IS THE POINT. The three <dl> rows are labelled and visibly
+  empty on purpose — an owner fills them in and the page is finished. Do not
+  fill them with placeholder prose: an honest empty slot is more useful than a
+  fake sentence, because a fake one looks finished.
+{%- endcomment -%}
+
+{%- assign h = include.host -%}
+{%- assign eid = include.eid | default: include.eid_prefix | default: "swirl" -%}
+{%- assign cid = eid | append: "-" | append: h.slug -%}
+{%- assign cats = site.data.hosts.categories -%}
+{%- assign cat = cats[h.category] -%}
+
+{%- assign status_label = "Unverified" -%}
+{%- assign status_verb = "Not probed yet." -%}
+{%- if h.status == "ok" -%}
+  {%- assign status_label = "Live" -%}
+  {%- assign status_verb = "Answered a plain GET with a browser user agent." -%}
+{%- elsif h.status == "guarded" -%}
+  {%- assign status_label = "Live (guarded)" -%}
+  {%- assign status_verb = "Reachable, but it answers automated requests with a bot wall. A browser gets through." -%}
+{%- elsif h.status == "down" -%}
+  {%- assign status_label = "Down" -%}
+  {%- assign status_verb = "No answer at all. The address is recorded for the record and should be repaired or retired." -%}
+{%- elsif h.status == "broken-dns" -%}
+  {%- assign status_label = "Broken DNS" -%}
+  {%- assign status_verb = "The name resolves but cannot be served. See the note below." -%}
+{%- endif -%}
+
+{%- comment -%}
+  One mapping from the record's status to the two CSS modifiers. broken-dns is
+  spelled out in the data file but must shorten to `broken` for the class, and
+  emitting the raw status produced `raw--broken-dns`, which matches no rule - so
+  the strikethrough that marks a dead raw link only ever fired for `down`.
+{%- endcomment -%}
+{%- assign raw_mod = h.status -%}
+{%- assign pill_mod = h.status -%}
+{%- if h.status == "broken-dns" -%}
+  {%- assign raw_mod = "broken" -%}
+  {%- assign pill_mod = "broken" -%}
+{%- endif -%}
+<article class="swirl" id="{{ cid }}" data-swirl data-slug="{{ h.slug }}">
+  <span class="swirl-halo" aria-hidden="true"></span>
+
+  {%- comment -%} The source disc. title explains the control to a mouse user. {%- endcomment -%}
+  <button class="swirl-source" type="button"
+          data-swirl-toggle
+          aria-expanded="false"
+          aria-controls="{{ cid }}-card"
+          title="Open the {{ h.title | escape }} card">
+    <span aria-hidden="true">{{ h.symbol | default: "◈" | strip_html }}</span>
+    <span class="skip-link">{{ h.title | escape }} — open card</span>
+  </button>
+
+  <div class="swirl-card" id="{{ cid }}-card">
+    <div class="swirl-panel">
+
+      <div class="swirl-head">
+        <span class="swirl-symbol" aria-hidden="true">{{ h.symbol | default: "◈" | strip_html }}</span>
+        <div>
+          <p class="swirl-title">{{ h.title | escape }}</p>
+          <p class="swirl-slug">{{ h.slug | escape }}</p>
+        </div>
+      </div>
+
+      {%- comment -%}
+        The live address. This anchor deliberately carries NO data-swirl-open.
+        It was there before, pointing at its own card, and hosts.js calls
+        preventDefault() whenever the target card has zero height - which a
+        collapsed card always does. So the button labelled with a destination
+        URL opened the card instead of following the link. The card's openers
+        are its own source disc and, on a host page, the hero button; this link
+        does what it says.
+      {%- endcomment -%}
+      <p>
+        <a class="host-action host-action--primary"
+           href="{{ h.url | escape }}"
+           rel="noopener noreferrer"
+           title="{{ h.title | escape }} — opens {{ h.url | escape }} in a new tab">{{ h.title | escape }} &nearr;</a>
+      </p>
+
+      <p class="swirl-blurb">{{ h.blurb | default: "No description recorded yet." | escape }}</p>
+
+      {%- comment -%} ── the raw link ─────────────────────────────────────── {%- endcomment -%}
+      <div class="raw raw--{{ raw_mod }}">
+        <div class="raw-head">
+          <span>Raw link</span>
+          <span class="pill pill--{{ pill_mod }}">{{ status_label }}</span>
+        </div>
+        <code class="raw-value">{{ h.raw | default: h.url | escape }}</code>
+      </div>
+
+      <p class="swirl-meta">
+        {%- if h.type == "url301" -%}
+          Zone type <code>URL301</code>, a permanent redirect record.
+        {%- else -%}
+          Zone type <code>URL</code>.
+        {%- endif -%}
+        Last probed {{ h.checked | default: "never" }}{% if h.code and h.code != "" %}, code <code>{{ h.code | escape }}</code>{% endif %}.
+      </p>
+
+      <p class="swirl-blurb">
+        <strong>{{ status_verb }}</strong>
+        {%- if h.note and h.note != "" %} {{ h.note | strip_newlines | escape }}{% endif -%}
+      </p>
+
+      {%- comment -%} ── the bio frame: labelled, deliberately empty ───────── {%- endcomment -%}
+      <dl class="swirl-fields">
+        <div class="swirl-field{% unless h.bio and h.bio != '' %} swirl-field--empty{% endunless %}">
+          <dt>Bio</dt>
+          <dd>{% if h.bio and h.bio != '' %}{{ h.bio | escape }}{% else %}Who this is, in one line.{% endif %}</dd>
+        </div>
+        <div class="swirl-field swirl-field--empty">
+          <dt>Page info</dt>
+          <dd>What lives behind the link, and who keeps it alive.</dd>
+        </div>
+        <div class="swirl-field swirl-field--empty">
+          <dt>Notes</dt>
+          <dd>Anything an owner needs to know before editing this card.</dd>
+        </div>
+      </dl>
+
+      {%- if include.show_actions -%}
+        {% include host-actions.html host=h %}
+      {%- endif -%}
+
+    </div>
+  </div>
+</article>

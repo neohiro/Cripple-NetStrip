@@ -1,0 +1,1471 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * neohiro-network :: Universal cross-site UX styles
+ *   - AI assistant input bar (full width, dynamic cursor, typing indicator)
+ *   - Conversation modal (sway-down, user/assistant bubbles, typing indicator)
+ *   - Previous-button (cross-domain navigation back to last visited site)
+ *   - Universal top-nav auth tabs (Login / Dashboard)
+ *   - Starfield parallax background + ambient orbs + interaction ripple
+ *   - FPM spotlight card (centered below grid)
+ *   - Typewriter / live signal section
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* ── Skip link (a11y) ───────────────────────────────────────────── */
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 0.5rem;
+  z-index: 10000;
+  padding: 0.6rem 1.1rem;
+  background: var(--accent, #7c4dff);
+  color: #fff;
+  border-radius: 0 0 8px 8px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: top 0.2s ease-out;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 0;
+  color: #fff;
+  outline: 2px solid #fff;
+  outline-offset: -4px;
+}
+/* Suppress the default focus ring on <main tabindex="-1"> so the skip
+   link target doesn't show a stray outline when activated. */
+main:focus { outline: none; }
+
+/* ── Ambient floating orbs (background depth layer) ────────────────── */
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.07; }
+  33%       { transform: translate(30px, -20px) scale(1.08); opacity: 0.11; }
+  66%       { transform: translate(-20px, 15px) scale(0.96); opacity: 0.06; }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.05; }
+  40%       { transform: translate(-40px, 25px) scale(1.12); opacity: 0.09; }
+  80%       { transform: translate(25px, -35px) scale(0.92); opacity: 0.04; }
+}
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.06; }
+  50%       { transform: translate(15px, 30px); opacity: 0.1; }
+}
+
+:root {
+  --orb1-x: 15%;
+  --orb1-y: 20%;
+  --orb2-x: 75%;
+  --orb2-y: 65%;
+  --orb3-x: 55%;
+  --orb3-y: 10%;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -2;
+  filter: blur(80px);
+}
+body::before {
+  width: 500px;
+  height: 500px;
+  top: var(--orb1-y);
+  left: var(--orb1-x);
+  background: radial-gradient(circle, var(--accent, #7c4dff), transparent 70%);
+  animation: orbFloat1 18s ease-in-out infinite;
+}
+body::after {
+  width: 400px;
+  height: 400px;
+  top: var(--orb2-y);
+  right: var(--orb2-x);
+  background: radial-gradient(circle, var(--cyan, #00d4ff), transparent 70%);
+  animation: orbFloat2 24s ease-in-out infinite;
+}
+
+/* Third orb via dedicated selector (pinky glow) */
+body > .ambient-orb {
+  position: fixed;
+  width: 360px;
+  height: 360px;
+  top: var(--orb3-y);
+  right: var(--orb3-x);
+  background: radial-gradient(circle, var(--purple, #ab47bc), transparent 70%);
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: -2;
+  animation: orbFloat3 22s ease-in-out infinite;
+}
+
+/* ── Click ripple (universal) ────────────────────────────────────── */
+@keyframes rippleOut {
+  to { transform: scale(2.5); opacity: 0; }
+}
+.click-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(124, 77, 255, 0.3);
+  pointer-events: none;
+  animation: rippleOut 0.65s ease-out forwards;
+  transform: scale(0);
+}
+
+/* ── Card tilt / 3D depth on hover ──────────────────────────────── */
+.card-3d {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  transform-style: preserve-3d;
+  perspective: 800px;
+}
+.card-3d:hover {
+  transform: translateY(-4px) rotateX(1deg) rotateY(-1deg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 20px var(--accent-dim, rgba(124,77,255,0.15));
+}
+
+/* ── Ambient glow pulse on key CTAs ─────────────────────────────── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-dim, rgba(124,77,255,0.2)); }
+  50%       { box-shadow: 0 0 0 8px transparent; }
+}
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ── Shimmer on badge / pill labels ────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--accent, #7c4dff) 0%,
+    var(--cyan, #00d4ff) 40%,
+    var(--accent, #7c4dff) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ── Scroll reveal (universal — add class="reveal" then "reveal-in") ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ── Starfield drift (already mounted by JS; fallback CSS) ───────── */
+@keyframes starDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-800px, -800px, 0); }
+}
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  overflow: hidden;
+  background: radial-gradient(ellipse at top, rgba(124,77,255,0.06) 0%, transparent 50%);
+  transform: translate3d(var(--mx, 0), calc(var(--my, 0) + var(--sy, 0px)), 0);
+  transition: transform 0.18s ease-out;
+}
+.starfield::before,
+.starfield::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, #fff, transparent),
+    radial-gradient(1px 1px at 28% 72%, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 44% 32%, #fff, transparent),
+    radial-gradient(1px 1px at 58% 88%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 73% 14%, #fff, transparent),
+    radial-gradient(2px 2px at 84% 56%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 91% 92%, #fff, transparent),
+    radial-gradient(1px 1px at 8% 50%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1.5px 1.5px at 36% 6%, #fff, transparent),
+    radial-gradient(1px 1px at 50% 60%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 64% 40%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 22% 88%, rgba(124,77,255,0.9), transparent),
+    radial-gradient(1.5px 1.5px at 78% 28%, rgba(38,198,218,0.9), transparent);
+  background-size: 800px 800px;
+  background-repeat: repeat;
+  animation: starDrift 120s linear infinite;
+  opacity: 0.85;
+}
+.starfield::after {
+  background-size: 600px 600px;
+  animation: starDrift 180s linear infinite reverse;
+  opacity: 0.55;
+  filter: blur(0.4px);
+}
+
+/* ── Universal nav auth (Login / Dashboard) tab ───────────────────── */
+.nav-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px !important;
+  font-size: 0.84rem !important;
+  font-weight: 600 !important;
+  color: var(--fg-muted, #96a8b8) !important;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  text-decoration: none;
+}
+.nav-auth:hover {
+  color: var(--fg, #eceff1) !important;
+  background: var(--bg-card, #111820);
+  border-color: var(--border, #1f2a36);
+}
+.nav-auth--login {
+  color: var(--accent, #7c4dff) !important;
+  border-color: var(--accent, #7c4dff);
+}
+.nav-auth--login:hover {
+  background: var(--accent, #7c4dff);
+  color: #fff !important;
+  box-shadow: 0 4px 16px var(--accent-dim, rgba(124,77,255,0.2));
+}
+.nav-auth--dashboard {
+  color: var(--green, #66bb6a) !important;
+  border-color: var(--green, #66bb6a);
+}
+.nav-auth--dashboard:hover {
+  background: var(--green, #66bb6a);
+  color: var(--bg, #0b0e12) !important;
+}
+.nav-auth--user {
+  padding: 4px 10px 4px 4px !important;
+  border-color: var(--border, #1f2a36);
+}
+.nav-auth--user img {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border, #1f2a36);
+}
+.nav-auth--user .role-badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-dim, rgba(124,77,255,0.2));
+  color: var(--accent, #7c4dff);
+  margin-left: 2px;
+}
+.nav-auth--user .role-badge--godadmin { background: var(--red, #ef5350); color: #fff; }
+.nav-auth svg { flex-shrink: 0; }
+.nav-auth.hidden { display: none !important; }
+/* The assistant variable panels are display:flex boxes. The UA [hidden] rule
+   loses to that, and these panels are toggled via the `hidden` property (not
+   the .hidden class), so without this override they never visually hide. */
+.ai-bar__vars[hidden],
+.ai-conv__vars[hidden] {
+  display: none !important;
+}
+@media (max-width: 768px) {
+  .nav-auth span:not(.role-badge) { display: none; }
+  .nav-auth { padding: 8px !important; }
+}
+
+/* ── Previous (back) button — cross-domain nav ─────────────────────── */
+.prev-btn {
+  position: fixed;
+  top: 86px;
+  left: 18px;
+  z-index: 95;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px 9px 12px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg, #eceff1);
+  background: linear-gradient(135deg, var(--bg-card, #111820) 0%, var(--bg-elevated, #161e26) 100%);
+  border: 1px solid var(--accent, #7c4dff);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45), 0 0 18px var(--accent-dim, rgba(124,77,255,0.2));
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  opacity: 0;
+  transform: translateX(-20px) scale(0.95);
+  animation: prevBtnIn 0.45s 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+  backdrop-filter: blur(8px);
+}
+.prev-btn:hover {
+  transform: translateX(0) scale(1.04);
+  background: linear-gradient(135deg, var(--accent, #7c4dff) 0%, var(--accent-strong, #9d7aff) 100%);
+  color: #fff;
+  box-shadow: 0 10px 32px rgba(124,77,255,0.45);
+}
+.prev-btn:active { transform: translateX(0) scale(0.97); }
+.prev-btn svg { transition: transform 0.2s; }
+.prev-btn:hover svg { transform: translateX(-3px); }
+.prev-btn .prev-host {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--fg-subtle, #6d7f8f);
+  text-transform: lowercase;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border, #1f2a36);
+}
+.prev-btn:hover .prev-host { color: rgba(255,255,255,0.7); border-left-color: rgba(255,255,255,0.3); }
+.prev-btn .prev-label { color: inherit; }
+@keyframes prevBtnIn {
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@media (max-width: 640px) {
+  .prev-btn { top: 78px; left: 12px; font-size: 0.75rem; padding: 7px 12px 7px 10px; }
+  .prev-btn .prev-host { display: none; }
+}
+
+/* ── AI Assistant input bar ────────────────────────────────────────────────────
+   Fixed to the bottom edge so it occupies the same slot as the dock rail: when
+   the assistant is idle the bar IS the lower menu bar. Opening a conversation
+   slides this bar down out of view (body.ai-conv-active) and the screenwide
+   sheet takes its place. The page behind stays scrollable and interactive — the
+   bar is pointer-events:none on its wrapper so only the bar itself captures. */
+.ai-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 88;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  box-sizing: border-box;
+  background: transparent;
+  transform: translateY(0);
+  transition: transform 0.28s cubic-bezier(0.3, 0, 0.3, 1), opacity 0.22s ease;
+}
+body.ai-conv-active .ai-bar {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+/* Once the dock rail is present the bar sits directly above it. */
+body.ai-dock-present .ai-bar {
+  bottom: var(--ai-dock-h, 52px);
+}
+@media (max-width: 680px) {
+  .ai-bar { padding-left: 8px; padding-right: 8px; }
+}
+.ai-bar__inner {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  position: relative;
+}
+.ai-bar__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 14px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.35), 0 0 0 1px var(--accent-dim, rgba(124,77,255,0.1));
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+  backdrop-filter: blur(8px);
+  min-height: 48px;
+}
+.ai-bar__form:focus-within,
+.ai-bar__form.has-content {
+  border-color: var(--accent, #7c4dff);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 0 0 2px var(--accent, #7c4dff), 0 0 16px var(--accent-dim, rgba(124,77,255,0.15));
+  background: var(--bg-card, #111820);
+}
+.ai-bar__icon {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent, #7c4dff);
+  opacity: 0.7;
+}
+.ai-bar__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg, #eceff1);
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.35;
+  padding: 2px 0;
+  caret-color: var(--accent, #7c4dff);
+  min-width: 0;
+}
+.ai-bar__input:focus-visible {
+  outline: 2px solid var(--accent, #7c4dff);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.ai-bar__input::placeholder { color: var(--fg-subtle, #8a9baa); font-style: normal; font-weight: 400; }
+.ai-bar__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  padding: 0;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--accent, #7c4dff);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.ai-bar__send:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px var(--accent-dim, rgba(124,77,255,0.25));
+  background: var(--accent-strong, #9d7aff);
+}
+.ai-bar__send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.ai-bar__send svg { width: 16px; height: 16px; stroke-width: 2.5; }
+.ai-bar__counter {
+  display: none; /* Hidden by default; shown only when near limit via JS */
+}
+.ai-bar__counter--visible {
+  display: block;
+  margin-top: 4px;
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.62rem;
+  color: var(--fg-subtle, #8a9baa);
+  opacity: 0.55;
+  transition: color 0.12s, opacity 0.12s;
+}
+.ai-bar__counter--near { color: var(--amber, #ffb74d); opacity: 1; }
+.ai-bar__counter--over { color: var(--red, #ef5350); opacity: 1; font-weight: 600; }
+.ai-bar__hint { display: none; }
+.ai-bar__typing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--accent, #7c4dff);
+  border-radius: 14px;
+  font-size: 0.85rem;
+  color: var(--fg-muted, #96a8b8);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4), 0 0 18px var(--accent-dim, rgba(124,77,255,0.2));
+  animation: aiPanelIn 0.3s ease;
+}
+.ai-bar__dots { display: inline-flex; gap: 4px; }
+.ai-bar__dots span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent, #7c4dff);
+  box-shadow: 0 0 6px var(--accent, #7c4dff);
+  animation: aiDot 1.2s ease-in-out infinite;
+}
+.ai-bar__dots span:nth-child(2) { animation-delay: 0.15s; }
+.ai-bar__dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes aiDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+@keyframes aiPanelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-bar__dots span,
+  .ai-bar__typing,
+  .ai-bar__response {
+    animation: none !important;
+  }
+}
+.ai-bar__response {
+  margin-top: 10px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--bg-elevated, #161e26) 0%, var(--bg-card, #111820) 100%);
+  border: 1px solid var(--border, #1f2a36);
+  border-left: 3px solid var(--accent, #7c4dff);
+  border-radius: 14px;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--fg, #eceff1);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+  animation: aiPanelIn 0.3s ease;
+}
+.ai-bar__response a { color: var(--accent, #7c4dff); }
+.ai-bar__response p { margin: 0 0 8px; color: var(--fg, #eceff1); }
+.ai-bar__response p:last-child { margin-bottom: 0; }
+.ai-bar__response .ai-step {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: var(--bg, #0b0e12);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 10px;
+  font-size: 0.86rem;
+}
+.ai-bar__response .ai-step .n {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  background: var(--accent, #7c4dff);
+  color: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+}
+.ai-bar--sent .ai-bar__form { opacity: 0.7; }
+.ai-bar--sent .ai-bar__input { pointer-events: none; }
+@media (max-width: 640px) {
+  .ai-bar { padding: 10px 12px 14px; }
+  .ai-bar__form { padding: 8px 10px 8px 14px; gap: 8px; }
+  .ai-bar__input { font-size: 0.9rem; }
+  .ai-bar__send { padding: 7px 12px; font-size: 0.8rem; }
+  .ai-bar__hint { display: none; }
+}
+
+/* ── AI bar variable menus (model selection) ────────────────────────── */
+.ai-bar__vars {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 4px 0;
+  margin-top: -4px;
+  animation: varsSlide 0.2s ease-out both;
+}
+@keyframes varsSlide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ai-bar__var-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--fg-muted, #96a8b8);
+}
+.ai-bar__var-label {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #6d7f8f);
+}
+.ai-bar__var-select {
+  appearance: none;
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 8px;
+  padding: 4px 28px 4px 10px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.75rem;
+  color: var(--fg, #eceff1);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c4dff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.ai-bar__var-select:focus {
+  outline: none;
+  border-color: var(--accent, #7c4dff);
+  box-shadow: 0 0 0 2px var(--accent-dim, rgba(124,77,255,0.2));
+}
+.ai-bar__vars-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em
+  color: var(--fg-muted, #96a8b8);
+  background: transparent;
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.ai-bar__vars-toggle:hover {
+  color: var(--fg, #eceff1);
+  border-color: var(--accent, #7c4dff);
+}
+.ai-bar__vars-toggle[aria-expanded="true"] {
+  color: #fff;
+  background: var(--accent, #7c4dff);
+  border-color: var(--accent, #7c4dff);
+}
+
+/* ── FPM highlighted card (centered below grid) ────────────────────── */
+.fpm-spotlight {
+  display: block;
+  margin: 32px auto 0;
+  max-width: 520px;
+  padding: 28px;
+  background: linear-gradient(135deg, var(--bg-card, #111820) 0%, rgba(171, 71, 188, 0.12) 100%);
+  border: 1px solid var(--purple, #ab47bc);
+  border-radius: var(--radius, 12px);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s, box-shadow 0.25s;
+  text-decoration: none;
+  color: inherit;
+}
+.fpm-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--purple, #ab47bc), var(--accent, #7c4dff) 50%, var(--cyan, #26c6da));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.fpm-spotlight:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg, 0 8px 40px rgba(0,0,0,0.5)), 0 0 30px rgba(171, 71, 188, 0.18);
+}
+.fpm-spotlight h3 { color: var(--purple, #ab47bc); margin-bottom: 8px; }
+.fpm-spotlight p { margin-bottom: 14px; }
+
+/* ── Typewriter / live signal ──────────────────────────────────────── */
+.typewriter-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 0 24px;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.typewriter-prefix {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-family: var(--font-mono, 'JetBrains Mono', monospace);
+        font-size: 0.66rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        /* Was accent text on an accent tint: 1.00:1 in light mode, so the "live
+           signal" badge was a violet smudge. Solid accent + light text is
+           legible in both schemes. */
+        color: #fff;
+        background: var(--accent, #7c4dff);
+        border: 1px solid var(--accent, #7c4dff);
+        margin-bottom: 22px;
+        animation: twLabelPulse 3.6s ease-in-out infinite;
+  }
+/* No dark-scheme override. There was one that restored the tinted treatment,
+       and it measured worse than the bug it was meant to fix: accent text on a
+       20% accent wash composites to roughly 2.9:1 against the dark surface, which
+       is still under the 4.5:1 threshold for text this size. Solid accent with
+       #fff is 4.8:1 in both schemes, so the badge uses one treatment
+       everywhere. */
+  @keyframes twLabelPulse {
+  50% { box-shadow: 0 0 24px var(--accent-dim, rgba(124,77,255,0.2)); }
+}
+/* Bright solid fill on purpose. A previous revision used
+   -webkit-background-clip:text + -webkit-text-fill-color:transparent, which made
+   the typed text render invisible (the gradient also faded out to --fg-muted, so
+   even when the clip worked the tail of every line read as dim grey). */
+.typewriter {
+    font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+    font-weight: 600;
+    font-size: clamp(1.35rem, 3.6vw, 2.25rem);
+    line-height: 1.3;
+    /* Was `color: #ffffff`. The typed line sits on the page background, so a
+       pinned white left it white-on-near-white in light mode -- the "Live
+       Signal" line simply vanished. The token follows the scheme on every site;
+       the dark-only glow is dropped on light below. (The earlier
+       -webkit-background-clip:text experiment failed for a different reason and
+       its note above still stands.) */
+    color: var(--fg);
+    letter-spacing: -0.015em;
+    min-height: 1.4em;
+    display: inline-block;
+    text-shadow: 0 0 30px rgba(124,77,255,0.35), 0 2px 10px rgba(0,0,0,0.6);
+    padding-right: 2px;
+  }
+  @media (prefers-color-scheme: light) {
+    .typewriter {
+      text-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+  }
+.typewriter-cursor {
+  display: inline-block;
+  width: 0.5ch;
+  height: 0.85em;
+  background: var(--accent, #7c4dff);
+  margin-left: 4px;
+  vertical-align: -0.05em;
+  border-radius: 2px;
+  box-shadow: 0 0 14px var(--accent, #7c4dff);
+  animation: twBlink 0.85s step-end infinite;
+}
+@keyframes twBlink { 50% { opacity: 0; } }
+.typewriter-attribution {
+  margin-top: 16px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.8rem;
+  color: var(--fg-subtle, #6d7f8f);
+  letter-spacing: 0.04em;
+  min-height: 1.4em;
+}
+.typewriter-attribution b { color: var(--accent, #7c4dff); font-weight: 600; }
+
+/* ── Utility ───────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ── Conversation modal ────────────────────────────────────────────
+   The sheet is full-bleed and anchored to the bottom edge, so neither
+   keyframe carries a horizontal centring translate.
+     convSlideUp  — opening: rises from the bottom edge
+     convFadeUp   — closing: shrinks and fades away                  */
+@keyframes convFadeUp {
+  from { opacity: 1; transform: translateY(0) scaleY(1); }
+  to   { opacity: 0; transform: translateY(-12px) scaleY(0.96); }
+}
+@keyframes msgSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes convPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+@keyframes dotBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ── Conversation sheet ─────────────────────────────────────────────────────
+   Screenwide: full bleed from the bottom edge up, rounded only at the top. It
+   deliberately does NOT use a backdrop — the user must still be able to scroll
+   and read the page underneath while a conversation is open.
+   z-index: 910 (above bottom-bar@900, below skip-link@10000).
+   Animation is faster (0.22s) so the modal "stops faster" and feels snappier. */
+.ai-conv {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 910;
+  width: 100%;
+  max-width: none;
+  pointer-events: none;
+}
+.ai-conv.hidden { display: none; }
+.ai-conv--open {
+  animation: convSlideUp 0.22s cubic-bezier(0.2, 0.6, 0.3, 1) both;
+  pointer-events: auto;
+}
+.ai-conv--closing {
+  /* Closing shrinks away and fades out — NOT convSlideDown, which would replay
+     the opening direction on the way out. */
+  animation: convFadeUp 0.18s ease-in both;
+  pointer-events: none;
+}
+@keyframes convSlideUp {
+  from { opacity: 0; transform: translateY(4%) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ai-conv__chrome {
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--border, #1f2a36);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow:
+    0 -20px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px var(--accent-dim, rgba(124, 77, 255, 0.15)),
+    0 0 40px var(--accent-dim, rgba(124, 77, 255, 0.1));
+overflow: hidden;
+    /* Near-screenwide conversation frame.
+       Was `max-height: min(76vh, 720px)`, and that alone could never make the
+       frame tall: the chrome is a flex column whose only height was its content,
+       so a conversation that had just started measured ~220px -- 29% of the
+       viewport -- and read as a small bar sliding up rather than a place to talk.
+       `max-height` is a ceiling, not a size.
+       Now it is a real height, so the frame is the same size whether the thread
+       has one line in it or fifty. The message list takes the slack and scrolls
+       internally (see .ai-conv__messages), so the header and the composer stay
+       pinned instead of being pushed off screen by a long conversation. */
+    height: min(80vh, 800px);
+    max-height: calc(100vh - max(12px, env(safe-area-inset-top, 0px)));
+    display: flex;
+    flex-direction: column;
+  }
+/* Leave room for the dock rail so the close button is never under it. */
+body.ai-dock-present .ai-conv { bottom: var(--ai-dock-h, 52px); }
+/* …unless the dock has slid away for this conversation. Must come after the
+   rule above (equal specificity, later wins). */
+body.ai-conv-active .ai-conv { bottom: 0; }
+@media (max-width: 680px) {
+  .ai-conv__chrome { max-height: 75vh; border-radius: 14px 14px 0 0; }
+}
+.ai-conv__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border, #1f2a36);
+  background: var(--bg-card, #111820);
+  flex-shrink: 0;
+}
+.ai-conv__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--fg, #eceff1);
+  letter-spacing: -0.01em;
+}
+.ai-conv__pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #7c4dff);
+  box-shadow: 0 0 8px var(--accent, #7c4dff);
+  animation: convPulse 2s ease-in-out infinite;
+}
+.ai-conv__heart {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  color: var(--fg-muted, #96a8b8);
+  transition: color 0.4s;
+}
+.ai-conv__heart-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-subtle, #6d7f8f);
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.ai-conv__heart--up    .ai-conv__heart-dot { background: #4caf50; box-shadow: 0 0 5px #4caf50; }
+.ai-conv__heart--down .ai-conv__heart-dot { background: var(--red, #ef5350); }
+.ai-conv__heart--probe .ai-conv__heart-dot { background: #ff9800; animation: convPulse 0.8s ease-in-out infinite; }
+.ai-conv__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--fg-muted, #96a8b8);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.ai-conv__close:hover { background: var(--bg-card, #111820); color: var(--fg, #eceff1); }
+.ai-conv__close:focus-visible { outline: 2px solid var(--accent, #7c4dff); outline-offset: 2px; }
+
+.ai-conv__messages {
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+gap: 12px;
+    /* `flex: 1` plus `min-height: 0` lets the thread absorb the slack in the
+       now-fixed-height frame and scroll inside it, instead of the list being
+       capped independently of the frame (which left dead space under the
+       composer, or clipped the list). `min-height: 0` is required for a flex
+       child to shrink below its content size -- without it this column refuses
+       to scroll and pushes the composer out of the frame entirely. */
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Shrink harder than the triage form so a long thread gives up space before
+       the composer does -- the Send button must stay reachable at every
+       scroll position and with the triage form open. */
+    flex-shrink: 8;
+    scroll-behavior: smooth;
+  }
+.ai-conv__messages::-webkit-scrollbar { width: 5px; }
+.ai-conv__messages::-webkit-scrollbar-track { background: transparent; }
+.ai-conv__messages::-webkit-scrollbar-thumb { background: var(--border, #1f2a36); border-radius: 3px; }
+
+.ai-conv__msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: msgSlideIn 0.25s ease-out both;
+}
+.ai-conv__msg--user {
+  flex-direction: row-reverse;
+}
+.ai-conv__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-dim, rgba(124, 77, 255, 0.25));
+  border: 1px solid var(--accent, #7c4dff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--accent, #7c4dff);
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  overflow: hidden;
+}
+/* Org-avatar image fills the assistant avatar slot; the fallback glyph
+   (✦ / 🤖) stays underneath and re-appears if the image can't load. */
+.ai-conv__avatar .ai-avatar-img,
+.ai-dock__chat-avatar .ai-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ai-conv__brand-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  outline: 1px solid var(--accent, #7c4dff);
+  outline-offset: 1px;
+}
+.ai-conv__bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--fg, #eceff1);
+  background: var(--bg-card, #111820);
+  border: 1px solid var(--border, #1f2a36);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.ai-conv__msg--user .ai-conv__bubble {
+  background: var(--accent, #7c4dff);
+  border-color: var(--accent, #7c4dff);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(124, 77, 255, 0.35);
+}
+.ai-conv__bubble a { color: var(--accent, #7c4dff); }
+.ai-conv__msg--user .ai-conv__bubble a { color: #fff; text-decoration: underline; }
+.ai-conv__bubble b { font-weight: 700; }
+.ai-conv__bubble i { font-style: italic; }
+.ai-conv__bubble code {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.85em;
+  background: var(--bg, #0b0e12);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  border: 1px solid var(--border, #1f2a36);
+}
+.ai-conv__bubble a { color: var(--accent, #7c4dff); text-decoration: underline; }
+.ai-conv__bubble ol, .ai-conv__bubble ul { margin: 0.5em 0 0.5em 1.5em; line-height: 1.6; }
+.ai-conv__bubble li { margin: 0.25em 0; }
+.ai-conv__bubble .ai-step {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 12px; margin: 6px 0;
+  background: var(--bg, #0b0e12);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 10px;
+  font-size: 0.86rem;
+}
+.ai-conv__bubble .ai-step .n {
+  flex-shrink: 0; width: 22px; height: 22px;
+  background: var(--accent, #7c4dff); color: #fff;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+}
+.ai-conv__bubble p { margin: 0 0 0.5em; }
+.ai-conv__bubble p:last-child { margin-bottom: 0; }
+
+.ai-conv__typing {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 0 16px 4px;
+}
+.ai-conv__bubble--typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-width: 200px;
+}
+.ai-conv__dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.ai-conv__dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent, #7c4dff);
+  animation: dotBounce 1.3s ease-in-out infinite;
+}
+.ai-conv__dots span:nth-child(2) { animation-delay: 0.15s; }
+.ai-conv__dots span:nth-child(3) { animation-delay: 0.3s; }
+
+.ai-conv__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  border-top: 1px solid var(--border, #1f2a36);
+  background: var(--bg-card, #111820);
+  flex-shrink: 0;
+}
+.ai-conv__notice {
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  color: #000;
+  background: #ffeb3b;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.01em;
+}
+.ai-conv__privacy {
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  color: var(--accent, #7c4dff);
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.ai-conv__privacy:hover { color: var(--accent-strong, #9d7aff); }
+
+/* ── Voicemail triage ─────────────────────────────────────────────────────
+   Sits below the conversation, collapsed by default, so asking a question
+   never looks like a contact form. The two triage questions come first: they
+   are what decides where the message ends up. */
+.ai-conv__message-toggle {
+  background: transparent;
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted, #96a8b8);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.ai-conv__message-toggle:hover {
+  color: var(--fg, #eceff1);
+  border-color: var(--accent, #7c4dff);
+}
+.ai-conv__message-toggle[aria-expanded="true"] {
+  color: #fff;
+  background: var(--accent, #7c4dff);
+  border-color: var(--accent, #7c4dff);
+}
+
+.ai-conv__triage {
+  /* flex-shrink: 0 and an internal scroller. The chrome is a fixed-height flex
+     column, so a flex child defaults to `flex-shrink: 1` but is floored by its
+     content: opening the triage form added ~300px of fields to a frame that had
+     no slack left, so it overflowed and pushed the composer (and the Send
+     button) off the bottom of the screen. The form must yield instead. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border, #1f2a36);
+  background: var(--bg, #0b0e12);
+}
+.ai-conv__triage.hidden { display: none; }
+
+.ai-conv__triage-lede {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--fg-subtle, #6d7f8f);
+}
+
+.ai-conv__triage-row { display: flex; flex-direction: column; gap: 5px; }
+.ai-conv__triage-row > span:first-child {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #6d7f8f);
+}
+.ai-conv__triage-pair { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai-conv__triage-pair input { flex: 1 1 140px; min-width: 0; }
+
+.ai-conv__triage input,
+.ai-conv__triage textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.85rem;
+  color: var(--fg, #eceff1);
+  background: var(--bg-card, #111820);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 8px;
+  resize: vertical;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.ai-conv__triage input::placeholder,
+.ai-conv__triage textarea::placeholder { color: var(--fg-subtle, #6d7f8f); }
+.ai-conv__triage input:focus,
+.ai-conv__triage textarea:focus {
+  outline: none;
+  border-color: var(--accent, #7c4dff);
+  box-shadow: 0 0 0 3px var(--accent-dim, rgba(124, 77, 255, 0.2));
+}
+
+.ai-conv__triage-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ai-conv__triage-send {
+  padding: 8px 20px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent, #7c4dff);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+.ai-conv__triage-send:hover:not(:disabled) { filter: brightness(1.12); }
+.ai-conv__triage-send:disabled { opacity: 0.55; cursor: progress; }
+.ai-conv__triage-status {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.72rem;
+  color: var(--fg-subtle, #6d7f8f);
+}
+@media (max-width: 560px) {
+  .ai-conv__footer { flex-wrap: wrap; }
+  .ai-conv__message-toggle { order: -1; }
+}
+
+/* ── Inline composer (wide rectangular query box, rounder corners, vars) ── */
+.ai-conv__composer {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border, #1f2a36);
+  background: var(--bg-card, #111820);
+}
+.ai-conv__composer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-conv__input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 18px;
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.4),
+    0 0 0 1px var(--accent-dim, rgba(124,77,255,0.15));
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.ai-conv__composer-form:focus-within .ai-conv__input-wrap,
+.ai-conv__composer-form.has-content .ai-conv__input-wrap {
+  border-color: var(--accent, #7c4dff);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.5),
+    0 0 0 2px var(--accent, #7c4dff),
+    0 0 20px var(--accent-dim, rgba(124,77,255,0.2));
+  background: var(--bg-card, #111820);
+}
+.ai-conv__input-icon {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent, #7c4dff);
+  filter: drop-shadow(0 0 6px var(--accent-dim, rgba(124,77,255,0.2)));
+}
+.ai-conv__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg, #eceff1);
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  padding: 4px 0;
+  caret-color: var(--accent, #7c4dff);
+  min-width: 0;
+}
+.ai-conv__input:focus-visible {
+  outline: 2px solid var(--accent, #7c4dff);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.ai-conv__input::placeholder { color: var(--fg-subtle, #8a9baa); font-style: italic; }
+.ai-conv__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent, #7c4dff) 0%, var(--accent-strong, #9d7aff) 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+.ai-conv__send:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px var(--accent-dim, rgba(124,77,255,0.2));
+}
+.ai-conv__send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.ai-conv__send svg { transition: transform 0.2s; }
+.ai-conv__send:hover:not(:disabled) svg { transform: translateX(2px); }
+
+/* Variable menus underneath the input */
+.ai-conv__vars {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 4px 0;
+  margin-top: -4px;
+  animation: varsSlide 0.2s ease-out both;
+}
+@keyframes varsSlide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ai-conv__var-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--fg-muted, #96a8b8);
+}
+.ai-conv__var-label {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #6d7f8f);
+}
+.ai-conv__var-select {
+  appearance: none;
+  background: var(--bg-elevated, #161e26);
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 8px;
+  padding: 4px 28px 4px 10px;
+  font-family: var(--font-ui, 'Space Grotesk', system-ui, sans-serif);
+  font-size: 0.75rem;
+  color: var(--fg, #eceff1);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c4dff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.ai-conv__var-select:focus {
+  outline: none;
+  border-color: var(--accent, #7c4dff);
+  box-shadow: 0 0 0 2px var(--accent-dim, rgba(124,77,255,0.2));
+}
+.ai-conv__vars-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted, #96a8b8);
+  background: transparent;
+  border: 1px solid var(--border, #1f2a36);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.ai-conv__vars-toggle:hover {
+  color: var(--fg, #eceff1);
+  border-color: var(--accent, #7c4dff);
+}
+.ai-conv__vars-toggle[aria-expanded="true"] {
+  color: #fff;
+  background: var(--accent, #7c4dff);
+  border-color: var(--accent, #7c4dff);
+}
+.ai-conv__counter {
+  align-self: flex-end;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.7rem;
+  color: var(--fg-subtle, #8a9baa);
+  opacity: 0.6;
+  transition: color 0.15s, opacity 0.15s;
+}
+.ai-conv__counter--near { color: var(--amber, #ffb74d); opacity: 1; }
+.ai-conv__counter--over { color: var(--red, #ef5350); opacity: 1; font-weight: 600; }
+
+/* Dual checkmarks for user messages — stacked, grey→bright, grey→blue */
+.ai-conv__msg--user {
+  position: relative;
+}
+.ai-conv__msg--user .ai-conv__bubble {
+  margin-right: 56px; /* space for checkmarks */
+}
+.ai-conv__checks {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+.ai-conv__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 50%;
+  background: var(--fg-subtle, #6d7f8f);
+  color: var(--bg, #0b0e12);
+  opacity: 0.5;
+  transform: scale(0.6);
+  transition: all 0.2s cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+.ai-conv__check--sent.ai-conv__check--active {
+  background: var(--fg-muted, #96a8b8);
+  color: var(--bg, #0b0e12);
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 0 8px var(--fg-muted, #96a8b8);
+}
+.ai-conv__check--delivered.ai-conv__check--active {
+  background: var(--blue, #42a5f5);
+  color: #fff;
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 0 10px var(--blue, #42a5f5), 0 0 20px var(--blue, #42a5f5);
+}
+/* Confirmation style for human messages (LLM reply message experience) */
+.ai-conv__msg--assistant.llm-reply .ai-conv__bubble {
+  border-left: 3px solid var(--blue, #42a5f5);
+  background: linear-gradient(90deg, rgba(66,165,245,0.08), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-conv--open { animation: none; }
+  .ai-conv--closing { animation: none; }
+  .ai-conv__pulse { animation: none; }
+  .ai-conv__dots span { animation: none; }
+  body::before, body::after, body > .ambient-orb {
+    animation: none !important;
+    opacity: 0.04 !important;
+  }
+  .starfield::before, .starfield::after { animation: none; }
+  /* Freeze parallax — JS still updates --mx/--my/--sy but the transform
+     stays at identity so users with vestibular sensitivity aren't pulled. */
+  .starfield { transform: none !important; transition: none !important; }
+  /* Card 3D tilt triggers a transform on hover; freeze to a static shadow. */
+  .card-3d, .card-3d:hover { transform: none !important; }
+  /* Click ripple is a one-shot scale animation; skip entirely. */
+  .click-ripple { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .neohiro-toast, #neohiro-toast { animation: none !important; }
+}
+
+/* ── Non-blocking toast (replaces alert() in nav auth fallback) ─────── */
+@keyframes neohiroToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes neohiroToastOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(8px); }
+}
+@media (max-width: 640px) {
+  .ai-conv {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--ai-bar-pad, 110px) + 12px);
+    transform: none;
+    width: auto;
+  }
+  .ai-conv__bubble { max-width: 88%; }
+}
+
+/* ── Hero avatar (org identity on landing heroes) ──────────────────── */
+.hero-avatar {
+  display: block;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent, #7c4dff);
+  box-shadow: 0 0 0 5px rgba(124, 77, 255, 0.18), 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+@media (max-width: 560px) {
+  .hero-avatar { width: 72px; height: 72px; margin-bottom: 14px; }
+}

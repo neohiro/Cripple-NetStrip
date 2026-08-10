@@ -1,0 +1,22 @@
+{% comment %} org-profile.md — single source of truth for the org description block.
+
+   Used in:
+     - README.md (jekyll include with a capture tag)
+     - github.io landing pages
+     - heartbeat-generated public summaries
+
+   Variables expected (from caller):
+     org: 'neohiro' | 'fpm' | 'osi' | 'hplus' {% endcomment %}
+
+{%- case include.org -%}
+{%- when 'neohiro' -%}
+> **neohiro** — security hardening & privacy tools for Windows and Linux. Defense is the best defense. Zero telemetry. Ever.
+{%- when 'fpm' -%}
+> **FrenzyPenguin Media** — indie media studio: video deep-dives, music, and creative works under the neohiro umbrella.
+{%- when 'osi' -%}
+> **Open Stage Island** — a free, 24/7 open-air music stage in Second Life. Any artist can play, no booking, no fee.
+{%- when 'hplus' -%}
+> **transhumanists** — tracking human progress, one milestone at a time. Breakthroughs, defense, frontier engineering.
+{%- else -%}
+> **{{ include.org }}** — part of the neohiro network.
+{%- endcase -%}

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none" role="img" aria-labelledby="ai-seal-title">
+  <title id="ai-seal-title">AI-assisted content</title>
+  <!--
+    ai-seal.svg: the AI provenance seal.
+
+    NB an XML comment may not contain a double hyphen, so the dashes in this
+    header are single hyphens each. Browsers reject the whole file as
+    malformed otherwise, which is silent: the image simply never paints.
+
+    Authored once in template-shared/assets/img/ and copied into every
+    *.github.io site by site_forge.py. tests/test-ai-seal.py fails when a copy
+    drifts, so edit here and re-sync rather than editing a site.
+
+    Design constraints, all of them load-bearing:
+
+      * White on transparent, never a colour. The four sites do not share one
+        palette vocabulary, and a seal that has to be recoloured per theme is a
+        seal that will be wrong on one of them.
+      * Soft, not hard. The haze, the wisps and the blurred fills are what make
+        it read as a watermark instead of a sticker. Opacity is left low on
+        purpose: assets/css/ai-seal.css scales the whole thing, so the alpha is
+        not the only thing keeping it quiet.
+      * The ring is a real ring. The `AI` geometry below is sized so the
+        baseline corners land at r=48.1 and the `I` at r=48.7, which is inside
+        the ring's stroke band (r 46.7 -> 49.3). The letters therefore touch the
+        ring rather than sitting politely inside it. If you rescale the word,
+        re-derive those radii or the seal stops touching.
+      * The letterforms are paths, not <text>. An SVG loaded through <img> runs
+        in a sandbox with no access to the page's @font-face, so a <text> node
+        would fall back to whatever the OS happens to have and the four sites
+        would render four different seals.
+
+    Geometry, stated so the next edit does not have to re-derive it:
+      ring r=48 stroke 2.6, dashed hairline r=40.5, word box x 28.6..92.3,
+      A apex flat at y=26.8 (a bevel, forced by stroke-miterlimit="2": the true
+      miter at that apex would spike to y=-4, outside the viewBox), baseline at
+      y=96.5.
+  -->
+  <defs>
+    <radialGradient id="ai-seal-haze" cx="50%" cy="44%" r="60%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.17"/>
+      <stop offset="58%" stop-color="#fff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ai-seal-arc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+      <stop offset="46%" stop-color="#fff" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0.88"/>
+    </linearGradient>
+
+    <!-- color-interpolation-filters="sRGB" because the default linearRGB
+         interpolation turns a low-alpha white wisp into a visible grey
+         rectangle once it is composited over a dark page. -->
+    <filter id="ai-seal-cloud" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="3.4"/>
+    </filter>
+    <filter id="ai-seal-cloud-soft" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.6"/>
+    </filter>
+  </defs>
+
+  <!-- haze: the soft body of the mark -->
+  <circle cx="60" cy="60" r="56" fill="url(#ai-seal-haze)"/>
+
+  <!-- wisps: the cloud texture. Blurred, so nothing here has a hard edge. -->
+  <g filter="url(#ai-seal-cloud)" fill="#fff">
+    <ellipse cx="31" cy="34" rx="18" ry="10" opacity="0.14"/>
+    <ellipse cx="88" cy="31" rx="15" ry="9" opacity="0.11"/>
+    <ellipse cx="94" cy="80" rx="17" ry="11" opacity="0.12"/>
+    <ellipse cx="26" cy="83" rx="16" ry="10" opacity="0.10"/>
+    <ellipse cx="60" cy="60" rx="30" ry="26" opacity="0.05"/>
+  </g>
+
+  <!-- the white ring, plus a faint dashed inner ring that the word crosses -->
+  <circle cx="60" cy="60" r="48" stroke="#fff" stroke-opacity="0.62" stroke-width="2.6"/>
+  <circle cx="60" cy="60" r="40.5" stroke="#fff" stroke-opacity="0.28" stroke-width="0.9" stroke-dasharray="3 5.5" stroke-linecap="round"/>
+
+  <!-- AI. One group so the group's opacity composites the whole word once:
+       a per-shape opacity would make the foot pads darker where they overlap
+       the legs, which reads as a printing error at this size. -->
+  <g opacity="0.94">
+    <g stroke="#fff" stroke-width="9.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2">
+      <path d="M50.4 28 L33.4 94"/>
+      <path d="M50.4 28 L67.4 94"/>
+      <path d="M36.5 66 L63.5 66" stroke-width="8.4"/>
+    </g>
+    <g fill="#fff">
+      <!-- Foot pads square off the baseline; a butt cap on a slanted leg leaves
+           a slanted cut, which is visible once the seal is 200px tall on a
+           hi-DPI screen. -->
+      <rect x="28.6" y="88.5" width="9.6" height="8"/>
+      <rect x="62.6" y="88.5" width="9.6" height="8"/>
+      <rect x="79.5" y="28" width="12.8" height="68.5"/>
+    </g>
+  </g>
+
+  <!-- apex bridge: two soft wisps closing the gap between the A's flat apex
+       (r=36.1) and the ring, so the seal reads as one closed form. -->
+  <g filter="url(#ai-seal-cloud-soft)" fill="#fff" opacity="0.13">
+    <ellipse cx="45.5" cy="19" rx="7" ry="5"/>
+    <ellipse cx="55" cy="19" rx="7" ry="5"/>
+  </g>
+
+  <!-- two arc highlights: the "fancy" pass, and the reason the ring does not
+       read as a plain stroke. -->
+  <path d="M14.89 43.58 A48 48 0 0 1 101.57 36" stroke="url(#ai-seal-arc)" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M101.57 84 A48 48 0 0 1 43.58 105.11" stroke="url(#ai-seal-arc)" stroke-width="2.6" stroke-linecap="round" opacity="0.7"/>
+</svg>

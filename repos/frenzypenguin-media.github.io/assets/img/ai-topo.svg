@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none" role="img" aria-labelledby="ai-topo-title">
+  <title id="ai-topo-title">Back to top</title>
+  <!--
+    ai-topo.svg: the persistent "back up" control.
+
+    As in ai-seal.svg, no double hyphen may appear in this comment or the file
+    is rejected as malformed XML and the control never paints.
+
+    Deliberately the same drawing as ai-seal.svg: same haze, same wisps, same
+    ring, same two arc highlights. That is the point of shipping them as two
+    files rather than one sprite with two symbols: a reviewer can diff the two
+    and see that the style did not drift. The only structural difference is that
+    the arrow is one filled path where the seal needs strokes, because an arrow
+    has to be solid to read as a control at 56px.
+
+    The arrow spans r=40 at its base corners, so it touches the dashed hairline
+    at r=40.5 exactly as the seal's word touches the ring at r=48.
+  -->
+  <defs>
+    <radialGradient id="ai-topo-haze" cx="50%" cy="44%" r="60%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.17"/>
+      <stop offset="58%" stop-color="#fff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ai-topo-arc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.95"/>
+      <stop offset="46%" stop-color="#fff" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0.88"/>
+    </linearGradient>
+
+    <filter id="ai-topo-cloud" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="3.4"/>
+    </filter>
+  </defs>
+
+  <circle cx="60" cy="60" r="56" fill="url(#ai-topo-haze)"/>
+
+  <g filter="url(#ai-topo-cloud)" fill="#fff">
+    <ellipse cx="31" cy="34" rx="18" ry="10" opacity="0.14"/>
+    <ellipse cx="88" cy="31" rx="15" ry="9" opacity="0.11"/>
+    <ellipse cx="94" cy="80" rx="17" ry="11" opacity="0.12"/>
+    <ellipse cx="26" cy="83" rx="16" ry="10" opacity="0.10"/>
+    <ellipse cx="60" cy="60" rx="30" ry="26" opacity="0.05"/>
+  </g>
+
+  <circle cx="60" cy="60" r="48" stroke="#fff" stroke-opacity="0.62" stroke-width="2.6"/>
+  <circle cx="60" cy="60" r="40.5" stroke="#fff" stroke-opacity="0.28" stroke-width="0.9" stroke-dasharray="3 5.5" stroke-linecap="round"/>
+
+  <!-- big arrow up: 80 wide at the shoulders, 22 thick shaft, apex at y=22 -->
+  <path d="M49 90 V58 H20 L60 22 L100 58 H71 V90 Z" fill="#fff" opacity="0.94"/>
+
+  <path d="M14.89 43.58 A48 48 0 0 1 101.57 36" stroke="url(#ai-topo-arc)" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M101.57 84 A48 48 0 0 1 43.58 105.11" stroke="url(#ai-topo-arc)" stroke-width="2.6" stroke-linecap="round" opacity="0.7"/>
+</svg>

@@ -1,0 +1,170 @@
+---
+layout: default
+title: "Host Directory — every subdomain in the frenzypenguin.media zone"
+description: "Every subdomain in the frenzypenguin.media zone, grouped by category, with the raw link, a live status probe, and a swirl-open card frame for each one."
+permalink: /hosts/
+extra_css:
+  - /assets/css/hosts.css
+extra_js:
+  - /assets/js/hosts.js
+---
+
+{%- comment -%}
+  /hosts/ — the directory. One swirl card per host, grouped by category, all
+  driven from _data/hosts.yml.
+
+  NOTHING IS HARDCODED HERE. Adding a host to the zone is a data edit: one record
+  in hosts.yml, and this page plus its per-host pages pick it up. If you ever
+  find yourself adding an <article> to this file by hand, the data file has been
+  bypassed and that is the bug.
+
+  ORDER comes from the `categories:` block in hosts.yml, and hosts inside a
+  category are sorted live-to-dead by the Liquid sort filter at the bottom of
+  each group. A dead link is the thing you most want to see on this page, so it
+  must not be buried at the bottom of an alphabetically-sorted list.
+{%- endcomment -%}
+
+{%- assign data = site.data.hosts -%}
+{%- assign hosts = data.hosts -%}
+
+{%- assign live = hosts | where: "status", "ok" | size -%}
+{%- assign guarded = hosts | where: "status", "guarded" | size -%}
+{%- assign down = hosts | where: "status", "down" | size -%}
+{%- assign broken = hosts | where: "status", "broken-dns" | size -%}
+
+<header class="host-hero" role="banner">
+  <p class="host-kicker">
+    <span aria-hidden="true">◈</span> Zone inventory &middot; probed
+    {{ hosts | map: "checked" | compact | join: ", " }}
+  </p>
+  <h1>Host Directory</h1>
+  <p class="host-lede">
+    Every subdomain in the <code>frenzypenguin.media</code> zone, one page each.
+    Each card swirls open from its disc to show the raw link, the probe result,
+    and a bio frame that is deliberately left open for you to fill in.
+  </p>
+
+  <div class="waveform" aria-hidden="true"></div>
+
+  <ul class="host-summary">
+    <li><span class="pill pill--ok">{{ live }} live</span></li>
+    <li><span class="pill pill--guarded">{{ guarded }} guarded</span></li>
+    <li><span class="pill pill--down">{{ down }} down</span></li>
+    <li><span class="pill pill--broken">{{ broken }} broken DNS</span></li>
+  </ul>
+
+  {%- comment -%}
+    A bot wall is not a broken link. 403/429/400/999 all mean "a person in a
+    browser gets through", so guarded is counted separately from live rather than
+    folded into it: neither number alone is the truth, and collapsing them would
+    hide the fact that five records have never actually been loaded.
+  {%- endcomment -%}
+  <p style="font-size: 0.9rem;">
+    <strong>Live</strong> answered a plain GET. <strong>Guarded</strong> answered
+    a bot wall instead, so it is reachable but unverified.
+    <strong>Down</strong> and <strong>Broken DNS</strong> are real failures and are
+    listed first inside their group.
+    {% if broken > 0 %}
+      Every broken record in this zone has the same root cause: <code>www.frenzypenguin.media</code>
+      is a CNAME to <code>frenzypenguin-media.github.io</code>, and GitHub Pages
+      does not issue a certificate for a <code>www</code> host. The apex works.
+    {% endif %}
+  </p>
+
+  {% include host-actions.html context="page" %}
+</header>
+
+{%- comment -%} ── the per-category groups ────────────────────────────────────── {%- endcomment -%}
+
+{%- for cat_entry in data.categories -%}
+  {%- assign cat_slug = cat_entry[0] -%}
+  {%- assign cat = cat_entry[1] -%}
+  {%- assign group = hosts | where: "category", cat_slug -%}
+  {%- comment -%}
+    Deadest first: broken-dns, then down, then the rest, each alphabetically.
+
+    Two Liquid traps, both of which had this page rendering all 34 hosts inside
+    every one of the five groups:
+
+      * `for` over a Hash yields [key, value] PAIRS. cat_slug below is
+        cat_entry[0]; binding the pair straight to `where` compares a String to
+        an Array, matches nothing, and stringifies the pair into the id.
+
+      * `where_exp: "x", "a and b"` is NOT an AND. Liquid rejects `and` there,
+        so the condition is truthy for every element and the filter returns its
+        input unchanged. The remainder is two chained single-comparison filters,
+        and chaining is a real AND.
+  {%- endcomment -%}
+  {%- assign g_dead = group | where: "status", "broken-dns" | sort: "title" -%}
+  {%- assign g_dn = group | where: "status", "down" | sort: "title" -%}
+  {%- assign g_ok = group | where_exp: "x", "x.status != 'broken-dns'" | where_exp: "x", "x.status != 'down'" | sort: "title" -%}
+  {%- assign ordered = g_dead | concat: g_dn | concat: g_ok -%}
+
+  <section class="host-group" id="{{ cat_slug }}" aria-labelledby="{{ cat_slug }}-heading">
+    <div class="host-group-head">
+      <span class="host-group-symbol" aria-hidden="true">{{ cat.symbol }}</span>
+      <h2 class="host-group-title" id="{{ cat_slug }}-heading">
+        <a href="/hosts/#{{ cat_slug }}" style="color: inherit;">{{ cat.title }}</a>
+      </h2>
+      <span class="host-group-tagline">{{ ordered | size }} hosts &middot; {{ cat.tagline }}</span>
+      <p class="host-group-blurb">{{ cat.blurb }}</p>
+    </div>
+
+    <div class="host-grid">
+      {%- for h in ordered -%}
+        {% include host-swirl.html host=h eid="swirl" %}
+      {%- endfor -%}
+    </div>
+  </section>
+{%- endfor -%}
+
+<hr style="border: 0; border-top: 1px solid var(--border); margin: 48px 0;">
+
+<section aria-labelledby="per-page-heading">
+  <h2 id="per-page-heading">One page per host</h2>
+  <p>
+    Every host above also has a page of its own, so a link to
+    <code>/artists/kennethgame/</code> or <code>/contact/</code> resolves even
+    when the DNS record does not. That matters: an artist can be shared their
+    own page whether or not their legacy address is alive.
+  </p>
+  <ul class="host-actions">
+    {%- for h in hosts -%}
+      <li>
+        <a class="host-action" href="{% if h.category == 'artists' %}/artists/{{ h.slug }}/{% else %}/{{ h.slug }}/{% endif %}">
+          <span aria-hidden="true">{{ h.symbol }}</span> {{ h.title | escape }}
+        </a>
+      </li>
+    {%- endfor -%}
+  </ul>
+</section>
+
+<section aria-labelledby="probe-heading">
+  <h2 id="probe-heading">How these were probed</h2>
+  <dl class="host-dl">
+    <div class="host-dl-row">
+      <dt>Method</dt>
+      <dd>Plain <code>GET</code> with a browser user agent, up to 8 redirects followed. Never <code>HEAD</code>: several of these hosts answer <code>HEAD</code> with 403 or 405 and look dead when they are not.</dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Guarded</dt>
+      <dd><code>403</code>, <code>429</code>, <code>400</code> or <code>999</code>. These mean a bot wall answered, which means the host is up.</dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Down</dt>
+      <dd>Connect refused, TCP timeout past 45&nbsp;s, or <code>404</code> on an otherwise-reachable host.</dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Broken DNS</dt>
+      <dd>The name resolves to a real address but nothing will serve it. Distinguished from <em>down</em> because the fix is a certificate or a CNAME, not a restarted service.</dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Re-probe</dt>
+      <dd><code>powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-hosts.ps1</code></dd>
+    </div>
+    <div class="host-dl-row">
+      <dt>Single source</dt>
+      <dd><code>_data/hosts.yml</code>. This page, the per-host pages and the status report all read it.</dd>
+    </div>
+  </dl>
+</section>

@@ -1,0 +1,751 @@
+[
+  {
+    "name": "ExploitProtection",
+    "full_name": "neohiro/ExploitProtection",
+    "html_url": "https://github.com/neohiro/ExploitProtection",
+    "description": "Windows Exploit Protection Settings (Ultimate) GUI",
+    "stargazers_count": 86,
+    "forks_count": 10,
+    "language": "Python",
+    "topics": [
+      "anonymous",
+      "antibot",
+      "antibotnet",
+      "cyber",
+      "cyberdefense",
+      "cybersecurity",
+      "debotnet",
+      "defender",
+      "endpoint-security",
+      "exploit-protection",
+      "hardening",
+      "microsoft",
+      "powershell",
+      "privacy",
+      "protection",
+      "security",
+      "windows",
+      "windows-11",
+      "windows-defender",
+      "xml"
+    ],
+    "pushed_at": "10/06/2026 06:08:54"
+  },
+  {
+    "name": "dnscrypt-proxy-gui",
+    "full_name": "neohiro/dnscrypt-proxy-gui",
+    "html_url": "https://github.com/neohiro/dnscrypt-proxy-gui",
+    "description": "Graphical user interface for dnscrypt-proxy",
+    "stargazers_count": 30,
+    "forks_count": 1,
+    "language": "Python",
+    "topics": [
+      "anonymized-dns",
+      "dns",
+      "dnscrypt",
+      "dnscrypt-proxy",
+      "dnscrypt-proxy2",
+      "gui",
+      "proxy"
+    ],
+    "pushed_at": "10/10/2026 14:54:11"
+  },
+  {
+    "name": "BlackGlass",
+    "full_name": "neohiro/BlackGlass",
+    "html_url": "https://github.com/neohiro/BlackGlass",
+    "description": "Multi-client chat viewer for Second Life",
+    "stargazers_count": 9,
+    "forks_count": 3,
+    "language": "Python",
+    "topics": [
+      "chat-viewer",
+      "cross-platform",
+      "gui",
+      "messaging",
+      "python",
+      "second-life",
+      "virtual-worlds"
+    ],
+    "pushed_at": "10/02/2026 05:56:51"
+  },
+  {
+    "name": "Cripple-NetStrip",
+    "full_name": "neohiro/Cripple-NetStrip",
+    "html_url": "https://github.com/neohiro/Cripple-NetStrip",
+    "description": "Next-gen Network Hardening & Debloater / DNS Sinkhole / Firewall / Domain filter",
+    "stargazers_count": 4,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "android",
+      "cybersecurity",
+      "debloater",
+      "deep-packet-inspection",
+      "dns",
+      "dnssinkhole",
+      "firewall",
+      "linux",
+      "macos",
+      "network-security",
+      "network-tools",
+      "online-security",
+      "python",
+      "windows"
+    ],
+    "pushed_at": "10/10/2026 08:53:46"
+  },
+  {
+    "name": "linux",
+    "full_name": "neohiro/linux",
+    "html_url": "https://github.com/neohiro/linux",
+    "description": "Cross-distro Linux hardening guide: UFW firewall, DNSCrypt, Tor routing, fail2ban, AppArmor/SELinux, sysctl, SSH hardening - auto-detects Debian/Ubuntu/RHEL/Fedora/SUSE/Arch/Manjaro",
+    "stargazers_count": 2,
+    "forks_count": 0,
+    "language": "Shell",
+    "topics": [
+      "apparmor",
+      "arch-linux",
+      "debian",
+      "dnscrypt",
+      "fail2ban",
+      "fedora",
+      "firewall",
+      "hardening",
+      "linux",
+      "linux-hardening",
+      "linux-security",
+      "opensuse",
+      "red-hat",
+      "security",
+      "selinux",
+      "ssh-hardening",
+      "sysctl",
+      "tor",
+      "ubuntu",
+      "ufw"
+    ],
+    "pushed_at": "10/10/2026 06:56:28"
+  },
+  {
+    "name": "HoneyScan",
+    "full_name": "neohiro/HoneyScan",
+    "html_url": "https://github.com/neohiro/HoneyScan",
+    "description": "Passive Honeypot for Home Networks",
+    "stargazers_count": 2,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "cybersecurity",
+      "home-network",
+      "honeypot",
+      "ids",
+      "intrusion-detection",
+      "network-security",
+      "python",
+      "security-tools"
+    ],
+    "pushed_at": "09/18/2026 05:05:18"
+  },
+  {
+    "name": "ubuntu",
+    "full_name": "neohiro/ubuntu",
+    "html_url": "https://github.com/neohiro/ubuntu",
+    "description": "[ARCHIVED 2026-10-06] Superseded by neohiro/linux - cross-distro hardening guide (was Ubuntu-only). Read-only; see DEPRECATED.md on the archive-2026-10-06 branch.",
+    "stargazers_count": 1,
+    "forks_count": 0,
+    "language": "Shell",
+    "topics": [
+      "linux",
+      "terminal",
+      "ubuntu"
+    ],
+    "pushed_at": "10/06/2026 01:08:01"
+  },
+  {
+    "name": "SecondLife",
+    "full_name": "neohiro/SecondLife",
+    "html_url": "https://github.com/neohiro/SecondLife",
+    "description": "LSL code snippets",
+    "stargazers_count": 1,
+    "forks_count": 0,
+    "language": "LSL",
+    "topics": [
+      "lsl-scripts",
+      "secondlife"
+    ],
+    "pushed_at": "10/02/2026 05:58:02"
+  },
+  {
+    "name": "DNSLookup",
+    "full_name": "neohiro/DNSLookup",
+    "html_url": "https://github.com/neohiro/DNSLookup",
+    "description": "Advanced IPv4 & IPv6 DNS Lookup tool",
+    "stargazers_count": 1,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "dns",
+      "dns-lookup",
+      "ipv4",
+      "ipv6",
+      "networking",
+      "python",
+      "reconnaissance"
+    ],
+    "pushed_at": "10/02/2026 05:57:09"
+  },
+  {
+    "name": "windows",
+    "full_name": "neohiro/windows",
+    "html_url": "https://github.com/neohiro/windows",
+    "description": "Windows new install - manual hardening (STIG)",
+    "stargazers_count": 1,
+    "forks_count": 0,
+    "language": "PowerShell",
+    "topics": [
+      "install",
+      "security",
+      "windows"
+    ],
+    "pushed_at": "10/02/2026 05:23:34"
+  },
+  {
+    "name": "mesh-vanity-key",
+    "full_name": "neohiro/mesh-vanity-key",
+    "html_url": "https://github.com/neohiro/mesh-vanity-key",
+    "description": "Vanity key mining for mesh networks — MeshCore device keys, Meshtastic channel PSKs and !node IDs. Ed25519, scalar-walk optimized, in-browser PWA + CLI",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [],
+    "pushed_at": "10/12/2026 12:52:29"
+  },
+  {
+    "name": "neohiro",
+    "full_name": "neohiro/neohiro",
+    "html_url": "https://github.com/neohiro/neohiro",
+    "description": "Security hardening & privacy tools for Windows and Linux",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "JavaScript",
+    "topics": [],
+    "pushed_at": "10/12/2026 11:45:16"
+  },
+  {
+    "name": "domail",
+    "full_name": "neohiro/domail",
+    "html_url": "https://github.com/neohiro/domail",
+    "description": "A local mail engine that runs entirely in your browser tab",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "JavaScript",
+    "topics": [],
+    "pushed_at": "10/12/2026 10:50:40"
+  },
+  {
+    "name": "meteo-ics",
+    "full_name": "neohiro/meteo-ics",
+    "html_url": "https://github.com/neohiro/meteo-ics",
+    "description": "Autonomous weather, astronomical & atmospheric calendar engine — delivers precision forecasts, AQI, UV, pollen, moon phases & road hazards to any calendar app via .ics / WebCal.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "JavaScript",
+    "topics": [
+      "air-quality",
+      "apps-script",
+      "astronomy",
+      "calendar",
+      "copernicus",
+      "forecast",
+      "google-calendar",
+      "icalendar",
+      "noaa",
+      "open-meteo",
+      "weather",
+      "webcal"
+    ],
+    "pushed_at": "10/10/2026 00:11:36"
+  },
+  {
+    "name": "auto-resume",
+    "full_name": "neohiro/auto-resume",
+    "html_url": "https://github.com/neohiro/auto-resume",
+    "description": "Self-healing OpenCode sessions: automatic retries, model rotation on quota/outages, permission autopilot & walk-away task autonomy",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "JavaScript",
+    "topics": [
+      "ai-agents",
+      "autopilot",
+      "opencode",
+      "plugin",
+      "resilience",
+      "retry"
+    ],
+    "pushed_at": "10/09/2026 20:18:36"
+  },
+  {
+    "name": "repo-audit",
+    "full_name": "neohiro/repo-audit",
+    "html_url": "https://github.com/neohiro/repo-audit",
+    "description": "[ARCHIVED 2026-10-06] Retired: cross-repo audits are now executable checks in neohiro/doctor. Read-only; see DEPRECATED.md on the archive-2026-10-06 branch.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [],
+    "pushed_at": "10/06/2026 10:22:45"
+  },
+  {
+    "name": "achievement-hacks",
+    "full_name": "neohiro/achievement-hacks",
+    "html_url": "https://github.com/neohiro/achievement-hacks",
+    "description": "Agentic documentation, recipes, and automation for every GitHub Achievement",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [],
+    "pushed_at": "10/06/2026 10:07:30"
+  },
+  {
+    "name": "Concrete",
+    "full_name": "frenzypenguin-media/Concrete",
+    "html_url": "https://github.com/frenzypenguin-media/Concrete",
+    "description": "Concrete - Human Progress: AI-generated music album with interactive video players",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": null,
+    "topics": [],
+    "pushed_at": "10/06/2026 08:38:34"
+  },
+  {
+    "name": "LANScan",
+    "full_name": "neohiro/LANScan",
+    "html_url": "https://github.com/neohiro/LANScan",
+    "description": "ARP / ICMP Passive & Active Network Scanner (Windows/Linux)",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "arp",
+      "cybersecurity",
+      "icmp",
+      "lan",
+      "network-analysis",
+      "network-scanner",
+      "python"
+    ],
+    "pushed_at": "10/06/2026 02:12:47"
+  },
+  {
+    "name": "github-social",
+    "full_name": "frenzypenguin-media/github-social",
+    "html_url": "https://github.com/frenzypenguin-media/github-social",
+    "description": "GitHub Social — decentralized social layer for GitHub. Browser extension, PWA, embed widget, Tauri desktop app.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "JavaScript",
+    "topics": [],
+    "pushed_at": "10/05/2026 20:29:31"
+  },
+  {
+    "name": "lora-multiboot",
+    "full_name": "neohiro/lora-multiboot",
+    "html_url": "https://github.com/neohiro/lora-multiboot",
+    "description": "Role-aware multi-slot firmware platform for single-radio LoRa devices: progressive provisioning, non-destructive system updates, and one SX1262 serving Meshtastic and MeshCore together.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "C++",
+    "topics": [
+      "bootloader",
+      "esp32",
+      "firmware",
+      "firmware-update",
+      "ham-radio",
+      "heltec",
+      "iot",
+      "lora",
+      "lorawan",
+      "mesh-networking",
+      "meshcore",
+      "meshtastic",
+      "meshtastic-firmware",
+      "multiboot",
+      "off-grid",
+      "repeater",
+      "reticulum",
+      "sx1262"
+    ],
+    "pushed_at": "10/05/2026 03:11:59"
+  },
+  {
+    "name": "meshcore-waveshare-usb-lora",
+    "full_name": "neohiro/meshcore-waveshare-usb-lora",
+    "html_url": "https://github.com/neohiro/meshcore-waveshare-usb-lora",
+    "description": "Turn a Waveshare USB-TO-LoRa-HF into a MeshCore KISS modem: firmware, SWD flashing, and a one-command setup.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "C",
+    "topics": [
+      "embedded",
+      "firmware",
+      "gd32",
+      "home-assistant",
+      "kiss-modem",
+      "lora",
+      "meshcore",
+      "meshcore-kiss",
+      "meshradio",
+      "meshtastic",
+      "radio",
+      "rtos",
+      "sx1262",
+      "waveshare"
+    ],
+    "pushed_at": "10/04/2026 10:47:51"
+  },
+  {
+    "name": "lora-sniffer",
+    "full_name": "neohiro/lora-sniffer",
+    "html_url": "https://github.com/neohiro/lora-sniffer",
+    "description": "Passive LoRa sniffer firmware for the Heltec WiFi LoRa 32 V4, built to run as its own slot alongside MeshCore and Meshtastic. Records the evidence behind each attribution instead of assuming it, and cannot transmit by default.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "C++",
+    "topics": [
+      "esp32",
+      "firmware",
+      "heltec",
+      "loralora",
+      "lorawan",
+      "meshcore",
+      "meshtastic",
+      "meshtastic-node",
+      "platformio",
+      "sniffer",
+      "sx1262"
+    ],
+    "pushed_at": "10/04/2026 10:25:09"
+  },
+  {
+    "name": "llm-action",
+    "full_name": "neohiro/llm-action",
+    "html_url": "https://github.com/neohiro/llm-action",
+    "description": "Free LLM router GitHub Action for AI-powered milestone scoring",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [],
+    "pushed_at": "10/02/2026 05:58:42"
+  },
+  {
+    "name": "htmlinfo",
+    "full_name": "neohiro/htmlinfo",
+    "html_url": "https://github.com/neohiro/htmlinfo",
+    "description": "HTML Info Scraper",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "HTML",
+    "topics": [
+      "browser-fingerprinting",
+      "html",
+      "http-headers",
+      "privacy",
+      "scraper",
+      "web"
+    ],
+    "pushed_at": "10/02/2026 05:58:37"
+  },
+  {
+    "name": "ZombieShoot",
+    "full_name": "neohiro/ZombieShoot",
+    "html_url": "https://github.com/neohiro/ZombieShoot",
+    "description": "Zombie Shooter for Linux/Windows",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "game",
+      "linux",
+      "pygame",
+      "shooter",
+      "windows",
+      "zombie"
+    ],
+    "pushed_at": "10/02/2026 05:58:25"
+  },
+  {
+    "name": "Tetris",
+    "full_name": "neohiro/Tetris",
+    "html_url": "https://github.com/neohiro/Tetris",
+    "description": "A small retro game for Windows & Linux",
+    "stargazers_count": 0,
+    "forks_count": 1,
+    "language": "Python",
+    "topics": [
+      "arcade",
+      "game",
+      "pygame",
+      "python",
+      "retro-games",
+      "tetris"
+    ],
+    "pushed_at": "10/02/2026 05:58:19"
+  },
+  {
+    "name": "SystemMonitor",
+    "full_name": "neohiro/SystemMonitor",
+    "html_url": "https://github.com/neohiro/SystemMonitor",
+    "description": "System Health Monitor",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "cpu-usage",
+      "dashboard",
+      "psutil",
+      "python",
+      "sensors",
+      "system-monitor"
+    ],
+    "pushed_at": "10/02/2026 05:58:14"
+  },
+  {
+    "name": "ShadowSocks",
+    "full_name": "neohiro/ShadowSocks",
+    "html_url": "https://github.com/neohiro/ShadowSocks",
+    "description": "Simple Python ShadowSocks client for Windows & Linux",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "censorship-circumvention",
+      "privacy",
+      "proxy",
+      "python",
+      "shadowsocks",
+      "socks5"
+    ],
+    "pushed_at": "10/02/2026 05:58:08"
+  },
+  {
+    "name": "NewsAggregator",
+    "full_name": "neohiro/NewsAggregator",
+    "html_url": "https://github.com/neohiro/NewsAggregator",
+    "description": "Global News Feed with search (Windows/Linux)",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "feed-reader",
+      "news",
+      "news-aggregator",
+      "python",
+      "rss",
+      "search"
+    ],
+    "pushed_at": "10/02/2026 05:57:56"
+  },
+  {
+    "name": "NetMatrix",
+    "full_name": "neohiro/NetMatrix",
+    "html_url": "https://github.com/neohiro/NetMatrix",
+    "description": "Connections monitor",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "connections-monitor",
+      "netstat",
+      "network-monitor",
+      "python",
+      "security",
+      "tcp"
+    ],
+    "pushed_at": "10/02/2026 05:57:50"
+  },
+  {
+    "name": "MusicPlay",
+    "full_name": "neohiro/MusicPlay",
+    "html_url": "https://github.com/neohiro/MusicPlay",
+    "description": "Simple cross-platform audio player (Windows/Linux)",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "audio-player",
+      "media-player",
+      "music-player",
+      "mutagen",
+      "pygame",
+      "python",
+      "tkinter"
+    ],
+    "pushed_at": "10/02/2026 05:57:45"
+  },
+  {
+    "name": "MoodTracker",
+    "full_name": "neohiro/MoodTracker",
+    "html_url": "https://github.com/neohiro/MoodTracker",
+    "description": "A diary for your wellbeing",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "diary",
+      "journal",
+      "mental-health",
+      "mood-tracker",
+      "python",
+      "tkinter",
+      "wellbeing"
+    ],
+    "pushed_at": "10/02/2026 05:57:39"
+  },
+  {
+    "name": "GoogleCommand",
+    "full_name": "neohiro/GoogleCommand",
+    "html_url": "https://github.com/neohiro/GoogleCommand",
+    "description": "TTS Google Assistant Commands (Windows)",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "automation",
+      "google-assistant",
+      "google-nest",
+      "python",
+      "smart-home",
+      "text-to-speech",
+      "tts",
+      "windows"
+    ],
+    "pushed_at": "10/02/2026 05:57:32"
+  },
+  {
+    "name": "Godmode",
+    "full_name": "neohiro/Godmode",
+    "html_url": "https://github.com/neohiro/Godmode",
+    "description": "One-click Windows God Mode folder activator",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "control-panel",
+      "god-mode",
+      "python",
+      "tweaks",
+      "utilities",
+      "windows"
+    ],
+    "pushed_at": "10/02/2026 05:57:26"
+  },
+  {
+    "name": "GhostMaze",
+    "full_name": "neohiro/GhostMaze",
+    "html_url": "https://github.com/neohiro/GhostMaze",
+    "description": "Ghost Maze - a small 2D RPG (Windows/Linux)",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "game",
+      "linux",
+      "pygame",
+      "rpg",
+      "windows"
+    ],
+    "pushed_at": "10/02/2026 05:57:21"
+  },
+  {
+    "name": "FileManager",
+    "full_name": "neohiro/FileManager",
+    "html_url": "https://github.com/neohiro/FileManager",
+    "description": "File Manager in Python",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "file-explorer",
+      "file-manager",
+      "gui",
+      "python",
+      "tkinter"
+    ],
+    "pushed_at": "10/02/2026 05:57:15"
+  },
+  {
+    "name": "ClockWidget",
+    "full_name": "neohiro/ClockWidget",
+    "html_url": "https://github.com/neohiro/ClockWidget",
+    "description": "A desktop clock widget",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "clock",
+      "desktop-widget",
+      "python",
+      "system-tray",
+      "tkinter",
+      "widget"
+    ],
+    "pushed_at": "10/02/2026 05:57:03"
+  },
+  {
+    "name": "Calculator",
+    "full_name": "neohiro/Calculator",
+    "html_url": "https://github.com/neohiro/Calculator",
+    "description": "Advanced Python Calculator",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "calculator",
+      "gui",
+      "mathematics",
+      "python",
+      "tkinter"
+    ],
+    "pushed_at": "10/02/2026 05:56:57"
+  },
+  {
+    "name": "metapod",
+    "full_name": "neohiro/metapod",
+    "html_url": "https://github.com/neohiro/metapod",
+    "description": "Windows 10 & 11 hardening tool - curated security & privacy tweaks from a simple GUI",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "debloat",
+      "hardening",
+      "privacy",
+      "python",
+      "registry",
+      "security",
+      "windows-10",
+      "windows-11",
+      "windows-hardening"
+    ],
+    "pushed_at": "09/18/2026 05:05:40"
+  },
+  {
+    "name": "tristar-mania",
+    "full_name": "frenzypenguin-media/tristar-mania",
+    "html_url": "https://github.com/frenzypenguin-media/tristar-mania",
+    "description": "A space shooter built with Python and pygame. Fast-paced arcade action with increasing difficulty. Part of the frenzypenguin-media game collection.",
+    "stargazers_count": 0,
+    "forks_count": 0,
+    "language": "Python",
+    "topics": [
+      "arcade-game",
+      "fpm-game",
+      "pygame",
+      "python",
+      "space-shooter",
+      "tristar-mania"
+    ],
+    "pushed_at": "09/18/2026 05:02:53"
+  }
+]

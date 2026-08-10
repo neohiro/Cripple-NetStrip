@@ -1,0 +1,92 @@
+{%- comment -%}
+video-facade.html — one click-to-play YouTube card.
+
+Usage — deliberately NOT written as literal tag syntax: a real include tag inside
+this comment is still tokenized by Liquid and fails the build on the example
+value, which is exactly how this file failed its first build.
+
+  include video-facade.html  with video=<a hash from _data/videos.yml>
+  include video-facade.html  with video=<hash> and lead=true
+
+Why a facade instead of a bare <iframe>:
+  A bare embed pulls ~1MB of YouTube JavaScript, cookies and ad scripts on page
+  load, for every video on the page. On a wall of twenty-two that is the whole
+  page's weight spent before anyone presses play, and it hands a third party a
+  tracking surface on every visitor.
+
+  This renders a thumbnail and a real link to youtube.com. The <iframe> is
+  created only when the card is activated, and it points at
+  youtube-nocookie.com so the embed does not set tracking cookies.
+
+  It degrades honestly. With JavaScript off, the card is an ordinary link to
+  the video on YouTube: it still works, it just navigates. That is the same
+  reasoning as the rest of this site — never ship a control that pretends to do
+  something it cannot.
+
+Accessibility:
+  The activator is an <a href> to the real video, not a <div role="button">, so
+  it is focusable, activates on Enter, and exposes a real destination to
+  assistive tech and to "open in new tab". aria-expanded tracks the swap.
+
+Parameters:
+  video      (required) a hash from _data/videos.yml. Needs `id` and `title`.
+  lead       (optional) true for the first, larger card.
+{%- endcomment -%}
+
+{%- assign v = include.video -%}
+{%- if v.id and v.title -%}
+{%- assign watch_url = "https://www.youtube.com/watch?v=" | append: v.id -%}
+{%- assign embed_url = "https://www.youtube-nocookie.com/embed/" | append: v.id | append: "?autoplay=1&rel=0&modestbranding=1" -%}
+{%- assign thumb = "https://i.ytimg.com/vi/" | append: v.id | append: "/hqdefault.jpg" -%}
+<li class="vfacade{% if include.lead %} vfacade--lead{% endif %}" data-video-id="{{ v.id | escape }}">
+  <a class="vfacade__hit"
+     href="{{ watch_url }}"
+     target="_blank"
+     rel="noopener"
+     data-embed-src="{{ embed_url }}"
+     data-watch-url="{{ watch_url }}"
+     data-video-title="{{ v.title | escape }}"
+     aria-expanded="false"
+     aria-label="Play “{{ v.title | escape }}” on YouTube{% if v.genre %} — {{ v.genre | escape }}{% endif %}">
+
+    <span class="vfacade__frame">
+      {%- comment -%}
+        hqdefault is 480x360 (4:3) and exists for every video; maxresdefault is
+        1280x720 but is absent on older uploads, which would give a broken image.
+        The frame is a fixed 16:9 box with object-fit:cover, so the 4:3 frame is
+        cropped rather than letterboxed, and reserving the box up front keeps
+        layout shift at zero.
+      {%- endcomment -%}
+      <img class="vfacade__thumb"
+           src="{{ thumb }}"
+           alt=""
+           width="480" height="360"
+           loading="lazy"
+           decoding="async">
+      <span class="vfacade__play" aria-hidden="true">
+        <svg viewBox="0 0 68 48" focusable="false">
+          <path class="vfacade__play-bg" d="M66.5 7.7a8.6 8.6 0 0 0-6-6C55.2.2 34 .2 34 .2S12.8.2 7.5 1.7a8.6 8.6 0 0 0-6 6A89.7 89.7 0 0 0 0 24a89.7 89.7 0 0 0 1.5 16.3 8.6 8.6 0 0 0 6 6C12.8 47.8 34 47.8 34 47.8s21.2 0 26.5-1.5a8.6 8.6 0 0 0 6-6A89.7 89.7 0 0 0 68 24a89.7 89.7 0 0 0-1.5-16.3z"/>
+          <path class="vfacade__play-fg" d="M27.2 34.3V13.7L45.5 24z"/>
+        </svg>
+      </span>
+      {%- if v.genre %}<span class="vfacade__genre">{{ v.genre | escape }}</span>{% endif %}
+    </span>
+
+    <span class="vfacade__body">
+      <span class="vfacade__billing">{{ v.billing | default: "FrenzyPenguin Media" | escape }}</span>
+      <span class="vfacade__title">{{ v.title | escape }}</span>
+      <span class="vfacade__meta">
+        {%- if v.year %}<span>{{ v.year | escape }}</span>{% endif -%}
+        {%- comment -%}
+          Views are a rounded, scraped, approximate figure (see the note in
+          _data/videos.yml). Shown as "about", never as an exact count, and the
+          whole span is omitted when we have no verified figure rather than
+          showing a placeholder zero.
+        {%- endcomment -%}
+        {%- if v.views %}<span>~{{ v.views | escape }} views</span>{% endif -%}
+      </span>
+      {%- if v.note %}<span class="vfacade__note">{{ v.note | escape }}</span>{% endif -%}
+    </span>
+  </a>
+</li>
+{%- endif -%}

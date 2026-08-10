@@ -1,0 +1,83 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      # network-ux.js is shared verbatim across the 4 network sites, so a
+      # regression here breaks every one of them. Fully offline: it reads the
+      # checked-out sources only, so it is safe to gate the deploy on.
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Test shared network-ux.js
+        run: node assets/js/test-network-ux.js
+
+      # The shared chrome has a history of shipping broken while the build stayed
+      # green: a `display: flex` left behind after a `display: none` fix (so the
+      # retired dock kept painting over the live bar), hardcoded #fff on text that
+      # sits on the page background (white-on-white in light mode), and a
+      # conversation frame that was a content-sized flex column, so it measured
+      # 29% of the viewport instead of being a usable panel. None of those fail a
+      # Jekyll build. This gate is offline and reads only the checked-out sources.
+      #
+      # It runs in single-site mode here because a per-site checkout has no
+      # siblings to diff against, so it checks this site's own copy of each shared
+      # file. The cross-site byte-identity comparison runs in the workspace.
+      - name: Check shared chrome contract
+        run: python scripts/check_chrome_contract.py
+
+      - name: Test the chrome gate itself
+        # A checker that silently stops detecting things reports green, which is
+        # how this gate could pass while the bottom bar was invisible. The
+        # self-test pins a real defect for every rule and fails loudly if the
+        # gate stops catching it.
+        run: python scripts/test_check_chrome_contract.py
+
+      - name: Build Jekyll Site
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./_site
+
+  deploy:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

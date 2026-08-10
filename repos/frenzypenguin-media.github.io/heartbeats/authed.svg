@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="160" viewBox="0 0 600 160">
+  <rect width="600" height="160" fill="#080a0e"/>
+  <text x="20" y="22" font-size="14" fill="#7c4dff" font-family="monospace" font-weight="bold">FrenzyPenguin Media — Heartbeat</text>
+  <text x="20" y="40" font-size="10" fill="#888" font-family="monospace">FPM score: 91/100 · 18 repos · 2 CI red</text>
+  <rect x="20" y="46" width="560" height="6" fill="#1a1a1a"/>
+  <rect x="20" y="46" width="509" height="6" fill="#7c4dff"/>
+  <text x="20" y="70" font-size="9" fill="#7c4dff" font-family="monospace">windows: 95 (last commit 1h ago)</text>
+  <text x="20" y="86" font-size="9" fill="#7c4dff" font-family="monospace">ubuntu: 92 (CI green)</text>
+  <text x="240" y="86" font-size="9" fill="#7c4dff" font-family="monospace">Cripple-NetStrip: 90</text>
+  <text x="430" y="86" font-size="9" fill="#7c4dff" font-family="monospace">dnscrypt-gui: 88</text>
+  <text x="20" y="110" font-size="9" fill="#666" font-family="monospace">FB feed: 23 posts synced (last 7d)</text>
+  <text x="240" y="110" font-size="9" fill="#666" font-family="monospace">YouTube: 47 subs, 12.3k views</text>
+  <text x="20" y="126" font-size="9" fill="#666" font-family="monospace">Workflows: 12 green, 1 red (ExploitProtection)</text>
+  <text x="20" y="148" font-size="7" fill="#444" font-family="monospace">updated: 2026-08-30T00:00:00Z — CNS</text>
+</svg>

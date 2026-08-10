@@ -1,0 +1,13 @@
+{% comment %} contact-card.html — README + dashboard contact snippet.
+
+   Pulls the live contact URL from _data/contact.yml (published by Heart).
+   Falls back to GitHub Issues on the source repo. {% endcomment %}
+
+{%- assign c = site.data.contact -%}
+{%- assign url = c.url | default: 'https://github.com/' | append: site.github_username | append: '/' | append: site.github_repo | append: '/issues/new' -%}
+{%- assign email = c.email | default: 'contact@frenzypenguin.media' -%}
+
+<p class="contact-card">
+  <strong>Get in touch:</strong>
+  <a href="{{ url }}" rel="noopener">Open an issue</a>{% if c.discord %} · <a href="{{ c.discord }}" rel="noopener">Discord</a>{% endif %}{% if c.email %} · <a href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}
+</p>

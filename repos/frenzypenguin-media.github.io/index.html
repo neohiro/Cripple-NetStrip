@@ -1,0 +1,257 @@
+---
+layout: default
+# jekyll-seo-tag owns the <title>: it appends the site name, so the front
+# matter carries only the distinctive half and avoids stuttering the brand
+# twice in the SERP line.
+title: "Two houses, one name"
+description: "FrenzyPenguin Media is an audiovisual studio in Belgium and the open-source security arm of the neohiro network. Twenty-two years of live sets, and the tooling we hardened our own machines with."
+canonical: "https://frenzypenguin.media/"
+
+# The visitor counter renders in the hero on this page, so _layouts/default.html
+# stands its footer copy down. Counted once per page view either way.
+hero_counter: true
+
+# decor-plain + decor-grain: the page brings its own atmosphere, so the shared
+# aurora preset would only add compositing work behind opaque sections. The grain
+# stays because it is what stops the near-black from banding on cheap panels.
+decor_class: "decor-plain decor-grain"
+
+extra_css:
+  - /assets/css/home.css
+extra_js:
+  - /assets/js/video-facade.js
+---
+
+{%- assign vids = site.data.videos.videos -%}
+{%- assign reel = vids | where: "id", "tULwnXVgHug" | first -%}
+{%- assign featured = vids | where: "featured", true -%}
+{%- assign rest = vids | where_exp: "v", "v.featured != true" -%}
+
+<!-- ==========================================================================
+     HERO — a stage light, not a billboard.
+     The reel is shown below the catalogue, not here. The hero is pure copy.
+     ========================================================================== -->
+<div class="hero-avatar-tags" aria-label="FrenzyPenguin Media" style="padding-top: 2.5rem;">
+  <img class="mhero__avatar" src="https://github.com/frenzypenguin-media.png" alt="FrenzyPenguin Media avatar" width="80" height="80" fetchpriority="high">
+  <div class="mhero__badges" aria-label="Affiliations">
+    <span class="badge badge-fpm">FrenzyPenguin Media</span>
+    <span class="badge badge-neohiro">neohiro network</span>
+  </div>
+</div>
+
+<section class="mhero" aria-labelledby="hero-h">
+  <div class="mhero__plate" aria-hidden="true"></div>
+  <div class="mhero__vignette" aria-hidden="true"></div>
+
+  <div class="mhero__copy">
+    <p class="mhero__eyebrow">
+      <span class="mhero__eyebrow-dot" aria-hidden="true"></span>
+      Belgium &middot; since 2015 &middot; part of the neohiro network
+    </p>
+
+    <h1 id="hero-h" class="mhero__title">
+      <span class="mhero__title-line">Two houses.</span>
+      <span class="mhero__title-line mhero__title-line--alt">One name.</span>
+    </h1>
+
+    <p class="mhero__lede">
+      We have always made two things that do not look alike: audiovisual projects for electronic music artists & more, design of virtual estate made of light and avatars, and hardening, for the machines that run them. Both are here. Neither is new.
+    </p>
+
+    <div class="mhero__actions">
+      <a class="btn btn--primary" href="#catalogue">Watch the catalogue</a>
+      <a class="btn btn--ghost" href="#workshop">See the tooling</a>
+    </div>
+
+    {%- comment -%}
+      Counter lives in the hero. Rendered by the shared partial so all four
+      sites read one counter, and only once: _layouts/default.html skips its
+      footer copy when hero_counter is true (see front matter).
+    {%- endcomment -%}
+    <div class="mhero__counter">
+      {% include counter-widget.html %}
+    </div>
+  </div>
+</section>
+
+<!-- ==========================================================================
+     THE TWO HOUSES
+     The most interesting fact about this organisation is that it is two
+     organisations. Lead with that rather than burying it.
+     ========================================================================== -->
+<section class="split" aria-labelledby="split-h">
+  <h2 id="split-h" class="visually-hidden">The two houses</h2>
+
+  <article class="split__col">
+    <p class="split__index" aria-hidden="true">01</p>
+    <h3 class="split__h">The studio</h3>
+    <p class="split__meta">Audiovisual &middot; est. 2015 &middot; Belgium</p>
+    <p>
+      We built a rig, learned to fly it into virtual worlds, and played until
+      somebody asked us to keep the lights on. Twenty-two published sets later
+      the answer is still mostly yes.
+    </p>
+    <p>
+      We build rigs, stream live sets, and capture electronic music artists,
+      theatre and everything in between — from Goa Trance on hardware to
+      techno guest slots, house sets from virtual rooms, fire and a radio
+      series numbered like records.
+    </p>
+    <p class="split__aside">
+      Looking to produce a set, a stream, or a launch you need captured? This
+      is the studio arm to brief.
+    </p>
+  </article>
+
+  <article class="split__col">
+    <p class="split__index" aria-hidden="true">02</p>
+    <h3 class="split__h">The workshop</h3>
+    <p class="split__meta">Open source &middot; privacy, debloating, hardening &middot; zero telemetry</p>
+    <p>
+      The tooling lives on <a href="https://github.com/neohiro">github.com/neohiro</a>:
+      free and open-source solutions for privacy, debloating and hardening,
+      plus LoRa mesh applications.
+    </p>
+    <p>
+      Network firewalls and DNS sinkholes, exploit-mitigation catalogues,
+      hardened Windows and Linux baselines, and mesh key tooling. Everything
+      is published under licences that let you read, depend on and fork it &mdash;
+      and none of it phones home.
+    </p>
+    <p class="split__aside">
+      Browse the whole shelf at <a href="https://github.com/neohiro">github.com/neohiro</a>.
+    </p>
+  </article>
+</section>
+
+<!-- ==========================================================================
+     CATALOGUE
+     Server-rendered from _data/videos.yml. Search engines see these titles; a
+     visitor without JavaScript sees working links; nobody pays for YouTube's
+     script bundle until they press play.
+     ========================================================================== -->
+<section id="catalogue" class="band" aria-labelledby="catalogue-h">
+  <div class="band__head">
+    <h2 id="catalogue-h" class="band__h">The catalogue</h2>
+    <p class="band__lede">
+      Every upload, verified against the platform it is published on. Roughly 75,000
+      views between all of them — this is a small channel that has been
+      running for about eight years, and we would rather show you the real
+      numbers than a wall of invented ones.
+    </p>
+  </div>
+
+  <ul class="vfacade-grid vfacade-grid--catalogue">
+    {%- for v in vids -%}
+      {% include video-facade.html video=v %}
+    {%- endfor -%}
+  </ul>
+</section>
+
+
+
+<!-- ==========================================================================
+     THE TOOLING
+     ========================================================================== -->
+<section id="workshop" class="band band--alt" aria-labelledby="workshop-h">
+  <div class="band__head">
+    <h2 id="workshop-h" class="band__h">From the workshop</h2>
+    <p class="band__lede">
+      The code side. All of it readable, all of it forkable, none of it talking
+      to us about your machine.
+    </p>
+  </div>
+
+  {%- comment -%}
+    The tools collection is the single source of truth for what exists. Looping
+    it means a tool can never be advertised here and not exist, which is the
+    failure mode this page used to have.
+  {%- endcomment -%}
+  {%- assign tools = site.tools | sort: "name" -%}
+  {%- if tools.size > 0 %}
+  <ul class="tools">
+    {%- for tool in tools %}
+    <li class="tool">
+      <a class="tool__link" href="{{ tool.url | relative_url }}">
+        <span class="tool__name">{{ tool.title | default: tool.name }}</span>
+        <span class="tool__desc">{{ tool.description | default: tool.excerpt | strip_html | truncate: 150 }}</span>
+        <span class="tool__go" aria-hidden="true">&rarr;</span>
+      </a>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="band__empty">
+    The catalogue is written down in the repository rather than duplicated here.
+  </p>
+  {%- endif %}
+
+  <div class="band__actions">
+    <a class="btn btn--ghost" href="{{ '/repositories/' | relative_url }}">Every repository</a>
+    <a class="btn btn--ghost" href="https://github.com/sponsors/neohiro" rel="noopener">Sponsor the work</a>
+  </div>
+</section>
+
+<!-- ==========================================================================
+     STAGES
+     Where the shows happened. Links out to the venue pages that actually exist.
+     ========================================================================== -->
+<section id="stages" class="band" aria-labelledby="stages-h">
+  <div class="band__head">
+    <h2 id="stages-h" class="band__h">Stages</h2>
+    <p class="band__lede">
+      A virtual stage is a room with no walls, which turns out to be a very good
+      thing for a lighting rig and a difficult thing for a door.
+    </p>
+  </div>
+
+  <ul class="stages">
+    <li class="stage">
+      <h3 class="stage__h"><a href="{{ '/hosts/' | relative_url }}">Hosts</a></h3>
+      <p class="stage__p">The venues we have played, and the people who run them.</p>
+    </li>
+    <li class="stage">
+      <h3 class="stage__h"><a href="{{ '/artists/' | relative_url }}">Artists</a></h3>
+      <p class="stage__p">Triquetra, Herton, Amare, Ohm Mind, Anoebis and the rest of the bill.</p>
+    </li>
+    <li class="stage">
+      <h3 class="stage__h"><a href="https://openstageis.land/" rel="noopener">Open Stage Island</a></h3>
+      <p class="stage__p">A free, 24/7 stage in Second Life. Same network, different room.</p>
+    </li>
+    <li class="stage">
+      <h3 class="stage__h"><a href="{{ '/social/' | relative_url }}">Elsewhere</a></h3>
+      <p class="stage__p">Where to find us when we are not mid-set.</p>
+    </li>
+  </ul>
+</section>
+
+<!-- ==========================================================================
+     COLOPHON
+     Concise project ethic — the why behind the how.
+     ========================================================================== -->
+<section class="colophon" aria-labelledby="colophon-h">
+  <h2 id="colophon-h" class="colophon__h">Colophon</h2>
+
+  <div class="colophon__grid">
+    <div>
+      <h3 class="colophon__sub">Verified, not invented</h3>
+      <p>
+        Every video resolved through YouTube's own metadata API. View counts rounded, approximate, and marked as such. This page used to show six fabricated security tutorials — all the same Rick Astley video. That failure is exactly what this site exists to avoid.
+      </p>
+    </div>
+
+    <div>
+      <h3 class="colophon__sub">Nothing loads until you ask</h3>
+      <p>
+        No tracking, no third-party scripts before you press play. Video wall rendered at build; player created on click. With JS off, every video is still a working link.
+      </p>
+    </div>
+
+    <div>
+      <h3 class="colophon__sub">Written down, not implied</h3>
+      <p>
+        Catalogue lives in one data file checked against YouTube. Tool list generated from the collection that actually exists. Neither drifts from reality without the build noticing. Maintained by <a href="https://github.com/neohiro">neohiro</a>.
+      </p>
+    </div>
+  </div>
+</section>

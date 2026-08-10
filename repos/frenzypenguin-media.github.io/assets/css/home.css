@@ -1,0 +1,784 @@
+/* ==========================================================================
+   home.css — FrenzyPenguin Media homepage
+   --------------------------------------------------------------------------
+   Scoped to the classes this page uses (.mhero, .split, .band, .vfacade,
+   .tools, .stages, .colophon). Loaded after main.css, and it reads main.css's
+   tokens rather than defining its own, so light/dark and the shared
+   --fg-muted / --fg-subtle / --border vocabulary stay in one place.
+
+   Design intent: a stage after the house lights go down. Restraint, one
+   accent, a lot of near-black, and type that carries the weight instead of
+   imagery. Nothing pulses, nothing parallaxes, nothing autoplays.
+
+   Two rules worth stating because they are easy to break later:
+     1. Every media box is an explicit aspect-ratio. A card whose height is
+        decided by an image that has not loaded is a layout shift you built on
+        purpose, and this page has a decorative canvas behind it that will
+        happily amplify one.
+     2. prefers-reduced-motion gates every transform transition, not just the
+        decorative ones. The reveal on scroll is the point of the section
+        rhythm; if motion is unwelcome, the content still has to arrive.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Page frame
+   -------------------------------------------------------------------------- */
+
+.site-main {
+  /* The curved bottom bar owns the bottom of the viewport. */
+  padding-bottom: 0;
+}
+
+.band,
+.split,
+.colophon {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.band { padding-block: clamp(4rem, 9vw, 7.5rem); }
+.band--alt {
+  /* A single tonal step, not a second background colour: enough to separate
+     the workshop section without the page turning into stripes. */
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 4%, transparent), transparent);
+}
+
+.band__head { max-width: 60ch; margin-bottom: clamp(2rem, 4vw, 3rem); }
+
+.band__h,
+.split__h,
+.colophon__h {
+  font-family: var(--font-display, var(--font-ui));
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--fg);
+  margin: 0 0 0.75rem;
+}
+
+.band__h { font-size: clamp(1.75rem, 4vw, 2.75rem); }
+
+.band__lede {
+  font-size: clamp(1rem, 1.6vw, 1.125rem);
+  line-height: 1.7;
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.band__empty { color: var(--fg-subtle); font-style: italic; }
+
+.band__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2.5rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.5rem;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease,
+              border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.btn--primary:hover,
+.btn--primary:focus-visible {
+  background: var(--accent-strong);
+  color: var(--bg);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+.btn--ghost:hover,
+.btn--ghost:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.btn:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   HERO
+   -------------------------------------------------------------------------- */
+
+.mhero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: clamp(2.5rem, 6vw, 4.5rem);
+  min-height: min(88svh, 900px);
+  padding: clamp(4rem, 10vw, 7rem) clamp(1.25rem, 4vw, 2.5rem) clamp(5rem, 9vw, 7rem);
+  max-width: 1180px;
+  margin-inline: auto;
+  isolation: isolate;
+  overflow: clip;
+}
+
+@media (min-width: 62rem) {
+  .mhero {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    align-items: center;
+  }
+}
+
+/* A single light source, top-left, as if from a rig. The gradient is painted
+   on a pseudo-layer rather than on .mhero itself so the decorative canvas
+   behind the page (decor-grain) stays composited underneath it. */
+.mhero__plate {
+    position: absolute;
+    /* inset:0, not negative values. The plate used to be inset -20%/-10% so the
+       bloom overhung the viewport, which contributed real horizontal scroll on
+       tablet and phone (27px at 1024, 35px at 768) despite overflow:clip on the
+       parent. A decorative layer must never be able to widen the page, so the
+       glow is now produced by moving the gradient stops inside a box that
+       exactly matches the parent. */
+    inset: 0 0 auto 0;
+    height: 78%;
+    z-index: -2;
+    background:
+      radial-gradient(58% 60% at 24% 16%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%),
+      radial-gradient(44% 42% at 76% 6%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 74%);
+    filter: blur(10px);
+    pointer-events: none;
+  }
+
+/* Fades the plate out before it reaches the copy, so the type sits on flat
+   ground and keeps its contrast ratio instead of fighting the bloom. */
+.mhero__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent 30%, var(--bg) 92%);
+  pointer-events: none;
+}
+
+.mhero__copy { max-width: 34rem; }
+
+.mhero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0 0 1.5rem;
+}
+
+.mhero__eyebrow-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  /* Slow, small, and gated: a live indicator, not a party light. */
+  animation: hero-pulse 3.2s ease-in-out infinite;
+}
+@keyframes hero-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1); }
+}
+
+.mhero__avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
+    0 8px 24px rgba(0,0,0,0.4),
+    0 0 20px color-mix(in srgb, var(--accent) 15%, transparent);
+  margin: 0 auto 1rem;
+  object-fit: cover;
+}
+
+.mhero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+}
+
+.mhero__badges .badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+.mhero__badges .badge-fpm {
+  --accent: #00e5ff;
+}
+
+.mhero__badges .badge-neohiro {
+  --accent: #7c4dff;
+}
+
+.mhero__title {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: clamp(2.75rem, 8.5vw, 5.5rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  margin: 0 0 1.5rem;
+  color: var(--fg);
+}
+
+.mhero__title-line { display: block; }
+
+/* The second line is the reveal. One accent, italic, offset — enough to read as
+   a second idea rather than a repeat. */
+.mhero__title-line--alt {
+  color: var(--accent);
+  font-style: italic;
+  padding-left: 0.12em;
+}
+
+.mhero__lede {
+  font-size: clamp(1.05rem, 1.9vw, 1.25rem);
+  line-height: 1.7;
+  color: var(--fg-muted);
+  margin: 0 0 2.25rem;
+  max-width: 46ch;
+}
+.mhero__lede em { color: var(--fg); font-style: normal; font-weight: 600; }
+
+.mhero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.mhero__counter {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.mhero__counter img { max-height: 28px; width: auto; }
+
+.mhero__reel { position: relative; }
+@media (max-width: 61.99rem) {
+  /* Copy first on narrow screens: the reel is an invitation, not the pitch. */
+  .mhero__reel { order: 2; }
+}
+
+/* --------------------------------------------------------------------------
+   SPLIT — the two houses
+   -------------------------------------------------------------------------- */
+
+.split {
+  display: grid;
+  gap: clamp(2rem, 5vw, 4rem);
+  padding-block: clamp(3.5rem, 8vw, 6rem);
+}
+@media (min-width: 56rem) {
+  .split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.split__col {
+  position: relative;
+  padding-top: 2.25rem;
+  border-top: 1px solid var(--border);
+}
+.split__col::before {
+  content: "";
+  position: absolute;
+  inset: -1px auto auto 0;
+  width: 3rem;
+  height: 2px;
+  background: var(--accent);
+}
+
+.split__index {
+  position: absolute;
+  top: 2.5rem;
+  right: 0;
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fg);
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.split__h { font-size: clamp(1.5rem, 3vw, 2rem); }
+
+.split__meta {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0 0 1.25rem;
+}
+
+.split__col p {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--fg-muted);
+  margin: 0 0 1rem;
+  max-width: 52ch;
+}
+
+.split__aside {
+  font-size: 0.875rem !important;
+  color: var(--fg-subtle) !important;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.split__aside a { color: var(--accent); }
+
+/* --------------------------------------------------------------------------
+   VIDEO FACADE
+   See _includes/video-facade.html for why this is a facade and not an iframe.
+   -------------------------------------------------------------------------- */
+
+.vfacade-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(1rem, 2.2vw, 1.75rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+
+.vfacade-grid--hero { grid-template-columns: 1fr; }
+.vfacade-grid--lead { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.vfacade-grid--featured { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.vfacade-grid--catalogue { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: clamp(0.75rem, 1.8vw, 1.25rem); }
+
+.vfacade { min-width: 0; }
+
+.vfacade__hit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.vfacade__hit:hover,
+.vfacade__hit:focus-visible {
+  text-decoration: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Once the iframe is in, the card is a player: no lift, no hover affordance,
+   and the cursor stops implying navigation. */
+.vfacade__hit--playing {
+  cursor: default;
+  border-color: var(--border);
+  box-shadow: none;
+}
+.vfacade__hit--playing:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+.vfacade__frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  overflow: hidden;
+}
+
+.vfacade__thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* hqdefault is 480x360 (4:3); cropping to 16:9 beats letterboxing and
+     guarantees no reflow. */
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.5s ease, filter 0.3s ease;
+  filter: saturate(0.85) contrast(1.05);
+}
+.vfacade__hit:hover .vfacade__thumb { transform: scale(1.04); filter: saturate(1) contrast(1.05); }
+
+/* The play affordance is the thumbnail's real link target, so it must not be
+   announced or focusable on its own — the whole card is one control. */
+.vfacade__play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.vfacade__play svg { width: 3.5rem; height: 2.5rem; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5)); transition: transform 0.3s ease; }
+.vfacade__play-bg { fill: rgba(0, 0, 0, 0.55); }
+.vfacade__play-fg { fill: #fff; }
+.vfacade__hit:hover .vfacade__play svg { transform: scale(1.12); }
+.vfacade__hit--playing .vfacade__play { opacity: 0; }
+
+.vfacade__genre {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.6rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.vfacade__iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      /* Injected on click, so it should not be announced as page furniture. */
+      z-index: 2;
+    }
+
+    /* Escape hatch, added by video-facade.js once a card is playing.
+       Sits above the player (z-index 3) in the card's own padding area, below the
+       frame, so it never covers the video's own controls. Without it a card
+       whose embed was blocked or stalled becomes a dead box: the card's href is
+       gone by then, so this link is the only way back to the video. */
+    .vfacade__escape {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0.6rem 1.1rem 0;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+      color: var(--fg-subtle);
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      line-height: 1.4;
+      text-decoration: none;
+      align-self: flex-start;
+      transition: color 0.2s ease, border-color 0.2s ease;
+      /* position:relative + z-index is load-bearing, not decoration. The card is
+         a flex column and the iframe is position:absolute with z-index 2, so a
+         statically positioned link paints *underneath* the player and becomes
+         unclickable -- the escape hatch would be invisible precisely when it is
+         most needed. Verified in-browser: without this the computed z-index is
+         `auto` and the link sits below the frame. */
+      position: relative;
+      z-index: 3;
+    }
+    .vfacade__escape:hover,
+    .vfacade__escape:focus-visible {
+      color: var(--accent);
+      border-color: var(--accent);
+      text-decoration: none;
+    }
+
+.vfacade__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem 1.15rem;
+  flex: 1;
+}
+
+.vfacade__billing {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.vfacade__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg);
+  /* Two lines max. Long titles are truncated with an ellipsis by the line
+     clamp rather than by guessing at the server. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vfacade__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-subtle);
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+.vfacade__meta span + span::before {
+  content: "Â·";
+  margin-right: 0.5rem;
+  opacity: 0.6;
+}
+
+.vfacade__note {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  font-style: italic;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.35rem;
+}
+
+/* --------------------------------------------------------------------------
+   "Show the other N" — a <details>, so it works with no JavaScript
+   -------------------------------------------------------------------------- */
+
+.more { margin-top: 2.5rem; }
+
+.more__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  list-style: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.more__summary::-webkit-details-marker { display: none; }
+.more__summary:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+.more__label { font-weight: 600; color: var(--fg); }
+.more__hint {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-subtle);
+  margin-left: auto;
+}
+.more[open] .more__summary { margin-bottom: 1.5rem; }
+.more[open] .more__label::after { content: " â–¾"; }
+
+/* --------------------------------------------------------------------------
+   TOOLS
+   -------------------------------------------------------------------------- */
+
+.tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  /* Hairline dividers come from a 1px gap over the card colour, so the grid
+     needs no per-item borders and stays correct at any column count. */
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+@media (min-width: 48rem) {
+  .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.tool { background: var(--bg); }
+
+.tool__link {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  height: 100%;
+  padding: 1.25rem 1.35rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.2s ease;
+}
+.tool__link:hover,
+.tool__link:focus-visible { background: color-mix(in srgb, var(--accent) 8%, transparent); text-decoration: none; }
+
+.tool__name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--fg);
+  grid-column: 1;
+}
+.tool__go {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--fg-subtle);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.tool__link:hover .tool__go { color: var(--accent); transform: translateX(3px); }
+
+.tool__desc {
+  grid-column: 1;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   STAGES
+   -------------------------------------------------------------------------- */
+
+.stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+.stage {
+  padding: 1.5rem 1.35rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+.stage:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-2px); }
+
+.stage__h { font-size: 1.0625rem; margin: 0 0 0.4rem; }
+.stage__h a { color: var(--fg); text-decoration: none; }
+.stage__h a:hover { color: var(--accent); }
+.stage__p { font-size: 0.875rem; line-height: 1.6; color: var(--fg-subtle); margin: 0; }
+
+/* --------------------------------------------------------------------------
+   COLOPHON
+   -------------------------------------------------------------------------- */
+
+.colophon {
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+  border-top: 1px solid var(--border);
+}
+
+.colophon__h {
+  font-size: clamp(1.25rem, 2.4vw, 1.5rem);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  margin-bottom: 2.5rem;
+}
+
+.colophon__grid {
+  display: grid;
+  gap: clamp(1.75rem, 4vw, 3rem);
+}
+@media (min-width: 54rem) {
+  .colophon__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.colophon__sub {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 0.6rem;
+}
+.colophon__grid p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--fg-subtle);
+  margin: 0 0 0.85rem;
+}
+.colophon__grid a { color: var(--accent); }
+
+/* --------------------------------------------------------------------------
+   MOTION
+   All of it opt-out. The content is identical either way; only the
+   transitions and the reveal are removed.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .mhero__eyebrow-dot { animation: none; opacity: 1; }
+  .btn,
+  .vfacade__hit,
+  .vfacade__thumb,
+  .vfacade__play svg,
+  .tool__link,
+  .tool__go,
+  .stage,
+  .more__summary {
+    transition: none !important;
+  }
+  .btn:hover,
+  .vfacade__hit:hover,
+  .tool__link:hover,
+  .stage:hover { transform: none; }
+}
+
+/* --------------------------------------------------------------------------
+   NARROW SCREENS
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  .mhero { min-height: 0; }
+  .mhero__title { letter-spacing: -0.03em; }
+  .mhero__actions .btn { flex: 1 1 auto; justify-content: center; }
+  .more__hint { margin-left: 0; width: 100%; }
+  .split__index { font-size: 1.75rem; top: 2.25rem; }
+}

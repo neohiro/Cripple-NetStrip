@@ -1,0 +1,17 @@
+{% comment %} legal-block.html — single source of truth for the inline legal footer
+   shown in READMEs and site footers.
+
+   Heartbeat refreshes the "last reviewed" date by writing
+   /shared/legal/last_reviewed.txt; the build pulls it in via _data/legal.yml. {% endcomment %}
+
+{%- assign lr = site.data.legal.last_reviewed | default: '2026-01-01' -%}
+{%- assign op = site.data.legal.operator | default: 'FrenzyPenguin Media' -%}
+{%- assign em = site.data.legal.email | default: 'contact@frenzypenguin.media' -%}
+
+<p class="legal">
+  © {{ site.time | date: '%Y' }} {{ op }} ·
+  <a href="{{ '/privacy/' | relative_url }}">Privacy</a> ·
+  <a href="{{ '/tos/' | relative_url }}">Terms</a> ·
+  <a href="https://github.com/{{ site.github_username | default: 'neohiro' }}">GitHub</a><br>
+  <small>Last reviewed: {{ lr }} · Questions: <code>{{ em }}</code></small>
+</p>

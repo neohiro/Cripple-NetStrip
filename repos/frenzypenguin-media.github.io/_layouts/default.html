@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ page.title | default: site.title }}</title>
+
+  <!-- GitHub Pages cannot send custom response headers, so CSP is declared
+       here (meta) because that is the only mechanism it honours.
+       Each origin below is actually used by this layout:
+         fonts.googleapis.com / fonts.gstatic.com - preconnect + webfont <link>
+                  img-src https:                             - remote avatars/badges
+       auth-bar.js only fetches same-origin /auth/state and /api/contact.
+       frame-ancestors is intentionally absent: it is ignored in meta CSP and
+       would misrepresent the clickjacking posture. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://mainframe.taild879f3.ts.net https://www.google-analytics.com https://region1.google-analytics.com https://api-v2.hearthis.at; media-src 'self' https://hearthis.app https://*.hearthis.at; object-src 'none'; frame-src https://www.youtube-nocookie.com; base-uri 'self'; form-action 'self'">
+  <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}">
+  <link rel="stylesheet" href="{{ '/assets/css/network-ux.css' | relative_url }}">
+  <link rel="stylesheet" href="{{ '/assets/css/auth-bar.css' | relative_url }}">
+  <link rel="stylesheet" href="{{ '/assets/css/ecosystem-network.css' | relative_url }}">
+  <link rel="icon" type="image/svg+xml" href="{{ '/assets/favicon.svg' | relative_url }}">
+  {% seo %}
+  {% feed_meta %}
+  <link rel="stylesheet" href="{{ "/assets/css/site-tokens.css" | relative_url }}">
+  <link rel="stylesheet" href="{{ "/assets/css/site-forge.css" | relative_url }}">
+{% comment %} fonts: managed by template-shared/site_forge.py from sites.yaml {% endcomment %}
+  <!-- fpm-hero.css: the 2080 hero + scroll-narrative design system. Scoped under
+     .fpm-hero / .fpm-scroll-* so it cannot collide with main.css or the shared
+     network-ux layer. Only the homepage opts in, via page.extra_css. -->
+  {%- for sheet in page.extra_css %}
+  <link rel="stylesheet" href="{{ sheet | relative_url }}">
+  {%- endfor %}
+{%- if site.font_google %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family={{ site.font_google }}&display=swap" rel="stylesheet">
+{%- endif %}
+  <link rel="stylesheet" href="{{ "/assets/css/ai-seal.css" | relative_url }}">
+
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WLW4MRLS39"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WLW4MRLS39');
+  </script>
+  <style>
+    .glitch-overlay{position:fixed;inset:0;background:var(--bg,#030710);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility .2s}
+    .glitch-overlay.active{opacity:1;visibility:visible;pointer-events:auto}
+    .glitch-text{font-family:system-ui,sans-serif;font-size:clamp(3rem,10vw,8rem);font-weight:700;color:#eaf2f4;letter-spacing:.1em;text-transform:uppercase}
+  </style>
+</head>
+  <!-- Persistent curved dock + central AI button. Owned by bottom-bar.css across
+       all four sites; extracting it out of site-chrome.css is what stopped the other
+       three rendering the dock unstyled. -->
+  <link rel="stylesheet" href="{{ '/assets/css/bottom-bar.css' | relative_url }}">
+{% comment %} decor: managed by template-shared/site_forge.py from sites.yaml {% endcomment %}
+<body class="{{ page.decor_class | default: site.decor_class | default: 'decor-aurora' }}">
+  {% include music-player.html %}
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <!-- Matrix rain canvas for background ambience -->
+  <canvas id="matrix-canvas" aria-hidden="true"></canvas>
+
+  <!-- Glitch overlay for page transitions -->
+  <div id="glitch-overlay" class="glitch-overlay" aria-hidden="true">
+    <div class="glitch-text" data-text="NEOHIRO"></div>
+  </div>
+
+  <div class="page-wrapper">
+    <header class="site-header" role="banner">
+      <div class="container">
+        {%- comment -%}
+    THE TOP-BAR CONTRACT.
+
+    Both the brand mark and the nav used to be hand-copied here. That copy had
+    drifted in two ways that each cost something:
+
+      1. "Tools" and "Guides" pointed at #featured-tools and #hardening-guides,
+         and NEITHER ANCHOR EXISTS on this site index.html. Two header links
+         that could never do anything, on every page.
+      2. The brand glyph and the dropdown caret were stored as mojibake: the
+         UTF-8 bytes decoded as cp1252, so the header was rendering four
+         junk characters where the penguin belongs.
+
+    Both are gone by construction now. The include emits the mark as a
+    JS unicode escape and the caret as inline SVG, so neither can rot again,
+    and the labels come from nav_links in _config.yml - the same list
+    site_forge.py keeps in step. One nav across four sites, no per-site copy.
+  {%- endcomment -%}
+  {% include nav.html %}
+  {%- unless page.hero_counter -%}{% include counter-widget.html %}{%- endunless -%}
+      </div>
+    </header>
+
+    <main id="main" class="site-main" role="main" tabindex="-1">
+      {{ content }}
+    </main>
+
+    <footer class="site-footer" role="contentinfo">
+      <div class="container">
+        {% include footer-button-row.html org="fpm" %}
+        {%- comment -%}
+        Ecosystem Network frame: the unified cross-site footer block. Included
+        once here so every page on this site carries the same four-card
+        directory of the network, below the button row with clear space
+        between them. `current` marks this site's own card.
+        {%- endcomment -%}
+        {% include ecosystem-network.html current="fpm" %}
+        {% include heartbeat-status.html %}
+
+    </footer>
+  </div>
+
+  {% include bottom-bar.html %}
+  {% include auth-bar.html %}
+
+  <!-- Scripts: load order matters. fpm-typing.js MUST load before main.js
+       because main.js calls FpmTyping.startPoller and FpmTyping.autoAttach.
+       Both are defer so DOMContentLoaded fires only after both are parsed. -->
+  <script src="{{ '/assets/js/fpm-typing.js' | relative_url }}" defer></script>
+  <script src="{{ '/assets/js/main.js' | relative_url }}" defer></script>
+  <script src="{{ '/assets/js/network-ux.js' | relative_url }}" defer></script>
+  <script src="{{ '/assets/js/auth-bar.js' | relative_url }}" defer></script>
+  {% include ai-disclosure.html %}
+  <script src="{{ "/assets/js/ai-seal.js" | relative_url }}" defer></script>
+
+  <script src="{{ '/assets/js/bottom-bar.js' | relative_url }}" defer></script>
+</body>
+</html>

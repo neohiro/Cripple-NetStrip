@@ -1,0 +1,591 @@
+/* =============================================================================
+   assets/css/hosts.css — the subdomain directory and the swirl-open card frame.
+
+   Depends on the tokens already declared in main.css (:root). Nothing here
+   redefines --bg/--fg/--accent, so the light-scheme block in main.css keeps
+   working for these pages too. Only the values that are genuinely new to this
+   component are declared, and they are declared in the same paired
+   dark/light blocks so the directory is readable in both schemes.
+
+   CONTENTS
+     1. Dj chrome          — equaliser, platter, waveform: the reference styling
+     2. Swirl-open card    — the frame that opens from a source disc
+     3. Status pills       — ok / guarded / down / broken-dns
+     4. Directory grid
+     5. Raw-link block
+     6. Action buttons
+     7. Reduced motion
+   ========================================================================== */
+
+:root {
+  --swirl-p1: #ff2e97;
+  --swirl-p2: #26c6da;
+  --swirl-p3: #ffa726;
+  --swirl-ring: color-mix(in srgb, var(--swirl-p2) 22%, transparent);
+  --swirl-glow: color-mix(in srgb, var(--swirl-p1) 30%, transparent);
+  --swirl-open-ms: 720ms;
+  --swirl-lift: 14px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --swirl-p1: #c2006c;
+    --swirl-p2: #0b7f8e;
+    --swirl-p3: #b35c00;
+    --swirl-ring: color-mix(in srgb, var(--swirl-p2) 30%, transparent);
+    --swirl-glow: color-mix(in srgb, var(--swirl-p1) 22%, transparent);
+  }
+}
+
+/* ── 1. DJ chrome ─────────────────────────────────────────────────────────
+   Three pieces of DJ-desk vocabulary used as decoration only. All three are
+   aria-hidden at the call site and all three stop under reduced-motion.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Five-bar equaliser. Each bar has its own duration so the row never lines up
+   into a visible pulse — that is what makes it read as "playing" rather than
+   "looping". */
+.eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+}
+.eq span {
+  width: 3px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--swirl-p1), var(--swirl-p2));
+  transform-origin: bottom;
+  animation: eq-bounce 900ms ease-in-out infinite alternate;
+}
+.eq span:nth-child(1) { height: 40%; animation-duration: 760ms; }
+.eq span:nth-child(2) { height: 85%; animation-duration: 540ms; animation-delay: -120ms; }
+.eq span:nth-child(3) { height: 60%; animation-duration: 980ms; animation-delay: -300ms; }
+.eq span:nth-child(4) { height: 100%; animation-duration: 620ms; animation-delay: -80ms; }
+.eq span:nth-child(5) { height: 50%; animation-duration: 860ms; animation-delay: -460ms; }
+
+@keyframes eq-bounce {
+  from { transform: scaleY(0.28); }
+  to   { transform: scaleY(1); }
+}
+
+/* The platter. A conic "vinyl" that turns once every 1.2s. */
+.platter {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, var(--bg) 0 22%, transparent 22%),
+    repeating-conic-gradient(from 0deg,
+      var(--border-hover) 0deg 6deg,
+      transparent 6deg 12deg),
+    var(--bg-card);
+  border: 1px solid var(--border);
+  animation: platter-spin 1.2s linear infinite;
+}
+@keyframes platter-spin { to { transform: rotate(360deg); } }
+
+/* Waveform divider. Built from a repeating gradient so it costs no markup and
+   scales to any width. */
+.waveform {
+  height: 26px;
+  width: 100%;
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg,
+    var(--border-hover) 0 2px,
+    transparent 2px 5px);
+  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  opacity: 0.55;
+}
+
+/* ── 2. Swirl-open card ───────────────────────────────────────────────────
+   The frame. Markup contract:
+
+     <article class="swirl" data-swirl>          the wrapper, gets .swirl--open
+       <span class="swirl-halo" aria-hidden>     rotating conic ring
+       <button class="swirl-source"              the source disc — opens it
+               data-swirl-toggle aria-expanded="false" aria-controls="ID">
+       <div class="swirl-card" id="ID">          the frame that opens
+
+   Closed, the card is scaled to 0 and clipped to nothing, so the source disc is
+   all a visitor sees. Opening is triggered three ways, all of which end up
+   adding .swirl--open to the wrapper:
+     - clicking the source disc (assets/js/hosts.js)
+     - activating an element with [data-swirl-open="ID"] elsewhere on the page
+       (assets/js/hosts.js) — this is the "opens from another source" path
+     - has:target on a URL fragment, so the open state is linkable
+   ────────────────────────────────────────────────────────────────────────── */
+
+.swirl {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 8px 0 4px;
+}
+
+.swirl-halo {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(from 0deg,
+    transparent 0deg,
+    var(--swirl-p1) 60deg,
+    var(--swirl-p2) 150deg,
+    var(--swirl-p3) 240deg,
+    transparent 360deg);
+  mask-image: radial-gradient(circle, transparent 0 40%, #000 41% 50%, transparent 51%);
+  -webkit-mask-image: radial-gradient(circle, transparent 0 40%, #000 41% 50%, transparent 51%);
+  transition: opacity 260ms ease;
+}
+
+.swirl--open .swirl-halo,
+.swirl--swirling .swirl-halo {
+  opacity: 1;
+  animation: halo-swirl var(--swirl-open-ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+/* Two full turns. --swirl-turn is registered so the angle interpolates; where
+   @property is unsupported the animation still runs and simply snaps back,
+   which is why the keyframe also ends at 720deg == 360deg visually. */
+@keyframes halo-swirl {
+  from { transform: rotate(0deg) scale(0.6); }
+  to   { transform: rotate(720deg) scale(1); }
+}
+
+.swirl-source {
+  position: relative;
+  z-index: 2;
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--fg);
+  cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 32% 28%, var(--bg-elevated), var(--bg-card));
+  box-shadow: var(--shadow);
+  transition: transform var(--transition), border-color var(--transition),
+              box-shadow var(--transition);
+}
+.swirl-source:hover {
+  transform: scale(1.06);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg), 0 0 0 4px var(--accent-dim);
+}
+.swirl-source:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.swirl--open .swirl-source {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg), 0 0 0 5px var(--accent-dim);
+}
+
+/* The card itself. Closed state must not be display:none — the bio inside has
+   to stay in the accessibility tree and findable by in-page search, so it is
+   hidden by scale + opacity + zero height rather than removed. */
+.swirl-card {
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(var(--swirl-lift)) rotate(-3deg) scale(0.86);
+  transform-origin: top center;
+  transition: max-height var(--swirl-open-ms) cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform var(--swirl-open-ms) cubic-bezier(0.22, 0.61, 0.36, 1),
+              opacity 320ms ease;
+}
+
+.swirl--open .swirl-card {
+  max-height: 1400px;
+  opacity: 1;
+  transform: translateY(0) rotate(0deg) scale(1);
+}
+
+/* The swirl pass: the card overshoots through a rotated, lifted state and
+   settles. Only plays while .swirl--swirling is set (added then removed by JS),
+   so a plain open (keyboard, no JS) still animates but does not replay. */
+.swirl--swirling .swirl-card {
+  animation: card-unfurl var(--swirl-open-ms) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes card-unfurl {
+  0%   { transform: translateY(var(--swirl-lift)) rotate(-3deg) scale(0.86); }
+  38%  { transform: translateY(-6px) rotate(1.5deg) scale(1.04); }
+  70%  { transform: translateY(2px) rotate(-0.5deg) scale(0.99); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+/* Contents of the frame. */
+.swirl-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  padding: 18px;
+  text-align: left;
+}
+.swirl--open .swirl-panel {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow);
+}
+
+.swirl-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.swirl-symbol {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.swirl-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0;
+}
+.swirl-slug {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg-subtle);
+  word-break: break-all;
+}
+
+.swirl-blurb {
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+  margin: 0 0 12px;
+}
+
+/* The bio frame: labelled slots that are visibly empty. This is the whole
+   point of the component — a page an owner can finish without touching markup. */
+.swirl-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px dashed var(--border-hover);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+}
+.swirl-field {
+  display: grid;
+  gap: 2px;
+}
+.swirl-field dt {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.swirl-field dd {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--fg-muted);
+}
+.swirl-field--empty dd {
+  color: var(--fg-subtle);
+  font-style: italic;
+}
+.swirl-field--empty dd::after {
+  content: " \2014 open slot";
+  font-style: normal;
+  opacity: 0.55;
+}
+
+/* ── 3. Status pills ─────────────────────────────────────────────────────
+   ok and guarded both render in the "live" colour on purpose: a bot wall is
+   not a broken link and colouring it red would be a lie. Only down and
+   broken-dns get the warning colour.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pill--ok        { color: var(--green); }
+.pill--guarded   { color: var(--cyan); }
+.pill--down      { color: var(--orange); }
+.pill--broken    { color: var(--red); }
+.pill--live .pill::before,
+.pill--ok::before,
+.pill--guarded::before {
+  animation: pill-pulse 2.4s ease-in-out infinite;
+}
+@keyframes pill-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* ── 4. Directory grid ──────────────────────────────────────────────────── */
+
+/* The kicker above the h1: "🎧 Artists · kennethgame". */
+.host-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0;
+}
+
+/* Definition list used for the per-host facts. main.css has no dl styling, and
+   the facts are the point of the page, so they get their own. */
+.host-dl {
+  display: grid;
+  gap: 0;
+  margin: 18px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.host-dl-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.host-dl-row:last-child { border-bottom: 0; }
+.host-dl-row:nth-child(odd) { background: color-mix(in srgb, var(--bg-elevated) 55%, transparent); }
+.host-dl-row dt {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.host-dl-row dd { margin: 0; font-size: 0.92rem; color: var(--fg-muted); word-break: break-word; }
+.host-dl-row dd code { font-family: var(--font-mono); font-size: 0.85em; }
+
+@media (max-width: 560px) {
+  .host-dl-row { grid-template-columns: 1fr; gap: 2px; }
+}
+
+.host-hero {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+.host-hero h1 { margin: 0; }
+.host-lede {
+  max-width: 62ch;
+  font-size: 1.05rem;
+}
+
+.host-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.host-group {
+  margin-bottom: 46px;
+}
+.host-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+.host-group-symbol { font-size: 1.6rem; }
+.host-group-title { margin: 0; font-size: 1.5rem; }
+.host-group-tagline {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--fg-subtle);
+}
+.host-group-blurb {
+  flex-basis: 100%;
+  max-width: 68ch;
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+}
+
+.host-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 22px 20px;
+}
+
+/* ── 5. Raw-link block ────────────────────────────────────────────────────
+   The "raw link" the brief asks for: the literal string, selectable and
+   copyable, with the dead ones visibly marked so nobody pastes one by mistake.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.raw {
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.raw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.raw-value {
+  display: block;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--fg);
+  word-break: break-all;
+  user-select: all;
+  background: none;
+  border: 0;
+  width: 100%;
+  text-align: left;
+}
+.raw--down .raw-value,
+.raw--broken .raw-value {
+  color: var(--fg-subtle);
+  text-decoration: line-through;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 1px;
+}
+
+/* Live and guarded are stated rather than left undefined.
+   The absence of a rule is the correct behaviour - a reachable address must not
+   be struck through - but an unstated absence is indistinguishable from a typo,
+   and a typo here is silent: eight broken records once rendered as healthy
+   because the class was spelled `broken-dns` and matched nothing. Guarded is
+   deliberately NOT struck: a bot wall is not a dead link. */
+.raw--ok .raw-value,
+.raw--guarded .raw-value {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+/* ── 6. Action buttons ──────────────────────────────────────────────────── */
+
+.host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.host-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--border-hover);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: transform var(--transition), border-color var(--transition),
+              box-shadow var(--transition);
+}
+.host-action:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px var(--accent-dim);
+}
+.host-action--primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--swirl-p1), var(--swirl-p2));
+  color: #fff;
+}
+.host-action--primary:hover { box-shadow: 0 8px 26px var(--swirl-glow); }
+.host-action--join {
+  border-color: var(--swirl-p3);
+  color: var(--swirl-p3);
+}
+.host-action-hint {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-subtle);
+}
+
+/* Secondary Life native link: a custom protocol the browser cannot preview, so
+   it needs a visible fallback next to it. */
+.host-action--native { border-style: dashed; }
+
+/* ── 7. Reduced motion ────────────────────────────────────────────────────
+   Everything decorative stops. The card still opens — it just arrives, rather
+   than spinning into place. Nothing here is load-bearing for the page to work.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .eq span,
+  .platter,
+  .swirl-halo,
+  .pill--ok::before,
+  .pill--guarded::before {
+    animation: none !important;
+  }
+  .swirl--open .swirl-halo { opacity: 0.5; transform: none; }
+  .swirl-card,
+  .swirl--swirling .swirl-card {
+    transition-duration: 1ms;
+    animation: none;
+  }
+  .host-action:hover,
+  .swirl-source:hover { transform: none; }
+}
+
+/* The one-line provenance strip under the raw link: zone type and probe result.
+   A .swirl-slug class was used here first, which is a lie - it is metadata, not
+   an identifier. */
+.swirl-meta {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  margin: 0 0 12px;
+}
+.swirl-meta code { color: var(--fg-muted); }
+. h o s t - g r o u p   {   c o n t e n t - v i s i b i l i t y :   a u t o ;   c o n t a i n - i n t r i n s i c - s i z e :   a u t o   3 0 0 p x ;   }  
+ 

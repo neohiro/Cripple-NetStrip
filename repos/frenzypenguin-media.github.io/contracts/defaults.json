@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Contract: Default configuration for all neohiro ecosystem sites. Single source of truth for shared chrome, AI assistant, and site-wide defaults.",
+  "version": "2.0.0",
+  "sites": {
+    "neohiro": {
+      "displayName": "neohiro",
+      "description": "Cyberpunk, matrix, geek, nerd, hypermodern, ultra-fast, easy, ultraUX design, tooling and efficiency, defense, privacy first, FOSS minded",
+      "theme": "purple-matrix",
+      "fonts": "matrix",
+      "decor": "matrix",
+      "palette": "purple-matrix",
+      "shell": "neohiro",
+      "accent": "#7c4dff",
+      "accentStrong": "#9d7aff",
+      "accentDim": "rgba(124, 77, 255, 0.20)",
+      "navLinks": [
+        "Home|/",
+        "Repos|/repositories/|3",
+        "Dashboard|/dashboard/|2",
+        "Heartbeats|/heartbeats/|3",
+        "Media|/media/|3"
+      ],
+      "communityLinks": [
+        "Org Overview|https://github.com/neohiro",
+        "Sponsor|https://github.com/sponsors/neohiro",
+        "neohiro|https://neohiro.github.io/"
+      ],
+      "assistant": {
+        "requestAccess": "/request-access/",
+        "dashboardUrl": "https://github.com/neohiro/dashboard"
+      }
+    },
+    "fpm": {
+      "displayName": "FrenzyPenguin Media",
+      "description": "Professional and optimized UI for fast and easy experience, customer centric and attractive for new collaborative project visitors & seekers",
+      "theme": "purple-matrix",
+      "fonts": "matrix",
+      "decor": "aurora",
+      "palette": "purple-matrix",
+      "shell": "fpm",
+      "accent": "#7c4dff",
+      "accentStrong": "#9d7aff",
+      "accentDim": "rgba(124, 77, 255, 0.20)",
+      "navLinks": [
+        "Home|/",
+        "Repos|/repositories/|3",
+        "Hosts|/hosts/|2",
+        "Artists|/artists/|2",
+        "Media|/media/|3",
+        "Social|/social/|3"
+      ],
+      "communityLinks": [
+        "Org Overview|https://github.com/neohiro",
+        "Bluesky|https://bsky.app/profile/frenzypenguin.media",
+        "Main Domain|https://frenzypenguin.media",
+        "neohiro|https://neohiro.github.io/",
+        "Sponsor|https://github.com/sponsors/neohiro"
+      ],
+      "assistant": {
+        "requestAccess": "/request-access/",
+        "dashboardUrl": "https://github.com/neohiro/dashboard"
+      }
+    },
+    "osi": {
+      "displayName": "OpenStage Island",
+      "description": "Gaming, Second Life, community, electronic music, cyberlife, youthful, urban, fun",
+      "theme": "purple-matrix",
+      "fonts": "matrix",
+      "decor": "matrix",
+      "palette": "purple-matrix",
+      "shell": "osi",
+      "accent": "#7c4dff",
+      "accentStrong": "#9d7aff",
+      "accentDim": "rgba(124, 77, 255, 0.20)",
+      "navLinks": [
+        "Home|/",
+        "Destinations|/destinations/|2",
+        "Live|/live/|3",
+        "Community|/community/|3"
+      ],
+      "communityLinks": [
+        "Discord|https://discord.gg/openstageisland",
+        "GitHub|https://github.com/openstageisland",
+        "neohiro|https://neohiro.github.io/"
+      ],
+      "assistant": {
+        "requestAccess": "",
+        "dashboardUrl": "https://github.com/neohiro/dashboard"
+      }
+    },
+    "transhumanists": {
+      "displayName": "transhumanists",
+      "description": "Cyber, modernistic, gamified world metrics, perfect styling and worldmap design",
+      "theme": "purple-matrix",
+      "fonts": "matrix",
+      "decor": "matrix",
+      "palette": "purple-matrix",
+      "shell": "transhumanists",
+      "accent": "#7c4dff",
+      "accentStrong": "#9d7aff",
+      "accentDim": "rgba(124, 77, 255, 0.20)",
+      "navLinks": [
+        "Home|/",
+        "Milestones|/milestones/|2",
+        "World Map|/map.html|2",
+        "Dashboard|/dashboard/|3"
+      ],
+      "communityLinks": [
+        "GitHub|https://github.com/transhumanists",
+        "neohiro|https://neohiro.github.io/"
+      ],
+      "assistant": {
+        "requestAccess": "",
+        "dashboardUrl": "https://github.com/neohiro/dashboard"
+      }
+    }
+  },
+  "chrome": {
+    "animation": {
+      "convSlideUp": "0.22s",
+      "convFadeUp": "0.18s",
+      "easing": "cubic-bezier(0.2, 0.6, 0.3, 1)"
+    },
+    "conversation": {
+      "height": "min(88vh, 960px)",
+      "maxHeight": "calc(100vh - max(12px, env(safe-area-inset-top, 0px)))",
+      "borderRadius": "18px 18px 0 0",
+      "mobileBorderRadius": "14px 14px 0 0"
+    },
+    "composer": {
+      "inputBorderRadius": "14px",
+      "inputPadding": "8px 14px",
+      "inputFontSize": "0.9rem",
+      "sendBorderRadius": "10px",
+      "varsAnimation": "0.2s"
+    },
+    "checkmarks": {
+      "size": "16px",
+      "sentActiveColor": "var(--fg-muted, #96a8b8)",
+      "deliveredActiveColor": "var(--blue, #42a5f5)",
+      "inactiveOpacity": 0.5,
+      "activeOpacity": 1,
+      "animationDuration": "0.2s"
+    },
+    "bottomBar": {
+      "height": "72px",
+      "mobileHeight": "68px",
+      "aiButtonSize": "64px",
+      "mobileAiButtonSize": "56px",
+      "aiButtonProtrusion": "0.6",
+      "mobileAiButtonProtrusion": "0.65",
+      "curve": "smile",
+      "curveEllipseHorizontal": "60%",
+      "curveEllipseVertical": "120%"
+    },
+    "bridge": {
+      "heartEndpoints": [
+        "https://neohiro.github.io/.well-known/heartbeat",
+        "https://neohiro.github.io/heartbeats/health.json"
+      ],
+      "mouthEndpoint": "/.well-known/ask",
+      "voicemailEndpoint": "/.well-known/voicemail",
+      "timeout": 12000
+    },
+    "limits": {
+      "maxQueryLength": 600,
+      "nearLimit": 540,
+      "typingCycleMs": 900,
+      "replyDelayBaseMs": 1500,
+      "replyDelayJitterMs": 600
+    }
+  },
+  "ux": {
+    "screenUsage": {
+      "conversationWidth": "100%",
+      "composerMaxWidth": "1200px",
+      "messageMaxWidth": "75%"
+    },
+    "delight": {
+      "dynamicPlaceholders": true,
+      "variableMenus": true,
+      "checkmarkAnimations": true,
+      "pulseIndicator": true
+    },
+    "contextGrounding": {
+      "enabled": true,
+      "readmeMaxChars": 2000,
+      "includeSite": true,
+      "includePath": true,
+      "includeReadme": true
+    }
+  }
+}

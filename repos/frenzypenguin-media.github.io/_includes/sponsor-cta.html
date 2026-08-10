@@ -1,0 +1,20 @@
+<section class="section section-alt" id="sponsor">
+  <div class="container" style="text-align:center; max-width:800px;">
+    {% if include.title %}
+      <h2 style="margin-bottom:16px;">{{ include.title }}</h2>
+    {% else %}
+      <h2 style="margin-bottom:16px;">Support the Stack</h2>
+    {% endif %}
+    {% if include.description %}
+      <p style="color:var(--fg-muted); margin-bottom:32px;">{{ include.description }}</p>
+    {% else %}
+      <p style="color:var(--fg-muted); margin-bottom:32px;">All tools here are free and open source. If they save you time or protect your systems, consider a sponsorship to keep development going.</p>
+    {% endif %}
+    <div class="sponsor-links">
+      <a href="https://github.com/sponsors/{{ site.github_username | default: 'neohiro' }}" class="sponsor-red" target="_blank" rel="noopener">♥ Sponsor neohiro on GitHub</a>
+      <a href="https://frenzypenguin-media.github.io/" target="_blank" rel="noopener">🎬 FrenzyPenguin Media</a>
+      <a href="https://transhumanists.github.io/" target="_blank" rel="noopener">🧬 transhumanists Dashboard</a>
+      <a href="https://github.com/transhumanists" target="_blank" rel="noopener">📋 transhumanists GitHub</a>
+    </div>
+  </div>
+</section>

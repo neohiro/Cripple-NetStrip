@@ -1,0 +1,34 @@
+---
+layout: default
+---
+{% comment %} page.html — the layout every generated page uses.
+
+   It deliberately inherits each site's own `default` layout rather than
+   restating the header, footer, nav and stylesheet list. Those differ per site
+   (brand name, org, which stylesheet holds the chrome, whether the site even has
+   a main.css) and copying them here is how those four sites drifted apart in the
+   first place. Inheriting means a new page is styled correctly on every site
+   with no per-site copy to keep in sync.
+
+   All this layout contributes is the article shell: the hero band and the body
+   wrapper. Both classes are defined in assets/css/site-forge.css, which reads
+   its colours from the generated assets/css/site-tokens.css.
+
+   `decor_class` comes from the page's front matter (set by
+   `site_forge.py page`) and falls back to `site.decor_class` from _config.yml,
+   which is itself generated from sites.yaml. See _layouts/default.html. 
+{% endcomment %}
+<article class="page-shell">
+  <div class="page-wrap">
+    <div class="page-hero">
+      <h1>{{ page.title }}</h1>
+      {%- if page.lede or page.description %}
+      <p class="lede">{{ page.lede | default: page.description }}</p>
+      {%- endif %}
+    </div>
+
+    <div class="page-body">
+      {{ content }}
+    </div>
+  </div>
+</article>

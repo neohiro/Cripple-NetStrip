@@ -1,0 +1,32 @@
+{% comment %}
+counter-widget.html — unified visitor counter partial for the neohiro/FPM/OSI/H+ Jekyll sites.
+   Include with:   include counter-widget.html %}
+   Reads the visitor path from site config (preferred) or a local override:
+     - site.counter_path (set in _config.yml) — auto-populated for all sites
+     - include counter_path="..."           — manual override (rare)
+    The embed:
+      - Uses a visitor-badge image (no JS; Camo/GitHub-safe)
+      - Wraps in <div align="center"> for visual consistency
+      - Wraps in a no-referrer rel="noopener noreferrer nofollow" link for accessibility
+      - paths live in links-secret/counter-surfaces.spec.yaml (SSOT)
+    Architecture (per AGENTS.md §template-shared):
+     1. Authoritative source: template-shared/_includes/counter-widget.html
+     2. Synced to 4 sites via template-shared/sync-shared.sh
+     3. Sites expose counter_path via _config.yml (site.counter_path)
+     4. Validator + CI ensure no other embed pattern ships.
+   NOTE: freevisitorcounters was retired from embeds (JS-dependent, broken on
+   GitHub). Visitor badges render a static SVG, so they work everywhere.
+      NOTE: usage lines above are written WITHOUT Liquid tag braces on purpose.
+      Liquid parses tags inside a brace-comment and inside an HTML comment, so a
+      self-referential include in this header is a live infinite recursion. It only
+      looks dormant because no built page currently reaches this partial.
+{% endcomment %}
+
+{%- assign _path = include.counter_path | default: site.counter_path -%}
+{%- if _path -%}
+<div align="center">
+  <a href="https://visitorbadge.io/status?path={{ _path | cgi_escape }}" rel="noopener noreferrer nofollow">
+    <img src="https://api.visitorbadge.io/api/visitors?path={{ _path | cgi_escape }}&label=Visitors&countColor=%23263759" alt="Visitors" />
+  </a>
+</div>
+{%- endif -%}

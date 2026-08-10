@@ -1,0 +1,40 @@
+{% comment %} badges.html — shields.io + custom badges for any repo/org.
+
+   Usage:
+     include badges.html org="neohiro" %}
+     include badges.html repo="neohiro/LLM" extra="ci|tests|coverage" %}
+
+   Heartbeat also generates a per-repo badge bundle and writes it to
+   /shared/badges/{owner}_{repo}.html. Sites with a _data/badges/{repo}.yml
+      NOTE: usage lines above are written WITHOUT Liquid tag braces on purpose.
+      Liquid parses tags inside a brace-comment and inside an HTML comment, so a
+      self-referential include in this header is a live infinite recursion. It only
+      looks dormant because no built page currently reaches this partial.
+   get richer badges (latest release, build status). {% endcomment %}
+
+
+{%- if include.repo -%}
+  {%- assign parts = include.repo | split: '/' -%}
+  {%- assign owner = parts[0] -%}
+  {%- assign name = parts[1] -%}
+<span class="badges">
+  <img src="https://img.shields.io/github/stars/{{ include.repo }}?style=flat-square" alt="stars" loading="lazy">
+  <img src="https://img.shields.io/github/forks/{{ include.repo }}?style=flat-square" alt="forks" loading="lazy">
+  <img src="https://img.shields.io/github/issues/{{ include.repo }}?style=flat-square" alt="issues" loading="lazy">
+  <img src="https://img.shields.io/github/license/{{ include.repo }}?style=flat-square" alt="license" loading="lazy">
+  <img src="https://img.shields.io/github/last-commit/{{ include.repo }}?style=flat-square" alt="last commit" loading="lazy">
+{%- if include.extra -%}
+  {%- assign extras = include.extra | split: '|' -%}
+  {%- for x in extras -%}
+    {%- case x -%}
+    {%- when 'ci' -%}<img src="https://img.shields.io/github/actions/workflow/status/{{ include.repo }}/ci.yml?style=flat-square" alt="CI" loading="lazy">{%- when 'release' -%}<img src="https://img.shields.io/github/v/release/{{ include.repo }}?style=flat-square" alt="release" loading="lazy">{%- when 'coverage' -%}<img src="https://img.shields.io/codecov/c/github/{{ include.repo }}?style=flat-square" alt="coverage" loading="lazy">{%- endcase -%}
+  {%- endfor -%}
+{%- endif -%}
+</span>
+{%- elsif include.org -%}
+<span class="badges">
+  <img src="https://img.shields.io/github/orgs/{{ include.org }}/repos?style=flat-square" alt="repos" loading="lazy">
+  <img src="https://img.shields.io/github/followers/{{ include.org }}?style=flat-square&label=followers" alt="followers" loading="lazy">
+  <img src="https://img.shields.io/github/sponsors/{{ include.org }}?style=flat-square&logo=github-sponsors" alt="sponsors" loading="lazy">
+</span>
+{%- endif -%}

@@ -1,0 +1,14 @@
+# social.yml — "find us on" data for _includes/social-links.html.
+#
+# This file is the reason every footer Bluesky link on this site was silently
+# absent: social-links.html reads site.data.social.<key>, and no social.yml
+# existed in any of the four sites. With it present the existing include renders
+# the links with no template change at all.
+#
+# Keys consumed by the include: github, sponsors, youtube, mastodon, bluesky,
+# twitter, discord, website. Any key left out is simply not rendered.
+github: neohiro
+sponsors: neohiro
+bluesky: frenzypenguin.media
+youtube: FrenzyPenguinMedia
+website: https://frenzypenguin.media

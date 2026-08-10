@@ -1,0 +1,110 @@
+{%- comment -%}
+  _includes/host-actions.html — the action button row.
+
+  PARAMETER:
+    include.host   the record from _data/hosts.yml (optional — the row still
+                   renders the generic island actions without it)
+    include.context
+                   "page" (default) full island row on a host page.
+                   "index" trimmed row for use inside a card on the directory.
+
+  WHY THIS LIST AND THIS ORDER
+    The buttons are lifted from the visitor guide at openstageis.land, because
+    that guide already answers "what does a Second Life visitor do next" and
+    these pages should not answer it differently. Three ordering rules:
+
+    1. "Register free" is FIRST. On a phone this group wraps, so the first item
+       is the topmost one and the one a first-time visitor reads first. The
+       stage is only reachable to people who already have an SL account, so
+       that is the real gate.
+    2. "Teleport" is next, with its web-map fallback rendered beside it
+       unconditionally. secondlife:// is a custom protocol: it silently does
+       nothing in a browser, so the map link is not decoration, it is the only
+       half of the button that works outside the viewer.
+    3. Booking sits after those two, because booking is meaningless without an
+       account to book from.
+
+  Every button is a plain <a>. No <form>, no fetch, no JS dependency: these have
+  to work on a page where hosts.js failed to load.
+{%- endcomment -%}
+
+{%- assign h = include.host -%}
+{%- assign island_discord = "https://discord.gg/Z38YQ6Xmbp" -%}
+{%- assign ctx = include.context | default: "page" -%}
+
+<ul class="host-actions"{% if ctx == "index" %} aria-label="Quick actions for {{ include.for | escape }}"{% endif %}>
+  <li>
+    {%- comment -%} join.secondlife.com — the account gate. {%- endcomment -%}
+    <a class="host-action host-action--join"
+       href="https://join.secondlife.com/" rel="noopener noreferrer"
+       title="Create a free Second Life account — it costs nothing to make an avatar">
+      <span aria-hidden="true">+</span> Register free
+    </a>
+  </li>
+  <li>
+    {%- comment -%} secondlife:// only resolves inside the viewer. Marked dashed
+       so the convention is visible, and always paired with the web map below. {%- endcomment -%}
+    <a class="host-action host-action--native"
+       href="secondlife://Derwent/248/128/22"
+       title="Teleport inside the Second Life viewer only — use the web map if you are in a browser">
+      <span aria-hidden="true">⤵</span> Teleport
+    </a>
+  </li>
+  <li>
+    <a class="host-action"
+       href="https://maps.secondlife.com/secondlife/Derwent/248/128/22"
+       rel="noopener noreferrer"
+       title="Open the island in the Second Life web map — works in any browser">
+      <span aria-hidden="true">🗺</span> Web map
+    </a>
+  </li>
+  <li>
+    <a class="host-action"
+       href="https://appointmentthing.com/openstageisland" rel="noopener noreferrer"
+       title="Book a slot on the stage — free, rolling availability">
+      <span aria-hidden="true">📓</span> Book a slot
+    </a>
+  </li>
+  {%- if ctx == "page" %}
+  <li>
+    <a class="host-action" href="{{ island_discord }}" rel="noopener noreferrer"
+       title="The island's own Discord — slot requests, set times, on-stage chat">
+      <span aria-hidden="true">⛓</span> Island Discord
+    </a>
+  </li>
+  <li>
+    <a class="host-action" href="http://timetable.openstageis.land" rel="noopener noreferrer"
+       title="What is on this week">
+      <span aria-hidden="true">📅</span> Timetable
+    </a>
+  </li>
+  <li>
+    <a class="host-action" href="https://openstageis.land/" rel="noopener noreferrer"
+       title="The full visitor guide for Open Stage Island">
+      <span aria-hidden="true">🎪</span> Visitor guide
+    </a>
+  </li>
+  {%- endif %}
+  <li>
+    <a class="host-action host-action--primary" href="https://patreon.com/frenzypenguin_media"
+       rel="noopener noreferrer" title="Recurring support — keeps the stage free">
+      <span aria-hidden="true">❤</span> Support
+    </a>
+  </li>
+  {%- if h and h.primary_action -%}
+    {%- comment -%}
+      The host's own override. /contact and /reservations use this to promote a
+      working substitute while their own address is down, and /landmark uses it
+      to point the web-map entry straight at its coordinates.
+    {%- endcomment -%}
+    <li>
+      <a class="host-action" href="{{ h.primary_action.url | escape }}"
+         rel="noopener noreferrer" title="{{ h.primary_action.hint | escape }}">
+        <span aria-hidden="true">→</span> {{ h.primary_action.label | escape }}
+      </a>
+    </li>
+  {%- endif -%}
+  <li class="host-action-hint">
+    Register free is the only step needed to try the stage — no booking, no fee.
+  </li>
+</ul>

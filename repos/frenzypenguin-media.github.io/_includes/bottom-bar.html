@@ -1,0 +1,157 @@
+{%- comment -%}
+bottom-bar.html — persistent curved section menu with central AI button.
+Shared across neohiro / frenzypenguin-media / openstageisland / transhumanists.
+
+Site identity comes from `site.shell` (_config.yml), NOT `site.github_username`:
+FPM and neohiro share the handle "neohiro", so keying off the handle rendered
+neohiro's "GitHub" CTA and neohiro's section chips on FPM. See the shell: note in
+frenzypenguin-media.github.io/_config.yml.
+
+Design:
+- Curved bottom bar (border-radius: 2rem 2rem 0 0) solid background
+- Central circular AI button protruding downward (transform: translateY(35%))
+- Section chips horizontally scrollable beside the AI button
+- Right side: one persistent CTA, the site's single most important outbound link
+- Left side: in-page section chips. OSI has in-page sections; neohiro now has
+  main_sections from _config.yml; FPM/transhumanists are multi-page with no chips.
+- AI button opens the full-width conversation sheet above the bar
+- Live mainframe status indicator (green/red dot + text) left of AI button
+{%- endcomment -%}
+
+{%- assign shell = site.shell | default: "" -%}
+{%- assign guide_ids = "" -%}
+{%- assign guide_labels = "" -%}
+{%- if shell == 'osi' -%}
+  {%- assign guide_ids = "welcome,music,open-stage,reservations,streaming,hosting,membership,about,features,location,live,faq,estate,links,network" | split: "," -%}
+  {%- assign guide_labels = "Welcome,Music,Open Stage,Reservations,Streaming,Hosting,Membership,About,Features,Visit,Live,FAQ,Estate,Links,Network" | split: "," -%}
+{%- elsif shell == 'neohiro' -%}
+  {%- assign sections = site.main_sections | default: "" -%}
+  {%- if sections != "" -%}
+    {%- assign guide_ids = "" -%}
+    {%- assign guide_labels = "" -%}
+    {%- for section in sections -%}
+      {%- assign parts = section | split: "|" -%}
+      {%- assign guide_ids = guide_ids | append: parts[1] | replace: "#", "" | append: "," -%}
+      {%- assign guide_labels = guide_labels | append: parts[0] | append: "," -%}
+    {%- endfor -%}
+    {%- assign guide_ids = guide_ids | split: "," -%}
+    {%- assign guide_labels = guide_labels | split: "," -%}
+  {%- endif -%}
+{%- endif -%}
+
+<nav class="bottom-bar" aria-label="Site navigation and assistant" role="navigation">
+  <div class="bottom-bar__canvas" aria-hidden="true"></div>
+
+{%- if guide_ids.size > 0 -%}
+  <div class="bottom-bar__left" role="group" aria-label="Site sections">
+    {%- comment -%}
+      Scroll affordances for the chip strip. Open Stage Island is the only site
+      with in-page sections and it has fifteen of them, which is wider than a
+      phone viewport or a laptop at 1.0 zoom, so the strip has to scroll -- and a
+      strip that scrolls with no visible affordance just looks like a truncated
+      nav. assets/js/bottom-bar.js reveals these only while the strip actually
+      overflows, so on the three sites that have no chips they never appear at
+      all, and it disables whichever one points past the end of the strip.
+    {%- endcomment -%}
+    {%- comment -%}
+      No tabindex on the scroll buttons. They were shipped with tabindex="-1" to
+      keep them out of the tab order, but that only hides them when they are
+      hidden: the buttons are `display: none` until the strip actually overflows,
+      and `display: none` already removes an element from the tab order. So the
+      attribute did nothing while hidden and, once the strip overflowed and the
+      buttons became visible and enabled, it kept a visible, operable control
+      unreachable by keyboard -- with :focus-visible styling that could never
+      fire. Verified: prev.tabIndex was -1, prev.focusableByKeyboard false, and
+      prev.focus() did not move focus. `disabled` still removes a button from the
+      tab order on its own, which is what handles the at-each-end state.
+    {%- endcomment -%}
+    <button type="button" class="bottom-bar__scroll-btn bottom-bar__scroll-btn--prev"
+            data-bar-scroll="prev" aria-label="Scroll site sections left" disabled>
+      <span aria-hidden="true">&#8249;</span>
+    </button>
+    <ul class="bottom-bar__list" data-bar-scroller>
+      {%- for guide_id in guide_ids -%}
+        {%- assign guide_label = guide_labels[forloop.index0] | default: guide_id -%}
+        <li class="bottom-bar__item">
+          <a class="bottom-bar__link" href="#{{ guide_id }}" data-section-link="{{ guide_id }}">{{ guide_label }}</a>
+        </li>
+      {%- endfor -%}
+    </ul>
+    <button type="button" class="bottom-bar__scroll-btn bottom-bar__scroll-btn--next"
+            data-bar-scroll="next" aria-label="Scroll site sections right" disabled>
+      <span aria-hidden="true">&#8250;</span>
+    </button>
+    <!-- Mainframe status indicator - right end of left section -->
+    <div class="bottom-bar__status" aria-live="polite" aria-atomic="true">
+      <span class="bottom-bar__status-dot" id="bottom-bar__status-dot" aria-hidden="true"></span>
+      <span class="bottom-bar__status-text" id="bottom-bar__status-text">Checking…</span>
+    </div>
+  </div>
+{%- else -%}
+  <!-- Mainframe status indicator for sites without section chips -->
+  <div class="bottom-bar__left bottom-bar__left--status-only" role="group" aria-label="Mainframe status">
+    <div class="bottom-bar__status" aria-live="polite" aria-atomic="true">
+      <span class="bottom-bar__status-dot" id="bottom-bar__status-dot" aria-hidden="true"></span>
+      <span class="bottom-bar__status-text" id="bottom-bar__status-text">Checking…</span>
+    </div>
+  </div>
+{%- endif -%}
+
+  <!-- Central AI Button - protrudes downward from the curved bar -->
+  {%- assign ai_title = "Talk to the " | append: site.shell | append: " assistant — questions, bug reports, access requests" -%}
+  <button type="button" class="bottom-bar__ai" id="bottom-bar__ai" data-ai-trigger
+          aria-label="Open assistant"
+          aria-expanded="false"
+          aria-controls="ai-conv"
+          title="{{ ai_title }}">
+    <span class="bottom-bar__ai-ring" aria-hidden="true">
+      <svg class="bottom-bar__ai-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+        <path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 2a8 8 0 110 16 8 8 0 010-16zm-1 3v4.586l-2.707 2.707-1.414-1.414L11.293 9.88 8.586 7.172A1 1 0 009.586 6.172l3 3A1 1 0 0112 10.586V7a1 1 0 012 0v3a1 1 0 01-1 1h-3z"/>
+      </svg>
+    </span>
+    <span class="bottom-bar__ai-pulse" aria-hidden="true"></span>
+  </button>
+
+  {%- case shell -%}
+  {%- when 'osi' -%}
+  <div class="bottom-bar__right" role="group" aria-label="Primary action">
+    <a class="bottom-bar__cta" href="https://join.secondlife.com/" rel="noopener"
+       title="Create a free Second Life account — it costs nothing to make an avatar">
+      <svg class="bottom-bar__cta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+        <path d="M2 3h20M2 7h20M2 11h20M2 15h20M2 19h20M8 3v16M16 3v16"/>
+      </svg>
+      Register free
+    </a>
+  </div>
+  {%- when 'neohiro' -%}
+  <div class="bottom-bar__right" role="group" aria-label="Primary action">
+    <a class="bottom-bar__cta" href="https://github.com/neohiro" target="_blank" rel="noopener"
+       title="View neohiro on GitHub">
+      <svg class="bottom-bar__cta-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+      </svg>
+      GitHub
+    </a>
+  </div>
+  {%- when 'fpm' -%}
+  <div class="bottom-bar__right" role="group" aria-label="Primary action">
+    <a class="bottom-bar__cta" href="https://www.youtube.com/@FrenzyPenguinMedia" target="_blank" rel="noopener"
+       title="Watch the shows on YouTube">
+      <svg class="bottom-bar__cta-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M23.498 6.186a3.167 3.167 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.173 3.173 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.169 3.169 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.155 3.155 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L16.18 12l-6.635 3.568z"/>
+      </svg>
+      Watch
+    </a>
+  </div>
+  {%- when 'transhumanists' -%}
+  <div class="bottom-bar__right" role="group" aria-label="Primary action">
+    <a class="bottom-bar__cta" href="https://github.com/transhumanists" target="_blank" rel="noopener"
+       title="View Transhumanists on GitHub">
+      <svg class="bottom-bar__cta-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+      </svg>
+      GitHub
+    </a>
+  </div>
+  {%- endcase -%}
+</nav>

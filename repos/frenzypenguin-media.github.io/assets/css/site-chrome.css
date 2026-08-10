@@ -1,0 +1,367 @@
+/* Site chrome — non-persistent top bar + persistent curved bottom bar.
+ *
+ * Reuses the custom properties declared in assets/style.css :root, so both
+ * light and dark themes come along automatically.
+ *
+ * Layout contract with the rest of the site:
+ *   - .site-header is deliberately `position: static` (NOT sticky): it scrolls
+ *     away with the document. The bottom bar is the only always-on chrome.
+ *   - .bottom-bar is fixed to the viewport bottom with curved corners.
+ *   - body reserves padding-bottom for the bottom bar so the footer's last
+ *     row (sponsor / privacy / ToS) is never hidden underneath it.
+ */
+
+
+/* ---------------------------------------------------------------------------
+ * Top bar (non-persistent)
+ * Class structure mirrors neohiro.github.io / transhumanists.github.io:
+ * .site-header > .container > .site-brand + .site-nav > .nav-link
+ * assets/js/network-ux.js injectNavAuth() appends the Login / Dashboard / user
+ * chips before `.nav-sponsor`, so the sponsor link must stay last.
+ * ------------------------------------------------------------------------- */
+
+.site-header {
+  position: static;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  min-height: var(--nav-height);
+  max-width: var(--max-content);
+  margin-inline: auto;
+  padding: 0.35rem 1rem;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--color-heading);
+  text-decoration: none;
+}
+.site-brand:hover,
+.site-brand:focus-visible {
+  color: var(--color-heading);
+  text-decoration: none;
+}
+
+.logo-mark {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.logo-text {
+  letter-spacing: -0.01em;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+.nav-link:hover,
+.nav-link:focus-visible {
+  background: var(--color-surface-alt);
+  color: var(--color-heading);
+  text-decoration: none;
+}
+.nav-link.active {
+  background: var(--color-surface-alt);
+  color: var(--color-heading);
+  font-weight: 600;
+}
+
+.nav-sponsor {
+  color: var(--color-accent);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Guide sections
+ * ------------------------------------------------------------------------- */
+
+.guide-section {
+  max-width: var(--max-content);
+  margin-inline: auto;
+}
+
+.guide-section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.guide-lede {
+  font-size: 1.05rem;
+}
+
+/* Secondary hero line, carried over from the Netlify SPA's hero tagline. */
+.tagline-secondary {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+/* Callout used for the genre list, mirroring the Netlify SPA's highlighted
+ * genre block so the wording survives the port unchanged. */
+.guide-callout {
+  padding: 0.9rem 1.1rem;
+  margin: 0 0 1.25rem;
+  background: var(--color-surface-alt);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.guide-note {
+  padding: 0.9rem 1.1rem;
+  margin: 1rem 0 0;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.guide-qa {
+  margin: 0 0 1.5rem;
+}
+.guide-qa h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+.guide-qa p {
+  margin-bottom: 0.5rem;
+}
+
+.guide-qa ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
+/* Membership tiers, formerly the score ladder in the Netlify SPA's
+ * catch-the-emoji game. Rendered as static reference cards. */
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.tier {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--tier-accent, var(--color-accent));
+  border-radius: var(--radius);
+}
+.tier-name {
+  font-weight: 700;
+  color: var(--color-heading);
+}
+.tier-price {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tier-accent, var(--color-accent));
+}
+.tier-desc {
+  font-size: 0.85rem;
+  color: var(--color-text);
+  opacity: 0.85;
+}
+
+.tier-free    { --tier-accent: #6b7280; }
+.tier-unlock  { --tier-accent: #0284c7; }
+.tier-elite   { --tier-accent: #9333ea; }
+.tier-tribe   { --tier-accent: #16a34a; }
+.tier-legend  { --tier-accent: #ca8a04; }
+
+/* Estate link cards (the openstageis.land subdomains). */
+.estate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.estate-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.8rem 0.95rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: border-color var(--transition), transform var(--transition);
+}
+.estate-name {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.estate-url {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  opacity: 0.8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+/* Only anchors get the hover treatment: a dead host is rendered as a <span>,
+ * and a lift-on-hover would imply it is clickable when it is not. */
+a.estate-card:hover,
+a.estate-card:focus-visible {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+a.estate-card .estate-name {
+  color: var(--color-accent);
+}
+
+.estate-card.is-unavailable {
+  cursor: default;
+  border-style: dashed;
+}
+.estate-card.is-unavailable .estate-name {
+  color: var(--color-text);
+  opacity: 0.7;
+}
+.estate-card.is-unavailable .estate-url {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.estate-note {
+  font-size: 0.75rem;
+  color: var(--color-text);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------------
+ * Responsive
+ * ------------------------------------------------------------------------- */
+
+  @media (max-width: 600px) {
+  .site-header .container {
+    padding: 0.3rem 0.75rem;
+  }
+  .logo-text {
+    font-size: 0.95rem;
+  }
+  .nav-link {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.85rem;
+  }
+  .guide-section > h2 {
+    font-size: 1.35rem;
+  }
+}
+
+/* neohiro-network: top-bar contract */
+/* The header is not sticky: it scrolls away and .header-mini takes over. */
+.site-header {
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
+}
+.site-header--hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.header-mini {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 99;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card, #111820) 88%, transparent);
+  border: 1px solid var(--border, #1f2a36);
+  backdrop-filter: saturate(180%) blur(12px);
+  box-shadow: var(--shadow, 0 4px 24px rgba(0,0,0,0.4));
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--fg, #eceff1);
+  text-decoration: none;
+  opacity: 0;
+  transform: translateY(-14px);
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.header-mini--visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.header-mini:hover { color: var(--accent, #7c4dff); border-color: var(--accent, #7c4dff); }
+.header-mini .logo-mark { font-size: 1.15rem; }
+
+.nav-dropdown-btn { display: inline-flex; align-items: center; gap: 5px; }
+.nav-dropdown-btn[aria-expanded="true"] { color: var(--fg, #eceff1); background: var(--bg-elevated, #161e26); }
+.nav-caret { transition: transform 0.2s ease; opacity: 0.7; }
+.nav-dropdown-btn[aria-expanded="true"] .nav-caret { transform: rotate(180deg); }
+
+/* GitHub org glyph: always the last nav item, hard against the right edge. */
+.nav-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 2px;
+  border-radius: 50%;
+  color: var(--fg, #eceff1);
+  background: var(--bg-card, #111820);
+  border: 1px solid var(--border, #1f2a36);
+  transition: color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+.nav-github:hover {
+  color: #fff;
+  border-color: var(--fg, #eceff1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.site-nav .nav-auth--user { max-width: 190px; }
+.site-nav .nav-auth--user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Progressive disclosure so the bar never wraps. Drop order: 4, then 3, then 2. */
+@media (max-width: 1180px) { .nav-opt-4 { display: none; } }
+@media (max-width: 1000px) { .nav-opt-3 { display: none; } }
+@media (max-width: 820px)  { .nav-opt-2 { display: none; } }
+@media (max-width: 1080px) { .site-nav .nav-auth--login span { display: none; } }
+@media (max-width: 860px)  { .nav-github { width: 30px; height: 30px; } }
+@media (max-width: 680px) {
+  .site-header .container { height: 56px; }
+  .site-nav { gap: 4px; }
+  .site-nav .nav-link { padding: 7px 10px; font-size: 0.8125rem; }
+}

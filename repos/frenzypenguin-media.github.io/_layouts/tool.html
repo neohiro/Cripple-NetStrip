@@ -1,0 +1,132 @@
+---
+layout: default
+---
+<div class="tool-page" id="tool-page">
+  <div class="container">
+    <nav class="tool-breadcrumb" aria-label="Breadcrumb">
+      <a href="{{ '/' | relative_url }}">neohiro</a>
+      <span aria-hidden="true">/</span>
+      <a href="{{ '/repositories/' | relative_url }}">All Repositories</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ page.title }}</span>
+    </nav>
+
+    <article class="tool-detail">
+      <header class="tool-header">
+        <div class="tool-icon-large" aria-hidden="true">
+          {% if page.icon %}
+            {{ page.icon }}
+          {% else %}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <path d="M9 12h6M12 9v6"/>
+            </svg>
+          {% endif %}
+        </div>
+        <div class="tool-header-content">
+          <h1 class="tool-title" itemprop="name">{{ page.title }}</h1>
+          <p class="tool-tagline" itemprop="description">{{ page.tagline }}</p>
+          <div class="tool-meta">
+            <span class="tool-platform" itemprop="operatingSystem">{{ page.platform }}</span>
+            {% if page.language %}
+              <span class="tool-lang">{{ page.language }}</span>
+            {% endif %}
+            {% if page.category %}
+              <span class="tool-category">{{ page.category }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </header>
+
+      <div class="tool-links-row">
+        <a href="{{ page.repo_url }}" class="tool-link tool-link-primary" target="_blank" rel="noopener" itemprop="url">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+        {% if page.demo_url %}
+          <a href="{{ page.demo_url }}" class="tool-link tool-link-secondary" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Live Demo
+          </a>
+        {% endif %}
+        {% if page.docs_url %}
+          <a href="{{ page.docs_url }}" class="tool-link tool-link-secondary" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Documentation
+          </a>
+        {% endif %}
+      </div>
+
+      <div class="tool-content" itemprop="description">
+        {{ content }}
+      </div>
+
+      <footer class="tool-footer">
+        <div class="tool-nav">
+          <a href="{{ '/repositories/' | relative_url }}" class="tool-nav-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            All Repositories
+          </a>
+          <a href="{{ '/' | relative_url }}" class="tool-nav-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </a>
+        </div>
+        <p class="tool-copyright">Part of <a href="https://github.com/neohiro" target="_blank" rel="noopener">neohiro</a> — {{ site.description }}</p>
+      </footer>
+    </article>
+  </div>
+</div>
+
+<style>
+.tool-page { padding: 60px 0 80px; }
+.tool-breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--fg-subtle); margin-bottom: 40px; flex-wrap: wrap; }
+.tool-breadcrumb a { color: var(--fg-subtle); transition: color var(--transition); }
+.tool-breadcrumb a:hover { color: var(--accent); }
+.tool-breadcrumb span[aria-current] { color: var(--fg); font-weight: 500; }
+
+.tool-detail { max-width: 800px; margin: 0 auto; }
+.tool-header { display: flex; gap: 24px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.tool-icon-large { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: var(--radius); background: var(--accent-dim); color: var(--accent); flex-shrink: 0; }
+.tool-icon-large svg { width: 40px; height: 40px; }
+.tool-header-content { flex: 1; }
+.tool-title { font-size: clamp(1.75rem, 3vw, 2.25rem); margin-bottom: 8px; }
+.tool-tagline { font-size: 1.125rem; color: var(--fg-muted); margin-bottom: 16px; line-height: 1.5; }
+.tool-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.8125rem; font-family: var(--font-mono); }
+.tool-platform, .tool-lang, .tool-category { padding: 4px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--fg-subtle); }
+
+.tool-links-row { display: flex; gap: 12px; margin-bottom: 40px; flex-wrap: wrap; }
+.tool-link { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; font-size: 0.875rem; font-weight: 600; border-radius: var(--radius-sm); transition: all var(--transition); text-decoration: none; }
+.tool-link-primary { background: var(--accent-dim); color: var(--accent); border: 1px solid transparent; }
+.tool-link-primary:hover { background: var(--accent); color: white; }
+.tool-link-secondary { background: var(--bg-card); color: var(--fg-muted); border: 1px solid var(--border); }
+.tool-link-secondary:hover { background: var(--bg); color: var(--fg); border-color: var(--border-hover); }
+.tool-link svg { flex-shrink: 0; }
+
+.tool-content { font-size: 1rem; line-height: 1.7; color: var(--fg-muted); }
+.tool-content h2 { margin: 32px 0 16px; font-size: 1.5rem; color: var(--fg); }
+.tool-content h3 { margin: 24px 0 12px; font-size: 1.25rem; color: var(--fg); }
+.tool-content p { margin-bottom: 16px; }
+.tool-content ul, .tool-content ol { margin: 16px 0; padding-left: 24px; }
+.tool-content li { margin-bottom: 8px; }
+.tool-content code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+.tool-content pre { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; margin: 16px 0; }
+.tool-content pre code { background: none; padding: 0; }
+.tool-content a { color: var(--accent); }
+.tool-content a:hover { color: var(--accent-strong); }
+
+.tool-footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+.tool-nav { display: flex; gap: 12px; margin-bottom: 16px; }
+.tool-nav-link { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.875rem; font-weight: 500; color: var(--fg-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); transition: all var(--transition); }
+.tool-nav-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+.tool-copyright { font-size: 0.875rem; color: var(--fg-subtle); text-align: center; }
+.tool-copyright a { color: var(--fg-subtle); }
+.tool-copyright a:hover { color: var(--accent); }
+
+@media (max-width: 640px) {
+  .tool-header { flex-direction: column; align-items: center; text-align: center; }
+  .tool-header-content { text-align: center; }
+  .tool-meta { justify-content: center; }
+  .tool-links-row { justify-content: center; }
+}
+</style>

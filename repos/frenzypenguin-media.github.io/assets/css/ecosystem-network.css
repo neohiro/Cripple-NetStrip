@@ -1,0 +1,332 @@
+/* Ecosystem Network — the unified cross-site footer frame.
+ *
+ * SSOT: repos/*/assets/css/ecosystem-network.css (4 network copies + this site). Keep in sync.
+ * Copied verbatim to each *.github.io site as
+ * assets/css/ecosystem-network.css and linked from that site's
+ * _layouts/default.html. Edit here first, then copy.
+ *
+ * Rendered by _includes/ecosystem-network.html, which is included once per
+ * page by the site layout, after footer-button-row.html. The grid therefore
+ * lists every site in the network — including the one you are on — so a
+ * visitor can always tell where they are and hop to the others.
+ *
+ * Colour strategy
+ * ---------------
+ * Surfaces resolve through var() fallbacks because the four sites do not share
+ * one token vocabulary: neohiro / FrenzyPenguin Media / transhumanists define
+ * --bg-card / --fg / --border, openstageisland defines --color-surface /
+ * --color-heading / --color-border. Each rule below asks for the local token
+ * and falls back to a neutral, so one file renders correctly on all four.
+ *
+ * Accents are deliberately NOT themed. The pills and the primary button use
+ * fixed brand colours with white text, which keeps the frame identical across
+ * the network and keeps text contrast at >= 4.5:1 in both light and dark
+ * themes. A translucent tint over a themed surface (the previous approach)
+ * put #00aaff on white in openstageisland's light theme — about 2.6:1 — and
+ * #58aaff-on-white for the primary button on neohiro.
+ *
+ * Layout contract
+ * ---------------
+ * - .ecosystem-name-row stacks the tag pill under the site name at every
+ *   width. It used to be a wrapping flex row, so the pill sat inline next to a
+ *   short name ("neohiro" + "Hardening Hub") but dropped to its own line under
+ *   a long one ("Transhumanists (H+)" + "Research Portal"). The same card
+ *   therefore rendered two different ways depending on its own label length.
+ * - Column counts step 4 -> 2 -> 1 rather than using auto-fit, because four
+ *   items in a three-column track leaves a single orphan card on the second
+ *   row at tablet widths.
+ * - The frame reserves room below itself for the always-on bottom chrome: the
+ *   network-ux AI/contact dock (--ai-dock-h, on every page) and, on
+ *   openstageisland, the guide's persistent section bar (--bottom-bar-h), which
+ *   is only rendered on some pages. :has() keys the extra height off the bar's
+ *   presence so pages without it do not carry dead space, matching the
+ *   treatment site-chrome.css already gives body padding.
+ */
+
+/* ── Frame ─────────────────────────────────────────────────────────── */
+
+.footer-ecosystem {
+  /* Local tokens first, neutral fallbacks second. */
+  --eco-surface: var(--bg-card, var(--color-surface, #ffffff));
+  --eco-raised: var(--bg-elevated, var(--color-surface-alt, #f4f6f8));
+  --eco-line: var(--border, var(--color-border, #d9dee5));
+  --eco-heading: var(--fg, var(--color-heading, #16202c));
+  --eco-muted: var(--fg-muted, var(--color-text, #4a5768));
+  --eco-subtle: var(--fg-subtle, var(--color-text, #6b7684));
+  --eco-accent: var(--accent, var(--color-accent, #2f6fb5));
+  --eco-accent-strong: var(--accent-strong, var(--color-accent-hover, #1f5c9c));
+  --eco-radius: var(--radius, 8px);
+
+  /* Fixed brand accents, white text on all of them (see header). */
+  --eco-brand: #4f46e5;
+  --eco-brand-hover: #4338ca;
+  --eco-pill-primary: #6d28d9;
+  --eco-pill-network: #0a7f5f;
+  --eco-pill-hub: #0b6fa4;
+  --eco-pill-stage: #b3235c;
+
+  background: var(--eco-surface);
+  border: 1px solid var(--eco-line);
+  border-radius: var(--eco-radius);
+  padding: 28px 24px;
+
+  /* Deliberate air gap above the frame: it reads as a separate section of the
+   * footer rather than as part of the note above it. On neohiro the frame is a
+   * flex child of .footer-unified, whose 36px row gap adds to this. */
+  margin-top: 2.5rem;
+
+  /* Keep the last row of buttons clear of the fixed bottom chrome once the
+   * page is scrolled to the end. See "Layout contract" above. */
+  margin-bottom: var(--ai-dock-h, 52px);
+}
+
+body:has(.bottom-bar) .footer-ecosystem {
+  margin-bottom: calc(var(--ai-dock-h, 52px) + var(--bottom-bar-h, 46px));
+}
+
+.footer-ecosystem-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.footer-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--eco-accent);
+  text-transform: uppercase;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+
+.footer-ecosystem-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--eco-heading);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Grid ──────────────────────────────────────────────────────────── */
+
+.footer-ecosystem-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1080px) {
+  .footer-ecosystem-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .footer-ecosystem {
+    padding: 22px 16px;
+    margin-top: 2rem;
+  }
+
+  .footer-ecosystem-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .footer-ecosystem-title {
+    font-size: 1.1rem;
+  }
+}
+
+/* ── Card ──────────────────────────────────────────────────────────── */
+
+.ecosystem-card {
+  background: var(--eco-raised);
+  border: 1px solid var(--eco-line);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  transition: border-color var(--transition, 0.2s ease), transform var(--transition, 0.2s ease);
+}
+
+.ecosystem-card:hover {
+  border-color: var(--eco-accent);
+  transform: translateY(-2px);
+}
+
+/* The site you are already on. Its name and host are rendered as plain text by
+ * the partial rather than as links, so the card is marked as a label. */
+.ecosystem-card.is-current {
+  border-color: var(--eco-accent);
+  box-shadow: inset 0 0 0 1px var(--eco-accent);
+}
+
+.ecosystem-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ecosystem-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ecosystem-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Column, not row: the tag always sits on its own line at every width. */
+.ecosystem-name-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ecosystem-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--eco-heading);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a.ecosystem-name:hover,
+a.ecosystem-name:focus-visible {
+  color: var(--eco-accent);
+}
+
+.ecosystem-url {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.78rem;
+  color: var(--eco-subtle);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  text-align: left;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+a.ecosystem-url:hover,
+a.ecosystem-url:focus-visible {
+  color: var(--eco-accent);
+}
+
+.ecosystem-desc {
+  font-size: 0.85rem;
+  color: var(--eco-muted);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  min-height: 3em;
+}
+
+/* ── Tag pills ─────────────────────────────────────────────────────── */
+
+.ecosystem-pill {
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+
+.ecosystem-pill-primary { background: var(--eco-pill-primary); color: #fff; }
+.ecosystem-pill-network { background: var(--eco-pill-network); color: #fff; }
+.ecosystem-pill-hub     { background: var(--eco-pill-hub);     color: #fff; }
+.ecosystem-pill-stage   { background: var(--eco-pill-stage);   color: #fff; }
+
+/* ── Actions ───────────────────────────────────────────────────────── */
+
+.ecosystem-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  container-type: inline-size;
+}
+
+.ecosystem-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background var(--transition, 0.2s ease),
+              border-color var(--transition, 0.2s ease),
+              color var(--transition, 0.2s ease),
+              transform var(--transition, 0.2s ease);
+  flex: 1 1 140px;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Narrow cards stack their actions instead of squeezing two into one row. */
+@container (max-width: 360px) {
+  .ecosystem-links {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ecosystem-action-btn {
+    flex: none;
+    width: 100%;
+  }
+}
+
+.ecosystem-btn-main {
+  background: var(--eco-brand);
+  color: #fff;
+}
+
+.ecosystem-btn-main:hover,
+.ecosystem-btn-main:focus-visible {
+  background: var(--eco-brand-hover);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.ecosystem-btn-alt {
+  background: transparent;
+  color: var(--eco-muted);
+  border: 1px solid var(--eco-line);
+}
+
+.ecosystem-btn-alt:hover,
+.ecosystem-btn-alt:focus-visible {
+  border-color: var(--eco-accent);
+  color: var(--eco-accent);
+  background: var(--eco-surface);
+}

@@ -1,0 +1,43 @@
+{%- comment -%}
+  ai-disclosure.html -- the AI provenance seal and the persistent "back up"
+  control. Included once per page by _layouts/default.html, immediately before
+  </body>.
+
+  Two elements, one style:
+
+    .ai-seal   a fixed white/cloudy watermark at 25% from top (right edge), raised
+               clear of the fixed AI/contact dock. It is a button that scrolls
+               to the top of the page, providing the same affordance as the
+               ai-totop arrow. The two crossfade in the same slot.
+
+    .ai-totop  a fixed "back up" arrow on the same right-hand edge at 25% from top,
+               sharing the slot with ai-seal. Hidden until assets/js/ai-seal.js has
+               scrolled past the trigger, then crossfades with the seal.
+
+  Both assets are white-on-transparent SVGs from template-shared/assets/img/.
+  Everything positional lives in assets/css/ai-seal.css; nothing here is styled
+  inline.
+
+Parameters:
+     (none — the seal is now a scroll-to-top button; href parameter is unused)
+{%- endcomment -%}
+{%- assign ai_seal_href = include.href | default: site.ai_disclosure_path | default: '/ai-disclosure/' -%}
+<div class="ai-seal-dock">
+  <button class="ai-seal" type="button" title="Back to top" aria-label="Scroll to top">
+    <img class="ai-seal__img"
+         src="{{ '/assets/img/ai-seal.svg' | relative_url }}"
+         alt="AI-assisted content seal"
+         width="120" height="120"
+         decoding="async">
+    <span class="ai-seal__label">AI&#8209;assisted</span>
+  </button>
+</div>
+
+<button class="ai-totop" type="button" data-ai-totop data-ai-totop-label="Back up">
+  <img class="ai-totop__img"
+       src="{{ '/assets/img/ai-topo.svg' | relative_url }}"
+       alt=""
+       width="120" height="120"
+       decoding="async">
+  <span class="ai-visually-hidden">Back up</span>
+</button>

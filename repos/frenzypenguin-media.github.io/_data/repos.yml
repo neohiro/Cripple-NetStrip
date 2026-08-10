@@ -1,0 +1,338 @@
+- name: ExploitProtection
+  html_url: https://github.com/neohiro/ExploitProtection
+  description: Windows Exploit Protection Settings (Ultimate) GUI
+  language: Python
+  topics:
+  - anonymous
+  - antibot
+  - antibotnet
+  - cyber
+  - cyberdefense
+  - cybersecurity
+  - debotnet
+  - defender
+  - endpoint-security
+  - exploit-protection
+  - hardening
+  - microsoft
+  - powershell
+  - privacy
+  - protection
+  - security
+  - windows
+  - windows-11
+  - windows-defender
+  - xml
+- name: dnscrypt-proxy-gui
+  html_url: https://github.com/neohiro/dnscrypt-proxy-gui
+  description: Graphical user interface for dnscrypt-proxy
+  language: Python
+  topics:
+  - anonymized-dns
+  - dns
+  - dnscrypt
+  - dnscrypt-proxy
+  - dnscrypt-proxy2
+  - gui
+  - proxy
+- name: BlackGlass
+  html_url: https://github.com/neohiro/BlackGlass
+  description: Multi-client chat viewer for Second Life
+  language: Python
+  topics:
+  - chat-viewer
+  - cross-platform
+  - gui
+  - messaging
+  - python
+  - second-life
+  - virtual-worlds
+- name: Cripple-NetStrip
+  html_url: https://github.com/neohiro/Cripple-NetStrip
+  description: Next-gen Network Hardening & Debloater / DNS Sinkhole / Firewall /
+    Domain filter
+  language: Python
+  topics:
+  - android
+  - cybersecurity
+  - debloater
+  - deep-packet-inspection
+  - dns
+  - dnssinkhole
+  - firewall
+  - linux
+  - macos
+  - network-security
+  - network-tools
+  - online-security
+  - python
+  - windows
+- name: HoneyScan
+  html_url: https://github.com/neohiro/HoneyScan
+  description: Passive Honeypot for Home Networks
+  language: Python
+  topics:
+  - cybersecurity
+  - home-network
+  - honeypot
+  - ids
+  - intrusion-detection
+  - network-security
+  - python
+  - security-tools
+- html_url: https://github.com/neohiro/linux
+  description: 'Cross-distro Linux hardening: UFW, DNSCrypt, Tor, fail2ban, AppArmor/SELinux,
+    sysctl, SSH - auto-detects Debian/Ubuntu/RHEL/Fedora/SUSE/Arch'
+  name: linux
+  language: Shell
+  topics:
+  - almalinux
+  - apparmor
+  - arch-linux
+  - debian
+  - dnscrypt
+  - fail2ban
+  - fedora
+  - firewall
+  - hardening
+  - linux
+  - linux-hardening
+  - linux-security
+  - opensuse
+  - privacy
+  - red-hat
+  - rocky-linux
+  - security
+  - selinux
+  - shell
+  - ssh-hardening
+  - sysctl
+  - tor
+  - ubuntu
+  - ufw
+- name: windows
+  html_url: https://github.com/neohiro/windows
+  description: Windows new install - manual hardening (STIG)
+  language: Batchfile
+  topics:
+  - install
+  - security
+  - windows
+- name: DNSLookup
+  html_url: https://github.com/neohiro/DNSLookup
+  description: Advanced IPv4 & IPv6 DNS Lookup tool
+  language: Python
+  topics:
+  - dns
+  - dns-lookup
+  - ipv4
+  - ipv6
+  - networking
+  - python
+  - reconnaissance
+- name: SecondLife
+  html_url: https://github.com/neohiro/SecondLife
+  description: LSL code snippets
+  language: LSL
+  topics:
+  - lsl-scripts
+  - secondlife
+  - feed-reader
+  - news
+  - news-aggregator
+  - python
+  - rss
+  - search
+- name: ZombieShoot
+  html_url: https://github.com/neohiro/ZombieShoot
+  description: Zombie Shooter for Linux/Windows
+  language: Python
+  topics:
+  - game
+  - linux
+  - pygame
+  - shooter
+  - windows
+  - zombie
+- name: TristarMania
+  html_url: https://github.com/neohiro/TristarMania
+  description: An addictive space shooter
+  language: Python
+  topics:
+  - game
+  - linux
+  - pygame
+  - shooter
+  - space
+  - windows
+- name: Tetris
+  html_url: https://github.com/neohiro/Tetris
+  description: A small retro game for Windows & Linux
+  language: Python
+  topics:
+  - arcade
+  - game
+  - pygame
+  - python
+  - retro-games
+  - tetris
+- name: ShadowSocks
+  html_url: https://github.com/neohiro/ShadowSocks
+  description: Simple Python ShadowSocks client for Windows & Linux
+  language: Python
+  topics:
+  - censorship-circumvention
+  - privacy
+  - proxy
+  - python
+  - shadowsocks
+  - socks5
+- name: NetMatrix
+  html_url: https://github.com/neohiro/NetMatrix
+  description: Connections monitor
+  language: Python
+  topics:
+  - connections-monitor
+  - netstat
+  - network-monitor
+  - python
+  - security
+  - tcp
+- name: MusicPlay
+  html_url: https://github.com/neohiro/MusicPlay
+  description: Simple cross-platform audio player (Windows/Linux)
+  language: Python
+  topics:
+  - audio-player
+  - media-player
+  - music-player
+  - mutagen
+  - pygame
+  - python
+  - tkinter
+- name: MoodTracker
+  html_url: https://github.com/neohiro/MoodTracker
+  description: A diary for your wellbeing
+  language: Python
+  topics:
+  - diary
+  - journal
+  - mental-health
+  - mood-tracker
+  - python
+  - tkinter
+  - wellbeing
+- name: LANScan
+  html_url: https://github.com/neohiro/LANScan
+  description: ARP / ICMP Passive & Active Network Scanner (Windows/Linux)
+  language: Python
+  topics:
+  - arp
+  - cybersecurity
+  - icmp
+  - lan
+  - network-analysis
+  - network-scanner
+  - python
+- name: GoogleCommand
+  html_url: https://github.com/neohiro/GoogleCommand
+  description: TTS Google Assistant Commands (Windows)
+  language: Python
+  topics:
+  - automation
+  - google-assistant
+  - google-nest
+  - python
+  - smart-home
+  - text-to-speech
+  - tts
+  - windows
+- name: GhostMaze
+  html_url: https://github.com/neohiro/GhostMaze
+  description: Ghost Maze - a small 2D RPG (Windows/Linux)
+  language: Python
+  topics:
+  - game
+  - linux
+  - pygame
+  - rpg
+  - windows
+- name: ClockWidget
+  html_url: https://github.com/neohiro/ClockWidget
+  description: A desktop clock widget
+  language: Python
+  topics:
+  - clock
+  - desktop-widget
+  - python
+  - system-tray
+  - tkinter
+  - widget
+- name: FileManager
+  html_url: https://github.com/neohiro/FileManager
+  description: File Manager in Python
+  language: Python
+  topics:
+  - file-explorer
+  - file-manager
+  - gui
+  - python
+  - tkinter
+- name: htmlinfo
+  html_url: https://github.com/neohiro/htmlinfo
+  description: HTML Info Scraper
+  language: HTML
+  topics:
+  - browser-fingerprinting
+  - html
+  - http-headers
+  - privacy
+  - scraper
+  - web
+- name: metapod
+  html_url: https://github.com/neohiro/metapod
+  description: Windows 10 & 11 hardening tool - curated security & privacy tweaks
+    from a simple GUI
+  language: Python
+  topics:
+  - debloat
+  - hardening
+  - privacy
+  - python
+  - registry
+  - security
+  - windows-10
+  - windows-11
+  - windows-hardening
+- name: Calculator
+  html_url: https://github.com/neohiro/Calculator
+  description: Advanced Python Calculator
+  language: Python
+  topics:
+  - calculator
+  - gui
+  - mathematics
+  - python
+  - tkinter
+- name: Godmode
+  html_url: https://github.com/neohiro/Godmode
+  description: One-click Windows God Mode folder activator
+  language: Python
+  topics:
+  - control-panel
+  - god-mode
+  - python
+  - tweaks
+  - utilities
+  - windows
+- name: SystemMonitor
+  html_url: https://github.com/neohiro/SystemMonitor
+  description: System Health Monitor
+  language: Python
+  topics:
+  - cpu-usage
+  - dashboard
+  - psutil
+  - python
+  - sensors
+  - system-monitor

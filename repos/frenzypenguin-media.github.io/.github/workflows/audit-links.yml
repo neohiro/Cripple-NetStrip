@@ -1,0 +1,80 @@
+name: Audit external links
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'  # weekly, Sundays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write  # to create/update issue on failure
+
+jobs:
+  link-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PowerShell 7
+        uses: actions/setup-powershell@v1
+        with:
+          powershell-version: '7.x'
+
+      - name: Run link audit
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $scriptPath = "$PSScriptRoot/../tools/verify-network.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            throw "verify-network.ps1 not found at $scriptPath"
+          }
+
+          $result = powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1
+          $exitCode = $LASTEXITCODE
+          $result | Write-Host
+
+          if ($exitCode -ne 0) {
+            $issueTitle = "🔗 Broken links detected in org profile READMEs ($(Get-Date -Format 'yyyy-MM-dd'))"
+
+            # Built as an array rather than a @"..."@ here-string: a here-string's
+            # closing delimiter has to sit in column 0, which a YAML block scalar
+            # cannot represent, so the body sat at column 0 and ended the run: |
+            # block early. GitHub rejected the whole file for that reason and the
+            # job never started.
+            $issueBody = @(
+              "Automated link audit found broken URLs or missing metadata."
+              ""
+              "```"
+              "$result"
+              "```"
+              ""
+              "Run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/verify-network.ps1` locally for details."
+            ) -join "`n"
+
+            gh issue create --repo frenzypenguin-media/frenzypenguin-media.github.io --title "$issueTitle" --body "$issueBody" --label "link-audit,automated" 2>&1 | Write-Host
+          }
+
+      - name: Audit repos.json for 404s
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $reposJson = Get-Content repos.json -Raw | ConvertFrom-Json
+          $dead = @()
+          foreach ($r in $reposJson) {
+            gh api "repos/$($r.full_name)" --jq '.full_name' 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) { $dead += $r.full_name }
+          }
+
+          if ($dead.Count -gt 0) {
+            $issueTitle = "🗂️ Dead repos in repos.json ($(Get-Date -Format 'yyyy-MM-dd'))"
+            $issueBody = "The following repos in \`repos.json\` return 404:\n\n" + ($dead | ForEach-Object { "- \`$_\`" } -join "`n")
+            gh issue create --repo frenzypenguin-media/frenzypenguin-media.github.io --title "$issueTitle" --body "$issueBody" --label "repos-json-audit,automated" 2>&1 | Write-Host
+          }

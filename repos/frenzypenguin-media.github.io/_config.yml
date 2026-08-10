@@ -1,0 +1,118 @@
+title: FrenzyPenguin Media
+description: "Security hardening & privacy tools for Windows and Linux."
+url: "https://frenzypenguin.media"
+baseurl: ""
+github_username: neohiro
+github_repo: frenzypenguin-media
+
+# Chrome identity for the shared chrome includes (_includes/bottom-bar.html).
+#
+# `github_username` cannot identify a site here: FPM and neohiro deliberately
+# share the handle "neohiro", so keying the bottom bar's branding and section
+# chips off it silently rendered neohiro's "GitHub" CTA and neohiro's chip list
+# on this site. `github_repo` does differ, but it encodes an org/repo layout
+# detail rather than an intent, and FPM's value ("frenzypenguin-media") does not
+# even carry the .github.io suffix the other three have. An explicit key states
+# the intent and is greppable.
+#
+# One of: fpm | neohiro | osi | transhumanists
+shell: fpm
+
+# Visitor counter. Rendered via _includes/counter-widget.html, which
+# _layouts/default.html includes exactly once (in the footer) so a page view
+# counts once. The badge is a static SVG from visitor-badge rather than the
+# retired freevisitorcounters JS embed, because GitHub Pages will not run that
+# third-party script reliably. See links-secret/counter-surfaces.spec.yaml (SSOT)
+# for the slot mapping; display_id 1631174 is this site's legacy surface.
+counter_path: "github.com/frenzypenguin-media.github.io"
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+collections:
+  tools:
+    output: true
+    permalink: /tools/:name/
+
+defaults:
+  - scope:
+      path: ""
+      type: "tools"
+    values:
+      layout: "tool"
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - .github
+  - README.md
+  - LICENSE
+  - scripts
+  - "*.ps1"
+  - "*.sh"
+  - "github-social/"
+  # heartbeat.yml commits a Facebook feed mirror under data/feeds/. Nothing in
+  # the site reads it, and Jekyll would otherwise copy ~500KB of third-party
+  # HTML into _site and list it in sitemap.xml - republishing Facebook's markup
+  # on our own domain. Kept in the repo, kept out of the published site.
+  - data
+  # index.md and index.html both render to /index.html. Jekyll emits them in
+  # an unspecified order, so one silently shadows the other and the sitemap
+  # lists https://frenzypenguin.media/ twice. index.html is the one that has
+  # been winning, so it keeps the homepage and this file is held back rather
+  # than deleted - it carries 13 content sections (and a Liquid loop over the
+  # featured tools collection) that may be the better homepage once someone
+  # decides which design wins. Flip by removing this line and deleting
+  # index.html.
+  - index.md
+
+
+# >>> top-bar contract (managed by template-shared/site_forge.py)
+# Top-bar contract. Rendered by _includes/nav.html — ONE template serves
+# every site in the network; only these lists differ. Format is
+# "Label|url" with an optional trailing drop-priority (2|3|4). Labels MUST
+# stay one word: the bar is not sticky, so a long label is the only thing
+# that can force a wrap on a phone. Only link pages that actually exist.
+github_username: "neohiro"
+sponsor_username: "neohiro"
+dashboard_url: "https://github.com/neohiro/dashboard"
+
+nav_links:
+  - "Home|/"
+  - "Repos|/repositories/|3"
+  - "Hosts|/hosts/|2"
+  - "Artists|/artists/|2"
+  - "Media|/media/|3"
+  - "Social|/social/|3"
+
+community_links:
+  - "Org Overview|https://github.com/neohiro"
+  - "Bluesky|https://bsky.app/profile/frenzypenguin.media"
+  - "Main Domain|https://frenzypenguin.media"
+  - "neohiro|https://neohiro.github.io/"
+  - "Sponsor|https://github.com/sponsors/neohiro"
+
+# Bottom-bar and assistant contract. request_access is the public gate for
+# the private assistant; an empty string means the site has no access page
+# yet and the dock must not link one.
+assistant:
+  request_access: "/request-access/"
+  dashboard_url: "https://github.com/neohiro/dashboard"
+
+palette: "purple-matrix"
+fonts: "matrix"
+decor: "aurora"
+decor_class: "decor-aurora decor-grain"
+font_google: "JetBrains+Mono:wght@400;500;700|Space+Grotesk:wght@400;500;600;700"
+show_host_menu: true
+hosts_data: "_data/hosts.yml"
+# <<< top-bar contract

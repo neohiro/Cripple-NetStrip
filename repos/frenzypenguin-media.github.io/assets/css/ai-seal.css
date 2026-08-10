@@ -1,0 +1,307 @@
+/* ai-seal.css -- the AI provenance seal and the persistent "back up" control.
+ *
+ * One sheet, two fixed elements, both on the right-hand edge of the viewport:
+ *
+ *   .ai-seal-dock / .ai-seal   bottom-right watermark, raised clear of the
+ *                              fixed AI/contact dock and of the guide's
+ *                              persistent section bar.
+ *   .ai-totop                  mid-right "back up" arrow, same edge, so the two
+ *                              share a horizontal plane and never collide.
+ *
+ * Loaded from _layouts/default.html. Authored once in template-shared/assets/css/
+ * and copied into every site by site_forge.py; tests/test-ai-seal.py fails when a
+ * copy drifts. Edit here and re-sync.
+ *
+ * No colours are declared here. The seal is white-on-transparent by definition,
+ * which is what lets one file serve four sites that do not share a palette
+ * vocabulary. Legibility on a light background comes from a dark drop-shadow
+ * halo rather than from a second colour, so nothing here needs a per-theme
+ * override.
+ */
+
+/* --- tokens ------------------------------------------------------------- */
+
+:root {
+  /* The watermark is chrome, not content. 84px was large enough to compete with
+   * the page it floats over, so it is now a corner mark. */
+  --ai-seal-size: 44px;
+  /* The arrow occupies the SAME slot as the seal and crossfades with it, so the
+   * two must be the same size or the swap would visibly jump. */
+  --ai-totop-size: var(--ai-seal-size);
+  --ai-seal-edge: clamp(12px, 2.4vw, 30px);
+  /* Clear the fixed AI/contact dock (auth-bar.css, ~52px) plus air. */
+  --ai-seal-lift: calc(var(--ai-dock-h, 52px) + 16px + env(safe-area-inset-bottom, 0px));
+  --ai-seal-alpha: 0.5;
+  --ai-totop-alpha: 0.62;
+  --ai-fade: 220ms;
+  /* Sits above page content (the sites top out around z-index 100) and below
+   * the AI dock (--ai-dock-z: 1000), so neither can cover the other. */
+  --ai-seal-z: 940;
+}
+
+/* --- shared ------------------------------------------------------------- */
+
+.ai-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- the watermark ------------------------------------------------------ */
+
+.ai-seal-dock {
+  position: fixed;
+  right: var(--ai-seal-edge);
+  bottom: var(--ai-seal-lift);
+  z-index: var(--ai-seal-z);
+  display: flex;
+  justify-content: flex-end;
+  /* The element itself must never eat clicks meant for the content under it;
+   * only the seal is a link. */
+  pointer-events: none;
+}
+
+/* When the guide's persistent section bar is present, both fixed bottom bars
+ * have to be cleared. Same hook, same fallback as ecosystem-network.css.
+ *
+ * The arrow is listed too because it now occupies the seal's corner: it has to
+ * be lifted by exactly the same amount or the crossfade would visibly jump
+ * sideways-and-up as the two swap. */
+body:has(.bottom-bar) .ai-seal-dock,
+body:has(.bottom-bar) .ai-totop {
+  --ai-seal-lift: calc(var(--ai-dock-h, 52px) + var(--bottom-bar-h, 46px) + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+.ai-seal {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  color: #fff;
+  opacity: var(--ai-seal-alpha);
+  /* Transitions only paint and opacity -- never layout -- so the watermark
+   * cannot shift the page it is floating over. */
+  transition: opacity var(--ai-fade) ease, translate var(--ai-fade) ease;
+  translate: 0 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ai-seal__img {
+  display: block;
+  width: var(--ai-seal-size);
+  height: var(--ai-seal-size);
+  /* White on transparent disappears over a light background. The halo is what
+   * keeps the seal readable in both themes without declaring a colour. */
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+}
+
+.ai-seal__label {
+  font-family: var(--font-ui, system-ui, -apple-system, sans-serif);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: center;
+  /* The drop-shadow that keeps the ring visible is not available to text
+   * through a filter on the <img>, so the label carries its own. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+}
+
+.ai-seal:hover,
+.ai-seal:focus-visible {
+  opacity: 1;
+  translate: 0 -2px;
+}
+
+.ai-seal:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* --- the back-up control ------------------------------------------------ */
+
+/* The arrow shares the seal's slot: same right edge, same bottom offset, same
+   box. Two controls on one corner, crossfaded, is the whole interaction -- at
+   the top of the page the watermark is what you want (a link explaining how the
+   page was built); once you are past the hero it has nothing to say and the
+   arrow takes the corner instead. Placing them at different coordinates
+   (arrow was pinned to `top: 50%`) meant both were on screen at once, which is
+   what the "logo and arrow floating in the corner" complaint was. */
+.ai-totop {
+  position: fixed;
+  top: auto;
+  right: var(--ai-seal-edge);
+  bottom: var(--ai-seal-lift);
+  z-index: var(--ai-seal-z);
+  translate: 0 0;
+  display: block;
+  width: var(--ai-totop-size);
+  height: var(--ai-totop-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  opacity: 0;
+  /* Hidden, not merely transparent: `visibility: hidden` also removes the
+   * control from the tab order, so a keyboard user never lands on a button that
+   * does nothing yet. Without JS the button simply never appears. */
+  visibility: hidden;
+  pointer-events: none;
+  cursor: pointer;
+  /* Same duration as the seal's fade below, so the crossfade is symmetric: the
+   * outgoing logo and the incoming arrow take the same time to swap. */
+  transition: opacity var(--ai-fade) ease;
+}
+
+.ai-totop.is-visible {
+  opacity: var(--ai-totop-alpha);
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity var(--ai-fade) ease;
+}
+
+.ai-totop:hover,
+.ai-totop:focus-visible {
+  opacity: 1;
+  translate: 0 -3px;
+}
+
+.ai-totop:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+/* The crossfade.
+   ai-seal.js mirrors the arrow's state onto <html> as `.ai-arrow-visible` in the
+   same tick that adds `.is-visible` to the arrow itself.
+
+   That mirror exists because this used to be `body:has(.ai-totop.is-visible)`.
+   `:has()` is unsupported on Firefox before 121, and where it is unsupported the
+   entire rule is dropped rather than degraded -- so the seal stayed at its
+   resting opacity while the arrow painted on top of it. Two controls stacked in
+   one corner, which is precisely the defect the crossfade exists to prevent, and
+   it was invisible in every modern browser this was tested in. Keying off a
+   class that the same function that shows the arrow also sets removes the
+   feature-detection question entirely: the arrow is never visible without JS
+   having run, so the class is always in agreement with `.is-visible`.
+
+   The seal fades to 0 *and* gives up hit-testing, because an invisible link that
+   still intercepts clicks would sit under the arrow and swallow the tap. */
+.ai-arrow-visible .ai-seal {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity var(--ai-fade) ease, visibility 0s linear var(--ai-fade);
+}
+
+.ai-arrow-visible .ai-seal-dock {
+  pointer-events: none;
+}
+
+/* Stand down while a conversation is open.
+   The sheet is z-index 910 and anchored to the bottom of the viewport at 87% of
+   its height, so the bottom-right corner is squarely inside it -- and this sheet
+   is 940. The arrow and the seal therefore painted on top of the open
+   conversation, floating over the composer's right-hand side. Measured before
+   the fix: elementFromPoint at the arrow's centre returned the arrow, not the
+   sheet.
+
+   The bottom bar already translates itself away for `ai-conv-active`
+   (bottom-bar.css) and network-ux.js sets that class on <body>, so this follows
+   the established treatment rather than inventing one. Losing the arrow for the
+   duration is the intended trade: the sheet holds a focus trap and closes on
+   Escape, so nothing in the conversation becomes unreachable without it.
+
+   Specificity: `body.ai-conv-active .ai-totop` is 0,2,1 against 0,2,0 for
+   `.ai-totop.is-visible`, so this wins even when the arrow is showing. */
+body.ai-conv-active .ai-seal-dock,
+body.ai-conv-active .ai-totop {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.ai-totop__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+}
+
+/* --- small screens ------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  :root {
+    --ai-seal-size: 38px;
+    --ai-seal-alpha: 0.44;
+  }
+}
+
+/* The seal is a corner mark now, so the caption under it is dropped. At 44px
+   the artwork leaves no room for it: "AI-assisted" is wider than the mark it
+   labels, which is why the corner looked crowded. The link keeps its `title` and
+   the image keeps its `alt`, and /ai-disclosure/ spells all of this out in
+   words. */
+.ai-seal__label {
+  display: none;
+}
+
+/* The arrow lives in the seal's slot rather than halfway up the right edge, so
+   the old "not enough height for both" adjustments no longer apply: there is
+   only ever one mark in the corner, and it crossfades with the other. */
+
+@media (max-height: 420px) {
+  :root {
+    --ai-seal-size: 32px;
+  }
+}
+
+/* --- preferences -------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-seal,
+  .ai-totop {
+    transition: none;
+  }
+
+  /* No fade means the swap is a hard cut, so the outgoing link must stop taking
+     clicks on the same frame it stops being painted -- otherwise an invisible
+     seal would sit on top of the arrow. */
+  .ai-arrow-visible .ai-seal {
+    visibility: hidden;
+    transition: none;
+  }
+
+  /* The hover nudge is the only movement in this sheet. */
+  .ai-seal:hover,
+  .ai-seal:focus-visible,
+  .ai-totop:hover,
+  .ai-totop:focus-visible {
+    translate: none;
+  }
+}
+
+/* Ink is expensive and the seal is chrome, not content. The disclosure page
+ * still says the same thing in words. */
+@media print {
+  .ai-seal-dock,
+  .ai-totop {
+    display: none !important;
+  }
+}

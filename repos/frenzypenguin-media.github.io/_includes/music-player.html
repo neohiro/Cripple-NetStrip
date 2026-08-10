@@ -1,0 +1,232 @@
+<div class="ul-player" id="ul-player" aria-label="Cyber-Ambient Audio Stream">
+  <button class="ul-player-toggle" id="ul-player-toggle" aria-label="Toggle audio player HUD" title="Audio HUD">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    <span class="ul-player-status-dot" id="ul-status-dot"></span>
+  </button>
+  <div class="ul-player-body" id="ul-player-body">
+    <div class="ul-player-info">
+      <a class="ul-player-label" href="https://hearthis.at/neohiro" target="_blank" rel="noopener noreferrer" aria-label="Link to hearthis.at/neohiro">HEARTHIS.AT / NEOHIRO</a>
+      <span class="ul-player-title" id="ul-track-title">Neohiro Live Set #1</span>
+    </div>
+    <div class="ul-player-visualizer" id="ul-visualizer" aria-hidden="true">
+      <canvas id="ul-canvas" width="56" height="20"></canvas>
+    </div>
+    <div class="ul-player-controls">
+      <button id="ul-prev" aria-label="Previous track" title="Previous">⏮</button>
+      <button id="ul-play" class="ul-play-btn" aria-label="Play or Pause music" title="Play / Pause">▶</button>
+      <button id="ul-next" aria-label="Next track" title="Next">⏭</button>
+      <input type="range" id="ul-vol" min="0" max="1" step="0.05" value="0.5" aria-label="Volume" title="Volume">
+    </div>
+  </div>
+</div>
+<style>
+.ul-player {
+  position: fixed;
+  top: 120px;
+  left: 16px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 14, 18, 0.94);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 999px;
+  padding: 6px 14px 6px 6px;
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 12px 40px rgba(0,0,0,0.65),
+    0 0 22px rgba(0,229,255,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  font-family: var(--font-mono, monospace);
+  color: #e8eef2;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ul-player:hover {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow:
+    0 16px 48px rgba(0,0,0,0.75),
+    0 0 32px rgba(0,229,255,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.ul-player-toggle {
+  background: linear-gradient(135deg, rgba(0,229,255,0.2), rgba(124,77,255,0.2));
+  border: 1px solid rgba(0,229,255,0.4);
+  color: #00e5ff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s, box-shadow 0.25s;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+.ul-player-toggle:hover {
+  transform: scale(1.1);
+  background: linear-gradient(135deg, #00e5ff, #7c4dff);
+  color: #fff;
+  box-shadow: 0 0 22px rgba(0,229,255,0.45);
+}
+.ul-player-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 0, 102, 0.5);
+}
+.ul-player-status-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #556677;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  transition: all 0.2s;
+}
+.ul-player-status-dot.playing {
+  background: #00cc88;
+  box-shadow:
+    0 0 8px #00cc88,
+    0 0 16px rgba(0,204,136,0.5);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.2); }
+}
+.ul-player-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  max-width: 360px;
+  transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s;
+}
+.ul-player.collapsed .ul-player-body {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+.ul-player-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+}
+.ul-player-label {
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  color: #778899;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.ul-player-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #00e5ff;
+  white-space: nowrap;
+  overflow: visible;
+  max-width: 320px;
+  text-shadow: 0 0 8px rgba(0,229,255,0.3);
+  animation: ul-scroll 8s linear infinite;
+  display: inline-block;
+}
+@keyframes ul-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ul-player-visualizer {
+  width: 56px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(0,229,255,0.2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ul-player-visualizer canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.ul-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ul-player-controls button {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e8eef2;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+.ul-player-controls button:hover {
+  background: rgba(0,229,255,0.2);
+  border-color: rgba(0,229,255,0.6);
+  color: #00e5ff;
+  transform: translateY(-1px);
+}
+.ul-player-controls button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 0, 102, 0.5);
+}
+.ul-play-btn {
+  background: rgba(0,229,255,0.25) !important;
+  border-color: rgba(0,229,255,0.6) !important;
+  color: #00e5ff !important;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(0,229,255,0.25);
+}
+.ul-play-btn:hover {
+  background: rgba(0,229,255,0.4) !important;
+  box-shadow: 0 0 16px rgba(0,229,255,0.4);
+}
+.ul-player-controls input[type="range"] {
+  width: 44px;
+  accent-color: #00e5ff;
+  cursor: pointer;
+  height: 3px;
+  margin-left: 2px;
+}
+.ul-player-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00e5ff;
+  box-shadow: 0 0 6px rgba(0,229,255,0.6);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.ul-player-controls input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+@media (max-width: 640px) {
+  .ul-player { top: 72px; left: 8px; padding: 4px 10px 4px 4px; gap: 6px; }
+  .ul-player-body { max-width: 240px; }
+  .ul-player-visualizer { width: 40px; }
+  .ul-player-controls input[type="range"] { width: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ul-player, .ul-player-toggle, .ul-player-status-dot,
+  .ul-player-controls button, .ul-player-body {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+</style>
+<script src="{{ '/assets/js/music-player.js' | relative_url }}" defer></script>
+<script src="{{ '/assets/js/music-player-scroll.js' | relative_url }}" defer></script>

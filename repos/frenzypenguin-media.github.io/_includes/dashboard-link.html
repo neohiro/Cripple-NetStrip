@@ -1,0 +1,12 @@
+{% comment %} dashboard-link.html — single source of truth for the "live dashboard" link.
+
+   Heartbeat updates _data/dashboard.yml with the current dashboard URL
+   and the latest 3-tier SVG path per site. {% endcomment %}
+
+{%- assign d = site.data.dashboard -%}
+{%- assign url = d.url | default: 'https://neohiro.github.io/dashboard/' -%}
+<p>
+  <a href="{{ url }}" rel="noopener"><strong>📊 Live Dashboard</strong></a>
+  {%- if d.svg_public %} · <a href="{{ d.svg_public }}" rel="noopener">Public SVG</a>{% endif %}
+  {%- if d.svg_authed %} · <a href="{{ d.svg_authed }}" rel="noopener">Authed SVG</a>{% endif %}
+</p>

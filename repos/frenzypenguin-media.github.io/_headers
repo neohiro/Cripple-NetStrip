@@ -1,0 +1,27 @@
+# Security Headers for frenzypenguin-media.github.io
+#
+# WARNING: GitHub Pages does NOT serve this file. `_headers` is a Netlify/Cloudflare
+# Pages convention; GitHub Pages has no equivalent, and it is ignored both for
+# branch-published and Actions-deployed (build_type: workflow) sites.
+#
+# Verified empirically against the live deployment: none of the headers below appear
+# in the response. `curl -sSI https://frenzypenguin.media` shows no CSP, no
+# X-Frame-Options, no Referrer-Policy.
+#
+# This file is kept as the intended policy, so it is ready to apply verbatim if the
+# site is ever moved behind a host that honours `_headers` (Cloudflare Pages,
+# Netlify). Do NOT read it as evidence that these headers are currently enforced.
+#
+# To actually enforce response headers on GitHub Pages you must terminate in front
+# of it (e.g. Cloudflare proxy) and set the headers there.
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  X-Permitted-Cross-Domain-Policies: none
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+/*
+  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'

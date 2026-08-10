@@ -1,0 +1,51 @@
+name: Heartbeat (FrenzyPenguin Media)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+# This workflow commits and pushes, so it needs write access. The repository
+# default is "read" (repos/.../actions/permissions/workflow), and without this
+# block the token inherits read-only and `git push` fails every run.
+permissions:
+  contents: write
+
+# Two overlapping runs would race on the same branch: the second push is built
+# on a ref the first already moved, so it is rejected. refresh-snapshot.yml
+# guards the same way.
+concurrency:
+  group: "heartbeat"
+  cancel-in-progress: false
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync FB feed (FrenzyPenguin Media)
+        run: |
+          mkdir -p data/feeds
+          curl -sf "https://www.facebook.com/frenzypenguin.media" -o data/feeds/fpm-fb.html 2>/dev/null || echo "FB sync failed (offline)" > data/feeds/fpm-fb.html
+          echo "Last sync: $(date -u +%Y-%m-%dT%H:%M:%SZ)" > data/feeds/fpm-fb.last
+          git config user.name "N3Vr0Tr4nsm1tt3r / CNS"
+          git config user.email "cns@neohiro.io"
+          git add data/feeds
+          if ! git diff --staged --quiet; then
+            git commit -m "FPM FB feed sync $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push
+          fi
+
+      - name: Generate FPM heartbeats
+        run: node scripts/generate-heartbeat.js
+
+      - name: Commit heartbeat
+        run: |
+          git config user.name "N3Vr0Tr4nsm1tt3r / CNS"
+          git config user.email "cns@neohiro.io"
+          git add heartbeats/
+          if ! git diff --staged --quiet; then
+            git commit -m "FPM heartbeat $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
+            git push
+          fi

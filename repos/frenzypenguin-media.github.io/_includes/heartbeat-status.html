@@ -1,0 +1,121 @@
+{%- comment -%}
+heartbeat-status.html — a live liveness badge for the mainframe node.
+
+Why this fetches instead of reading _data/heartbeat.yml: the data file was
+never published, so the old badge could only ever render its "no data"
+branch. A fetch proves the thing a visitor actually cares about — that the
+node is reachable from their browser, right now — rather than that some
+commit landed recently.
+
+Two endpoints, because they answer different questions:
+
+  /heartbeat  nginx answers directly, so it proves the edge is alive and
+              carries a live timestamp. Costs no extra process.
+  /status     proxied to Brain, so it proves the body is up and not just
+              the proxy.
+
+Both are public on purpose and say almost nothing: a status word, a node
+name and a timestamp. The opencode engine behind the same proxy stays behind
+basic auth.
+
+Requires the origin in the page's Content-Security-Policy connect-src, or the
+fetch is blocked and this degrades to "unreachable" rather than lying.
+{%- endcomment -%}
+{%- assign hb_origin = site.heartbeat_origin | default: "https://mainframe.taild879f3.ts.net" -%}
+<span class="hb" id="hb" data-hb-origin="{{ hb_origin }}" role="status" aria-live="polite">
+  <span class="hb__dot" aria-hidden="true"></span>
+  <span class="hb__label">mainframe</span>
+  <span class="hb__detail" data-hb-detail>checking…</span>
+</span>
+
+<style>
+  .hb {
+    display: inline-flex; align-items: center; gap: .5em;
+    font: 500 .78rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: .3em .7em; border-radius: 999px;
+    border: 1px solid rgba(148,163,184,.35);
+    background: rgba(148,163,184,.08); color: #94a3b8;
+    white-space: nowrap; vertical-align: middle;
+  }
+  .hb__dot {
+    width: .55em; height: .55em; border-radius: 50%;
+    background: currentColor; flex: none;
+  }
+  .hb[data-state="alive"]    { color: #34d399; border-color: rgba(52,211,153,.45); background: rgba(52,211,153,.10); }
+  .hb[data-state="degraded"] { color: #fbbf24; border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.10); }
+  .hb[data-state="down"]     { color: #f87171; border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.10); }
+  .hb[data-state="checking"] { color: #94a3b8; }
+
+  /* Only pulse when there is something true to say about it. A pulsing dot on a
+     dead node would be a lie told continuously. */
+  .hb[data-state="alive"] .hb__dot { animation: hb-pulse 2.4s ease-in-out infinite; }
+  @keyframes hb-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,.55); }
+    50%      { box-shadow: 0 0 0 .45em rgba(52,211,153,0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hb[data-state="alive"] .hb__dot { animation: none; }
+  }
+  .hb__detail { color: inherit; opacity: .82; }
+  .hb__detail::before { content: "· "; opacity: .6; }
+</style>
+
+<script>
+(function () {
+  var el = document.getElementById('hb');
+  if (!el) return;
+  var origin = el.getAttribute('data-hb-origin');
+  var detail = el.querySelector('[data-hb-detail]');
+  var PERIOD = 30000;
+
+  function set(state, text) {
+    el.setAttribute('data-state', state);
+    detail.textContent = text;
+  }
+
+  function ms(n) { return Math.round(n) + 'ms'; }
+
+  function fail(text) {
+    set('down', text);
+    setTimeout(poll, PERIOD);
+  }
+
+  function poll() {
+    var started = performance.now();
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
+
+    fetch(origin + '/heartbeat', {
+      cache: 'no-store',
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) {
+      if (!r.ok) throw new Error('edge ' + r.status);
+      return r.json();
+    }).then(function () {
+      var edge = performance.now() - started;
+      // The edge answered. Now ask whether the body behind it is actually up.
+      return fetch(origin + '/status', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (body) {
+          clearTimeout(timer);
+          if (body && body.status === 'ok') {
+            set('alive', 'alive · ' + ms(edge));
+          } else {
+            set('degraded', 'edge only · ' + ms(edge));
+          }
+        });
+    }).catch(function () {
+      clearTimeout(timer);
+      // Rejected fetch usually means the CSP blocked it or the node is gone;
+      // say which is unknowable and let the visitor see it is not working.
+      fail('unreachable');
+    });
+  }
+
+  poll();
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) poll();
+  });
+})();
+</script>

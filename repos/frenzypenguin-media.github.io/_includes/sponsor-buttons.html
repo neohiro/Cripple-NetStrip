@@ -1,0 +1,11 @@
+{% comment %} sponsor-buttons.html — used in READMEs and site pages.
+
+   Heartbeat updates _data/sponsor.yml with active tiers. Falls back to
+   the GitHub Sponsors link for the configured github_username. {% endcomment %}
+
+{%- assign gh = site.github_username | default: 'neohiro' -%}
+<p class="sponsor-buttons">
+  <a href="https://github.com/sponsors/{{ gh }}" rel="noopener"><img src="https://img.shields.io/badge/Sponsor-♥-ea4aaa?style=for-the-badge&logo=github-sponsors" alt="Sponsor on GitHub" loading="lazy"></a>
+  <a href="https://ko-fi.com/{{ gh }}" rel="noopener"><img src="https://img.shields.io/badge/Ko--fi-Support-ff5e5b?style=for-the-badge&logo=ko-fi" alt="Support on Ko-fi" loading="lazy"></a>
+  <a href="https://liberapay.com/{{ gh }}/give" rel="noopener"><img src="https://img.shields.io/badge/Liberapay-Tip-fbaf32?style=for-the-badge&logo=liberapay" alt="Tip on Liberapay" loading="lazy"></a>
+</p>
