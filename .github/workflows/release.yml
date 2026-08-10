@@ -60,10 +60,18 @@ jobs:
           pip install --retries 3 --timeout 60 Pillow pyinstaller buildozer "cython==0.29.33" virtualenv maturin
           pip install -e .
 
+      - name: Set Release Tag
+        shell: bash
+        run: |
+          VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v$VERSION"
+          fi
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+
       - name: Build Windows Executable
         if: matrix.target == 'windows'
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           cmd.exe /c build.bat
           if (Test-Path "dist\Cripple") {
@@ -74,8 +82,6 @@ jobs:
 
       - name: Build macOS Executable
         if: matrix.target == 'macos'
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
           bash build.sh || true
@@ -90,8 +96,6 @@ jobs:
 
       - name: Build Linux Executable
         if: matrix.target == 'linux'
-        env:
-          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           chmod +x build.sh run.sh
           bash build.sh || true
@@ -107,7 +111,6 @@ jobs:
       - name: Build Android Package
         if: matrix.target == 'android'
         env:
-          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
           yes | buildozer android debug || true
@@ -125,7 +128,7 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: NetStrip-*-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
