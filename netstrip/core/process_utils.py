@@ -229,6 +229,11 @@ def resolve_process_identity(proc) -> Tuple[str, str, any, str]:
         
     canonical_name = normalize_process_name(raw_name, cmdline=cmdline, pid=pid_val)
     
+    if raw_name.lower() == "svchost.exe" and cmdline and len(cmdline) > 2:
+        if cmdline[1].lower() == "-k":
+            service_group = cmdline[2]
+            canonical_name = f"Service Host ({service_group})"
+    
     if proc_pid is not None:
         with _PID_CACHE_LOCK:
             # Clean old entries if cache grows beyond 2000

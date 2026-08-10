@@ -683,13 +683,9 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
                 
-        implicit_block = False
-        if self._global_action_state is None and self.rows:
-            implicit_block = all(r.conn_data.get('action') == 'block' for r in self.rows.values())
-            
         # Update button visuals
         from netstrip.gui.theme import Colors
-        if self._global_action_state == 'block' or implicit_block:
+        if self._global_action_state == 'block':
             self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         elif self._global_action_state == 'allow':

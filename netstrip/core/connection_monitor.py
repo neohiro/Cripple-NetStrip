@@ -125,7 +125,7 @@ class ConnectionMonitor:
         self.port_to_pid = new_port_to_pid
         
         for conn in connections:
-            if not conn.raddr or not conn.pid or not hasattr(conn.raddr, 'ip'):
+            if not conn.raddr or conn.pid is None or not hasattr(conn.raddr, 'ip'):
                 continue
                 
             # Ignore internal loopback connections (e.g. dnscrypt-proxy communicating locally, or DNS requests to 127.127.127.127)
@@ -169,11 +169,19 @@ class ConnectionMonitor:
                 process_name = "Cripple (Internal)"
                 process_path = sys.executable
                 original_exe = "Cripple"
+            elif conn.pid == 0:
+                process_name = "System Idle Process"
+                process_path = "System"
+                original_exe = "System"
+            elif conn.pid == 4:
+                process_name = "System (Kernel/Driver)"
+                process_path = "System"
+                original_exe = "System"
             else:
                 proc = psutil.Process(conn.pid)
                 process_name, process_path, root_proc, original_exe = self._resolve_process_identity(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
-            process_name = "Unknown"
+            process_name = f"Unknown (PID {conn.pid})"
             process_path = ""
 
         ip = conn.raddr.ip
