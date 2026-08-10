@@ -1,0 +1,921 @@
+"""
+NetStrip - Main Entry Point
+Checks privileges, starts the core engine, and launches the GUI.
+"""
+
+import sys
+import os
+import logging
+import signal
+import time
+
+# If this process was launched successfully (e.g. as an elevated process), 
+# assassinate the restricted parent process so we don't have duplicate GUIs.
+if "--parent-pid" in sys.argv:
+    try:
+        idx = sys.argv.index("--parent-pid")
+        parent_pid = int(sys.argv[idx + 1])
+        os.kill(parent_pid, signal.SIGTERM)
+        # Remove these from argv so they don't interfere with anything else
+        sys.argv.pop(idx)
+        sys.argv.pop(idx)
+    except Exception:
+        pass
+
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+# Windows App User Model ID & NTFS Mark-of-the-Web (Zone.Identifier) Auto-Unblocker
+try:
+    if sys.platform == 'win32':
+        import ctypes
+        myappid = 'NetStrip.app.1.0'
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+
+        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        internal_dir = os.path.join(base_dir, '_internal')
+
+        # Automatically strip NTFS Zone.Identifier (Mark of the Web) from all files and directories
+        # to ensure seamless execution under Smart App Control / AppLocker
+        try:
+            kernel32 = ctypes.windll.kernel32
+            # Unblock main executable and directory
+            if getattr(sys, 'frozen', False) and sys.executable:
+                kernel32.DeleteFileW(f"\\\\?\\{sys.executable}:Zone.Identifier")
+            kernel32.DeleteFileW(f"\\\\?\\{base_dir}:Zone.Identifier")
+
+            for root, dirs, files in os.walk(base_dir):
+                for d in dirs:
+                    try:
+                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, d)}:Zone.Identifier")
+                    except Exception:
+                        pass
+                for f in files:
+                    try:
+                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, f)}:Zone.Identifier")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Ensure base and internal directories are on PATH for standard Windows DLL resolution
+        try:
+            if os.path.exists(internal_dir):
+                os.environ['PATH'] = f"{base_dir};{internal_dir};" + os.environ.get('PATH', '')
+        except Exception:
+            pass
+except Exception:
+    pass
+
+
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    )
+
+def check_dependencies():
+    missing = []
+    is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
+    
+    if not is_android:
+        try:
+            import customtkinter
+        except ImportError:
+            missing.append("customtkinter")
+            
+        try:
+            import PIL
+        except ImportError:
+            missing.append("Pillow")
+            
+    try:
+        import psutil
+    except ImportError:
+        missing.append("psutil")
+        
+    try:
+        import dnslib
+    except ImportError:
+        missing.append("dnslib")
+        
+    if missing:
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0,
+                    f"Please install required dependencies: {', '.join(missing)}",
+                    "Missing Dependencies",
+                    0x10 # MB_ICONERROR
+                )
+            except Exception:
+                print(f"Missing Dependencies: {', '.join(missing)}")
+        else:
+            print(f"Missing Dependencies: {', '.join(missing)}")
+        sys.exit(1)
+
+
+def is_server_or_embedded():
+    """Detects if we are running on a server OS, or a low-resource embedded system like a Raspberry Pi."""
+    import platform
+    import os
+    
+    # Check Windows Server
+    if platform.system() == 'Windows':
+        if 'Server' in platform.win32_ver()[0]:
+            return True
+            
+    # Check Linux Server (Ubuntu Server, Debian headless, etc.) or missing display
+    if platform.system() == 'Linux':
+        if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
+            return True
+            
+        try:
+            with open('/etc/os-release', 'r') as f:
+                os_release = f.read().lower()
+                if 'server' in os_release:
+                    return True
+        except Exception:
+            pass
+            
+    machine = platform.machine().lower()
+    if machine in ('armv7l', 'aarch64', 'armv6l'):
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().lower()
+                if 'raspberry pi' in model or 'orange pi' in model or 'bananapi' in model:
+                    return True
+        except FileNotFoundError:
+            pass
+            
+    # Android check
+    if os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel'):
+        return True
+        
+    return False
+
+def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        from netstrip import __version__
+        print(f"\n{'='*60}")
+        print(f"  Cripple (NetStrip) v{__version__} - CLI / Daemon")
+        print(f"{'='*60}")
+        print("\nBOOT VARIABLES:")
+        print("  --service              Headless/daemon mode (no GUI).")
+        print("  --blockinbound         Block ALL inbound (requires confirmation).")
+        print("  --allowlan             Permit LAN connections even in strict modes.")
+        print("  --android              Force Android/Mobile layout for UI testing.")
+        print("\nSSH SAFEGUARD:")
+        print("  --set ssh_safeguard true   Always allow inbound port 22/2222.")
+        print("                             Auto-enabled in headless mode.")
+        print("                             Survives killswitch, ghost, and paranoid.")
+        print("\nDIRECT COMMANDS (no running daemon needed):")
+        print("  --set-psk <KEY>        Set LAN Shield PSK (44-char Fernet key).")
+        print("  --get-psk              Display the current LAN Shield PSK.")
+        print("  --set <key> <value>    Set any engine setting directly in the database.")
+        print("  --get <key>            Get any engine setting from the database.")
+        print("  --set-telemetry-token <PAT>  Save GitHub telemetry token.")
+        print("  --export <file.json>   Export full settings/rules profile to JSON.")
+        print("  --import <file.json>   Import settings/rules profile from JSON.")
+        print("\nLIVE IPC COMMANDS (sent to running daemon):")
+        print("  --block <domain>       Add domain to user blocklist.")
+        print("  --allow <domain>       Add domain to user allowlist.")
+        print("  --mode <MODE>          Switch mode: LOOSE, STANDARD, STRICT, PARANOID.")
+        print("  --status               Print daemon status, mode, and active threats.")
+        print("  --stats                Print 24h connection statistics.")
+        print("  --allow-anomaly <name> Whitelist a kernel threat and unlock system.")
+        print("  --killswitch           Engage the master killswitch (requires confirmation).")
+        print("  --unkillswitch         Disengage the master killswitch.")
+        print("  --ghost                Engage Ghost Mode (requires confirmation).")
+        print("  --unghost              Disengage Ghost Mode.")
+        print("  --force                Skip confirmation prompts (for scripts/automation).")
+        print("  --update-blocklists    Force an immediate blocklist refresh.")
+        print("  --trust-wifi <SSID>    Mark a WiFi network as trusted for LAN Shield.")
+        print("  --untrust-wifi <SSID>  Remove a WiFi network from trusted list.")
+        print(f"{'='*60}\n")
+        sys.exit(0)
+
+    # --- Direct database commands (no running daemon needed) ---
+    def _get_db():
+        from pathlib import Path
+        from netstrip.data.database import Database
+        db_path = Path.home() / ".netstrip" / "netstrip.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return Database(str(db_path))
+
+    # Handle telemetry token setup
+    if "--set-telemetry-token" in sys.argv:
+        try:
+            idx = sys.argv.index("--set-telemetry-token")
+            token = sys.argv[idx + 1]
+            db = _get_db()
+            db.set_setting("telemetry_github_token", token)
+            db.stop()
+            print(f"Telemetry token saved successfully.")
+        except (IndexError, ValueError):
+            print("Usage: --set-telemetry-token <GITHUB_PAT>")
+        except Exception as e:
+            print(f"Error saving token: {e}")
+        sys.exit(0)
+
+    # PSK management
+    if "--set-psk" in sys.argv:
+        try:
+            idx = sys.argv.index("--set-psk")
+            psk = sys.argv[idx + 1].strip()
+            # Validate Post-Quantum or Legacy Fernet key format
+            if len(psk) not in (44, 88) or not psk.endswith('='):
+                print("Error: PSK must be a 44-character or 88-character Post-Quantum key (base64 ending with '=').")
+                sys.exit(1)
+            try:
+                from netstrip.core.crypto_utils import Fernet
+                Fernet(psk.encode('utf-8'))  # Validates structure
+            except Exception:
+                print("Error: Invalid Post-Quantum key format.")
+                sys.exit(1)
+            db = _get_db()
+            db.set_setting("lan_shield_psk", psk)
+            db.stop()
+            key_type = "512-bit Native Post-Quantum" if len(psk) == 88 else "256-bit Legacy (HKDF-SHA512 Upgraded)"
+            print(f"LAN Shield PSK saved successfully ({key_type}).")
+            print(f"Restart the daemon for the new key to take effect, or use the GUI which hot-reloads.")
+        except IndexError:
+            print("Usage: --set-psk <44-or-88-char-Quantum-Key>")
+        except Exception as e:
+            print(f"Error saving PSK: {e}")
+        sys.exit(0)
+
+    if "--get-psk" in sys.argv:
+        try:
+            db = _get_db()
+            psk = db.get_setting("lan_shield_psk", "")
+            db.stop()
+            if psk:
+                print(f"LAN Shield PSK: {psk}")
+                print(f"Copy this key to other Cripple instances on your LAN to pair them.")
+            else:
+                print("No PSK configured yet. Start the daemon once to auto-generate, or use --set-psk.")
+        except Exception as e:
+            print(f"Error reading PSK: {e}")
+        sys.exit(0)
+
+    # Generic settings get/set
+    if "--set" in sys.argv and "--set-psk" not in sys.argv and "--set-telemetry-token" not in sys.argv:
+        try:
+            idx = sys.argv.index("--set")
+            key = sys.argv[idx + 1]
+            value = sys.argv[idx + 2]
+            db = _get_db()
+            db.set_setting(key, value)
+            db.stop()
+            print(f"Setting '{key}' = '{value}' saved.")
+        except IndexError:
+            print("Usage: --set <key> <value>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    if "--get" in sys.argv and "--get-psk" not in sys.argv:
+        try:
+            idx = sys.argv.index("--get")
+            key = sys.argv[idx + 1]
+            db = _get_db()
+            value = db.get_setting(key, "(not set)")
+            db.stop()
+            print(f"{key} = {value}")
+        except IndexError:
+            print("Usage: --get <key>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    # Profile export/import
+    if "--export" in sys.argv:
+        try:
+            idx = sys.argv.index("--export")
+            filepath = sys.argv[idx + 1]
+            db = _get_db()
+            profile = db.export_profile()
+            db.stop()
+            import json
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(profile, f, indent=2)
+            print(f"Profile exported to {filepath}")
+        except IndexError:
+            print("Usage: --export <output.json>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    if "--import" in sys.argv:
+        try:
+            idx = sys.argv.index("--import")
+            filepath = sys.argv[idx + 1]
+            import json
+            with open(filepath, 'r', encoding='utf-8') as f:
+                profile = json.load(f)
+            db = _get_db()
+            db.import_profile(profile)
+            db.stop()
+            print(f"Profile imported from {filepath}")
+        except IndexError:
+            print("Usage: --import <input.json>")
+        except Exception as e:
+            print(f"Error: {e}")
+        sys.exit(0)
+
+    is_fallback = "--fallback-admin" in sys.argv
+    is_elevated_retry = "--elevated" in sys.argv
+
+    # Install global crash reporter hook
+    try:
+        from netstrip.core.crash_reporter import install_global_exception_hook
+        install_global_exception_hook()
+    except Exception:
+        pass
+
+    from netstrip.platform.base import get_platform
+    platform = get_platform()
+
+    # If we are NOT admin, and we haven't already tried elevating...
+    if not platform.is_admin() and not is_elevated_retry and not is_fallback:
+        # Request elevation IMMEDIATELY before loading any heavy or non-core modules.
+        # DO NOT import tkinter or any external DLLs here so standard user launches cleanly.
+        success = platform.request_admin(os.path.abspath(__file__))
+        
+        if success:
+            # The elevated child will kill us (parent-pid). We just wait to die.
+            time.sleep(10)
+            sys.exit(0)
+        else:
+            # User declined UAC or it failed. Continue in restricted mode.
+            if sys.platform == 'win32':
+                try:
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(
+                        0,
+                        "Cripple will run in restricted mode. Core firewall and DNS sinkhole features will be disabled or limited.",
+                        "Elevation Declined",
+                        0x30 # MB_ICONWARNING
+                    )
+                except Exception:
+                    pass
+            else:
+                print("Elevation Declined: Cripple will run in restricted mode.")
+    elif not is_fallback:
+        pass
+
+
+    setup_logging()
+    logger = logging.getLogger("Cripple")
+    logger.info("Starting Cripple Initialization...")
+
+    check_dependencies()
+
+    is_embedded = is_server_or_embedded()
+    is_headless = "--service" in sys.argv or is_embedded
+    
+    # --- CLI Boot Overrides ---
+    if "--blockinbound" in sys.argv:
+        if "--force" not in sys.argv:
+            print("")
+            print("  ╔══════════════════════════════════════════════════════╗")
+            print("  ║  ⚠  STRICT INBOUND BLOCK — SSH WARNING             ║")
+            print("  ╠══════════════════════════════════════════════════════╣")
+            print("  ║  ALL inbound connections will be blocked,           ║")
+            print("  ║  including SSH, VNC, and remote terminals.          ║")
+            print("  ║                                                      ║")
+            print("  ║  • Overrides the Headless Admin LAN Bypass          ║")
+            print("  ║  • Remote access will be lost if not safeguarded    ║")
+            print("  ║                                                      ║")
+            print("  ║  Tip: --set ssh_safeguard true  (keeps port 22/2222)║")
+            print("  ╚══════════════════════════════════════════════════════╝")
+            print("")
+            confirm = input("  Type YES to block all inbound, or press Enter to cancel: ")
+            if confirm != "YES":
+                print("  Cancelled. Starting without --blockinbound.")
+                sys.argv.remove("--blockinbound")
+    if "--allowlan" in sys.argv:
+        pass
+
+    # --- IPC Single-Instance Check ---
+    import socket
+    IPC_PORT = 54321
+    ipc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        ipc_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except Exception:
+        pass
+        
+    global _ipc_socket
+    _ipc_socket = ipc_socket
+
+    is_primary_instance = False
+    bind_attempts = 0
+    while bind_attempts < 6:
+        try:
+            ipc_socket.bind(('127.0.0.1', IPC_PORT))
+            ipc_socket.listen(1)
+            is_primary_instance = True
+            break
+        except OSError:
+            bind_attempts += 1
+            if bind_attempts < 6:
+                time.sleep(0.15)
+
+    if not is_primary_instance:
+        # Another instance is already running
+        try:
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect(('127.0.0.1', IPC_PORT))
+            client.settimeout(5.0)
+            
+            # CLI Management Commands — validate args before IPC send
+            def _get_cli_arg(flag):
+                """Get the argument after a CLI flag, or print usage and exit."""
+                idx = sys.argv.index(flag)
+                if idx + 1 >= len(sys.argv):
+                    print(f"Error: {flag} requires an argument. Run --help for usage.")
+                    client.close()
+                    sys.exit(1)
+                return sys.argv[idx + 1]
+
+            if "--block" in sys.argv:
+                domain = _get_cli_arg("--block")
+                client.sendall(f"BLOCK:{domain}\n".encode())
+                print(f"✓ Sent block command for {domain}")
+            elif "--allow" in sys.argv:
+                domain = _get_cli_arg("--allow")
+                client.sendall(f"ALLOW:{domain}\n".encode())
+                print(f"✓ Sent allow command for {domain}")
+            elif "--mode" in sys.argv:
+                mode = _get_cli_arg("--mode").upper()
+                from netstrip.core.modes import ProtectionLevel
+                if not hasattr(ProtectionLevel, mode):
+                    print(f"Error: Unknown mode '{mode}'. Valid: LOOSE, STANDARD, NORMAL, STRICT, PARANOID.")
+                    client.close()
+                    sys.exit(1)
+                if mode in ("PARANOID", "STRICT") and "--force" not in sys.argv:
+                    print("")
+                    print("  ╔══════════════════════════════════════════════════════╗")
+                    print("  ║  ⚠  PARANOID MODE — RESTRICTIVE LOCKDOWN            ║")
+                    print("  ╠══════════════════════════════════════════════════════╣")
+                    print("  ║  Blocks ALL connections not explicitly whitelisted.  ║")
+                    print("  ║                                                      ║")
+                    print("  ║  • Unknown connections will be dropped               ║")
+                    print("  ║  • OS updates and background services blocked        ║")
+                    print("  ║  • SSH may disconnect if not safeguarded             ║")
+                    print("  ║                                                      ║")
+                    print("  ║  Tip: --set ssh_safeguard true  (keeps port 22/2222) ║")
+                    print("  ╚══════════════════════════════════════════════════════╝")
+                    print("")
+                    confirm = input("  Type YES to switch to Paranoid, or press Enter to cancel: ")
+                    if confirm != "YES":
+                        print("  Cancelled.")
+                        client.close()
+                        sys.exit(0)
+                client.sendall(f"MODE:{mode}\n".encode())
+                print(f"✓ Mode changed to {mode}")
+            elif "--allow-anomaly" in sys.argv:
+                anomaly = _get_cli_arg("--allow-anomaly")
+                client.sendall(f"ALLOWANOMALY:{anomaly}\n".encode())
+                print(f"✓ Whitelisted anomaly: {anomaly}")
+            elif "--killswitch" in sys.argv and "--unkillswitch" not in sys.argv:
+                if "--force" not in sys.argv:
+                    print("")
+                    print("  ╔══════════════════════════════════════════════════════╗")
+                    print("  ║  ☠  MASTER KILLSWITCH — TOTAL NETWORK DEATH         ║")
+                    print("  ╠══════════════════════════════════════════════════════╣")
+                    print("  ║  This is the NUCLEAR OPTION. No exceptions.         ║")
+                    print("  ║                                                      ║")
+                    print("  ║  • ALL traffic dropped — no whitelists honored      ║")
+                    print("  ║  • ALL interfaces disabled including loopback       ║")
+                    print("  ║  • SSH, VNC, and ALL remote access will die         ║")
+                    print("  ║  • IPC commands may stop working                    ║")
+                    print("  ║  • No user preferences or rules are respected       ║")
+                    print("  ║                                                      ║")
+                    print("  ║  Recovery requires PHYSICAL ACCESS to the machine.  ║")
+                    print("  ╚══════════════════════════════════════════════════════╝")
+                    print("")
+                    confirm = input("  Type YES to engage killswitch, or press Enter to cancel: ")
+                    if confirm != "YES":
+                        print("  Cancelled.")
+                        client.close()
+                        sys.exit(0)
+                client.sendall(b"KILLSWITCH:ON\n")
+                print("✓ Master Killswitch ENGAGED — all traffic dropped")
+            elif "--unkillswitch" in sys.argv:
+                client.sendall(b"KILLSWITCH:OFF\n")
+                print("✓ Master Killswitch DISENGAGED")
+            elif "--ghost" in sys.argv and "--unghost" not in sys.argv:
+                if "--force" not in sys.argv:
+                    print("")
+                    print("  ╔══════════════════════════════════════════════════════╗")
+                    print("  ║  ⚠  GHOST MODE — STEALTH NETWORK ISOLATION          ║")
+                    print("  ╠══════════════════════════════════════════════════════╣")
+                    print("  ║  Drops all traffic with Ghost Mode exceptions.      ║")
+                    print("  ║                                                      ║")
+                    print("  ║  • Most connections will be severed                  ║")
+                    print("  ║  • Ghost Mode whitelists ARE honored (not Normal)   ║")
+                    print("  ║  • SSH survives if whitelisted in Ghost Mode prefs  ║")
+                    print("  ║  • Remote --unghost recovery is still possible      ║")
+                    print("  ║  • LAN Shield listeners remain active               ║")
+                    print("  ║                                                      ║")
+                    print("  ║  Softer than killswitch — but still destructive.    ║")
+                    print("  ╚══════════════════════════════════════════════════════╝")
+                    print("")
+                    confirm = input("  Type YES to engage Ghost Mode, or press Enter to cancel: ")
+                    if confirm != "YES":
+                        print("  Cancelled.")
+                        client.close()
+                        sys.exit(0)
+                client.sendall(b"GHOST:ON\n")
+                print("✓ Ghost Mode ENGAGED — stealth network isolation")
+            elif "--unghost" in sys.argv:
+                client.sendall(b"GHOST:OFF\n")
+                print("✓ Ghost Mode DISENGAGED")
+            elif "--update-blocklists" in sys.argv:
+                client.sendall(b"UPDATE_BLOCKLISTS\n")
+                print("✓ Blocklist refresh triggered")
+            elif "--trust-wifi" in sys.argv:
+                ssid = _get_cli_arg("--trust-wifi")
+                client.sendall(f"TRUSTWIFI:{ssid}\n".encode())
+                print(f"✓ WiFi '{ssid}' marked as trusted")
+            elif "--untrust-wifi" in sys.argv:
+                ssid = _get_cli_arg("--untrust-wifi")
+                client.sendall(f"UNTRUSTWIFI:{ssid}\n".encode())
+                print(f"✓ WiFi '{ssid}' removed from trusted list")
+            elif "--status" in sys.argv:
+                client.sendall(b"STATUS\n")
+                response = client.recv(4096).decode()
+                print(response)
+            elif "--stats" in sys.argv:
+                client.sendall(b"STATS\n")
+                response = client.recv(4096).decode()
+                print(response)
+            elif "--service" in sys.argv:
+                print("Daemon is already running in the background.")
+                sys.exit(0)
+            else:
+                client.sendall(b"SHOW_GUI\n")
+                print("NetStrip is already running. Showing existing GUI.")
+            client.close()
+        except Exception as e:
+            print(f"Failed to communicate with running daemon: {e}")
+        sys.exit(0)
+
+    import threading
+    engine_instance = None
+    app = None
+
+    # --- IPC Listener Thread ---
+    def ipc_listener():
+        while True:
+            try:
+                conn, addr = ipc_socket.accept()
+                
+                # Sanity check: Only accept local connections
+                if addr[0] not in ('127.0.0.1', '::1'):
+                    conn.close()
+                    continue
+                    
+                # Sanity check: Buffer limit to prevent memory exhaustion (local DoS)
+                data = conn.recv(1024)
+                if len(data) > 1000:
+                    conn.close()
+                    continue
+                    
+                data = data.decode()
+                import re
+                
+                if "SHOW_GUI" in data and app:
+                    app.after(0, app.deiconify)
+                    app.after(50, app.lift)
+                    app.after(100, app.focus_force)
+                    
+                if engine_instance:
+                    if data.startswith("BLOCK:"):
+                        domain = data.split("BLOCK:")[1].strip()
+                        if re.match(r'^[a-zA-Z0-9.\-_*]{1,253}$', domain):
+                            engine_instance.db.add_user_rule(domain, "block", "global", "Added via CLI")
+                            engine_instance.classifier.user_rules[domain] = "block"
+                    elif data.startswith("ALLOW:"):
+                        domain = data.split("ALLOW:")[1].strip()
+                        if re.match(r'^[a-zA-Z0-9.\-_*]{1,253}$', domain):
+                            engine_instance.db.add_user_rule(domain, "allow", "global", "Added via CLI")
+                            engine_instance.classifier.user_rules[domain] = "allow"
+                    elif data.startswith("MODE:"):
+                        mode_str = data.split("MODE:")[1].strip().upper()
+                        from netstrip.core.modes import ProtectionLevel
+                        if hasattr(ProtectionLevel, mode_str):
+                            engine_instance.set_mode(ProtectionLevel[mode_str])
+                    elif data.startswith("ALLOWANOMALY:"):
+                        anomaly = data.split("ALLOWANOMALY:")[1].strip()
+                        engine_instance.db.whitelist_anomaly(anomaly)
+                        logger.info(f"Whitelisted anomaly via CLI IPC: {anomaly}")
+                        pending = engine_instance.db.get_setting("pending_kernel_threat", "")
+                        if pending.startswith(anomaly):
+                            engine_instance.db.set_setting("pending_kernel_threat", "")
+                            engine_instance.set_killswitch(False)
+                    elif data.startswith("KILLSWITCH:"):
+                        state = data.split("KILLSWITCH:")[1].strip().upper()
+                        engine_instance.set_killswitch(state == "ON")
+                        logger.info(f"Killswitch {'engaged' if state == 'ON' else 'disengaged'} via CLI")
+                    elif data.startswith("GHOST:"):
+                        state = data.split("GHOST:")[1].strip().upper()
+                        if state == "ON":
+                            engine_instance.db.set_setting("ghost_mode", "true")
+                            engine_instance.set_killswitch(True)
+                            logger.warning("Ghost Mode engaged via CLI — total network isolation")
+                        else:
+                            engine_instance.db.set_setting("ghost_mode", "false")
+                            engine_instance.set_killswitch(False)
+                            logger.info("Ghost Mode disengaged via CLI")
+                    elif data.startswith("UPDATE_BLOCKLISTS"):
+                        if hasattr(engine_instance, 'updater') and engine_instance.updater:
+                            engine_instance.updater.check_and_update()
+                            logger.info("Blocklist update triggered via CLI")
+                    elif data.startswith("TRUSTWIFI:"):
+                        ssid = data.split("TRUSTWIFI:")[1].strip()
+                        engine_instance.db.add_trusted_wifi(ssid)
+                        logger.info(f"WiFi '{ssid}' trusted via CLI")
+                    elif data.startswith("UNTRUSTWIFI:"):
+                        ssid = data.split("UNTRUSTWIFI:")[1].strip()
+                        engine_instance.db.remove_trusted_wifi(ssid)
+                        logger.info(f"WiFi '{ssid}' untrusted via CLI")
+                    elif data.startswith("STATS"):
+                        try:
+                            stats = engine_instance.db.get_24h_statistics()
+                            stat_str = f"NetStrip 24h Statistics:\n"
+                            stat_str += f"  Blocked:    {stats.get('total_blocked', 0):,}\n"
+                            stat_str += f"  Allowed:    {stats.get('total_allowed', 0):,}\n"
+                            stat_str += f"  Total DNS:  {stats.get('total_queries', 0):,}\n"
+                            stat_str += f"  Ads:        {stats.get('blocked_ads', 0):,}\n"
+                            stat_str += f"  Trackers:   {stats.get('blocked_trackers', 0):,}\n"
+                            stat_str += f"  Telemetry:  {stats.get('blocked_telemetry', 0):,}\n"
+                            stat_str += f"  Malware:    {stats.get('blocked_malware', 0):,}\n"
+                            conn.sendall(stat_str.encode())
+                        except Exception as e:
+                            conn.sendall(f"Error fetching stats: {e}\n".encode())
+                    elif data.startswith("STATUS"):
+                        status_str = f"NetStrip Daemon Status:\n"
+                        status_str += f"  Mode:       {engine_instance.classifier.mode.name}\n"
+                        status_str += f"  Killswitch: {'ACTIVE' if engine_instance.db.get_setting('killswitch_active', 'false') == 'true' else 'inactive'}\n"
+                        status_str += f"  Ghost Mode: {'ACTIVE' if engine_instance.db.get_setting('ghost_mode', 'false') == 'true' else 'inactive'}\n"
+                        psk = engine_instance.db.get_setting('lan_shield_psk', '')
+                        status_str += f"  LAN Shield: {'paired (PSK set)' if psk else 'not configured'}\n"
+                        pending = engine_instance.db.get_setting("pending_kernel_threat", "")
+                        if pending:
+                            status_str += f"  ⚠ LOCKDOWN: {pending}\n"
+                        else:
+                            status_str += "  Threats:    none detected\n"
+                        conn.sendall(status_str.encode())
+                conn.close()
+            except Exception:
+                pass
+                
+    threading.Thread(target=ipc_listener, daemon=True).start()
+
+    if is_embedded:
+        logger.info("Embedded system mode active. GUI will not be initialized.")
+        from netstrip.core.engine import NetStripEngine
+        engine_instance = NetStripEngine(is_headless=is_headless)
+        
+        # Apply CLI Boot Overrides natively
+        if "--blockinbound" in sys.argv:
+            engine_instance.db.set_setting("strict_inbound_shield", "true")
+            engine_instance.db.set_setting("inbound_lan_bypass", "false")
+        if "--allowlan" in sys.argv:
+            engine_instance.db.set_setting("inbound_lan_bypass", "true")
+        
+        try:
+            from netstrip.core.sound import sound_manager
+            sound_manager.set_muted(True) # Disable sounds in headless mode
+            
+            engine_instance.start()
+            
+            # Since there is no Tkinter mainloop, we need our own wait loop
+            while engine_instance.is_running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt received, stopping engine.")
+            import pathlib
+            clean_exit_path = pathlib.Path.home() / ".netstrip" / ".clean_exit"
+            try:
+                clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
+                clean_exit_path.touch()
+            except: pass
+        finally:
+            engine_instance.stop()
+            sys.exit(0)
+
+    # Standard GUI Boot Path (used for both desktop AND --service to get tray icon)
+    is_android_mode = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel') or '--android' in sys.argv
+    
+    try:
+        if is_android_mode:
+            from netstrip.gui.app_android import NetStripApp
+        else:
+            from netstrip.gui.app import NetStripApp
+            
+        from netstrip.gui.splash import SplashScreen
+        from netstrip.core.engine import NetStripEngine
+        
+        # Create hidden main app immediately
+        app = NetStripApp()
+    except Exception as e:
+        logger.error(f"GUI Subsystem Initialization Failed: {e}")
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0,
+                    f"Error initializing Cripple GUI: {e}\n\nPlease ensure display drivers and system prerequisites are up to date.",
+                    "Cripple Initialization Error",
+                    0x10 # MB_ICONERROR
+                )
+            except Exception:
+                pass
+        raise
+        
+    # Suppress Tkinter's noisy callback exception reporting in headless/service mode
+    if is_headless:
+        app.report_callback_exception = lambda exc, val, tb: None
+        
+    if not is_fallback and not is_headless:
+        splash = SplashScreen(app)
+        app.update() # Force draw the splash screen to the OS NOW!
+    else:
+        splash = None
+
+        
+    start_time = time.time()
+    
+    import threading
+    engine_instance = None
+    
+    def splash_progress_callback(text: str, progress_val: float):
+        if not is_headless and splash and splash.winfo_exists():
+            app.after(0, lambda: splash.update_status(text, progress_val))
+
+    def boot_thread():
+        nonlocal engine_instance
+        try:
+            # Initialize Engine with live splash progress callback
+            engine_instance = NetStripEngine(is_headless=is_headless, progress_callback=splash_progress_callback if not is_headless else None)
+            
+            # Apply CLI Boot Overrides natively
+            if "--blockinbound" in sys.argv:
+                engine_instance.db.set_setting("strict_inbound_shield", "true")
+                engine_instance.db.set_setting("inbound_lan_bypass", "false")
+            if "--allowlan" in sys.argv:
+                engine_instance.db.set_setting("inbound_lan_bypass", "true")
+                
+            from netstrip.core.sound import sound_manager
+            
+            # Mute sounds during boot
+            initial_mute_state = sound_manager.muted
+            sound_manager.set_muted(True)
+            
+            engine_instance.start()
+            
+            # Register atexit and signal handlers to ensure OS settings are restored on any exit
+            import atexit
+            atexit.register(lambda: engine_instance.stop() if engine_instance and engine_instance.is_running else None)
+            
+            def _sig_handler(signum, frame):
+                logger.info(f"Signal {signum} received, stopping engine gracefully...")
+                if engine_instance and engine_instance.is_running:
+                    engine_instance.stop()
+                sys.exit(0)
+                
+            try:
+                signal.signal(signal.SIGINT, _sig_handler)
+                signal.signal(signal.SIGTERM, _sig_handler)
+            except Exception:
+                pass
+            
+            # Defer back to main thread to build UI and finalize
+            app.after(0, lambda: finalize_boot(engine_instance, initial_mute_state))
+            
+        except Exception as e:
+            logger.error(f"Engine Boot Error: {e}")
+            import traceback
+            traceback.print_exc()
+            app.after(0, app.destroy)
+            
+    def finalize_boot(engine, initial_mute_state):
+        try:
+            # Prepare main app for invisible rendering to prevent white flash
+            app.attributes('-alpha', 0.0)
+            
+            # Build the heavy UI components now that engine is ready
+            app.build_ui(engine)
+            
+            # Force Tkinter to render the widgets while fully transparent
+            if not is_headless:
+                app.deiconify()
+            app.apply_icon()
+            try:
+                app.update_idletasks()
+            except Exception:
+                pass
+            
+            def on_transition_done():
+                if not is_headless:
+                    app.attributes('-alpha', 1.0)
+                    app.attributes('-topmost', True)
+                    app.lift()
+                    app.focus_force()
+                    app.after(200, lambda: app.attributes('-topmost', False))
+                    app.apply_icon()
+                    
+                    from netstrip.core.sound import sound_manager
+                    sound_manager.set_muted(initial_mute_state)
+                    if not initial_mute_state:
+                        sound_manager.play_intro()
+                else:
+                    app._show_tray_icon()
+                    
+            def start_transition():
+                if is_headless:
+                    on_transition_done()
+                    return
+
+                # Ensure splash is on top before revealing app to avoid jarring pop-in
+                if splash and splash.winfo_exists():
+                    try:
+                        splash.attributes('-topmost', True)
+                    except Exception:
+                        pass
+
+                # Pre-reveal the main app behind the splash screen
+                try:
+                    app.attributes('-alpha', 1.0)
+                except Exception:
+                    pass
+                    
+                if splash and splash.winfo_exists():
+                    splash.fade_out(callback=on_transition_done, total_steps=15)
+                else:
+                    on_transition_done()
+
+            transition_started = False
+            def check_engine_ready():
+                nonlocal transition_started
+                if transition_started:
+                    return
+
+                elapsed = time.time() - start_time
+                if is_headless:
+                    transition_started = True
+                    on_transition_done()
+                    return
+    
+                # Wait for blocklist ready and minimum 1.2s display duration (or 30.0s safety timeout)
+                is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
+                if (is_blocklist_ready and elapsed >= 1.2) or elapsed >= 30.0:
+                    transition_started = True
+                    if splash and splash.winfo_exists():
+                        try:
+                            splash.update_status("Protection Active", 1.0)
+                        except Exception:
+                            pass
+                    app.after(50, start_transition)
+
+                else:
+                    app.after(30, check_engine_ready)
+                    
+            check_engine_ready()
+        except Exception as e:
+            logger.error(f"GUI Build Error: {e}")
+            
+    # Start the boot process in background so splash animation can run
+    threading.Thread(target=boot_thread, daemon=True).start()
+
+    try:
+        app.mainloop()
+    except Exception as e:
+        logger.error(f"Mainloop Error: {e}")
+        if engine_instance:
+            try:
+                engine_instance.stop()
+            except Exception:
+                pass
+        try:
+            from netstrip.core.crash_reporter import send_crash_report
+            send_crash_report(exception=e, context="mainloop")
+        except Exception:
+            pass
+    finally:
+        if engine_instance:
+            try:
+                engine_instance.stop()
+            except Exception:
+                pass
+
+if __name__ == "__main__":
+    main()
