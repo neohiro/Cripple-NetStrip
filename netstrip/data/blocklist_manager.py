@@ -168,8 +168,31 @@ class BlocklistManager:
         self.progress_callback = progress_callback
         
         if lists_dir is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            lists_dir = os.path.join(base_dir, 'lists')
+            user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
+            lists_dir = os.path.join(user_dir, "lists")
+            os.makedirs(lists_dir, exist_ok=True)
+            
+            # Copy bundled lists and updater_sources.json to persistent storage if missing
+            bundled_data_dir = os.path.dirname(os.path.abspath(__file__))
+            bundled_lists = os.path.join(bundled_data_dir, 'lists')
+            bundled_sources = os.path.join(bundled_data_dir, 'updater_sources.json')
+            
+            import shutil
+            if os.path.exists(bundled_sources):
+                target_sources = os.path.join(user_dir, 'updater_sources.json')
+                if not os.path.exists(target_sources):
+                    try: shutil.copy2(bundled_sources, target_sources)
+                    except Exception: pass
+            
+            if os.path.exists(bundled_lists):
+                for item in os.listdir(bundled_lists):
+                    if item.endswith('.txt') or item.endswith('.json'):
+                        src = os.path.join(bundled_lists, item)
+                        dst = os.path.join(lists_dir, item)
+                        if not os.path.exists(dst):
+                            try: shutil.copy2(src, dst)
+                            except Exception: pass
+                            
         self.lists_dir = lists_dir
         self.is_loading = True
         

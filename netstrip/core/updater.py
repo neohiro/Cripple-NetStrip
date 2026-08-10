@@ -68,9 +68,14 @@ def is_newer_version(remote: str, current: str) -> bool:
 
 
 class BlocklistUpdater:
-    def __init__(self, lists_dir: str, on_update_callback: callable = None):
-        self.lists_dir = lists_dir
-        self.sources_file = os.path.join(lists_dir, '..', 'updater_sources.json')
+    def __init__(self, lists_dir: str = None, on_update_callback: callable = None):
+        if lists_dir is None:
+            user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
+            self.lists_dir = os.path.join(user_dir, "lists")
+            os.makedirs(self.lists_dir, exist_ok=True)
+        else:
+            self.lists_dir = lists_dir
+        self.sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         self.is_updating = False
         self.on_update_callback = on_update_callback
 
