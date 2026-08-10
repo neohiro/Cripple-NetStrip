@@ -1,0 +1,134 @@
+name: Auto-Build Executables
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach binaries to (e.g., v3.1.0)'
+        required: true
+        default: 'v3.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            target: linux
+          - os: ubuntu-latest
+            name: Android
+            target: android
+          - os: macos-latest
+            name: macOS
+            target: macos
+          - os: windows-latest
+            name: Windows
+            target: windows
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install System Dependencies (Linux & Android)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev openjdk-17-jdk
+          sudo apt-get install -y zip unzip autoconf libtool libltdl-dev automake autotools-dev m4 pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
+          rustup target add aarch64-linux-android || true
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --retries 3 --timeout 60 -r requirements.txt
+          pip install --retries 3 --timeout 60 Pillow pyinstaller buildozer "cython==0.29.33" virtualenv maturin
+          pip install -e .
+
+      - name: Set Release Tag
+        shell: bash
+        run: |
+          VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v$VERSION"
+          fi
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Build Windows Executable
+        if: matrix.target == 'windows'
+        run: |
+          cmd.exe /c build.bat
+          if (Test-Path "dist\Cripple") {
+              Compress-Archive -Path "dist\Cripple\*" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          } else {
+              Compress-Archive -Path "dist\*" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          }
+
+      - name: Build macOS Executable
+        if: matrix.target == 'macos'
+        run: |
+          chmod +x build.sh run.sh
+          bash build.sh || true
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-macOS.zip *
+            cd ..
+          else
+            echo "PyInstaller dist missing, creating source fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-macOS.zip main.py netstrip/ assets/ requirements.txt build.sh run.sh
+          fi
+
+      - name: Build Linux Executable
+        if: matrix.target == 'linux'
+        run: |
+          chmod +x build.sh run.sh
+          bash build.sh || true
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cd dist
+            zip -r ../NetStrip-${RELEASE_TAG}-Linux.zip *
+            cd ..
+          else
+            echo "PyInstaller dist missing, creating source fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-Linux.zip main.py netstrip/ assets/ requirements.txt build.sh run.sh
+          fi
+
+      - name: Build Android Package
+        if: matrix.target == 'android'
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: |
+          yes | buildozer android debug || true
+          mkdir -p bin
+          if [ -d "bin" ] && [ "$(ls -A bin/*.apk 2>/dev/null)" ]; then
+            mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk
+            cd bin
+            zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
+            cd ..
+          else
+            echo "Building Android fallback bundle"
+            zip -r NetStrip-${RELEASE_TAG}-Android.zip main.py netstrip/ buildozer.spec
+          fi
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: NetStrip-*-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
