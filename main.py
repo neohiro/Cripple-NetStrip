@@ -826,8 +826,11 @@ def main():
             
             def on_transition_done():
                 if not is_headless:
+                    app.attributes('-alpha', 1.0)
+                    app.attributes('-topmost', True)
                     app.lift()
                     app.focus_force()
+                    app.after(200, lambda: app.attributes('-topmost', False))
                     app.apply_icon()
                     
                     from netstrip.core.sound import sound_manager
@@ -837,44 +840,27 @@ def main():
                 else:
                     app._show_tray_icon()
                     
-            def cross_fade(frame=0, total_frames=8):
+            def start_transition():
                 if is_headless:
                     on_transition_done()
                     return
 
-                import math
-                progress = min(1.0, float(frame) / float(total_frames))
-                # Cosine ease-in-out curve: 0.0 -> 1.0
-                eased = (1.0 - math.cos(progress * math.pi)) / 2.0
-                
-                splash_alpha = max(0.0, 1.0 - eased)
-                app_alpha = min(1.0, eased)
-                
+                # Ensure splash is on top before revealing app to avoid jarring pop-in
                 if splash and splash.winfo_exists():
                     try:
-                        splash.attributes('-alpha', splash_alpha)
+                        splash.attributes('-topmost', True)
                     except Exception:
                         pass
-                        
+
+                # Pre-reveal the main app behind the splash screen
                 try:
-                    app.attributes('-alpha', app_alpha)
+                    app.attributes('-alpha', 1.0)
                 except Exception:
                     pass
                     
-                if frame < total_frames:
-                    app.after(25, lambda: cross_fade(frame + 1, total_frames))
+                if splash and splash.winfo_exists():
+                    splash.fade_out(callback=on_transition_done, total_steps=15)
                 else:
-                    if splash and splash.winfo_exists():
-                        try:
-                            splash.stop_animation()
-                            splash.withdraw()
-                        except Exception:
-                            pass
-                    app.attributes('-alpha', 1.0)
-                    app.attributes('-topmost', True)
-                    app.lift()
-                    app.focus_force()
-                    app.after(200, lambda: app.attributes('-topmost', False))
                     on_transition_done()
 
             transition_started = False
@@ -898,7 +884,7 @@ def main():
                             splash.update_status("Protection Active", 1.0)
                         except Exception:
                             pass
-                    app.after(50, cross_fade)
+                    app.after(50, start_transition)
 
                 else:
                     app.after(30, check_engine_ready)
