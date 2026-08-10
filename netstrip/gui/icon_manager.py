@@ -184,18 +184,24 @@ class IconManager:
                 except Exception: pass
 
         # 3. Check disk cache for App Fallback
-        app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
-        if os.path.exists(app_icon_path):
-            try:
-                img = Image.open(app_icon_path)
-                img.verify()
-                img = Image.open(app_icon_path)
-                self._image_cache[process_path] = img
-                return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
-            except Exception:
-                try: os.remove(app_icon_path)
-                except Exception: pass
-                
+        path_base = os.path.basename(process_path).lower().replace('.exe', '') if process_path and os.path.isabs(process_path) else ''
+        
+        possible_app_paths = [os.path.join(self.cache_dir, f"app_{app_name_base}.png")]
+        if path_base:
+            possible_app_paths.append(os.path.join(self.cache_dir, f"app_{path_base}.png"))
+            possible_app_paths.append(os.path.join(self.cache_dir, f"app_guess_{path_base}.png"))
+            
+        for app_icon_path in possible_app_paths:
+            if os.path.exists(app_icon_path):
+                try:
+                    img = Image.open(app_icon_path)
+                    img.verify()
+                    img = Image.open(app_icon_path)
+                    self._image_cache[process_path] = img
+                    return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
+                except Exception:
+                    try: os.remove(app_icon_path)
+                    except Exception: pass
         # 4. Check disk cache for OS Fallback
         os_type = AppIdentifier.identify(process_path)
         cached_os_icon_path = os.path.join(self.cache_dir, f"{os_type}.png")
@@ -276,16 +282,33 @@ class IconManager:
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
         app_name_base = process_name.lower().replace('.exe', '')
+        path_base = os.path.basename(process_path).lower().replace('.exe', '') if process_path else ''
         
+        # 1. Try matching path base (e.g. chrome)
+        if path_base in APP_ICONS:
+            app_icon_path = os.path.join(self.cache_dir, f"app_{path_base}.png")
+            self._download_icon(APP_ICONS[path_base], app_icon_path, process_path, callback)
+            return
+            
+        # 2. Try matching display name (e.g. Google Chrome usually fails this, but good fallback)
         if app_name_base in APP_ICONS:
             app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
             self._download_icon(APP_ICONS[app_name_base], app_icon_path, process_path, callback)
             return
             
+        # 3. Try OS icons
         os_type = AppIdentifier.identify(process_path)
         if os_type in OS_ICONS:
             cached_os_icon_path = os.path.join(self.cache_dir, f"{os_type}.png")
             self._download_icon(OS_ICONS[os_type], cached_os_icon_path, process_path, callback)
+            return
+            
+        # 4. Try guessing from a clean domain using the executable name (e.g. 'brave' -> 'brave.com')
+        # This catches tons of apps without needing them hardcoded in APP_ICONS
+        if path_base and path_base not in ('unknown', 'system', 'svchost', 'explorer'):
+            guess_url = f"https://www.google.com/s2/favicons?domain={path_base}.com&sz=64"
+            app_icon_path = os.path.join(self.cache_dir, f"app_guess_{path_base}.png")
+            self._download_icon(guess_url, app_icon_path, process_path, callback)
             return
             
         if process_path in self._in_progress:

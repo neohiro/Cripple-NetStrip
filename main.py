@@ -845,18 +845,8 @@ def main():
                     on_transition_done()
                     return
 
-                # Ensure splash is on top before revealing app to avoid jarring pop-in
-                if splash and splash.winfo_exists():
-                    try:
-                        splash.attributes('-topmost', True)
-                    except Exception:
-                        pass
-
-                # Pre-reveal the main app behind the splash screen
-                try:
-                    app.attributes('-alpha', 1.0)
-                except Exception:
-                    pass
+                # Do not pre-reveal the main app to prevent overlap/layering artifacts.
+                # Keep it hidden (alpha=0.0) until the splash screen has fully faded out and withdrawn.
                     
                 if splash and splash.winfo_exists():
                     splash.fade_out(callback=on_transition_done, total_steps=15)
