@@ -133,7 +133,8 @@
       "url": "https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/extra.txt",
       "format": "hosts",
       "category": "security",
-      "enabled": true
+      "enabled": true,
+      "update_interval_hours": 12
     },
     {
       "name": "AdGuard Base Filter",
@@ -325,14 +326,16 @@
       "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/crypto.txt",
       "format": "hosts",
       "category": "security",
-      "enabled": true
+      "enabled": true,
+      "update_interval_hours": 4
     },
     {
       "name": "KADhosts (Fraud/Scam)",
       "url": "https://raw.githubusercontent.com/KADhosts/KADhosts/master/KADhosts.txt",
       "format": "hosts",
       "category": "security",
-      "enabled": true
+      "enabled": true,
+      "update_interval_hours": 4
     },
     {
       "name": "Identity: Netflix",

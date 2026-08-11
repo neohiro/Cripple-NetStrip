@@ -1,3 +1,10 @@
+## [v3.4.4] - Security List Update Intervals
+
+- **Rapid Security Updates**: Configured explicit fast-update cycles for the newly added security threat intelligence feeds:
+  - HaGeZi Crypto / Prigent: Updates every 4 hours (previously 24h default)
+  - KADhosts (Fraud/Scams): Updates every 4 hours (previously 24h default)
+  - WindowsSpyBlocker - Extra (Paranoid): Updates every 12 hours
+
 ## [v3.4.3] - Curated Feeds & Updater Whitelist
 
 - **Dynamic Updater Protection**: Automatically extracts blocklist source domains (e.g., raw.githubusercontent.com, urlhaus.abuse.ch) and dynamically injects them into the engine's ESSENTIAL_DOMAINS memory set. This guarantees the updater has network clearance to download blocklists even when the app is in strict Paranoid or Ghost isolation modes.
