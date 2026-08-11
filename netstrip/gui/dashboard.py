@@ -190,7 +190,9 @@ class DashboardView(ctk.CTkScrollableFrame):
         def proceed():
             val = "true" if self.system_toggle.get() else "false"
             self.engine.db.set_setting("block_system_connections", val)
-
+            if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
+                try: self.engine.gui_update_callback("MODE_CHANGED")
+                except: pass
 
         is_on = self.system_toggle.get()
         if not is_on: # They toggled it to OFF

@@ -661,6 +661,7 @@ class AppGroupFrame(ctk.CTkFrame):
         # Check current global status
         self._global_action_state = None
         self._implicit_block = False
+        self._system_blocked = False
         is_paranoid = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
         is_paranoid = is_paranoid and is_paranoid.name.upper() in ("GHOST", "PARANOID")
         has_explicit_allow = False
@@ -684,20 +685,20 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # System block implied indicator ONLY applies if user has no explicit rule (state is None)
+        # System block indicator ONLY applies if user has no explicit rule (state is None)
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
         if self._global_action_state is None and sys_blocked:
             is_system = False
             p_lower = self.process_name.lower()
-            if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe'):
+            if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe', 'system', 'system (kernel/driver)', 'system idle process'):
                 is_system = True
-            elif len(self.rows) > 2 and all(r.conn_data.get('category') == 'system' for r in self.rows.values()):
+            elif len(self.rows) > 0 and all(r.conn_data.get('category') in ('system', ConnectionCategory.SYSTEM.value) for r in self.rows.values()):
                 is_system = True
                 
             if is_system:
-                self._implicit_block = True
+                self._system_blocked = True
                 
-        # Update button visuals (Explicit User Preference ALWAYS takes priority over implicit indicators!)
+        # Update button visuals (Explicit User Preference ALWAYS takes priority!)
         from netstrip.gui.theme import Colors
         if self._global_action_state == 'block':
             self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
@@ -708,6 +709,10 @@ class AppGroupFrame(ctk.CTkFrame):
         elif self._global_action_state == 'neutral':
             # User explicitly turned off both toggles — both transparent!
             self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._system_blocked:
+            # Block System Connections is active for this system process -> Block All lights up RED!
+            self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         elif self._implicit_block:
             self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)

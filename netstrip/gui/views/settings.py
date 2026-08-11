@@ -442,6 +442,9 @@ class SettingsView(ctk.CTkFrame):
                     self.engine.classifier._domain_cache.clear()
                     if hasattr(self.engine.classifier, '_ip_cache'):
                         self.engine.classifier._ip_cache.clear()
+                if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
+                    try: self.engine.gui_update_callback("MODE_CHANGED")
+                    except: pass
 
             readable_name = setting_key.replace('_', ' ').title()
             status = "Enabled" if value == 'true' else "Disabled"

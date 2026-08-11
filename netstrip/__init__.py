@@ -4,5 +4,5 @@ A cross-platform firewall, DNS sinkhole, and traffic classifier
 that strips unnecessary connections from your system.
 """
 
-__version__ = "3.3.20"
+__version__ = "3.3.21"
 __app_name__ = "NetStrip"

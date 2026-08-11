@@ -1,3 +1,11 @@
+## [v3.3.21] - System Connection Block Visual Indicator & Real-Time App Row Sync
+
+- **Active System Process Block Visual Indicator**:
+  - Restored the active system process block indicator: when `Block System Connections` is enabled, all system process rows (`svchost.exe`, `explorer.exe`, `conhost.exe`, `System`, `services.exe`, etc.) display their `Block All` toggle in **bright red** (`#f43f5e`).
+  - Explicit user actions (`Allow All` or `Neutral`) on individual system apps continue to override the global system block setting.
+- **Real-Time Sidebar Event Sync**:
+  - Toggling `Block System Connections` from the Dashboard or Settings tab now immediately broadcasts `MODE_CHANGED` to update all visible sidebar process rows in real time.
+
 ## [v3.3.20] - Strict 3-Mode Architecture (Ghost / Normal / Loose) & Dashboard Controls
 
 - **Strict 3-Mode Architecture**:
