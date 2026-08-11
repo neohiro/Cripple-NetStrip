@@ -60,12 +60,12 @@ class GeoIPService:
 
     def fetch_now(self) -> bool:
         """Fetch immediately and return True if successful."""
-        # Privacy Hardening: Abort public IP checks entirely in Ghost/Paranoid or Streamer Privacy mode
+        # Privacy Hardening: Abort public IP checks entirely in Ghost or Streamer Privacy mode
         is_privacy = False
         if self.engine:
             if getattr(self.engine, 'db', None) and str(self.engine.db.get_setting("privacy_stream_mode", "false")).lower() == "true":
                 is_privacy = True
-            elif getattr(self.engine, 'classifier', None) and getattr(self.engine.classifier, 'mode', None) and self.engine.classifier.mode.name in ("PARANOID", "GHOST"):
+            elif getattr(self.engine, 'classifier', None) and getattr(self.engine.classifier, 'mode', None) and self.engine.classifier.mode.name == "GHOST":
                 is_privacy = True
                 
         if is_privacy:
@@ -198,8 +198,8 @@ class OfflineGeoIP:
             # Check privacy modes before downloading
             if self.engine:
                 mode = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
-                if mode and mode.name in ("PARANOID", "GHOST"):
-                    logger.info("GeoLite2 download blocked by Ghost/Paranoid Mode. Retrying later.")
+                if mode and mode.name == "GHOST":
+                    logger.info("GeoLite2 download blocked by Ghost Mode. Retrying later.")
                     return
                 if hasattr(self.engine, 'db') and self.engine.db.get_setting("privacy_stream_mode", "false") == "true":
                     logger.info("GeoLite2 download blocked by Streamer Privacy Mode. Retrying later.")
@@ -249,11 +249,13 @@ class OfflineGeoIP:
     def get_full_location(self, ip_str: str) -> str:
         flag = self.get_flag(ip_str)
         city = self.get_city(ip_str)
-        country = self.get_country(ip_str)
         
         parts = []
         if flag: parts.append(flag)
         if city: parts.append(city)
-        if country and country != city: parts.append(country)
-        
+        elif not city: 
+            # Fallback to country name if city is unknown
+            country = self.get_country(ip_str)
+            if country: parts.append(country)
+            
         return " ".join(parts) if parts else "" 

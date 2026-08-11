@@ -476,6 +476,32 @@ class SettingsView(ctk.CTkFrame):
                     try: self.engine.gui_update_callback("MODE_CHANGED")
                     except: pass
 
+            if setting_key == 'mac_randomization':
+                import threading
+                def _apply_mac():
+                    try:
+                        from netstrip.core.mac_randomizer import MACRandomizer
+                        randomizer = MACRandomizer(self.engine)
+                        if value == 'true':
+                            randomizer.randomize_active_adapter()
+                        else:
+                            randomizer.restore_active_adapter()
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).error(f"MAC randomization failed: {e}")
+                threading.Thread(target=_apply_mac, daemon=True).start()
+
+            if setting_key == 'harden_network_adapter':
+                import threading
+                def _apply_hardening():
+                    try:
+                        from netstrip.core.mac_randomizer import MACRandomizer
+                        MACRandomizer.harden_adapter_protocols(enable=(value == 'true'))
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).error(f"Adapter hardening failed: {e}")
+                threading.Thread(target=_apply_hardening, daemon=True).start()
+
             readable_name = setting_key.replace('_', ' ').title()
             status = "Enabled" if value == 'true' else "Disabled"
             if hasattr(self.engine, 'on_status') and self.engine.on_status:
@@ -508,6 +534,19 @@ class SettingsView(ctk.CTkFrame):
         # Layer 2 ARP Lockdown
         self._add_switch_row(card, "Layer 2 ARP Lockdown", 'layer2_arp_lockdown', tooltip_text="Use Case: Public Wi-Fi / Corporate Networks. Prevents hackers from spoofing your router's MAC address and redirecting your packets to them.")
         self._add_subtitle(card, "Enforces static MAC-to-IP pinning for your default gateway at the OS level. Mathematically prevents ARP Spoofing and Layer 2 redirection attacks without needing a custom kernel driver.")
+
+        # MAC Address Randomization (Default OFF)
+        self._add_switch_row(card, "MAC Address Randomization", 'mac_randomization', tooltip_text="Use Case: Public Wi-Fi anonymity. Changes your hardware MAC address to a random locally-administered address, preventing physical device tracking across networks.")
+        self._add_subtitle(card, "Generates a random locally-administered MAC address and applies it to your active network adapter. Prevents network-level fingerprinting and hardware tracking. Requires brief adapter restart (~3s disconnect).")
+
+        # Harden Network Adapter
+        self._add_switch_row(card, "Harden Network Adapter", 'harden_network_adapter', tooltip_text="Use Case: Attack surface reduction. Disables vulnerable legacy protocols (NetBIOS, LLDP, LLMNR, mDNS, Client for Microsoft Networks, QoS) on all network adapters.")
+        self._add_subtitle(card, "Strips unnecessary protocol bindings from your network adapters. Disables NetBIOS over TCP/IP, LLMNR, LLDP, mDNS responder, Client for Microsoft Networks, File and Printer Sharing, and QoS Packet Scheduler. Dramatically reduces your adapter's attack surface.")
+
+        # Force DNS-over-HTTPS
+        self._add_switch_row(card, "Force DNS-over-HTTPS (DoH)", 'force_doh', tooltip_text="Use Case: ISP blindness. Encrypts all DNS queries so your internet provider cannot see which domains you visit. Auto-enabled when no third-party DNS proxy is detected.")
+        self._add_subtitle(card, "Forces all DNS resolution through encrypted HTTPS tunnels (Cloudflare, Google, Quad9, AdGuard). Falls back to DoT if DoH fails. Plaintext UDP port 53 is used only as last resort in 'auto' mode, or blocked entirely in strict mode.")
+
 
         # Linux Deep Kernel XDP Mode
         import os

@@ -16,8 +16,8 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
-# Disable DoH to prevent recursive getaddrinfo loop since NetStrip itself intercepts DNS.
-# Upstream queries will fallback to standard UDP which uses raw IP sockets.
+# NetStrip supports DoH, DoT, and UDP. Upstream queries can be configured to force
+# DoH/DoT to prevent ISP snooping, or fallback to standard UDP.
 DOH_PROVIDERS = {
     "1.1.1.1": ("cloudflare-dns.com", "/dns-query"),
     "1.1.1.2": ("security.cloudflare-dns.com", "/dns-query"),
@@ -497,18 +497,40 @@ class NetStripResolver(BaseResolver):
             proxy_response = None
             is_public_ip = not upstream_ip.startswith("127.") and upstream_ip != "::1"
             
-            # 1. Primary: Standard UDP port 53 (Fastest, 10-30ms response time, 1.5s timeout)
-            try:
-                proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
-            except Exception:
-                proxy_response = None
-
-            # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH) if standard UDP failed and public IP
-            if not proxy_response and is_public_ip:
-                proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
-                if not proxy_response and upstream_ip in DOH_PROVIDERS:
+            force_doh_setting = self.db.get_setting('force_doh', 'auto')
+            force_doh = force_doh_setting != 'false'
+            
+            if force_doh and not has_local_proxy:
+                if upstream_ip in DOH_PROVIDERS:
                     host, url_path = DOH_PROVIDERS[upstream_ip]
                     proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=1.5)
+                
+                if not proxy_response and is_public_ip:
+                    proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
+                    
+                if not proxy_response:
+                    if force_doh_setting == 'true':
+                        reply = request.reply()
+                        reply.header.rcode = RCODE.SERVFAIL
+                        return reply
+                    else:
+                        try:
+                            proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
+                        except Exception:
+                            proxy_response = None
+            else:
+                # 1. Primary: Standard UDP port 53 (Fastest, 10-30ms response time, 1.5s timeout)
+                try:
+                    proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
+                except Exception:
+                    proxy_response = None
+    
+                # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH) if standard UDP failed and public IP
+                if not proxy_response and is_public_ip:
+                    proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
+                    if not proxy_response and upstream_ip in DOH_PROVIDERS:
+                        host, url_path = DOH_PROVIDERS[upstream_ip]
+                        proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=1.5)
 
             if not proxy_response:
                 raise TimeoutError(f"No response from upstream DNS {upstream_ip}")
@@ -530,6 +552,12 @@ class NetStripResolver(BaseResolver):
             return record
         except Exception as e:
             logger.debug(f"DNS Upstream error for {domain} via {upstream_ip}: {e}")
+            force_doh_setting = self.db.get_setting('force_doh', 'auto')
+            if force_doh_setting == 'true' and not has_local_proxy:
+                reply = request.reply()
+                reply.header.rcode = RCODE.SERVFAIL
+                return reply
+                
             if upstream_ip != "1.1.1.1":
                 try:
                     proxy_response = request.send("1.1.1.1", 53, timeout=1.5)
