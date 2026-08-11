@@ -844,6 +844,12 @@ class NetStripApp(ctk.CTk):
                         if hasattr(group, 'refresh_global_state'):
                             group.refresh_global_state()
                     self.connections_list._refresh_loop()
+                
+                # Keep SettingsView toggles in sync with Dashboard changes
+                from netstrip.gui.views.settings import SettingsView
+                settings_view = self._cached_views.get(SettingsView)
+                if settings_view and hasattr(settings_view, 'refresh_toggles'):
+                    settings_view.refresh_toggles()
         self.after(0, _handle_event)
                 
     def _start_version_glow_animation(self):

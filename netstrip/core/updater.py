@@ -167,13 +167,15 @@ class BlocklistUpdater:
                 last_error = None
                 for attempt in range(1, max_attempts + 1):
                     try:
-                        req = urllib.request.Request(
-                            url, 
-                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-                        )
-                        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as response:
-                            with open(temp_file, 'wb') as out_file:
-                                out_file.write(response.read())
+                        import requests
+                        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                        response = requests.get(url, headers=headers, stream=True, timeout=30)
+                        response.raise_for_status()
+                        
+                        with open(temp_file, 'wb') as out_file:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    out_file.write(chunk)
                         
                         if os.path.exists(target_file):
                             try: os.remove(target_file)

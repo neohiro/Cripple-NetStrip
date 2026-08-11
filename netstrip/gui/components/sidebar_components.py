@@ -685,9 +685,9 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # System block indicator ONLY applies if user has no explicit rule (state is None)
+        # System block indicator applies unless user explicitly allowed
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
-        if self._global_action_state is None and sys_blocked:
+        if sys_blocked and not has_explicit_allow:
             is_system = False
             p_lower = self.process_name.lower()
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe', 'system', 'system (kernel/driver)', 'system idle process'):
@@ -696,6 +696,7 @@ class AppGroupFrame(ctk.CTkFrame):
                 is_system = True
                 
             if is_system:
+                self._global_action_state = 'block'
                 self._system_blocked = True
                 
         # Update button visuals (Explicit User Preference ALWAYS takes priority!)

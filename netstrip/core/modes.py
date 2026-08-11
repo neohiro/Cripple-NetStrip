@@ -28,6 +28,7 @@ class ConnectionCategory(Enum):
     USER_ALLOWED = "user_allowed"
     USER_BLOCKED = "user_blocked"
     UNKNOWN = "unknown"
+    IDENTITY = "identity"
     LAN = "lan"
     UPDATE = "update"
     SECURITY = "security"
@@ -84,6 +85,10 @@ class ModeConfig:
 
     def get_action_for_category(self, category: ConnectionCategory, db=None) -> ConnectionAction:
         """Determine what action to take for a given connection category."""
+        # Check global allowlist overrides first
+        if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL, ConnectionCategory.IDENTITY):
+            return ConnectionAction.ALLOW
+
         if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT):
             if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL):
                 return ConnectionAction.ALLOW

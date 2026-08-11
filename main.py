@@ -849,7 +849,7 @@ def main():
                 # Keep it hidden (alpha=0.0) until the splash screen has fully faded out and withdrawn.
                     
                 if splash and splash.winfo_exists():
-                    splash.fade_out(callback=on_transition_done, total_steps=15)
+                    splash.fade_out(callback=on_transition_done, total_steps=8)
                 else:
                     on_transition_done()
 

@@ -112,6 +112,9 @@ class SettingsView(ctk.CTkFrame):
         self._build_analytics_card()
         self._build_about_card()
         
+        # Track switch references for state syncing
+        self._switch_refs = {}
+        
     def _build_updates_card(self):
         from netstrip import __version__
         card = ctk.CTkFrame(self.scroll_frame, **CTK_FRAME_STYLE)
@@ -340,6 +343,33 @@ class SettingsView(ctk.CTkFrame):
             switch.select()
         else:
             switch.deselect()
+        self._switch_refs[setting_key] = switch
+
+    def refresh_toggles(self):
+        """Synchronize switch visuals with current DB state (called on MODE_CHANGED)."""
+        if not hasattr(self, '_switch_refs'):
+            return
+        for key, switch in self._switch_refs.items():
+            if not switch.winfo_exists():
+                continue
+            
+            if key == 'block_system_connections':
+                val = self.engine.db.get_setting(key, "false")
+            elif key == 'smart_shield':
+                val = self.engine.db.get_setting(key, "true")
+            elif key == 'telemetry':
+                val = self.engine.db.get_setting(key, "false")
+            else:
+                val = self.engine.db.get_setting(key, "false")
+                
+            current_state = switch.get()
+            expected_state = 1 if val == 'true' else 0
+            
+            if current_state != expected_state:
+                if expected_state:
+                    switch.select()
+                else:
+                    switch.deselect()
 
     def _on_switch_toggle(self, switch, setting_key):
         try:

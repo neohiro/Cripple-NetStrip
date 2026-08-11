@@ -196,7 +196,16 @@ class IconManager:
         display_lower = process_name.lower()
         if "chrome" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_chrome.png"))
         if "edge" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_msedge.png"))
-        if "service host" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_svchost.png"))
+        if "service host" in display_lower or "svchost" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_svchost.png"))
+        if "system idle process" in display_lower or "system" == display_lower or "system (kernel" in display_lower or "registry" in display_lower:
+            possible_app_paths.append(os.path.join(self.cache_dir, "app_system.png"))
+        if "explorer" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_explorer.png"))
+        if "cmd" == display_lower or "command prompt" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_cmd.png"))
+        if "powershell" in display_lower or "pwsh" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_powershell.png"))
+        if "taskhostw" in display_lower or "host process" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_taskhostw.png"))
+        if "services" in display_lower or "services.exe" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_services.png"))
+        if "lsass" in display_lower or "csrss" in display_lower or "wininit" in display_lower or "smss" in display_lower:
+            possible_app_paths.append(os.path.join(self.cache_dir, "app_system.png"))
         if "code" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_code.png"))
             
         possible_app_paths.append(os.path.join(self.cache_dir, "app_default_globe.png"))
@@ -299,7 +308,7 @@ class IconManager:
             self._download_icon(APP_ICONS[path_base], app_icon_path, process_path, callback)
             return
             
-        # 2. Try matching display name (e.g. Google Chrome usually fails this, but good fallback)
+        # 2. Try matching display name
         if app_name_base in APP_ICONS:
             app_icon_path = os.path.join(self.cache_dir, f"app_{app_name_base}.png")
             self._download_icon(APP_ICONS[app_name_base], app_icon_path, process_path, callback)
@@ -313,8 +322,29 @@ class IconManager:
         if "edge" in display_lower:
             self._download_icon(APP_ICONS['msedge'], os.path.join(self.cache_dir, "app_msedge.png"), process_path, callback)
             return
-        if "service host" in display_lower:
+        if "service host" in display_lower or "svchost" in display_lower:
             self._download_icon(APP_ICONS['svchost'], os.path.join(self.cache_dir, "app_svchost.png"), process_path, callback)
+            return
+        if "system idle process" in display_lower or "system" == display_lower or "system (kernel" in display_lower or "registry" in display_lower:
+            self._download_icon(APP_ICONS['system'], os.path.join(self.cache_dir, "app_system.png"), process_path, callback)
+            return
+        if "explorer" in display_lower:
+            self._download_icon(APP_ICONS['explorer'], os.path.join(self.cache_dir, "app_explorer.png"), process_path, callback)
+            return
+        if "cmd" == display_lower or "command prompt" in display_lower:
+            self._download_icon(APP_ICONS['cmd'], os.path.join(self.cache_dir, "app_cmd.png"), process_path, callback)
+            return
+        if "powershell" in display_lower or "pwsh" in display_lower:
+            self._download_icon(APP_ICONS['powershell'], os.path.join(self.cache_dir, "app_powershell.png"), process_path, callback)
+            return
+        if "taskhostw" in display_lower or "host process" in display_lower:
+            self._download_icon(APP_ICONS['taskhostw'], os.path.join(self.cache_dir, "app_taskhostw.png"), process_path, callback)
+            return
+        if "services" in display_lower or "services.exe" in display_lower:
+            self._download_icon(APP_ICONS['services'], os.path.join(self.cache_dir, "app_services.png"), process_path, callback)
+            return
+        if "lsass" in display_lower or "csrss" in display_lower or "wininit" in display_lower or "smss" in display_lower:
+            self._download_icon(APP_ICONS['system'], os.path.join(self.cache_dir, "app_system.png"), process_path, callback)
             return
         if "code" in display_lower:
             self._download_icon(APP_ICONS['code'], os.path.join(self.cache_dir, "app_code.png"), process_path, callback)

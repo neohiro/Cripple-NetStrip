@@ -592,6 +592,8 @@ class BlocklistManager:
                             block_doh = not allow_doh
                         if block_doh:
                             cat = ConnectionCategory.TRACKER
+                        else:
+                            cat = ConnectionCategory.DNS
                     elif filename.startswith('security_'):
                         cat = ConnectionCategory.SECURITY
                     elif filename.startswith('update_'):
@@ -609,6 +611,7 @@ class BlocklistManager:
                     elif filename.startswith('identity_'):
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
+                        cat = ConnectionCategory.IDENTITY
 
                     domains = self._parse_domains_from_file(filepath, is_whitelist_file=is_whitelist_file)
                     dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')

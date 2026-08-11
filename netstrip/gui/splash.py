@@ -64,16 +64,35 @@ class SplashScreen(ctk.CTkToplevel):
                 pass
 
     def update_status(self, text, progress_val):
-        """Update the loading text and progress bar."""
+        """Update the loading text and smoothly animate the progress bar."""
         import time
         self._last_custom_update = time.time()
         if self.winfo_exists():
             try:
                 self.status_label.configure(text=text)
-                self.progress.set(progress_val)
+                self._animate_progress(progress_val)
                 self.update_idletasks()
             except Exception:
                 pass
+                
+    def _animate_progress(self, target_val, current_step=0, steps=10):
+        if not self.winfo_exists():
+            return
+        
+        current_val = self.progress.get()
+        if current_step == 0:
+            self._prog_target = target_val
+            self._prog_start = current_val
+            
+        # Target might have changed during animation
+        if getattr(self, '_prog_target', target_val) != target_val:
+            return
+            
+        new_val = self._prog_start + (target_val - self._prog_start) * (current_step / steps)
+        self.progress.set(new_val)
+        
+        if current_step < steps:
+            self.after(10, lambda: self._animate_progress(target_val, current_step + 1, steps))
             
     def _cycle_loading_text(self):
         if not self.winfo_exists():
@@ -141,7 +160,7 @@ class SplashScreen(ctk.CTkToplevel):
             pass
             
         if step < total_steps:
-            self.after(25, lambda: self.fade_out(callback, step + 1, total_steps))
+            self.after(15, lambda: self.fade_out(callback, step + 1, total_steps))
         else:
             try:
                 self.withdraw()
