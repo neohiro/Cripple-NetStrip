@@ -83,6 +83,10 @@ class LogView(ctk.CTkFrame):
 
         self._last_signature = None
         self._row_pool = []
+        # Pre-allocate row pool to eliminate first-render widget creation stall
+        for _ in range(50):
+            frame, lbls = self._build_empty_row()
+            self._row_pool.append((frame, lbls))
         # Rows are built lazily in chunks to prevent UI stutter
 
         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)

@@ -663,6 +663,7 @@ class AppGroupFrame(ctk.CTkFrame):
     def refresh_global_state(self):
         # Check current global status
         self._global_action_state = None
+        self._implicit_block = False
         is_paranoid = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
         is_paranoid = is_paranoid and is_paranoid.name.upper() == "PARANOID"
         has_explicit_allow = False
@@ -679,7 +680,7 @@ class AppGroupFrame(ctk.CTkFrame):
                 rules = list(self.engine.db.get_user_rules(mode_scope="PARANOID"))
                 has_partial_allow = any(r['app_name'] == self.process_name and r['action'] == 'allow' and r['scope'] == 'global' for r in rules)
                 if not has_partial_allow:
-                    self._global_action_state = 'block' # Simulated visual default
+                    self._implicit_block = True  # Paranoid default — visual only
             except Exception:
                 pass
                 
@@ -691,14 +692,17 @@ class AppGroupFrame(ctk.CTkFrame):
         elif self._global_action_state == 'allow':
             self.btn_allow_all.configure(fg_color=Colors.SUCCESS, text_color=Colors.TEXT_PRIMARY)
             self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._implicit_block:
+            self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         else:
             self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
 
 
-        # Update system block visual override (so it isn't erased on UI poll)
+        # System block implied indicator (dimmed, does NOT touch _global_action_state)
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
-        if sys_blocked and self._global_action_state != 'allow':
+        if sys_blocked and self._global_action_state is None:
             is_system = False
             p_lower = self.process_name.lower()
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe'):
@@ -707,7 +711,8 @@ class AppGroupFrame(ctk.CTkFrame):
                 is_system = True
                 
             if is_system:
-                self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
+                self._implicit_block = True
+                self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)
 
     def apply_filter(self, hide_inactive: bool, active_filter: str = "All"):
         import time

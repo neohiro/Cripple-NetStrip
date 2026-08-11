@@ -1,3 +1,18 @@
+## [v3.3.17] - Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
+
+- **Log View Instant First Scroll**:
+  - Pre-allocated 50 row widget frames in `LogView.__init__` so the first data render only packs and fills — no widget creation overhead.
+  - Eliminates the 200–400ms initial scroll stutter caused by lazy 350-widget allocation during `build_and_pack`.
+- **Allow All / Block All 3-State Toggle Fix**:
+  - Introduced `_implicit_block` flag to separate implicit block indicators (Paranoid default, system block setting) from the explicit `_global_action_state`.
+  - Paranoid mode default and system block override now show a dimmed visual (`#4a1525`) instead of the full active red, and do NOT modify `_global_action_state`.
+  - 3-state toggle cycle (`None → Allow All → None → Block All → None`) now works cleanly without poll-driven state reapplication.
+- **Updater Reliability**:
+  - Reduced initial automatic update delay from 30 minutes to 2 minutes.
+  - Increased download timeout from 15s to 30s to handle large blocklists.
+  - Added 2-attempt retry per source with 2s delay between attempts.
+  - Never-downloaded sources (no file on disk) bypass throttle and always retry on the next cycle.
+
 ## [v3.3.16] - Log View Scroll Optimization & Filter List Domain Search Fix
 
 - **Log View Scroll & Geometry Optimization**:

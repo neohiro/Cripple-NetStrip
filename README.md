@@ -318,6 +318,11 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.17 — Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
+- **Instant Log Scroll**: Pre-allocates all 50 row widgets at view init, eliminating the first-render 350-widget creation stall that caused initial scroll sluggishness.
+- **Allow All / Block All 3-State Toggle**: Separated implicit block indicators (Paranoid default, system block setting) from the explicit toggle state so the 3-state cycle (`None → Allow → None → Block → None`) works cleanly without state reapplication on poll.
+- **Updater Reliability**: Reduced initial auto-update delay from 30 min to 2 min, doubled download timeout to 30s, added 2-attempt retry per source, and skipped throttle for never-downloaded sources — ensuring all 43 online feeds are fetched.
+
 ### v3.3.16 — Log View Scroll Optimization & Filter List Domain Search Fix
 - **Glitch-Free Connection Logs**: Optimized `LogView` row geometry with fixed height frames (`pack_propagate(False)`), transparent process container background, right-aligned scrollbar padding for header alignment, and smooth mousewheel event handling to eliminate interlacing, glitching, and line overlapping during scrolling.
 - **Filter Lists Category Counters & Search**: Implemented `_get_category_count` with robust category normalization checking `stats`, `sources_metadata`, and `domain_map` across all threat categories so counts and domain results render accurately on category click or search query.

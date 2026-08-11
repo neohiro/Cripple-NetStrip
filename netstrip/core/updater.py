@@ -154,43 +154,50 @@ class BlocklistUpdater:
                         if file_age_seconds < update_interval_seconds:
                             continue
 
-                    # Check if it's been attempted recently (throttle to prevent spamming on failures)
-                    throttle_seconds = min(3600, update_interval_seconds / 2.0)
-                    last_attempt = state_data.get(name, {}).get('last_attempt', 0)
-                    if time.time() - last_attempt < throttle_seconds:
-                        continue
+                    # Throttle recent attempts — but always retry sources that have never been downloaded
+                    if os.path.exists(target_file):
+                        throttle_seconds = min(3600, update_interval_seconds / 2.0)
+                        last_attempt = state_data.get(name, {}).get('last_attempt', 0)
+                        if time.time() - last_attempt < throttle_seconds:
+                            continue
                     
                 logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")
                 
-                try:
-                    req = urllib.request.Request(
-                        url, 
-                        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-                    )
-                    with urllib.request.urlopen(req, timeout=15, context=ssl_context) as response:
-                        with open(temp_file, 'wb') as out_file:
-                            out_file.write(response.read())
-                    
-                    if os.path.exists(target_file):
-                        try: os.remove(target_file)
-                        except Exception: pass
-                    os.replace(temp_file, target_file)
+                max_attempts = 2
+                last_error = None
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        req = urllib.request.Request(
+                            url, 
+                            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                        )
+                        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as response:
+                            with open(temp_file, 'wb') as out_file:
+                                out_file.write(response.read())
                         
-                    logger.info(f"Successfully updated '{name}'")
-                    state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
-                    any_updated = True
-                    updated_count += 1
-                    
-                    # Short delay between downloads
-                    time.sleep(0.05)
-
-                except Exception as e:
-                    logger.error(f"Failed to update blocklist '{name}': {e}")
-                    if os.path.exists(temp_file):
-                        try: os.remove(temp_file)
-                        except Exception: pass
+                        if os.path.exists(target_file):
+                            try: os.remove(target_file)
+                            except Exception: pass
+                        os.replace(temp_file, target_file)
+                            
+                        logger.info(f"Successfully updated '{name}' (attempt {attempt})")
+                        state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
+                        any_updated = True
+                        updated_count += 1
+                        last_error = None
+                        break  # Success — exit retry loop
                         
-                    # Track failure
+                    except Exception as e:
+                        last_error = e
+                        if os.path.exists(temp_file):
+                            try: os.remove(temp_file)
+                            except Exception: pass
+                        if attempt < max_attempts:
+                            logger.warning(f"Attempt {attempt} failed for '{name}': {e} — retrying...")
+                            time.sleep(2)
+                        
+                if last_error:
+                    logger.error(f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}")
                     failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
                     state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
                     
@@ -198,8 +205,9 @@ class BlocklistUpdater:
                         logger.warning(f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures.")
                         source['enabled'] = False
                         sources_modified = True
-                        
-                    time.sleep(0.1)
+                
+                # Short delay between sources
+                time.sleep(0.05)
                         
             # Save state
             try:

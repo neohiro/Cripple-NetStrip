@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='netstrip',
-    version='3.3.16',
+    version='3.3.17',
     packages=find_packages(),
     package_data={
         'netstrip': [
