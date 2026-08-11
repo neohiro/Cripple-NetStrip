@@ -351,12 +351,12 @@ class AppRulesView(ctk.CTkFrame):
                 scope = rule.get('scope') or "global"
                 mode_scope = rule.get('mode_scope', 'STANDARD') if isinstance(rule, dict) else (rule['mode_scope'] if 'mode_scope' in rule.keys() else 'STANDARD')
                 
-                if mode_scope == "PARANOID":
-                    mode_str = "🔒 PARANOID Mode Only"
+                if mode_scope in ("PARANOID", "GHOST"):
+                    mode_str = "👻 GHOST Mode Only"
                 elif mode_scope == "ALL":
                     mode_str = "🌐 ALL Modes"
                 else:
-                    mode_str = "🛡️ STANDARD Mode Only"
+                    mode_str = "🔰 NORMAL / LOOSE Mode Only"
                     
                 sub_text = f"{app} • {scope}  |  {mode_str}"
             except Exception:

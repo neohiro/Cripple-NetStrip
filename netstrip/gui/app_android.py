@@ -570,7 +570,7 @@ class NetStripApp(ctk.CTk):
                 
             items.extend([
                 pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
-                pystray.MenuItem('Paranoid Mode', toggle_paranoid, checked=is_paranoid_active),
+                pystray.MenuItem('Ghost Mode', toggle_paranoid, checked=is_paranoid_active),
                 pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
                 pystray.MenuItem('Quit', on_quit)
             ])

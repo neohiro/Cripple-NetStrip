@@ -157,9 +157,9 @@ TOOLTIP_MAP = {
     "Collapse Connections": "Close the live App Connections panel.",
     
     # Dashboard
-    "Standard Mode": "Balanced protection blocking known trackers and malware.\nRecommended for daily use.",
-    "Paranoid Mode": "Maximum security: blocks ALL unrecognized traffic unless explicitly whitelisted.",
-    "Learning Mode": "Interactive mode: prompts you to approve or deny new connections as they happen.",
+    "Ghost Mode": "Maximum privacy & stealth protection: blocks ALL unrecognized traffic unless explicitly whitelisted.",
+    "Normal Mode": "Balanced protection: blocks known ads, trackers, malware, and telemetry.\nRecommended for daily use.",
+    "Loose Mode": "Minimal protection: only blocks confirmed ad/tracker domains and malware for maximum compatibility.",
     
     # Settings View
     "Minimize to system tray on close": "Keeps Cripple running in the background protecting your network.",

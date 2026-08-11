@@ -318,6 +318,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.20 — Strict 3-Mode Architecture (Ghost / Normal / Loose) & Dashboard Controls
+- **Strict 3-Mode Architecture**: Standardized protection levels strictly to `Ghost`, `Normal`, and `Loose` across the GUI, tray menu, rules view, and engine.
+- **Dashboard & Settings Layout Alignment**: Positioned `Block System Connections` and `Smart Shield` toggles prominently above the protection mode selector on the Dashboard tab, allowing fast access to blocklist/whitelist modifier switches.
+
 ### v3.3.19 — Unified Ghost & Paranoid Mode Subsets & Engine Security Alignment
 - **Ghost & Paranoid Unified Subsets**: Fixed `engine.py` and `blocklists.py` mode checks so `GHOST`, `PARANOID`, and `STRICT` share the exact same high-security mode bucket (`mode_scope = "PARANOID"`). Selecting Ghost mode now properly loads high-security user rules and engages strict firewall/adapter security defaults.
 - **Normal & Loose Subsets**: `NORMAL` (Standard) and `LOOSE` modes share the standard security subset (`mode_scope = "STANDARD"`). Switching protection mode buckets seamlessly activates the corresponding user settings and engine defaults.

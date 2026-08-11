@@ -1,3 +1,10 @@
+## [v3.3.20] - Strict 3-Mode Architecture (Ghost / Normal / Loose) & Dashboard Controls
+
+- **Strict 3-Mode Architecture**:
+  - Enforced the three primary protection modes: **Ghost**, **Normal**, and **Loose** across all GUI views, hovertips, tray menus, rules lists, and status indicators.
+- **Dashboard & Settings Layout Alignment**:
+  - Positioned key blocklist/whitelist modifier switches (`Block System Connections` and `Smart Shield`) directly above the protection mode selector on the Dashboard tab and in the Settings tab.
+
 ## [v3.3.19] - Unified Ghost & Paranoid Mode Subsets & Engine Security Alignment
 
 - **Unified High-Security Mode Bucket (Ghost & Paranoid)**:
