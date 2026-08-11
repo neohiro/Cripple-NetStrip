@@ -295,21 +295,74 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG, pady=pady)
 
+    # Platform compatibility map: setting_key -> set of supported platforms
+    # Platforms: 'win32', 'linux', 'darwin', 'android'
+    PLATFORM_SUPPORT = {
+        'disable_ipv6_globally':   {'win32', 'linux', 'darwin'},
+        'disable_ipv4_globally':   {'win32', 'linux', 'darwin'},
+        'kernel_anomaly_scanner':  {'win32', 'linux'},
+        'layer2_arp_lockdown':     {'win32', 'linux', 'darwin'},
+        'mac_randomization':       {'win32', 'linux', 'darwin'},
+        'harden_network_adapter':  {'win32', 'linux', 'darwin'},
+        'force_doh':               {'win32', 'linux', 'darwin', 'android'},
+        'linux_ebpf_mode':         {'linux'},
+        'strict_inbound_shield':   {'win32', 'linux', 'darwin'},
+        'inbound_lan_bypass':      {'win32', 'linux', 'darwin'},
+        'inbound_notifications':   {'win32', 'linux', 'darwin', 'android'},
+        'block_system_connections': {'win32', 'linux', 'darwin'},
+    }
+
+    @staticmethod
+    def _get_current_platform() -> str:
+        import os, sys
+        if os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel'):
+            return 'android'
+        return sys.platform  # 'win32', 'linux', 'darwin'
+
+    @staticmethod
+    def _platform_label(platforms: set) -> str:
+        """Generate a human-readable platform availability string."""
+        names = []
+        if 'win32' in platforms: names.append('Windows')
+        if 'linux' in platforms: names.append('Linux')
+        if 'darwin' in platforms: names.append('macOS')
+        if 'android' in platforms: names.append('Android')
+        return ', '.join(names)
+
     def _add_switch_row(self, parent, label_text, setting_key, tooltip_text=None):
+        # Check platform compatibility
+        current_platform = self._get_current_platform()
+        supported_platforms = self.PLATFORM_SUPPORT.get(setting_key)
+        
+        if supported_platforms is not None:
+            is_supported = current_platform in supported_platforms
+            # On Android: completely omit settings that aren't supported
+            if current_platform == 'android' and not is_supported:
+                return
+        else:
+            is_supported = True
+        
         row = ctk.CTkFrame(parent, fg_color=Colors.BG_PANEL)
         row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, 0))
 
+        text_color = Colors.TEXT_PRIMARY if is_supported else Colors.TEXT_TERTIARY
         lbl = ctk.CTkLabel(
             row, text=label_text,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
-            text_color=Colors.TEXT_PRIMARY,
+            text_color=text_color,
         )
         lbl.pack(side="left")
         
-        if tooltip_text:
+        # Build tooltip — add platform availability notice for greyed-out items
+        effective_tooltip = tooltip_text or ""
+        if not is_supported and supported_platforms:
+            platform_str = self._platform_label(supported_platforms)
+            effective_tooltip = f"⚠️ Only available on: {platform_str}.\n\n{effective_tooltip}"
+        
+        if effective_tooltip:
             try:
                 from netstrip.gui.hovertip import FadingHovertip
-                FadingHovertip(lbl, tooltip_text, hover_delay=300)
+                FadingHovertip(lbl, effective_tooltip, hover_delay=300)
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to bind hovertip: {e}")
@@ -330,16 +383,27 @@ class SettingsView(ctk.CTkFrame):
             if setting_key == 'inbound_lan_bypass' and hasattr(self, 'engine') and self.engine.is_headless:
                 current = True
 
-        switch = ctk.CTkSwitch(
-            row, text="",
-            progress_color=Colors.ACCENT_PRIMARY,
-            button_color=Colors.TEXT_PRIMARY,
-            button_hover_color=Colors.ACCENT_LIGHT,
-            fg_color=Colors.BORDER_DEFAULT,
-            command=lambda: self._on_switch_toggle(switch, setting_key),
-        )
+        if is_supported:
+            switch = ctk.CTkSwitch(
+                row, text="",
+                progress_color=Colors.ACCENT_PRIMARY,
+                button_color=Colors.TEXT_PRIMARY,
+                button_hover_color=Colors.ACCENT_LIGHT,
+                fg_color=Colors.BORDER_DEFAULT,
+                command=lambda: self._on_switch_toggle(switch, setting_key),
+            )
+        else:
+            # Greyed-out, non-interactive switch for unsupported platforms
+            switch = ctk.CTkSwitch(
+                row, text="",
+                progress_color=Colors.BORDER_DEFAULT,
+                button_color=Colors.TEXT_TERTIARY,
+                button_hover_color=Colors.TEXT_TERTIARY,
+                fg_color=Colors.BG_DARKEST,
+                state="disabled",
+            )
         switch.pack(side="right")
-        if current:
+        if current and is_supported:
             switch.select()
         else:
             switch.deselect()
@@ -548,11 +612,9 @@ class SettingsView(ctk.CTkFrame):
         self._add_subtitle(card, "Forces all DNS resolution through encrypted HTTPS tunnels (Cloudflare, Google, Quad9, AdGuard). Falls back to DoT if DoH fails. Plaintext UDP port 53 is used only as last resort in 'auto' mode, or blocked entirely in strict mode.")
 
 
-        # Linux Deep Kernel XDP Mode
-        import os
-        if os.name != 'nt' and os.uname().sysname == 'Linux':
-            self._add_switch_row(card, "Deep Kernel XDP Mode (eBPF)", 'linux_ebpf_mode', tooltip_text="Use Case: Ultimate Linux Security. Hooks into the physical NIC to drop raw socket bypasses before the Linux kernel even sees them.")
-            self._add_subtitle(card, "Hooks a custom eBPF/XDP program directly into the physical Network Interface Card (NIC) driver to drop rogue Layer 2 and raw socket traffic before the Linux Kernel processes it.")
+        # Linux Deep Kernel XDP Mode — shown on all platforms, greyed out on non-Linux
+        self._add_switch_row(card, "Deep Kernel XDP Mode (eBPF)", 'linux_ebpf_mode', tooltip_text="Use Case: Ultimate Linux Security. Hooks into the physical NIC to drop raw socket bypasses before the Linux kernel even sees them.")
+        self._add_subtitle(card, "Hooks a custom eBPF/XDP program directly into the physical Network Interface Card (NIC) driver to drop rogue Layer 2 and raw socket traffic before the Linux Kernel processes it.")
 
         # Strict Inbound Shield
         self._add_switch_row(card, "Strict Inbound Shield", 'strict_inbound_shield', tooltip_text="Use Case: Unsafe networks. Hard-drops all incoming connections, rendering your device invisible to network scanners.")
