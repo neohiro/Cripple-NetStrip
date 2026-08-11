@@ -55,6 +55,11 @@ class ConnectionMonitor:
         self._rate_limits = {}
         self._arp_cache = {}
         
+        # Origin process port and domain maps for System Idle resolution
+        self._port_to_process_map = {}
+        self._domain_to_process_map = {}
+        self._origin_map_lock = threading.Lock()
+        
         # Callback for the GUI or Notifier
         self.on_new_connection: Callable = None
         self.on_malware_detected: Callable = None
@@ -164,22 +169,35 @@ class ConnectionMonitor:
 
     def _handle_new_connection(self, conn, conn_sig, direction):
         original_exe = "Unknown"
+        lport = conn.laddr.port if getattr(conn, 'laddr', None) else None
+        now_ts = time.time()
+        
         try:
             if conn.pid == os.getpid():
                 process_name = "Cripple (Internal)"
                 process_path = sys.executable
                 original_exe = "Cripple"
-            elif conn.pid == 0:
-                process_name = "System Idle Process"
+            elif conn.pid in (0, 4):
+                process_name = "System Idle Process" if conn.pid == 0 else "System (Kernel/Driver)"
                 process_path = "System"
                 original_exe = "System"
-            elif conn.pid == 4:
-                process_name = "System (Kernel/Driver)"
-                process_path = "System"
-                original_exe = "System"
+                
+                # Check if local port or domain belongs to a real origin application
+                with self._origin_map_lock:
+                    if lport and lport in self._port_to_process_map:
+                        cached_name, cached_path, cached_exe, cached_ts = self._port_to_process_map[lport]
+                        if now_ts - cached_ts < 120.0:
+                            process_name, process_path, original_exe = cached_name, cached_path, cached_exe
             else:
                 proc = psutil.Process(conn.pid)
                 process_name, process_path, root_proc, original_exe = self._resolve_process_identity(proc)
+                
+                # Record local port -> origin process mapping for system socket resolution
+                if lport and process_name not in ("System Idle Process", "System (Kernel/Driver)"):
+                    with self._origin_map_lock:
+                        if len(self._port_to_process_map) > 2000:
+                            self._port_to_process_map = {k: v for k, v in self._port_to_process_map.items() if now_ts - v[3] < 120.0}
+                        self._port_to_process_map[lport] = (process_name, process_path, original_exe, now_ts)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             process_name = f"Unknown (PID {conn.pid})"
             process_path = ""
@@ -187,6 +205,20 @@ class ConnectionMonitor:
         ip = conn.raddr.ip
         port = conn.raddr.port
         protocol = "TCP" if conn.type == 1 else "UDP"
+        
+        # Second-stage resolution: if domain is available and process is still System, resolve via domain map
+        domain = self.db.get_cached_domain(ip)
+        if domain and process_name in ("System Idle Process", "System (Kernel/Driver)"):
+            with self._origin_map_lock:
+                if domain in self._domain_to_process_map:
+                    cached_name, cached_path, cached_exe, cached_ts = self._domain_to_process_map[domain]
+                    if now_ts - cached_ts < 300.0:
+                        process_name, process_path, original_exe = cached_name, cached_path, cached_exe
+        elif domain and process_name not in ("System Idle Process", "System (Kernel/Driver)"):
+            with self._origin_map_lock:
+                if len(self._domain_to_process_map) > 2000:
+                    self._domain_to_process_map = {k: v for k, v in self._domain_to_process_map.items() if now_ts - v[3] < 300.0}
+                self._domain_to_process_map[domain] = (process_name, process_path, original_exe, now_ts)
         
         # --- IoT Botnet Detection ---
         now = time.time()
@@ -204,7 +236,6 @@ class ConnectionMonitor:
             if self.on_malware_detected:
                 self.on_malware_detected({'name': 'botnet_behavior', 'message': f"IoT Botnet / Rapid Scan detected! {process_name} established >50 connections/sec to {ip}"})
 
-        domain = self.db.get_cached_domain(ip)
         if not domain:
             # Basic check to avoid reversing loopback/local IPs
             is_local_ipv4 = ip in ("127.0.0.1", "0.0.0.0") or ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172.16.")

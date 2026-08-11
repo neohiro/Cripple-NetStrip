@@ -1,3 +1,14 @@
+## [v3.3.18] - Explicit 3-State Neutral Toggle & System Idle Origin Process Resolution
+
+- **Explicit 3-State Neutral Toggle Mechanics**:
+  - Added explicit `neutral` user preference state (`app_neutral`) stored in DB (`action = 'neutral'`).
+  - Clicking an active `Allow All` or `Block All` toggle to turn it off sets state to `neutral`, turning **both buttons transparent (OFF)** simultaneously and restoring individual per-domain connection evaluation.
+  - User explicit choices (`Allow All`, `Block All`, or `Both Off / Neutral`) take absolute priority over implicit Paranoid default or System block visual indicators across all modes (Ghost, Paranoid, Normal, Loose).
+- **System Idle & Kernel Origin Process Resolution**:
+  - Implemented `_port_to_process_map` and `_domain_to_process_map` tracking in `ConnectionMonitor`.
+  - Network sockets appearing under PID 0 (`System Idle Process`) or PID 4 (`System (Kernel/Driver)`) automatically look up origin local port and domain to re-attribute traffic to the true parent process (e.g., `AntiGravity`).
+  - Kernel-level sockets for whitelisted apps inherit `USER_ALLOWED` status, eliminating false positive blocks that broke application background services.
+
 ## [v3.3.17] - Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
 
 - **Log View Instant First Scroll**:

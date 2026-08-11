@@ -318,6 +318,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.18 — Explicit 3-State Neutral Toggle & System Idle Origin Resolution
+- **Explicit 3-State Neutral Toggle**: Introduced explicit `neutral` user state when both `Allow All` and `Block All` are toggled off. Toggling an active bulk button off now turns both buttons transparent (OFF) simultaneously and restores individual connection/domain evaluation. User explicit settings (Allow, Block, or Both Off) take absolute priority over implicit Paranoid or System block defaults.
+- **System Idle & Kernel Origin Resolution**: Added origin local port and domain mapping tracking to attribute sockets created under PID 0 (`System Idle Process`) or PID 4 (`System`) back to their parent application (e.g. `AntiGravity`). Kernel connections for whitelisted apps properly inherit `USER_ALLOWED` status, eliminating false positive blocks.
+
 ### v3.3.17 — Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
 - **Instant Log Scroll**: Pre-allocates all 50 row widgets at view init, eliminating the first-render 350-widget creation stall that caused initial scroll sluggishness.
 - **Allow All / Block All 3-State Toggle**: Separated implicit block indicators (Paranoid default, system block setting) from the explicit toggle state so the 3-state cycle (`None → Allow → None → Block → None`) works cleanly without state reapplication on poll.

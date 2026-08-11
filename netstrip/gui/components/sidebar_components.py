@@ -577,26 +577,26 @@ class AppGroupFrame(ctk.CTkFrame):
         # The system block visual override is handled in refresh_global_state during the UI loop
     def _toggle_global_action(self, target_action: str):
         def proceed():
-            # Determine if we are turning the action ON or OFF
+            # Determine if we are turning the action ON or OFF (Explicit 3-State Toggle)
             if self._global_action_state == target_action:
-                # Toggle OFF
-                new_state = None
-                db_action = 'remove'
+                # Toggle OFF -> Set explicit Neutral state (both buttons transparent, individual evaluation active)
+                new_state = 'neutral'
+                db_action = 'neutral'
             else:
-                # Toggle ON
+                # Toggle ON -> Set state
                 new_state = target_action
                 db_action = target_action
                 
             self._global_action_state = new_state
             
-            # Update button visuals
+            # Update button visuals immediately
             if new_state == 'block':
                 self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
                 self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
             elif new_state == 'allow':
                 self.btn_allow_all.configure(fg_color=Colors.SUCCESS, text_color=Colors.TEXT_PRIMARY)
                 self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-            else:
+            else: # 'neutral' / both off
                 self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
                 self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
                 
@@ -614,34 +614,33 @@ class AppGroupFrame(ctk.CTkFrame):
                 
             # Update Database
             current_mode = self.engine.classifier.mode.name
-            mode_scope = "PARANOID" if current_mode == "PARANOID" else "STANDARD"
+            mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
             
-            # First remove any existing global app rule for this mode
+            # First remove any existing global app rule for this app
             try:
                 conn = self.engine.db._get_connection()
-                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND mode_scope=?", (self.process_name, mode_scope))
+                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=?", (self.process_name,))
                 conn.commit()
             except:
                 pass
                 
-            if db_action != 'remove':
-                self.engine.db.add_user_rule({
-                    'pattern': '*',
-                    'action': db_action,
-                    'scope': 'app',
-                    'app_name': self.process_name,
-                    'category': 'user_allowed' if db_action == 'allow' else 'user_blocked',
-                    'note': self.process_path,
-                    'mode_scope': mode_scope
-                })
+            # Store explicit rule (allow, block, or neutral)
+            self.engine.db.add_user_rule({
+                'pattern': '*',
+                'action': db_action,
+                'scope': 'app',
+                'app_name': self.process_name,
+                'category': 'user_allowed' if db_action == 'allow' else ('user_blocked' if db_action == 'block' else 'essential'),
+                'note': self.process_path,
+                'mode_scope': mode_scope
+            })
                 
             # Sync memory instantly for this mode scope
             if hasattr(self.engine.blocklist, 'sync_user_rules'):
                 self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
                 
             # Apply action to all existing child rows
-            # If removing a rule, we want to re-evaluate them (by just deleting the row, it will re-populate on next update)
-            if db_action == 'remove':
+            if db_action in ('neutral', 'remove'):
                 for target, row in list(self.rows.items()):
                     row.destroy()
                 self.rows.clear()
@@ -653,19 +652,17 @@ class AppGroupFrame(ctk.CTkFrame):
                     except:
                         pass
 
-
         if target_action == 'allow' and self._global_action_state != 'allow':
             check_killswitch_override(self.engine, self, proceed)
         else:
             proceed()
-
 
     def refresh_global_state(self):
         # Check current global status
         self._global_action_state = None
         self._implicit_block = False
         is_paranoid = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
-        is_paranoid = is_paranoid and is_paranoid.name.upper() == "PARANOID"
+        is_paranoid = is_paranoid and is_paranoid.name.upper() in ("GHOST", "PARANOID")
         has_explicit_allow = False
         
         if hasattr(self.engine, 'blocklist'):
@@ -674,35 +671,22 @@ class AppGroupFrame(ctk.CTkFrame):
                 has_explicit_allow = True
             elif self.process_name in self.engine.blocklist.app_blacklist:
                 self._global_action_state = 'block'
+            elif self.process_name in getattr(self.engine.blocklist, 'app_neutral', set()):
+                self._global_action_state = 'neutral'
                 
-        if is_paranoid and not has_explicit_allow and self._global_action_state != 'block':
+        # Implicit mode default ONLY applies if user has no explicit rule (state is None)
+        if self._global_action_state is None and is_paranoid and not has_explicit_allow:
             try:
                 rules = list(self.engine.db.get_user_rules(mode_scope="PARANOID"))
                 has_partial_allow = any(r['app_name'] == self.process_name and r['action'] == 'allow' and r['scope'] == 'global' for r in rules)
                 if not has_partial_allow:
-                    self._implicit_block = True  # Paranoid default — visual only
+                    self._implicit_block = True  # Paranoid default — visual indicator only
             except Exception:
                 pass
-                
-        # Update button visuals
-        from netstrip.gui.theme import Colors
-        if self._global_action_state == 'block':
-            self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
-            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-        elif self._global_action_state == 'allow':
-            self.btn_allow_all.configure(fg_color=Colors.SUCCESS, text_color=Colors.TEXT_PRIMARY)
-            self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-        elif self._implicit_block:
-            self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)
-            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-        else:
-            self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
 
-
-        # System block implied indicator (dimmed, does NOT touch _global_action_state)
+        # System block implied indicator ONLY applies if user has no explicit rule (state is None)
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
-        if sys_blocked and self._global_action_state is None:
+        if self._global_action_state is None and sys_blocked:
             is_system = False
             p_lower = self.process_name.lower()
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe'):
@@ -712,7 +696,25 @@ class AppGroupFrame(ctk.CTkFrame):
                 
             if is_system:
                 self._implicit_block = True
-                self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)
+                
+        # Update button visuals (Explicit User Preference ALWAYS takes priority over implicit indicators!)
+        from netstrip.gui.theme import Colors
+        if self._global_action_state == 'block':
+            self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._global_action_state == 'allow':
+            self.btn_allow_all.configure(fg_color=Colors.SUCCESS, text_color=Colors.TEXT_PRIMARY)
+            self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._global_action_state == 'neutral':
+            # User explicitly turned off both toggles — both transparent!
+            self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._implicit_block:
+            self.btn_block_all.configure(fg_color="#4a1525", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        else:
+            self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
 
     def apply_filter(self, hide_inactive: bool, active_filter: str = "All"):
         import time

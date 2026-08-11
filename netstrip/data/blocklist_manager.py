@@ -160,6 +160,7 @@ class BlocklistManager:
         self.whitelist: Set[str] = set()
         self.app_whitelist: Set[str] = set()
         self.app_blacklist: Set[str] = set()
+        self.app_neutral: Set[str] = set()
         self.blacklist: Dict[str, bool] = {}
         self.lock = threading.RLock()
         self.stats: Dict[ConnectionCategory, int] = {cat: 0 for cat in ConnectionCategory}
@@ -778,6 +779,7 @@ class BlocklistManager:
             self.whitelist.clear()
             self.app_whitelist.clear()
             self.app_blacklist.clear()
+            self.app_neutral.clear()
             self.blacklist.clear()
             for rule in rules:
                 pattern = rule['pattern'].lower()
@@ -790,6 +792,8 @@ class BlocklistManager:
                         self.app_whitelist.add(app_name)
                     elif action == 'block':
                         self.app_blacklist.add(app_name)
+                    elif action in ('neutral', 'none'):
+                        self.app_neutral.add(app_name)
                 else:
                     if action == 'allow':
                         self.whitelist.add(pattern)
