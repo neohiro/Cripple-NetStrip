@@ -1,3 +1,14 @@
+## [v3.3.16] - Log View Scroll Optimization & Filter List Domain Search Fix
+
+- **Log View Scroll & Geometry Optimization**:
+  - Fixed row frame geometry (`pack_propagate(False)` with height 36px) so row height remains rock-solid while scrolling or filtering.
+  - Fixed process frame background transparency to eliminate blocky alternating background "interlacing" visual artifacts.
+  - Padded table header by 14px on the right to align columns 1:1 with `_log_scroll` rows.
+  - Bound mousewheel scroll handler cleanly on component `<Map>` / `<Unmap>` events.
+- **Filter Lists Category Counters & Search Fix**:
+  - Implemented `_get_category_count` with robust category normalization checking `stats`, `sources_metadata`, and `domain_map` across all 10 categories.
+  - Fixed `_do_search` NameError bug (`search_id` -> `current_search_id`) and normalized search category filter parsing in `BlocklistManager.search()`.
+
 ## [v3.3.9] - High-Performance Multi-Core Parallel Parsing, Widget-Pool List Virtualization, Native Instant Splash & UI Fluency
 
 - **Native Zero-Dependency Canvas Splash & Sub-50ms Cold Boot**:

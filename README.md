@@ -318,6 +318,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.16 — Log View Scroll Optimization & Filter List Domain Search Fix
+- **Glitch-Free Connection Logs**: Optimized `LogView` row geometry with fixed height frames (`pack_propagate(False)`), transparent process container background, right-aligned scrollbar padding for header alignment, and smooth mousewheel event handling to eliminate interlacing, glitching, and line overlapping during scrolling.
+- **Filter Lists Category Counters & Search**: Implemented `_get_category_count` with robust category normalization checking `stats`, `sources_metadata`, and `domain_map` across all threat categories so counts and domain results render accurately on category click or search query.
+
 ### v3.3.9 — Multi-Core Parallel Parsing, Widget-Pool List Virtualization & UI Fluency
 - **Multi-Core Parallel List Parsing & Fast Tokenizer**: Parallelized cold filter compilation across all CPU cores with `concurrent.futures.ThreadPoolExecutor` and C-speed tokenizing. Bundled pre-indexed binary cache database (`NetStrip_cache.pkl`) loading 3.25+ million rules in ~2.9s.
 - **Widget-Pool List Virtualization**: Replaced UI row destructions with persistent object recycling pools and tuple signature diffing across Rules, Blocklists, Feeds, and Logs.

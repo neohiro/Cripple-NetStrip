@@ -319,40 +319,58 @@ class BlocklistView(ctk.CTkFrame):
         self._search_entry.insert(0, pattern)
         self._do_search()
         
+    def _get_category_count(self, cat_enum):
+        from netstrip.core.modes import ConnectionCategory
+        cat_val = getattr(cat_enum, 'value', str(cat_enum)).lower()
+        if cat_val.startswith('connectioncategory.'):
+            cat_val = cat_val.split('.')[-1].lower()
+
+        if cat_enum == ConnectionCategory.USER_ALLOWED or cat_val == 'user_allowed':
+            whitelist_size = len(getattr(self.engine.blocklist, 'whitelist', set()))
+            app_whitelist_size = len(getattr(self.engine.blocklist, 'app_whitelist', set()))
+            return whitelist_size + app_whitelist_size
+
+        if cat_enum == ConnectionCategory.USER_BLOCKED or cat_val == 'user_blocked':
+            blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
+            app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
+            return blacklist_size + app_blacklist_size
+
+        stats = getattr(self.engine.blocklist, 'stats', {})
+        metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
+
+        cnt = 0
+        for k, v in stats.items():
+            k_val = getattr(k, 'value', str(k)).lower()
+            if k_val.startswith('connectioncategory.'):
+                k_val = k_val.split('.')[-1].lower()
+            if k == cat_enum or k_val == cat_val or (k_val in ('ad', 'ads') and cat_val in ('ad', 'ads')):
+                cnt += v
+
+        if cnt == 0 and metadata:
+            for k, sources in metadata.items():
+                k_val = getattr(k, 'value', str(k)).lower()
+                if k_val.startswith('connectioncategory.'):
+                    k_val = k_val.split('.')[-1].lower()
+                if k == cat_enum or k_val == cat_val or (k_val in ('ad', 'ads') and cat_val in ('ad', 'ads')):
+                    cnt += sum(s.get('size', 0) for s in sources if isinstance(s, dict))
+
+        if cnt == 0:
+            domain_map = getattr(self.engine.blocklist, 'domain_map', {})
+            if domain_map:
+                cnt = sum(
+                    1 for v in domain_map.values()
+                    if (v == cat_enum or getattr(v, 'value', str(v)).lower().split('.')[-1] == cat_val)
+                )
+
+        return cnt
+
     def _refresh_stats_grid(self, msg=None):
         if msg and hasattr(self.engine, 'on_status') and self.engine.on_status:
             self.engine.on_status(msg)
             
         try:
-            metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
-            stats = getattr(self.engine.blocklist, 'stats', {})
-            
-            whitelist_size = len(self.engine.blocklist.whitelist)
-            app_whitelist_size = len(self.engine.blocklist.app_whitelist)
-            blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
-            app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
-            
-            from netstrip.core.modes import ConnectionCategory
-            
             for cat_enum, (card, inner, lbl_count) in getattr(self, '_category_ui_elements', {}).items():
-                cat_val = getattr(cat_enum, 'value', str(cat_enum))
-                sources = metadata.get(cat_enum) or metadata.get(cat_val) or []
-                cnt = sum(s.get('size', 0) for s in sources)
-                if not cnt and stats:
-                    cnt = (
-                        stats.get(cat_enum)
-                        or stats.get(cat_val)
-                        or (stats.get('ad') if cat_val in ('ad', 'ads') else 0)
-                        or (stats.get('ads') if cat_val in ('ad', 'ads') else 0)
-                        or 0
-                    )
-                    
-                if cat_enum == ConnectionCategory.USER_ALLOWED or cat_val == 'user_allowed':
-                    cnt += whitelist_size + app_whitelist_size
-                elif cat_enum == ConnectionCategory.USER_BLOCKED or cat_val == 'user_blocked':
-                    cnt += blacklist_size + app_blacklist_size
-                        
-                cnt = int(cnt or 0)
+                cnt = self._get_category_count(cat_enum)
                 lbl_count.configure(text=f"{cnt:,}")
         except Exception as e:
             import logging
@@ -409,14 +427,6 @@ class BlocklistView(ctk.CTkFrame):
             ConnectionCategory.USER_BLOCKED,
         ]
 
-        metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
-        stats = getattr(self.engine.blocklist, 'stats', {})
-        domain_map = getattr(self.engine.blocklist, 'domain_map', {})
-        whitelist_size = len(self.engine.blocklist.whitelist)
-        app_whitelist_size = len(self.engine.blocklist.app_whitelist)
-        blacklist_size = len(getattr(self.engine.blocklist, 'blacklist', {}))
-        app_blacklist_size = len(getattr(self.engine.blocklist, 'app_blacklist', set()))
-
         for idx, category in enumerate(categories_to_display):
             card = ctk.CTkFrame(grid_frame, **CTK_FRAME_STYLE)
             card.grid(
@@ -444,15 +454,7 @@ class BlocklistView(ctk.CTkFrame):
             )
             lbl_title.pack(anchor="w")
             
-            if category == ConnectionCategory.USER_ALLOWED:
-                total_size = whitelist_size + app_whitelist_size
-            elif category == ConnectionCategory.USER_BLOCKED:
-                total_size = blacklist_size + app_blacklist_size
-            else:
-                sources = metadata.get(category, [])
-                total_size = sum(s.get('size', 0) for s in sources)
-                if total_size == 0 and stats:
-                    total_size = stats.get(category, 0)
+            total_size = self._get_category_count(category)
 
             lbl_count = ctk.CTkLabel(
                 inner,

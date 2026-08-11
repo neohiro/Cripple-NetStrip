@@ -61,7 +61,7 @@ class LogView(ctk.CTkFrame):
 
         # Column headers (stretches to exact pane width)
         hdr = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL, corner_radius=0, height=36)
-        hdr.pack(fill="x", pady=(0, Spacing.XS), padx=0)
+        hdr.pack(fill="x", pady=(0, 14), padx=(0, 14))
         
         for i, (label, cfg) in enumerate(zip(
             ["Time", "Process", "Domain/IP", "Category", "Action"],
@@ -249,9 +249,10 @@ class LogView(ctk.CTkFrame):
     def _build_empty_row(self):
         frame = ctk.CTkFrame(
             self._log_scroll,
-            fg_color=Colors.BG_PANEL, corner_radius=6,
-            border_width=1, border_color=Colors.BORDER_SUBTLE,
+            fg_color=Colors.BG_PANEL, corner_radius=4, height=36,
+            border_width=0, border_color=Colors.BORDER_SUBTLE,
         )
+        frame.pack_propagate(False)
         for i, cfg in enumerate(self.COL_CONFIGS):
             frame.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
 
