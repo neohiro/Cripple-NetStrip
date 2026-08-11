@@ -1,3 +1,10 @@
+## [v3.4.6] - Global UI Polish & Category Mapping
+
+- **Dynamic Logo Redesign**: Restored the sidebar's animated CRIPPLE logo to continuously animate, but carefully re-architected it to prevent the Tkinter/GPU tearing bug. The animation loop is now strictly hardware-capped at a stable 25 FPS (40ms ticks) and includes a window-mapping safeguard that completely suspends the drawing loop when the application is minimized or hidden. The bounce amplitude has also been increased by 140% to make the dynamic motion much more visible and satisfying.
+- **Uniform Button Styling**: Swept the entire graphical interface (Alerts, Settings, Dashboard, and Killswitch Modals) to remove sharp-edged buttons. All buttons globally now follow the 8px smooth-curved corner aesthetic seen in the Filter Lists tab, establishing a premium, uniform layout.
+- **Identity Category Alignment**: Enhanced the blocklist parsing engine so that blocklists prefixed with `identity_` natively map to the ConnectionCategory.IDENTITY enum rather than falling back to UNKNOWN. This fixes the visual badges inside the Filter Lists data grid and in the active search results list. 
+- **Expanded Filter Grid**: Added the *Identity* and *DNS* categories natively to the Filter Lists grid, creating a perfectly balanced 3x4 layout and exposing those categories to quick-filter clicking.
+
 ## [v3.4.5] - UI Rendering Artifacts Fix
 
 - **Animated Logo Stability**: Rewrote the animated sidebar logo logic so that it only triggers hardware acceleration and canvas rendering frames when actively hovered over by the mouse. This eliminates a persistent background CPU polling loop that was continuously shifting coordinates in CustomTkinter (at 40 FPS), completely fixing the graphical artifact/tearing glitches occasionally seen in the upper-left corner of the window on Windows.

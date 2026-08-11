@@ -61,13 +61,13 @@ class SmartParanoidModal(ctk.CTkToplevel):
         
         btn_disable = ctk.CTkButton(
             btn_frame, text="DISABLE SMART SHIELD", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
-            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=0, command=self._disable_smart_shield
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=8, command=self._disable_smart_shield
         )
         btn_disable.pack(side="left", expand=True, padx=(0, 5))
         
         btn_keep = ctk.CTkButton(
             btn_frame, text="KEEP LOCKED DOWN", fg_color=Colors.DANGER, 
-            hover_color="#991b1b", text_color="white", corner_radius=0, command=self.destroy
+            hover_color="#991b1b", text_color="white", corner_radius=8, command=self.destroy
         )
         btn_keep.pack(side="right", expand=True, padx=(5, 0))
 

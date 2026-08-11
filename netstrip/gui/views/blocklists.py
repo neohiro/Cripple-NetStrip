@@ -169,7 +169,7 @@ class BlocklistView(ctk.CTkFrame):
 
         btn_add = ctk.CTkButton(
             add_row, text="Add Block",
-            width=100, height=40, corner_radius=0,
+            width=100, height=40, corner_radius=8,
             fg_color=Colors.DANGER,
             hover_color="#be123c",
             text_color=Colors.TEXT_PRIMARY,
@@ -390,7 +390,7 @@ class BlocklistView(ctk.CTkFrame):
 
         btn_search = ctk.CTkButton(
             search_row, text=Icons.SEARCH,
-            width=44, height=40, corner_radius=0,
+            width=44, height=40, corner_radius=8,
             fg_color=Colors.ACCENT_PRIMARY,
             hover_color=Colors.ACCENT_LIGHT,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG),
@@ -423,6 +423,8 @@ class BlocklistView(ctk.CTkFrame):
             ConnectionCategory.UPDATE,
             ConnectionCategory.SECURITY,
             ConnectionCategory.ESSENTIAL,
+            ConnectionCategory.IDENTITY,
+            ConnectionCategory.DNS,
             ConnectionCategory.USER_ALLOWED,
             ConnectionCategory.USER_BLOCKED,
         ]
@@ -666,6 +668,8 @@ class BlocklistView(ctk.CTkFrame):
 
             try:
                 norm_cat = "ad" if cat_str == "ads" else cat_str
+                if norm_cat.startswith("identity_"):
+                    norm_cat = "identity"
                 cat_enum = ConnectionCategory(norm_cat)
             except Exception:
                 cat_enum = ConnectionCategory.UNKNOWN
@@ -963,7 +967,10 @@ class BlocklistView(ctk.CTkFrame):
             item['domain_lbl'].configure(text=domain)
             
             try:
-                cat_enum = ConnectionCategory(cat)
+                norm_cat = cat
+                if norm_cat.startswith("identity_"):
+                    norm_cat = "identity"
+                cat_enum = ConnectionCategory(norm_cat)
             except ValueError:
                 cat_enum = ConnectionCategory.UNKNOWN
                 

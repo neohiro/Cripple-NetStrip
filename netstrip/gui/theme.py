@@ -290,7 +290,7 @@ def get_category_color(category) -> str:
         'essential': Colors.CAT_ESSENTIAL, 'user_allowed': Colors.CAT_USER_ALLOWED,
         'user_blocked': Colors.CAT_USER_BLOCKED, 'unknown': Colors.CAT_UNKNOWN,
         'lan': Colors.CAT_LAN, 'update': Colors.CAT_UPDATE, 'security': Colors.CAT_SECURITY,
-        'dns': Colors.INFO, 'system': Colors.CAT_SYSTEM,
+        'dns': Colors.INFO, 'system': Colors.CAT_SYSTEM, 'identity': '#8b5cf6',
     }
     return mapping.get(category, Colors.CAT_UNKNOWN)
 
@@ -305,7 +305,7 @@ def get_category_label(category) -> str:
         'malware': 'Malware', 'essential': 'Essential', 'user_allowed': 'Allowed',
         'user_blocked': 'Blocked', 'unknown': 'Unknown', 'lan': 'LAN',
         'update': 'Update', 'security': 'Security', 'dns': 'DNS',
-        'system': 'System',
+        'system': 'System', 'identity': 'Identity',
     }
     return mapping.get(category, category.title() if category != 'unknown' else 'Unknown')
 
@@ -320,6 +320,6 @@ def get_category_icon(category) -> str:
         'malware': Icons.MALWARE, 'essential': Icons.ESSENTIAL,
         'user_allowed': Icons.ALLOWED, 'user_blocked': Icons.BLOCKED,
         'lan': Icons.LAN, 'update': Icons.REFRESH, 'security': "🛡",
-        'dns': "🌐", 'system': Icons.SYSTEM,
+        'dns': "🌐", 'system': Icons.SYSTEM, 'identity': '🪪',
     }
     return mapping.get(category, Icons.PENDING)

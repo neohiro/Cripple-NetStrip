@@ -22,14 +22,14 @@ class AnimatedLogo(ctk.CTkCanvas):
         )
         
         self._animation_step = 0
-        self._running = False
+        self._running = True
         self._anim_id = None
-        
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
         
         # Draw initial resting frame
         self._draw_frame(0, 0)
+        
+        # Ensure it starts animating
+        self._animate()
 
     def _draw_frame(self, up_offset, down_offset):
         sx = self._scale_x
@@ -47,17 +47,6 @@ class AnimatedLogo(ctk.CTkCanvas):
             115*sx, (130*sy) + down_offset, 150*sx, (90*sy) + down_offset, 130*sx, (90*sy) + down_offset, 130*sx, (30*sy) + down_offset
         )
 
-    def _on_enter(self, event):
-        self._running = True
-        if not self._anim_id:
-            self._animate()
-
-    def _on_leave(self, event):
-        self._running = False
-        self.stop_animation()
-        self._animation_step = 0
-        self._draw_frame(0, 0)
-
     def stop_animation(self):
         """Stop animation loop and cancel pending timer."""
         self._running = False
@@ -72,13 +61,24 @@ class AnimatedLogo(ctk.CTkCanvas):
         if not self._running or not self.winfo_exists():
             return
             
+        top = self.winfo_toplevel()
+        if top:
+            try:
+                state = str(top.state())
+                if state in ("iconic", "withdrawn") or not self.winfo_ismapped():
+                    # Pause animation if window is hidden, check again in 250ms
+                    self._anim_id = self.after(250, self._animate)
+                    return
+            except Exception:
+                pass
+                
         self._animation_step = (self._animation_step + 0.15) % (2 * math.pi)
         
-        # Bounce animation using sine wave, scaled
-        up_offset = math.sin(self._animation_step) * (5 * self._scale_y)
-        down_offset = math.cos(self._animation_step) * (5 * self._scale_y)
+        # Dynamic Bounce animation using sine wave (increased amplitude to 12)
+        up_offset = math.sin(self._animation_step) * (12 * self._scale_y)
+        down_offset = math.cos(self._animation_step) * (12 * self._scale_y)
         
         self._draw_frame(up_offset, down_offset)
         
-        # Reduced framerate for better UI stability
-        self._anim_id = self.after(30, self._animate)
+        # Capped framerate strictly to 25 FPS (40ms) to ensure GPU stability
+        self._anim_id = self.after(40, self._animate)

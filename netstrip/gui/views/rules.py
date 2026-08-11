@@ -63,7 +63,7 @@ class AppRulesView(ctk.CTkFrame):
         ctk.CTkButton(
             header, text="Block All",
             fg_color="#4a1525", hover_color="#f43f5e",
-            text_color=Colors.TEXT_PRIMARY, height=30, corner_radius=0,
+            text_color=Colors.TEXT_PRIMARY, height=30, corner_radius=8,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             command=self._block_all,
         ).pack(side="right", padx=(Spacing.XS, 0))
@@ -71,7 +71,7 @@ class AppRulesView(ctk.CTkFrame):
         ctk.CTkButton(
             header, text="Allow All",
             fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS,
-            text_color=Colors.TEXT_PRIMARY, height=30, corner_radius=0,
+            text_color=Colors.TEXT_PRIMARY, height=30, corner_radius=8,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
             command=self._allow_all,
         ).pack(side="right", padx=(Spacing.XS, 0))

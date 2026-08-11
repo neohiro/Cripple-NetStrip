@@ -72,19 +72,19 @@ class CTkAnomalyAlert(ctk.CTkToplevel):
         
         ctk.CTkButton(
             btn_top_row, text=f"WHITELIST '{self.anomaly_data.get('name', 'unknown')}'",
-            fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, text_color=Colors.TEXT_TERTIARY, hover_color=Colors.BG_PANEL, corner_radius=0,
+            fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, text_color=Colors.TEXT_TERTIARY, hover_color=Colors.BG_PANEL, corner_radius=8,
             command=lambda: self._make_decision('whitelist')
         ).pack(side="left", expand=True, padx=(0, 5))
         
         ctk.CTkButton(
             btn_top_row, text="DISABLE SCANNER",
-            fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, text_color=Colors.TEXT_TERTIARY, hover_color=Colors.BG_PANEL, corner_radius=0,
+            fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, text_color=Colors.TEXT_TERTIARY, hover_color=Colors.BG_PANEL, corner_radius=8,
             command=lambda: self._make_decision('disable_scanner')
         ).pack(side="right", expand=True, padx=(5, 0))
         
         ctk.CTkButton(
             btn_frame, text="NEUTRALIZE THREAT",
-            fg_color=Colors.DANGER, hover_color="#991b1b", text_color="#ffffff", corner_radius=0,
+            fg_color=Colors.DANGER, hover_color="#991b1b", text_color="#ffffff", corner_radius=8,
             command=lambda: self._make_decision('neutralize')
         ).pack(fill="x")
         
