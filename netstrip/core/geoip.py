@@ -60,16 +60,24 @@ class GeoIPService:
 
     def fetch_now(self) -> bool:
         """Fetch immediately and return True if successful."""
-        if self.engine and getattr(self.engine, 'classifier', None) and getattr(self.engine.classifier, 'mode', None) and self.engine.classifier.mode.name == "PARANOID":
+        # Privacy Hardening: Abort public IP checks entirely in Ghost/Paranoid or Streamer Privacy mode
+        is_privacy = False
+        if self.engine:
+            if getattr(self.engine, 'db', None) and str(self.engine.db.get_setting("privacy_stream_mode", "false")).lower() == "true":
+                is_privacy = True
+            elif getattr(self.engine, 'classifier', None) and getattr(self.engine.classifier, 'mode', None) and self.engine.classifier.mode.name in ("PARANOID", "GHOST"):
+                is_privacy = True
+                
+        if is_privacy:
             self.current_data = {
-                'ip': 'PARANOID MODE',
-                'city': 'Blocked (No Update)',
-                'country': 'Blocked',
+                'ip': 'PRIVACY MODE',
+                'city': 'Hidden',
+                'country': 'Hidden',
                 'countryCode': 'XX',
-                'flag': '🛡️'
+                'flag': '🌐'
             }
             for cb in self.callbacks:
-                try: cb('PARANOID MODE', self.current_data)
+                try: cb('PRIVACY MODE', self.current_data)
                 except Exception: pass
             return True
             
@@ -97,71 +105,35 @@ class GeoIPService:
                 logger.debug(f"GeoIP fetch failed for {url}: {ex}")
                 return None
 
-        # Provider 1: ipapi.co (HTTPS, highly reliable)
-        d1 = try_provider('https://ipapi.co/json/')
-        if d1 and d1.get('ip'):
-            cc = d1.get('country_code', 'XX')
-            self.current_data = {
-                'ip': d1.get('ip'),
-                'city': d1.get('city', 'Unknown'),
-                'country': d1.get('country_name', 'Unknown'),
-                'countryCode': cc,
-                'flag': self.get_flag_emoji(cc)
-            }
-            for cb in self.callbacks:
-                try: cb(old_ip, self.current_data)
-                except Exception: pass
-            return True
+        # Randomize provider pool for redundancy and privacy (don't always hit same domain)
+        providers = [
+            {'url': 'https://ipapi.co/json/', 'type': 'ipapi'},
+            {'url': 'https://ipinfo.io/json', 'type': 'ipinfo'},
+            {'url': 'https://ipwho.is/', 'type': 'ipwho'},
+            {'url': 'http://ip-api.com/json/', 'type': 'ip-api'}
+        ]
+        import random
+        random.shuffle(providers)
+        
+        for prov in providers:
+            d = try_provider(prov['url'])
+            if d and (d.get('ip') or d.get('query')):
+                cc = d.get('country_code') or d.get('countryCode') or d.get('country', 'XX')
+                ip_str = d.get('ip') or d.get('query')
+                if not ip_str: continue
+                self.current_data = {
+                    'ip': ip_str,
+                    'city': d.get('city', 'Unknown'),
+                    'country': d.get('country_name') or d.get('country', 'Unknown'),
+                    'countryCode': cc,
+                    'flag': self.get_flag_emoji(cc)
+                }
+                for cb in self.callbacks:
+                    try: cb(old_ip, self.current_data)
+                    except Exception: pass
+                return True
 
-        # Provider 2: ipinfo.io (HTTPS)
-        d2 = try_provider('https://ipinfo.io/json')
-        if d2 and d2.get('ip'):
-            cc = d2.get('country', 'XX')
-            self.current_data = {
-                'ip': d2.get('ip'),
-                'city': d2.get('city', 'Unknown'),
-                'country': cc,
-                'countryCode': cc,
-                'flag': self.get_flag_emoji(cc)
-            }
-            for cb in self.callbacks:
-                try: cb(old_ip, self.current_data)
-                except Exception: pass
-            return True
-
-        # Provider 3: ipwho.is (HTTPS)
-        d3 = try_provider('https://ipwho.is/')
-        if d3 and d3.get('success') and d3.get('ip'):
-            cc = d3.get('country_code', 'XX')
-            self.current_data = {
-                'ip': d3.get('ip'),
-                'city': d3.get('city', 'Unknown'),
-                'country': d3.get('country', 'Unknown'),
-                'countryCode': cc,
-                'flag': self.get_flag_emoji(cc)
-            }
-            for cb in self.callbacks:
-                try: cb(old_ip, self.current_data)
-                except Exception: pass
-            return True
-
-        # Provider 4: ip-api.com (HTTP / HTTPS)
-        d4 = try_provider('http://ip-api.com/json/')
-        if d4 and d4.get('status') == 'success':
-            cc = d4.get('countryCode', 'XX')
-            self.current_data = {
-                'ip': d4.get('query', 'Unknown'),
-                'city': d4.get('city', 'Unknown'),
-                'country': d4.get('country', 'Unknown'),
-                'countryCode': cc,
-                'flag': self.get_flag_emoji(cc)
-            }
-            for cb in self.callbacks:
-                try: cb(old_ip, self.current_data)
-                except Exception: pass
-            return True
-
-        # Provider 5: api.ipify.org fallback for IP-only
+        # Fallback to ipify for IP-only
         d5 = try_provider('https://api.ipify.org', is_json=False)
         if d5 and d5.get('ip'):
             self.current_data['ip'] = d5.get('ip')
@@ -191,13 +163,14 @@ class OfflineGeoIP:
     _instance = None
     
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, engine=None):
         if cls._instance is None:
-            cls._instance = cls()
+            cls._instance = cls(engine)
         return cls._instance
         
-    def __init__(self):
-        self.db_path = Path(__file__).parent.parent / 'data' / 'GeoLite2-Country.mmdb'
+    def __init__(self, engine=None):
+        self.engine = engine
+        self.db_path = Path(__file__).parent.parent / 'data' / 'GeoLite2-City.mmdb'
         self.reader = None
         self.is_ready = False
         self._download_thread = None
@@ -222,9 +195,19 @@ class OfflineGeoIP:
         
     def _download_db(self):
         try:
+            # Check privacy modes before downloading
+            if self.engine:
+                mode = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
+                if mode and mode.name in ("PARANOID", "GHOST"):
+                    logger.info("GeoLite2 download blocked by Ghost/Paranoid Mode. Retrying later.")
+                    return
+                if hasattr(self.engine, 'db') and self.engine.db.get_setting("privacy_stream_mode", "false") == "true":
+                    logger.info("GeoLite2 download blocked by Streamer Privacy Mode. Retrying later.")
+                    return
+                    
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
             logger.info("Downloading GeoLite2-Country.mmdb for offline GeoIP...")
-            url = "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-Country.mmdb"
+            url = "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-City.mmdb"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 with open(self.db_path, 'wb') as f:
@@ -246,8 +229,31 @@ class OfflineGeoIP:
             pass
         return ""
         
+    def get_city(self, ip_str: str) -> str:
+        if not self.is_ready or not self.reader or not ip_str:
+            return ""
+        try:
+            res = self.reader.get(ip_str)
+            if res and 'city' in res and 'names' in res['city'] and 'en' in res['city']['names']:
+                return res['city']['names']['en']
+        except Exception:
+            pass
+        return ""
+        
     def get_flag(self, ip_str: str) -> str:
         code = self.get_country(ip_str)
         if not code or len(code) != 2:
             return ""
         return chr(ord(code[0]) + 127397) + chr(ord(code[1]) + 127397)
+        
+    def get_full_location(self, ip_str: str) -> str:
+        flag = self.get_flag(ip_str)
+        city = self.get_city(ip_str)
+        country = self.get_country(ip_str)
+        
+        parts = []
+        if flag: parts.append(flag)
+        if city: parts.append(city)
+        if country and country != city: parts.append(country)
+        
+        return " ".join(parts) if parts else "" 

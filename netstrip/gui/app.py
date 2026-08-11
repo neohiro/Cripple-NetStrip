@@ -833,9 +833,17 @@ class NetStripApp(ctk.CTk):
                 self.engine.db.set_setting("block_system_connections", "false" if current else "true")
                 self.engine.event_bus.publish("MODE_CHANGED")
                 
+            def is_streamer_privacy_active(item):
+                return self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
+            def toggle_streamer_privacy(icon, item):
+                current = is_streamer_privacy_active(item)
+                self.engine.db.set_setting("privacy_stream_mode", "false" if current else "true")
+                self.engine.event_bus.publish("MODE_CHANGED")
+                
             items.extend([
                 pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
                 pystray.MenuItem('Ghost Mode', toggle_ghost, checked=is_ghost_active),
+                pystray.MenuItem('Streamer Privacy Mode', toggle_streamer_privacy, checked=is_streamer_privacy_active),
                 pystray.MenuItem('Smart Shield', toggle_smart_shield, checked=is_smart_shield_active),
                 pystray.MenuItem('Block System Connections', toggle_system_blocked, checked=is_system_blocked),
                 pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),

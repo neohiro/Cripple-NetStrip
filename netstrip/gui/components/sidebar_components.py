@@ -50,9 +50,9 @@ class ConnectionRow(ctk.CTkFrame):
             geoip_engine = OfflineGeoIP.get_instance()
             raw_ip = conn_data.get('remote_ip') or conn_data.get('ip')
             if raw_ip:
-                flag = geoip_engine.get_flag(raw_ip)
-                if flag:
-                    target = f"{flag} {target}"
+                loc = geoip_engine.get_full_location(raw_ip)
+                if loc:
+                    target = f"[{loc}] {target}"
         except Exception as e:
             pass
         
