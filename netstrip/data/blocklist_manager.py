@@ -33,7 +33,7 @@ CATEGORY_PRIORITY = {
 }
 
 # 1. ESSENTIAL DOMAINS — Minimal set required for local IPC and NetStrip itself (Immune to all blocks)
-ESSENTIAL_DOMAINS = frozenset({
+ESSENTIAL_DOMAINS = {
     # NetStrip Core Self-Updates & Releases
     'api.github.com',
     'raw.githubusercontent.com',
@@ -56,10 +56,10 @@ ESSENTIAL_DOMAINS = frozenset({
     'dns.google', 'dns.quad9.net', 'cloudflare-dns.com',
     # Local Loopbacks
     '127.0.0.1', '127.0.0.53', '::1', 'localhost', 'broadcasthost',
-})
+}
 
 # 2. SYSTEM DOMAINS — OS Infrastructure, Search Engines & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
-SYSTEM_DOMAINS = frozenset({
+SYSTEM_DOMAINS = {
     # Global Search & Core Web Portals
     'google.com', 'google.co.uk', 'google.de', 'google.fr', 'google.ca',
     'google.com.au', 'google.co.jp', 'google.es', 'google.it', 'google.nl',
@@ -116,10 +116,10 @@ SYSTEM_DOMAINS = frozenset({
     # Gaming Cloud Backends
     'steampowered.com',
     'steamstatic.com',
-})
+}
 
 # 3. UPDATE DOMAINS — OS Repositories & Package Managers (Categorized as ConnectionCategory.UPDATE)
-UPDATE_DOMAINS = frozenset({
+UPDATE_DOMAINS = {
     # Linux Distributions & Package Managers
     'ubuntu.com',
     'canonical.com',
@@ -144,7 +144,25 @@ UPDATE_DOMAINS = frozenset({
     'steamcontent.com',
     'windowsupdate.com',
     'update.microsoft.com',
-})
+}
+
+# Dynamically inject updater source domains into ESSENTIAL_DOMAINS to prevent updater lockout
+try:
+    import json
+    import os
+    import urllib.parse
+    _bundled_sources = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'updater_sources.json')
+    if os.path.exists(_bundled_sources):
+        with open(_bundled_sources, 'r', encoding='utf-8') as _f:
+            _data = json.load(_f)
+        for _s in _data.get('sources', []):
+            _url = _s.get('url')
+            if _url and _s.get('enabled', True):
+                _netloc = urllib.parse.urlparse(_url).netloc
+                if _netloc:
+                    ESSENTIAL_DOMAINS.add(_netloc)
+except Exception:
+    pass
 
 DOM_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$')
 

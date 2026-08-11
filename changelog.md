@@ -1,3 +1,14 @@
+## [v3.4.3] - Curated Feeds & Updater Whitelist
+
+- **Dynamic Updater Protection**: Automatically extracts blocklist source domains (e.g., raw.githubusercontent.com, urlhaus.abuse.ch) and dynamically injects them into the engine's ESSENTIAL_DOMAINS memory set. This guarantees the updater has network clearance to download blocklists even when the app is in strict Paranoid or Ghost isolation modes.
+- **New Curated Feeds**: Expanded default updater_sources.json with 6 highly regarded community blocklists:
+  - Perflyst SmartTV Telemetry
+  - Perflyst Amazon FireTV Telemetry
+  - HaGeZi Crypto / Prigent (Cryptomining)
+  - KADhosts (Fraud/Scams)
+  - v2fly Identity: Netflix
+  - v2fly Identity: Twitch
+
 ## [v3.4.2] - Local Updater Merge DB
 
 - **Updater Source Merge**: Fixed a bug where a new version of the app containing newly curated blocklists would not copy the new lists to the user local updater configuration if updater_sources.json already existed. The app now parses and seamlessly merges new lists (and upstream URL changes) into the local user DB at boot without touching existing toggled settings.

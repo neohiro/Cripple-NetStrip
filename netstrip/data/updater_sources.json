@@ -305,6 +305,48 @@
       "format": "domains",
       "category": "ad",
       "enabled": true
+    },
+    {
+      "name": "Perflyst SmartTV Telemetry",
+      "url": "https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV.txt",
+      "format": "domains",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "Perflyst Amazon FireTV Telemetry",
+      "url": "https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/AmazonFireTV.txt",
+      "format": "domains",
+      "category": "telemetry",
+      "enabled": true
+    },
+    {
+      "name": "HaGeZi Crypto / Prigent",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists-legacy/main/hosts/crypto.txt",
+      "format": "hosts",
+      "category": "security",
+      "enabled": true
+    },
+    {
+      "name": "KADhosts (Fraud/Scam)",
+      "url": "https://raw.githubusercontent.com/KADhosts/KADhosts/master/KADhosts.txt",
+      "format": "hosts",
+      "category": "security",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Netflix",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/netflix",
+      "format": "v2fly",
+      "category": "identity_netflix",
+      "enabled": true
+    },
+    {
+      "name": "Identity: Twitch",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/twitch",
+      "format": "v2fly",
+      "category": "identity_twitch",
+      "enabled": true
     }
   ]
 }
