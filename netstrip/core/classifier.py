@@ -29,6 +29,9 @@ class TrafficClassifier:
         if cache_key in self._domain_cache:
             return self._domain_cache[cache_key]
             
+        if len(self._domain_cache) > 5000:
+            self._domain_cache.clear()
+            
         # Check loopback specifically (local DNS resolvers)
         if domain.startswith("127.") or domain == "::1":
             self._domain_cache[cache_key] = ConnectionCategory.ESSENTIAL
@@ -145,12 +148,6 @@ class TrafficClassifier:
                             return ConnectionCategory.TELEMETRY
 
         self._domain_cache[cache_key] = ConnectionCategory.UNKNOWN
-        
-        # Prevent memory leak
-        if len(self._domain_cache) > 5000:
-            # Simple clearing strategy
-            self._domain_cache.clear()
-            
         return ConnectionCategory.UNKNOWN
 
     def classify_ip(self, ip: str, port: int = 0, process_name: str = "Unknown") -> tuple:
@@ -161,6 +158,9 @@ class TrafficClassifier:
             
         if cache_key in self._ip_cache:
             return self._ip_cache[cache_key]
+            
+        if len(self._ip_cache) > 5000:
+            self._ip_cache.clear()
             
         if self._is_lan_ip(ip):
             cat = ConnectionCategory.LAN
@@ -184,9 +184,6 @@ class TrafficClassifier:
         action = self.mode.get_action_for_category(cat, self.db)
         
         self._ip_cache[cache_key] = (cat, action)
-        if len(self._ip_cache) > 5000:
-            self._ip_cache.clear()
-            
         return cat, action
 
     def _is_lan_ip(self, ip: str) -> bool:

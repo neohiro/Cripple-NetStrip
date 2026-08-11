@@ -582,6 +582,9 @@ def main():
                     conn.close()
                     continue
                     
+                # Prevent socket hanging (local Slowloris DoS)
+                conn.settimeout(2.0)
+                    
                 # Sanity check: Buffer limit to prevent memory exhaustion (local DoS)
                 data = conn.recv(1024)
                 if len(data) > 1000:

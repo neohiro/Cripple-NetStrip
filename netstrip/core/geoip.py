@@ -181,3 +181,73 @@ class GeoIPService:
             self._stop_event.wait(30) 
             if self.is_running:
                 self.fetch_now()
+
+
+import os
+import maxminddb
+from pathlib import Path
+
+class OfflineGeoIP:
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+        
+    def __init__(self):
+        self.db_path = Path(__file__).parent.parent / 'data' / 'GeoLite2-Country.mmdb'
+        self.reader = None
+        self.is_ready = False
+        self._download_thread = None
+        self._init_db()
+        
+    def _init_db(self):
+        if self.db_path.exists():
+            try:
+                self.reader = maxminddb.open_database(str(self.db_path))
+                self.is_ready = True
+            except Exception as e:
+                logger.error(f"Failed to open GeoLite2 DB: {e}")
+                self._start_download()
+        else:
+            self._start_download()
+            
+    def _start_download(self):
+        if self._download_thread and self._download_thread.is_alive():
+            return
+        self._download_thread = threading.Thread(target=self._download_db, daemon=True)
+        self._download_thread.start()
+        
+    def _download_db(self):
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.info("Downloading GeoLite2-Country.mmdb for offline GeoIP...")
+            url = "https://raw.githubusercontent.com/P3TERX/GeoLite.mmdb/download/GeoLite2-Country.mmdb"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                with open(self.db_path, 'wb') as f:
+                    f.write(resp.read())
+            self.reader = maxminddb.open_database(str(self.db_path))
+            self.is_ready = True
+            logger.info("Offline GeoIP database downloaded and loaded.")
+        except Exception as e:
+            logger.error(f"Failed to download GeoIP database: {e}")
+            
+    def get_country(self, ip_str: str) -> str:
+        if not self.is_ready or not self.reader or not ip_str:
+            return ""
+        try:
+            res = self.reader.get(ip_str)
+            if res and 'country' in res and 'iso_code' in res['country']:
+                return res['country']['iso_code']
+        except Exception:
+            pass
+        return ""
+        
+    def get_flag(self, ip_str: str) -> str:
+        code = self.get_country(ip_str)
+        if not code or len(code) != 2:
+            return ""
+        return chr(ord(code[0]) + 127397) + chr(ord(code[1]) + 127397)

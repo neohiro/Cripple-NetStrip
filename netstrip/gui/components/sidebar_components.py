@@ -43,6 +43,18 @@ class ConnectionRow(ctk.CTkFrame):
             
         if str(conn_data.get('protocol')).upper() == 'DNS':
             target += " [DNS]"
+            
+        # Add GeoIP info
+        try:
+            from netstrip.core.geoip import OfflineGeoIP
+            geoip_engine = OfflineGeoIP.get_instance()
+            raw_ip = conn_data.get('remote_ip') or conn_data.get('ip')
+            if raw_ip:
+                flag = geoip_engine.get_flag(raw_ip)
+                if flag:
+                    target = f"{flag} {target}"
+        except Exception as e:
+            pass
         
         self.target_label = ctk.CTkLabel(
             self,

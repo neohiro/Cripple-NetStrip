@@ -83,12 +83,31 @@ class StatCard(ctk.CTkFrame):
 
     def set_value(self, value: str):
         val_str = str(value)
-        scale = getattr(self, '_current_scale', 1.0)
+        old_val = self.value_label.cget("text")
         
-        # Use a constant font size (SIZE_BASE) to prevent vertical bouncing 
-        # and glitchy redraws when string length changes.
+        scale = getattr(self, '_current_scale', 1.0)
         scaled_size = int(Fonts.SIZE_BASE * scale)
         self.value_label.configure(text=val_str, font=(Fonts.FAMILY_PRIMARY[0], scaled_size, Fonts.WEIGHT_BOLD))
+        
+        # Trigger a subtle sparkline/pulse when value updates and differs
+        if str(old_val) != val_str and str(old_val).replace(',', '').isdigit() and val_str.replace(',', '').isdigit():
+            if not getattr(self, '_is_pulsing', False):
+                self._is_pulsing = True
+                orig_color = Colors.BG_PANEL
+                # Green pulse for Allows, Red pulse for Blocks
+                steps = ["#1a2e21", "#14251a", "#0f1c14", orig_color] if self.color == Colors.SUCCESS else ["#3d141b", "#2c0e13", "#1b090c", orig_color]
+                
+                def _fade(idx=0):
+                    if not self.winfo_exists(): return
+                    if idx < len(steps):
+                        self.configure(fg_color=steps[idx])
+                        self.inner.configure(fg_color=steps[idx])
+                        self.after(80, lambda: _fade(idx + 1))
+                    else:
+                        self.configure(fg_color=orig_color)
+                        self.inner.configure(fg_color="transparent")
+                        self._is_pulsing = False
+                _fade(0)
 
     def set_subtitle(self, subtitle: str):
         if hasattr(self, 'subtitle_label'):

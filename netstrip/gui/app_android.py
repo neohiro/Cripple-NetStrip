@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 4x standard speed: 80 units per standard 120-delta notch
-                    step = -int(event.delta / 1.5)
+                    # 4x standard speed
+                    step = -int((event.delta / 120) * 4)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):

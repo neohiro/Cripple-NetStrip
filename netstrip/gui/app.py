@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 4x standard speed: 80 units per standard 120-delta notch
-                    step = -int(event.delta / 1.5)
+                    # 4x standard speed
+                    step = -int((event.delta / 120) * 4)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -559,41 +559,53 @@ class NetStripApp(ctk.CTk):
             btn.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         selected_btn.configure(fg_color=Colors.BG_ELEVATED, text_color=Colors.ACCENT_PRIMARY)
 
-        if self.current_view:
-            self.current_view.grid_remove() # Hide the old view instead of destroying it
-
         view_class = _resolve_view_class(selected_btn._view_class)
+        is_dash = getattr(view_class, '__name__', '') == 'DashboardView'
+        target_pad = 0 if is_dash else 24
         
-        # If view is already cached, show it instantly with zero overlay latency
+        def _slide_in(view):
+            if self.current_view and self.current_view != view:
+                self.current_view.grid_remove()
+            self.current_view = view
+            
+            # Fast micro-animation: Slide up and fade-in illusion
+            steps = [0.06, 0.03, 0.01, 0.0]
+            def step(idx):
+                if not self.winfo_exists(): return
+                if idx < len(steps):
+                    rely_val = steps[idx]
+                    view.place(relx=0, rely=rely_val, relwidth=1.0, relheight=1.0 - rely_val)
+                    self.after(12, lambda: step(idx+1))
+                else:
+                    view.place_forget()
+                    view.grid(row=0, column=0, sticky="nsew", padx=target_pad, pady=target_pad)
+            step(0)
+
+        # If view is already cached, show it with animation
         if view_class in self._cached_views:
-            self.current_view = self._cached_views[view_class]
-            if getattr(view_class, '__name__', '') == 'DashboardView':
-                self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-            else:
-                self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+            _slide_in(self._cached_views[view_class])
             return
         
         # First-time load on-demand
         if not hasattr(self, '_tab_loading_overlay'):
             self._tab_loading_overlay = ctk.CTkFrame(self.main_frame, fg_color=Colors.BG_DARK)
-            ctk.CTkLabel(self._tab_loading_overlay, text="Loading Tab...", font=(Fonts.FAMILY_PRIMARY[0], 20)).place(relx=0.5, rely=0.5, anchor="center")
+            ctk.CTkLabel(self._tab_loading_overlay, text="Loading...", font=(Fonts.FAMILY_PRIMARY[0], 20)).place(relx=0.5, rely=0.5, anchor="center")
             
         self._tab_loading_overlay.grid(row=0, column=0, sticky="nsew")
+        if self.current_view:
+            self.current_view.grid_remove()
+            
         self.update_idletasks()
         
         def _build_and_show():
             try:
                 if view_class not in self._cached_views:
                     self._cached_views[view_class] = view_class(self.main_frame, self.engine)
-                self.current_view = self._cached_views[view_class]
-                
-                if getattr(view_class, '__name__', '') == 'DashboardView':
-                    self.current_view.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-                else:
-                    self.current_view.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+                if hasattr(self, '_tab_loading_overlay'):
+                    self._tab_loading_overlay.grid_remove()
+                _slide_in(self._cached_views[view_class])
             except Exception as e:
                 logger.error(f"Failed to load view {view_class}: {e}", exc_info=True)
-            finally:
                 if hasattr(self, '_tab_loading_overlay'):
                     self._tab_loading_overlay.grid_remove()
             
@@ -808,9 +820,24 @@ class NetStripApp(ctk.CTk):
             if threat:
                 items.append(pystray.MenuItem('⚠️ Review Kernel Anomaly', review_anomaly))
                 
+            def is_smart_shield_active(item):
+                return self.engine.db.get_setting("smart_shield_enabled", "true") == "true"
+            def toggle_smart_shield(icon, item):
+                current = is_smart_shield_active(item)
+                self.engine.db.set_setting("smart_shield_enabled", "false" if current else "true")
+                
+            def is_system_blocked(item):
+                return self.engine.db.get_setting("block_system_connections", "false") == "true"
+            def toggle_system_blocked(icon, item):
+                current = is_system_blocked(item)
+                self.engine.db.set_setting("block_system_connections", "false" if current else "true")
+                self.engine.event_bus.publish("MODE_CHANGED")
+                
             items.extend([
                 pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
                 pystray.MenuItem('Ghost Mode', toggle_ghost, checked=is_ghost_active),
+                pystray.MenuItem('Smart Shield', toggle_smart_shield, checked=is_smart_shield_active),
+                pystray.MenuItem('Block System Connections', toggle_system_blocked, checked=is_system_blocked),
                 pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
                 pystray.MenuItem('Quit', on_quit)
             ])

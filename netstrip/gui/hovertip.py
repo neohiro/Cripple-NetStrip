@@ -210,7 +210,7 @@ def apply_global_tooltips():
             text = text.strip()
             if text in TOOLTIP_MAP: return TOOLTIP_MAP[text]
             for key, tip in TOOLTIP_MAP.items():
-                if key in text: return tip
+                if key in text and key != "": return tip
         except Exception:
             pass
         return ""

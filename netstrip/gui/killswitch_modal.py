@@ -20,7 +20,7 @@ class ManualKillswitchModal(ctk.CTkToplevel):
     def _build_ui(self):
         from netstrip.gui.utils import get_app_logo_image
         # Outer container with a thin danger border for futuristic accent
-        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.DANGER)
+        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, bg_color=Colors.BG_DARKEST, corner_radius=8, border_width=1, border_color=Colors.DANGER)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         inner = ctk.CTkFrame(frame, fg_color="transparent")
@@ -54,13 +54,13 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         
         btn_cancel = ctk.CTkButton(
             btn_frame, text="ABORT", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
-            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=8, command=self.on_cancel
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_cancel
         )
         btn_cancel.pack(side="left", expand=True, padx=(0, 5))
         
         btn_confirm = ctk.CTkButton(
             btn_frame, text="ENGAGE", fg_color=Colors.DANGER, 
-            hover_color="#991b1b", text_color="#ffffff", corner_radius=8, command=self.on_confirm
+            hover_color="#991b1b", text_color="#ffffff", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_confirm
         )
         btn_confirm.pack(side="right", expand=True, padx=(5, 0))
 
@@ -91,7 +91,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
     def _build_ui(self):
         from netstrip.gui.utils import get_app_logo_image
         # Outer container with a thin info/danger border
-        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, corner_radius=0, border_width=1, border_color=Colors.WARNING)
+        frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARKEST, bg_color=Colors.BG_DARKEST, corner_radius=8, border_width=1, border_color=Colors.WARNING)
         frame.pack(fill="both", expand=True, padx=2, pady=2)
         
         inner = ctk.CTkFrame(frame, fg_color="transparent")
@@ -119,13 +119,13 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         
         btn_keep = ctk.CTkButton(
             btn_frame, text="MAINTAIN LOCKDOWN", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
-            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, corner_radius=8, command=self.on_keep
+            hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_keep
         )
         btn_keep.pack(side="left", expand=True, padx=(0, 5))
         
         btn_restore = ctk.CTkButton(
             btn_frame, text="ACKNOWLEDGE", fg_color=Colors.WARNING, 
-            hover_color="#b45309", text_color="white", corner_radius=8, command=self.on_restore
+            hover_color="#b45309", text_color="white", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_restore
         )
         btn_restore.pack(side="right", expand=True, padx=(5, 0))
 

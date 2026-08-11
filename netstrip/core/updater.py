@@ -89,156 +89,159 @@ class BlocklistUpdater:
     def _perform_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         self.is_updating = True
         try:
-            if not os.path.exists(self.sources_file):
-                logger.warning(f"Updater sources file not found: {self.sources_file}")
-                if on_complete:
-                    on_complete(0)
-                return False
-
-            with open(self.sources_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            sources = data.get('sources', [])
-            enabled_sources = [s for s in sources if s.get('enabled', False) and s.get('url') and s.get('category')]
-            total_enabled = len(enabled_sources)
-            
-            # Load state
-            state_file = os.path.join(self.lists_dir, 'updater_state.json')
-            state_data = {}
-            if os.path.exists(state_file):
-                try:
-                    with open(state_file, 'r', encoding='utf-8') as f:
-                        state_data = json.load(f)
-                except Exception:
-                    pass
-
-            sources_modified = False
-            any_updated = False
-            updated_count = 0
-
-            # Create robust SSL context
-            import ssl
             try:
-                import certifi
-                ssl_context = ssl.create_default_context(cafile=certifi.where())
-            except Exception:
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-            
-            for idx, source in enumerate(enabled_sources, 1):
-                url = source.get('url')
-                category = source.get('category')
-                name = source.get('name')
+                if not os.path.exists(self.sources_file):
+                    logger.warning(f"Updater sources file not found: {self.sources_file}")
+                    if on_complete:
+                        on_complete(0)
+                    return False
+
+                with open(self.sources_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                sources = data.get('sources', [])
+                enabled_sources = [s for s in sources if s.get('enabled', False) and s.get('url') and s.get('category')]
+                total_enabled = len(enabled_sources)
                 
-                name = str(name) if name else f"unknown_{category}_{int(time.time())}"
-                safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
-                temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
-                target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
-                
-                # Report progress
-                if on_progress:
+                # Load state
+                state_file = os.path.join(self.lists_dir, 'updater_state.json')
+                state_data = {}
+                if os.path.exists(state_file):
                     try:
-                        on_progress(idx, total_enabled, name)
+                        with open(state_file, 'r', encoding='utf-8') as f:
+                            state_data = json.load(f)
                     except Exception:
                         pass
 
-                # Get the update interval for this source (default 24h)
-                update_interval_hours = float(source.get('update_interval_hours', 24))
-                update_interval_seconds = update_interval_hours * 3600
-                
-                if not force:
-                    # Check file age (skip if updated within the required interval)
-                    if os.path.exists(target_file):
-                        file_age_seconds = time.time() - os.path.getmtime(target_file)
-                        if file_age_seconds < update_interval_seconds:
-                            continue
+                sources_modified = False
+                any_updated = False
+                updated_count = 0
 
-                    # Throttle recent attempts — but always retry sources that have never been downloaded
-                    if os.path.exists(target_file):
-                        throttle_seconds = min(3600, update_interval_seconds / 2.0)
-                        last_attempt = state_data.get(name, {}).get('last_attempt', 0)
-                        if time.time() - last_attempt < throttle_seconds:
-                            continue
-                    
-                logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")
-                
-                max_attempts = 2
-                last_error = None
-                for attempt in range(1, max_attempts + 1):
-                    try:
-                        import requests
-                        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-                        response = requests.get(url, headers=headers, stream=True, timeout=30)
-                        response.raise_for_status()
-                        
-                        with open(temp_file, 'wb') as out_file:
-                            for chunk in response.iter_content(chunk_size=8192):
-                                if chunk:
-                                    out_file.write(chunk)
-                        
-                        if os.path.exists(target_file):
-                            try: os.remove(target_file)
-                            except Exception: pass
-                        os.replace(temp_file, target_file)
-                            
-                        logger.info(f"Successfully updated '{name}' (attempt {attempt})")
-                        state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
-                        any_updated = True
-                        updated_count += 1
-                        last_error = None
-                        break  # Success — exit retry loop
-                        
-                    except Exception as e:
-                        last_error = e
-                        if os.path.exists(temp_file):
-                            try: os.remove(temp_file)
-                            except Exception: pass
-                        if attempt < max_attempts:
-                            logger.warning(f"Attempt {attempt} failed for '{name}': {e} — retrying...")
-                            time.sleep(2)
-                        
-                if last_error:
-                    logger.error(f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}")
-                    failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
-                    state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
-                    
-                    if failures >= 10 and name.startswith("Custom:"):
-                        logger.warning(f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures.")
-                        source['enabled'] = False
-                        sources_modified = True
-                
-                # Short delay between sources
-                time.sleep(0.05)
-                        
-            # Save state
-            try:
-                with open(state_file, 'w', encoding='utf-8') as f:
-                    json.dump(state_data, f, indent=2)
-            except Exception:
-                pass
-                
-            # Save modified sources if any were disabled
-            if sources_modified:
+                # Create robust SSL context
+                import ssl
                 try:
-                    with open(self.sources_file, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2)
-                except Exception as e:
-                    logger.error(f"Failed to save updated sources: {e}")
+                    import certifi
+                    ssl_context = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                
+                for idx, source in enumerate(enabled_sources, 1):
+                    url = source.get('url')
+                    category = source.get('category')
+                    name = source.get('name')
                     
-            # Trigger blocklist reload if any updates were made
-            if any_updated and self.on_update_callback:
-                self.on_update_callback()
-                
-            # Fetch DNSCrypt resolvers to build dynamic upstream options
-            self._fetch_dnscrypt_resolvers()
-            
-            if on_complete:
-                try: on_complete(updated_count)
-                except Exception: pass
-                
-            return any_updated
+                    name = str(name) if name else f"unknown_{category}_{int(time.time())}"
+                    safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
+                    temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
+                    target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
+                    
+                    # Report progress
+                    if on_progress:
+                        try:
+                            on_progress(idx, total_enabled, name)
+                        except Exception:
+                            pass
+
+                    # Get the update interval for this source (default 24h)
+                    update_interval_hours = float(source.get('update_interval_hours', 24))
+                    update_interval_seconds = update_interval_hours * 3600
+                    
+                    if not force:
+                        # Check file age (skip if updated within the required interval)
+                        if os.path.exists(target_file):
+                            file_age_seconds = time.time() - os.path.getmtime(target_file)
+                            if file_age_seconds < update_interval_seconds:
+                                continue
+
+                        # Throttle recent attempts — but always retry sources that have never been downloaded
+                        if os.path.exists(target_file):
+                            throttle_seconds = min(3600, update_interval_seconds / 2.0)
+                            last_attempt = state_data.get(name, {}).get('last_attempt', 0)
+                            if time.time() - last_attempt < throttle_seconds:
+                                continue
                         
+                    logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")
+                    
+                    max_attempts = 2
+                    last_error = None
+                    for attempt in range(1, max_attempts + 1):
+                        try:
+                            import requests
+                            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                            response = requests.get(url, headers=headers, stream=True, timeout=30)
+                            response.raise_for_status()
+                            
+                            with open(temp_file, 'wb') as out_file:
+                                for chunk in response.iter_content(chunk_size=8192):
+                                    if chunk:
+                                        out_file.write(chunk)
+                            
+                            if os.path.exists(target_file):
+                                try: os.remove(target_file)
+                                except Exception: pass
+                            os.replace(temp_file, target_file)
+                                
+                            logger.info(f"Successfully updated '{name}' (attempt {attempt})")
+                            state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
+                            any_updated = True
+                            updated_count += 1
+                            last_error = None
+                            break  # Success — exit retry loop
+                            
+                        except Exception as e:
+                            last_error = e
+                            if os.path.exists(temp_file):
+                                try: os.remove(temp_file)
+                                except Exception: pass
+                            if attempt < max_attempts:
+                                logger.warning(f"Attempt {attempt} failed for '{name}': {e} — retrying...")
+                                time.sleep(2)
+                            
+                    if last_error:
+                        logger.error(f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}")
+                        failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
+                        state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
+                        
+                        if failures >= 10 and name.startswith("Custom:"):
+                            logger.warning(f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures.")
+                            source['enabled'] = False
+                            sources_modified = True
+                    
+                    # Short delay between sources
+                    time.sleep(0.05)
+                            
+                # Save state
+                try:
+                    with open(state_file, 'w', encoding='utf-8') as f:
+                        json.dump(state_data, f, indent=2)
+                except Exception:
+                    pass
+                    
+                # Save modified sources if any were disabled
+                if sources_modified:
+                    try:
+                        with open(self.sources_file, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, indent=2)
+                    except Exception as e:
+                        logger.error(f"Failed to save updated sources: {e}")
+                        
+                # Trigger blocklist reload if any updates were made
+                if any_updated and self.on_update_callback:
+                    self.on_update_callback()
+                    
+                # Fetch DNSCrypt resolvers to build dynamic upstream options
+                self._fetch_dnscrypt_resolvers()
+                
+                if on_complete:
+                    try: on_complete(updated_count)
+                    except Exception: pass
+                    
+                return any_updated
+            except Exception as e:
+                logger.error(f"Catastrophic failure in blocklist updater thread: {e}")
+                return False
         finally:
             self.is_updating = False
 

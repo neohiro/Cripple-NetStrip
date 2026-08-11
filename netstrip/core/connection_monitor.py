@@ -285,6 +285,10 @@ class ConnectionMonitor:
                                         if self.on_malware_detected:
                                             self.on_malware_detected({'name': 'arp_spoof_local', 'message': f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!"})
                                     self._arp_cache[check_ip] = mac
+                                    
+                                    # Prevent memory leak for ARP cache
+                                    if len(self._arp_cache) > 2000:
+                                        self._arp_cache = {k: v for i, (k, v) in enumerate(self._arp_cache.items()) if i > 1000}
                             except Exception:
                                 pass
                         try:

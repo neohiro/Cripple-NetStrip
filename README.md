@@ -268,6 +268,8 @@ Two independent layers that never block each other:
 
 | Layer | What it does |
 |---|---|
+| **🛡️ NIST CSF 2.0 Resilience** | Process watchdog with crash recovery, memory-bound caching, IPC timeouts (Slowloris mitigation), and thread exhaust prevention |
+| **🛡️ ISO/IEC 25010 Quality** | Architecture meets ISO standards for Reliability, Performance Efficiency, and Security via strict fail-safe state handling and WAL DB |
 | **🛡️ Post-Quantum Cryptography** | Pure-Python AES-256-CBC + HMAC-SHA512 + HKDF-SHA512 (immune to Grover's quantum attack & WDAC blocks) |
 | **🔍 HMAC-SHA512 Watchdog** | Ephemeral 512-bit keyed hashes continuously verify integrity of all engine files & modules against live tampering |
 | **DLL Sideloading Mitigation** | `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` + dynamic `_MEIPASS` search path restriction at startup |
@@ -278,6 +280,11 @@ Two independent layers that never block each other:
 | **Anti-Corruption DB** | SQLite WAL mode with thread-safe isolation |
 | **ARP Lockdown** | Gateway MAC address pinned — prevents ARP spoofing / MITM attacks |
 | **eBPF XDP Mode** | On Linux, fileless eBPF programs injected into the NIC for wire-speed filtering |
+
+### Compliance Standards
+Cripple is engineered to align with two major cybersecurity standards:
+- **NIST Cybersecurity Framework 2.0 (CSF 2.0)**: Specifically addressing the **Govern, Protect, Detect, and Recover** functions. Cripple automatically restores network configurations (DNS, firewall rules, active bindings) on ungraceful exits, monitors process integrity via a cryptographic watchdog, and implements local Denial of Service (DoS) protections.
+- **ISO/IEC 25010:2011**: System quality strictly models the standards for **Reliability** (fault tolerance, recoverability), **Security** (confidentiality, integrity), and **Performance Efficiency** (memory-bound caches, socket timeouts, adaptive thread polling).
 
 ### Performance
 

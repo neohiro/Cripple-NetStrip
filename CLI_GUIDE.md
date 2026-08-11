@@ -72,7 +72,7 @@ If the daemon is already running (e.g. in `tmux` or as a systemd service), these
 ### Firewall Mode
 | Command | Action |
 |---|---|
-| `--mode <LEVEL>` | Switch mode: `LOOSE`, `STANDARD`, `STRICT`, `PARANOID`. |
+| `--mode <LEVEL>` | Switch mode: `LOOSE`, `STANDARD`, `STRICT`, `GHOST`. |
 | `--killswitch` | Engage Master Killswitch — **requires confirmation** (type `YES`). |
 | `--unkillswitch` | Disengage Master Killswitch. |
 | `--ghost` | Ghost Mode — **requires confirmation** (type `YES`). |
@@ -116,8 +116,8 @@ sudo python main.py --block evil-tracker.com
 # 4. View today's stats
 sudo python main.py --stats
 
-# 5. Escalate to Paranoid mode
-sudo python main.py --mode PARANOID
+# 5. Escalate to strict mode
+sudo python main.py --mode STRICT
 
 # 6. Something went wrong — kill the network
 sudo python main.py --killswitch

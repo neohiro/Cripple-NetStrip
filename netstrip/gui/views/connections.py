@@ -184,6 +184,15 @@ class ConnectionsView(ctk.CTkFrame):
         if getattr(self, '_resize_paused', False):
             return
             
+        if getattr(self, '_is_fetching', False):
+            if not self._destroyed:
+                if hasattr(self, '_refresh_after_id'):
+                    self.after_cancel(self._refresh_after_id)
+                self._refresh_after_id = self.after(500, self._refresh_loop)
+            return
+            
+        self._is_fetching = True
+        
         # Fetch recent connections in background thread to prevent UI micro-stutters
         def fetch():
             try:
@@ -191,13 +200,16 @@ class ConnectionsView(ctk.CTkFrame):
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
                 def process_ui():
+                    self._is_fetching = False
                     if getattr(self, '_destroyed', False) or not self.winfo_exists():
                         return
                     self.engine._cached_recent = conns
                     self._process_connections(conns, sys_val)
                 self.after(0, process_ui)
             except Exception:
-                pass
+                def reset_flag():
+                    self._is_fetching = False
+                self.after(0, reset_flag)
                 
         import threading
         threading.Thread(target=fetch, daemon=True).start()

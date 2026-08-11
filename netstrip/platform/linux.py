@@ -137,13 +137,13 @@ class LinuxPlatform(PlatformBase):
         return True
 
     def disable_ipv4(self) -> bool:
-        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-p", "ip", "-j", "DROP"])
-        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-p", "ip", "-j", "DROP"])
+        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
         return res1.returncode == 0 and res2.returncode == 0
 
     def enable_ipv4(self) -> bool:
-        self._run_cmd(["iptables", "-D", "INPUT", "-p", "ip", "-j", "DROP"])
-        self._run_cmd(["iptables", "-D", "OUTPUT", "-p", "ip", "-j", "DROP"])
+        while self._run_cmd(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
+        while self._run_cmd(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
         return True
 
     def is_ipv4_enabled(self) -> bool:

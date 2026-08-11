@@ -182,6 +182,9 @@ def restore_network():
                 
             if get_db_setting("disable_ipv4_globally") == "true":
                 logging.info("Re-enabling global IPv4 (was disabled by engine before crash)...")
+                subprocess.run(["powershell", "-Command",
+                    "Set-NetAdapterBinding -ComponentID ms_tcpip -Enabled $true -Name '*'"],
+                    creationflags=subprocess.CREATE_NO_WINDOW)
                 clear_db_setting("disable_ipv4_globally")
             
             # Reset killswitch state in DB so the app starts fresh
@@ -232,10 +235,10 @@ def restore_network():
             clear_db_setting("killswitch_active")
             
             # Flush any IPv4 drops
-            while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "INPUT", "!", "-i", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
-            while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+            while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
+                subprocess.run(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+            while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
+                subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
             
         logging.info("Emergency network restore completed successfully.")
     except Exception as e:

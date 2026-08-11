@@ -47,49 +47,54 @@ class WinDivertInterceptor(PacketInterceptor):
         # We exclude local loopback to avoid intercepting our own DNS proxy traffic.
         filter_str = "ip and not loopback and (tcp.Syn or udp)"
         
-        try:
-            with pydivert.WinDivert(filter_str) as w:
-                self._w = w
-                for packet in w:
-                    if not self.is_running:
-                        break
-                    
-                    try:
-                        dst_ip = packet.dst_addr
-                        src_ip = packet.src_addr
+        backoff = 1.0
+        while self.is_running:
+            try:
+                with pydivert.WinDivert(filter_str) as w:
+                    self._w = w
+                    backoff = 1.0  # Reset backoff on successful bind
+                    for packet in w:
+                        if not self.is_running:
+                            break
                         
-                        protocol = "TCP" if packet.tcp else "UDP" if packet.udp else "UNKNOWN"
-                        
-                        if packet.tcp:
-                            dst_port = packet.dst_port
-                            src_port = packet.src_port
-                        elif packet.udp:
-                            dst_port = packet.dst_port
-                            src_port = packet.src_port
-                        else:
-                            dst_port = 0
-                            src_port = 0
+                        try:
+                            dst_ip = packet.dst_addr
+                            src_ip = packet.src_addr
                             
-                        # Evaluate packet via callback
-                        allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip, packet.is_inbound)
-                        
-                        if allowed:
-                            w.send(packet) # Re-inject packet into network stack
-                        else:
-                            # Drop the packet (do not send)
-                            pass
+                            protocol = "TCP" if packet.tcp else "UDP" if packet.udp else "UNKNOWN"
                             
-                    except Exception as e:
-                        logger.error(f"Error evaluating packet: {e}")
-                        # CRITICAL: If killswitch is active, failsafe = DROP to maintain block-all contract.
-                        # Otherwise, failsafe = ALLOW so we don't break the internet on transient errors.
-                        is_killswitch = self.engine and getattr(self.engine, 'killswitch_active', False)
-                        if not is_killswitch:
-                            try:
-                                w.send(packet)
-                            except:
+                            if packet.tcp:
+                                dst_port = packet.dst_port
+                                src_port = packet.src_port
+                            elif packet.udp:
+                                dst_port = packet.dst_port
+                                src_port = packet.src_port
+                            else:
+                                dst_port = 0
+                                src_port = 0
+                                
+                            # Evaluate packet via callback
+                            allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip, packet.is_inbound)
+                            
+                            if allowed:
+                                w.send(packet) # Re-inject packet into network stack
+                            else:
+                                # Drop the packet (do not send)
                                 pass
-                        # else: packet is silently dropped (correct behavior under killswitch)
-        except Exception as e:
-            logger.error(f"WinDivert engine failed: {e}")
-            self.is_running = False
+                                
+                        except Exception as e:
+                            logger.error(f"Error evaluating packet: {e}")
+                            # CRITICAL: If killswitch is active, failsafe = DROP to maintain block-all contract.
+                            # Otherwise, failsafe = ALLOW so we don't break the internet on transient errors.
+                            is_killswitch = self.engine and getattr(self.engine, 'killswitch_active', False)
+                            if not is_killswitch:
+                                try:
+                                    w.send(packet)
+                                except:
+                                    pass
+                            # else: packet is silently dropped (correct behavior under killswitch)
+            except Exception as e:
+                logger.error(f"WinDivert engine failed: {e}")
+                import time
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60.0)
