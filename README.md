@@ -320,7 +320,9 @@ pip install -r requirements.txt
 
 ### v3.3.18 — Explicit 3-State Neutral Toggle & System Idle Origin Resolution
 - **Explicit 3-State Neutral Toggle**: Introduced explicit `neutral` user state when both `Allow All` and `Block All` are toggled off. Toggling an active bulk button off now turns both buttons transparent (OFF) simultaneously and restores individual connection/domain evaluation. User explicit settings (Allow, Block, or Both Off) take absolute priority over implicit Paranoid or System block defaults.
+- **Mode-Scoped Rule Isolation**: Rule modifications and database cache invalidations are isolated by `mode_scope` (`STANDARD` vs `GHOST` / `PARANOID`). Switching modes initialises each protection mode's default rules without cross-mode interference.
 - **System Idle & Kernel Origin Resolution**: Added origin local port and domain mapping tracking to attribute sockets created under PID 0 (`System Idle Process`) or PID 4 (`System`) back to their parent application (e.g. `AntiGravity`). Kernel connections for whitelisted apps properly inherit `USER_ALLOWED` status, eliminating false positive blocks.
+- **Windows Executable Metadata**: Updated embedded `version_info.txt` (`VSVersionInfo` PE metadata) to version `3.3.18.0`. Identifies company, product, and version for Windows Firewall and UAC prompts. *(Note: Windows SmartScreen shows "Publisher: Unknown" for unsigned builds as SmartScreen requires paid EV Authenticode code-signing certificates).*
 
 ### v3.3.17 — Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
 - **Instant Log Scroll**: Pre-allocates all 50 row widgets at view init, eliminating the first-render 350-widget creation stall that caused initial scroll sluggishness.

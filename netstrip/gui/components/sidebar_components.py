@@ -616,10 +616,10 @@ class AppGroupFrame(ctk.CTkFrame):
             current_mode = self.engine.classifier.mode.name
             mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
             
-            # First remove any existing global app rule for this app
+            # First remove any existing global app rule for this app under the current mode scope
             try:
                 conn = self.engine.db._get_connection()
-                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=?", (self.process_name,))
+                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
                 conn.commit()
             except:
                 pass

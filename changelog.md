@@ -4,10 +4,14 @@
   - Added explicit `neutral` user preference state (`app_neutral`) stored in DB (`action = 'neutral'`).
   - Clicking an active `Allow All` or `Block All` toggle to turn it off sets state to `neutral`, turning **both buttons transparent (OFF)** simultaneously and restoring individual per-domain connection evaluation.
   - User explicit choices (`Allow All`, `Block All`, or `Both Off / Neutral`) take absolute priority over implicit Paranoid default or System block visual indicators across all modes (Ghost, Paranoid, Normal, Loose).
+- **Mode-Scoped Rule Isolation**:
+  - Isolated app rule deletions and database cache invalidations by `mode_scope` (`STANDARD` vs `GHOST` / `PARANOID`). Mode switches now initially apply new mode defaults cleanly without leaking rules across modes.
 - **System Idle & Kernel Origin Process Resolution**:
   - Implemented `_port_to_process_map` and `_domain_to_process_map` tracking in `ConnectionMonitor`.
   - Network sockets appearing under PID 0 (`System Idle Process`) or PID 4 (`System (Kernel/Driver)`) automatically look up origin local port and domain to re-attribute traffic to the true parent process (e.g., `AntiGravity`).
   - Kernel-level sockets for whitelisted apps inherit `USER_ALLOWED` status, eliminating false positive blocks that broke application background services.
+- **Windows Executable PE Resource Metadata**:
+  - Updated `version_info.txt` to version `3.3.18.0` with full PE `VSVersionInfo` headers (`CompanyName`, `ProductName`, `FileVersion`, `LegalCopyright`), ensuring proper branding in Windows Firewall, UAC prompts, and Task Manager.
 
 ## [v3.3.17] - Log Scroll Pre-allocation, Allow/Block All 3-State Fix, Updater Reliability
 

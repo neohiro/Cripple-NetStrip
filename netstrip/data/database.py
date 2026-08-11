@@ -390,17 +390,17 @@ class Database:
             if hasattr(self, '_rules_cache'):
                 self._rules_cache.clear()
             with self._get_connection() as conn:
-                app_name = rule_data.get('app_name')
+                m_scope = rule_data.get('mode_scope', 'STANDARD')
                 if app_name is None:
                     conn.execute('''
                         DELETE FROM user_rules 
-                        WHERE pattern = ? AND scope = ? AND app_name IS NULL
-                    ''', (rule_data.get('pattern'), rule_data.get('scope', 'global')))
+                        WHERE pattern = ? AND scope = ? AND app_name IS NULL AND (mode_scope = ? OR mode_scope = 'ALL')
+                    ''', (rule_data.get('pattern'), rule_data.get('scope', 'global'), m_scope))
                 else:
                     conn.execute('''
                         DELETE FROM user_rules 
-                        WHERE pattern = ? AND scope = ? AND app_name = ?
-                    ''', (rule_data.get('pattern'), rule_data.get('scope', 'global'), app_name))
+                        WHERE pattern = ? AND scope = ? AND app_name = ? AND (mode_scope = ? OR mode_scope = 'ALL')
+                    ''', (rule_data.get('pattern'), rule_data.get('scope', 'global'), app_name, m_scope))
                 
                 conn.execute('''
                     INSERT INTO user_rules 
