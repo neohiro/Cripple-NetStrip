@@ -1,3 +1,7 @@
+## [v3.4.5] - UI Rendering Artifacts Fix
+
+- **Animated Logo Stability**: Rewrote the animated sidebar logo logic so that it only triggers hardware acceleration and canvas rendering frames when actively hovered over by the mouse. This eliminates a persistent background CPU polling loop that was continuously shifting coordinates in CustomTkinter (at 40 FPS), completely fixing the graphical artifact/tearing glitches occasionally seen in the upper-left corner of the window on Windows.
+
 ## [v3.4.4] - Security List Update Intervals
 
 - **Rapid Security Updates**: Configured explicit fast-update cycles for the newly added security threat intelligence feeds:
