@@ -179,11 +179,41 @@ class BlocklistManager:
             bundled_sources = os.path.join(bundled_data_dir, 'updater_sources.json')
             
             import shutil
+            import json
             if os.path.exists(bundled_sources):
                 target_sources = os.path.join(user_dir, 'updater_sources.json')
                 if not os.path.exists(target_sources):
                     try: shutil.copy2(bundled_sources, target_sources)
                     except Exception: pass
+                else:
+                    try:
+                        with open(bundled_sources, 'r', encoding='utf-8') as f:
+                            b_data = json.load(f)
+                        with open(target_sources, 'r', encoding='utf-8') as f:
+                            t_data = json.load(f)
+                        
+                        b_sources = b_data.get('sources', [])
+                        t_sources = t_data.get('sources', [])
+                        
+                        t_dict = {s.get('name'): s for s in t_sources if s.get('name')}
+                        modified = False
+                        
+                        for b_s in b_sources:
+                            name = b_s.get('name')
+                            if not name: continue
+                            if name not in t_dict:
+                                t_sources.append(b_s)
+                                modified = True
+                            else:
+                                if b_s.get('url') and t_dict[name].get('url') != b_s.get('url'):
+                                    t_dict[name]['url'] = b_s.get('url')
+                                    modified = True
+                        
+                        if modified:
+                            with open(target_sources, 'w', encoding='utf-8') as f:
+                                json.dump(t_data, f, indent=2)
+                    except Exception:
+                        pass
             
             if os.path.exists(bundled_lists):
                 for item in os.listdir(bundled_lists):

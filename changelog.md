@@ -1,3 +1,7 @@
+## [v3.4.2] - Local Updater Merge DB
+
+- **Updater Source Merge**: Fixed a bug where a new version of the app containing newly curated blocklists would not copy the new lists to the user local updater configuration if updater_sources.json already existed. The app now parses and seamlessly merges new lists (and upstream URL changes) into the local user DB at boot without touching existing toggled settings.
+
 ## [v3.4.1] - UI Scrolling Glitch Fix
 
 - **Fixed Logs Interlacing**: Fixed a scrollbar interlacing glitch on Windows where the LogView row geometry fluctuated during dynamic text updates.
