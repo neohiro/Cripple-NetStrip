@@ -256,7 +256,8 @@ class LogView(ctk.CTkFrame):
             fg_color=Colors.BG_PANEL, corner_radius=4, height=36,
             border_width=0, border_color=Colors.BORDER_SUBTLE,
         )
-        frame.pack_propagate(False)
+        frame.grid_propagate(False)
+        frame.pack_propagate(False) # Keep both just in case
         for i, cfg in enumerate(self.COL_CONFIGS):
             frame.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
 

@@ -318,7 +318,7 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
-### v3.4.0 — System Connection Block Visual Indicator & Real-Time App Row Sync
+### v3.4.1 — System Connection Block Visual Indicator & Real-Time App Row Sync
 - **System App Block Active Red Button**: When `Block System Connections` is toggled ON, system process rows (`svchost.exe`, `explorer.exe`, `conhost.exe`, `System`, `services.exe`, etc.) in the live app connections sidebar immediately show their `Block All` button highlighted in **bright red** (`#f43f5e`), clearly indicating an active system process block state.
 - **Real-Time Sidebar Event Sync**: Toggling `Block System Connections` in the Dashboard or Settings tab immediately broadcasts `MODE_CHANGED` to instantly update all active process row toggle visuals without requiring a manual UI reload.
 

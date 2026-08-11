@@ -1,3 +1,7 @@
+## [v3.4.1] - UI Scrolling Glitch Fix
+
+- **Fixed Logs Interlacing**: Fixed a scrollbar interlacing glitch on Windows where the LogView row geometry fluctuated during dynamic text updates.
+
 ## [v3.4.0] - Updater Robustness & Final Polish
 
 - **Robust Blocklist Updater**: Migrated from urllib to robust requests library to bypass Cloudflare 403 Forbidden timeouts and restore millions of missing blocklist domains.
