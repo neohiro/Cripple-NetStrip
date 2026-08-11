@@ -293,7 +293,7 @@ class BlocklistView(ctk.CTkFrame):
         pattern = pattern.lower().replace('http://', '').replace('https://', '').split('/')[0]
 
         # Add to DB
-        mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
+        mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() in ("GHOST", "PARANOID", "STRICT") else "STANDARD"
         self.engine.db.add_user_rule({
             'pattern': pattern,
             'action': action,
@@ -984,7 +984,7 @@ class BlocklistView(ctk.CTkFrame):
             act_val = 'block' if is_allowed else 'allow'
 
             def make_action(d=domain, act=act_val):
-                mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() == "PARANOID" else "STANDARD"
+                mode_scope = "PARANOID" if self.engine.classifier.mode.name.upper() in ("GHOST", "PARANOID", "STRICT") else "STANDARD"
                 self.engine.db.add_user_rule({
                     'pattern': d,
                     'action': act,

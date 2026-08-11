@@ -318,6 +318,10 @@ pip install -r requirements.txt
 
 ## 🚀 Release Notes
 
+### v3.3.19 — Unified Ghost & Paranoid Mode Subsets & Engine Security Alignment
+- **Ghost & Paranoid Unified Subsets**: Fixed `engine.py` and `blocklists.py` mode checks so `GHOST`, `PARANOID`, and `STRICT` share the exact same high-security mode bucket (`mode_scope = "PARANOID"`). Selecting Ghost mode now properly loads high-security user rules and engages strict firewall/adapter security defaults.
+- **Normal & Loose Subsets**: `NORMAL` (Standard) and `LOOSE` modes share the standard security subset (`mode_scope = "STANDARD"`). Switching protection mode buckets seamlessly activates the corresponding user settings and engine defaults.
+
 ### v3.3.18 — Explicit 3-State Neutral Toggle & System Idle Origin Resolution
 - **Explicit 3-State Neutral Toggle**: Introduced explicit `neutral` user state when both `Allow All` and `Block All` are toggled off. Toggling an active bulk button off now turns both buttons transparent (OFF) simultaneously and restores individual connection/domain evaluation. User explicit settings (Allow, Block, or Both Off) take absolute priority over implicit Paranoid or System block defaults.
 - **Mode-Scoped Rule Isolation**: Rule modifications and database cache invalidations are isolated by `mode_scope` (`STANDARD` vs `GHOST` / `PARANOID`). Switching modes initialises each protection mode's default rules without cross-mode interference.

@@ -1,3 +1,12 @@
+## [v3.3.19] - Unified Ghost & Paranoid Mode Subsets & Engine Security Alignment
+
+- **Unified High-Security Mode Bucket (Ghost & Paranoid)**:
+  - Fixed Enum equality comparisons in `engine.py` (`set_mode`) so `ProtectionLevel.GHOST`, `PARANOID`, and `STRICT` share the exact same high-security mode subset (`mode_scope = "PARANOID"`).
+  - Selecting Ghost mode now properly loads high-security user rules and applies strict firewall/adapter security defaults (`apply_paranoid_mode()`).
+- **Standard Security Subset (Normal & Loose)**:
+  - `ProtectionLevel.NORMAL` (Standard) and `LOOSE` modes share the standard security mode subset (`mode_scope = "STANDARD"`).
+  - Mode switching between high-security (Ghost/Paranoid) and standard-security (Normal/Loose) mode buckets seamlessly activates the corresponding user settings and engine defaults.
+
 ## [v3.3.18] - Explicit 3-State Neutral Toggle & System Idle Origin Process Resolution
 
 - **Explicit 3-State Neutral Toggle Mechanics**:

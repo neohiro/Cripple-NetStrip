@@ -753,7 +753,8 @@ class NetStripEngine:
         self.db.set_setting("protection_mode", level.name)
         
         # Load mode-specific user overrides
-        mode_scope = "PARANOID" if level == ProtectionLevel.PARANOID else "STANDARD"
+        is_ghost_paranoid = level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT)
+        mode_scope = "PARANOID" if is_ghost_paranoid else "STANDARD"
         rules = self.db.get_user_rules(mode_scope=mode_scope)
         if hasattr(self, 'blocklist'):
             self.blocklist.sync_user_rules(rules)
@@ -776,7 +777,7 @@ class NetStripEngine:
         if hasattr(self, 'connection_monitor') and hasattr(self.connection_monitor, 'known_connections'):
             self.connection_monitor.known_connections.clear()
             
-        if level == ProtectionLevel.PARANOID:
+        if is_ghost_paranoid:
             self.firewall.apply_paranoid_mode()
             
         logger.info(f"Mode changed to: {level.name}. Loaded {len(rules)} '{mode_scope}' user rules.")
