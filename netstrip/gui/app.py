@@ -53,6 +53,9 @@ def fast_check_if_valid_scroll(self, widget):
     try:
         if not self.winfo_exists() or not self.winfo_ismapped():
             return False
+        # Don't scroll if this scrollable frame is not visible (hidden tab)
+        if not self.winfo_viewable():
+            return False
         canvas = getattr(self, '_parent_canvas', None)
         if not canvas or not canvas.winfo_exists():
             return False

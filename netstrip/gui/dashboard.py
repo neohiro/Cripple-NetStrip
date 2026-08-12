@@ -108,31 +108,6 @@ class DashboardView(ctk.CTkScrollableFrame):
         self._is_mobile_layout = None
 
         # Recursively bind mousewheel to all initial widgets
-        self.after(100, lambda: self._bind_mousewheel(self.inner))
-
-    def _bind_mousewheel(self, widget):
-        def _on_wheel(event):
-            try:
-                if hasattr(self, '_parent_canvas'):
-                    if event.delta:
-                        self._parent_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-                    elif event.num == 4:
-                        self._parent_canvas.yview_scroll(-1, "units")
-                    elif event.num == 5:
-                        self._parent_canvas.yview_scroll(1, "units")
-            except Exception:
-                pass
-        try:
-            widget.bind("<MouseWheel>", _on_wheel, add="+")
-            widget.bind("<Button-4>", _on_wheel, add="+")
-            widget.bind("<Button-5>", _on_wheel, add="+")
-        except Exception:
-            pass
-        try:
-            for child in widget.winfo_children():
-                self._bind_mousewheel(child)
-        except Exception:
-            pass
 
     def _on_resize(self, event):
         # We check the width to toggle between 1-column and 2-column layout
@@ -372,7 +347,6 @@ class DashboardView(ctk.CTkScrollableFrame):
                 lbl_domain.pack(side="right")
                 self._activity_pool.append((row, lbl_dot, lbl_proc, lbl_domain))
                 row.pack(fill="x", pady=2, side="top")
-                self._bind_mousewheel(row)
                 
             # Update visible rows
             for i, r in enumerate(blocked_only):

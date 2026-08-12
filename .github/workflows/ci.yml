@@ -59,7 +59,7 @@ jobs:
           python -c "from netstrip.core.geoip import GeoIPService, OfflineGeoIP; print('GeoIP module OK')"
           python -c "from netstrip.core.mac_randomizer import MACRandomizer; print('MAC Randomizer module OK')"
           python -c "from netstrip.core.updater import BlocklistUpdater; print('Updater module OK')"
-          python -c "from netstrip.core.crash_reporter import CrashReporter; print('Crash Reporter module OK')"
+          python -c "from netstrip.core.crash_reporter import send_crash_report; print('Crash Reporter module OK')"
 
       - name: Run unit tests
         run: |
@@ -86,6 +86,5 @@ jobs:
           python-version: '3.11'
       - name: Compile all Python files
         run: |
-          python -m py_compile main.py
-          find netstrip -name "*.py" -exec python -m py_compile {} \;
+          python -m compileall main.py netstrip/
           echo "All Python files compile successfully"

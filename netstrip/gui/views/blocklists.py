@@ -273,7 +273,7 @@ class BlocklistView(ctk.CTkFrame):
                         def on_success():
                             self._refresh_stats_grid(f"Added permanent blocklist: {name}")
                             sources = self.engine.blocklist.get_updater_sources()
-                            count = len(sources) if sources else 36
+                            count = len(sources) if sources else 0
                             if not self._sources_expanded:
                                 self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
                             else:
@@ -526,8 +526,14 @@ class BlocklistView(ctk.CTkFrame):
         ).pack(side="left")
 
         self._sources_expanded = False
+        # Dynamically count sources for the initial label
+        try:
+            _init_sources = self.engine.blocklist.get_updater_sources()
+            _init_count = len(_init_sources) if _init_sources else 0
+        except Exception:
+            _init_count = 0
         self._btn_toggle_sources = ctk.CTkButton(
-            header_frame, text="▼ Show Online Feeds (36)",
+            header_frame, text=f"▼ Show Online Feeds ({_init_count})",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
             fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_PRIMARY,
@@ -546,7 +552,7 @@ class BlocklistView(ctk.CTkFrame):
         if self._sources_expanded:
             self._sources_list_frame.pack_forget()
             sources = self.engine.blocklist.get_updater_sources()
-            count = len(sources) if sources else 36
+            count = len(sources) if sources else 0
             self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
             self._sources_expanded = False
         else:
