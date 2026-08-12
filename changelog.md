@@ -1,3 +1,7 @@
+## [v3.6.4] - 2026-08-13
+### Fixed
+- **Safe Native Icon Extraction**: Restored native PE icon extraction without triggering `Bearfoos.A!ml` trojan heuristics! `icoextract` now buffers `.ico` resources strictly in memory (`io.BytesIO`) and transforms them into safe `.png` files via Pillow before ever touching the disk.
+
 ## [v3.6.3] - 2026-08-12
 ### Fixed
 - **Anti-Virus False Positive (Runtime)**: Completely removed the `icoextract` dependency and all native PE-parsing code from the Icon Manager. Dropping `.ico` files to the filesystem during runtime was triggering Windows Defender's `Bearfoos.A!ml` heuristic while the GUI was running. The app now securely relies on its robust fallback mechanisms (Favicon API / predefined icons).

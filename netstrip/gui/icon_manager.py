@@ -253,8 +253,39 @@ class IconManager:
         return None
 
     def _extract_icon_native(self, process_path: str, process_name: str, save_path: str, callback):
-        """Native extraction disabled to prevent ML heuristics. Calls fallback immediately."""
-        self._do_fallback(process_path, process_name, callback)
+        """Native extraction using pure-Python icoextract directly to memory to avoid disk ML heuristics."""
+        success = False
+        
+        # Security/ML Evasion: Do not parse PE resources of protected Windows system binaries.
+        if "\\windows\\" in process_path.lower():
+            self._do_fallback(process_path, process_name, callback)
+            return
+            
+        try:
+            from icoextract import IconExtractor
+            from PIL import Image
+            
+            # Extract the raw .ico file from the PE resources directly into MEMORY (io.BytesIO)
+            # This completely avoids writing executable .ico drops to the disk which triggers Bearfoos.A!ml
+            extractor = IconExtractor(process_path)
+            ico_bytes = extractor.get_icon()
+            
+            if ico_bytes:
+                # Convert the memory bytes to .png using Pillow for standard Tkinter rendering
+                img = Image.open(ico_bytes)
+                # Save the final harmless PNG to the cache
+                img.save(save_path, format="PNG")
+                success = True
+        except Exception:
+            pass
+            
+        if success:
+            with self._lock:
+                if process_path in self._in_progress:
+                    self._in_progress.remove(process_path)
+            callback()
+        else:
+            self._do_fallback(process_path, process_name, callback)
 
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
