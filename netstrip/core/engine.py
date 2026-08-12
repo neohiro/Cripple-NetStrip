@@ -414,6 +414,8 @@ class NetStripEngine:
         def _sync_firewall():
             try:
                 if hasattr(self.platform, 'get_user_firewall_rules'):
+                    if self.progress_callback:
+                        self.progress_callback("Importing OS firewall rules...", 0.1)
                     user_rules = self.platform.get_user_firewall_rules()
                     import_count = 0
                     for rule in user_rules:
@@ -430,12 +432,18 @@ class NetStripEngine:
                 
         threading.Thread(target=_sync_firewall, daemon=True).start()
 
+        if self.progress_callback:
+            self.progress_callback("Cleaning up old logs...", 0.2)
+            
         # Clean up data older than 24 hours on initialization
         try:
             self.db.prune_old_logs(hours=24)
         except Exception as e:
             logger.error(f"Error wiping initial data: {e}")
 
+        if self.progress_callback:
+            self.progress_callback("Loading user settings...", 0.3)
+            
         # Load settings
         saved_mode_str = self.db.get_setting("protection_mode", "NORMAL")
         try:
@@ -443,16 +451,26 @@ class NetStripEngine:
         except KeyError:
             self.set_mode(ProtectionLevel.NORMAL)
 
+        if self.progress_callback:
+            self.progress_callback("Starting core interception subsystems...", 0.5)
+            
         # We no longer block engine startup waiting for blocklists to load.
         # The blocklists will load in the background, and the classifier will use cached/live data until then.
         # Start subsystems
         self.interceptor.start()
         self.dns_proxy.start()
+        
+        if self.progress_callback:
+            self.progress_callback("Initializing network telemetry...", 0.6)
+            
         self.connection_monitor.start()
         self.iot_sync.start()
         self.iot_local_api.start()
         self.geoip.start()
         self.network_monitor.start()
+        if self.progress_callback:
+            self.progress_callback("Activating anomaly engines...", 0.7)
+            
         self.anomaly_scanner.start()
         if hasattr(self.lan_shield, 'start'):
             self.lan_shield.start()
@@ -467,6 +485,9 @@ class NetStripEngine:
         # Start analytics reporter (opt-in only, off by default)
         self.analytics.start()
         
+        if self.progress_callback:
+            self.progress_callback("Injecting kernel IP blocklists...", 0.8)
+            
         # Hard-coded IP Kernel Blocking
         try:
             import os as _os
@@ -480,6 +501,9 @@ class NetStripEngine:
         except Exception as e:
             logger.error(f"Failed to inject IP blocklist: {e}")
         
+        if self.progress_callback:
+            self.progress_callback("Checking for third-party DNS proxies...", 0.9)
+            
         # Check for active local third-party DNS listeners (e.g. dnscrypt-proxy)
         detected_local_dns = self._detect_local_dns()
         
