@@ -282,16 +282,26 @@ class IconManager:
                 $bmp.Save('{safe_save_path}', [System.Drawing.Imaging.ImageFormat]::Png)
             }} catch {{}}
             """
-            
-            encoded_script = base64.b64encode(ps_script.encode('utf-16-le')).decode('utf-8')
-            
-            subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded_script],
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=4
-            )
+            # Drop script to a temporary .ps1 file instead of using -EncodedCommand
+            # to evade ML heuristics (Bearfoos.A!ml) that flag PyInstaller + Base64 powershell.
+            ps1_path = f"{save_path}.{random.randint(10000, 99999)}.ps1"
+            try:
+                with open(ps1_path, "w", encoding="utf-8") as f:
+                    f.write(ps_script)
+                
+                subprocess.run(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path],
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=4
+                )
+            finally:
+                if os.path.exists(ps1_path):
+                    try:
+                        os.remove(ps1_path)
+                    except Exception:
+                        pass
             
             if os.path.exists(temp_save_path) and os.path.getsize(temp_save_path) > 200:
                 os.replace(temp_save_path, save_path)

@@ -28,10 +28,10 @@ class AnomalyScanner:
         """Detect installed Antivirus engines via Windows WMI or generic Linux checks."""
         try:
             if os.name == 'nt':
-                # Query SecurityCenter2 using WMI via PowerShell
-                cmd = ["powershell", "-NoProfile", "-Command", "Get-WmiObject -Namespace root\\SecurityCenter2 -Class AntiVirusProduct | Select-Object -ExpandProperty displayName"]
+                # Query SecurityCenter2 using WMI via native wmic
+                cmd = ["wmic", "/namespace:\\\\root\\SecurityCenter2", "path", "AntiVirusProduct", "get", "displayName"]
                 res = subprocess.run(cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                avs = [line.strip() for line in res.stdout.split('\n') if line.strip() and "Windows Defender" not in line]
+                avs = [line.strip() for line in res.stdout.split('\n') if line.strip() and "displayName" not in line and "Windows Defender" not in line]
                 if avs:
                     return ", ".join(avs)
         except Exception:

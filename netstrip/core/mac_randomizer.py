@@ -38,10 +38,14 @@ class MACRandomizer:
     def get_active_interface(self) -> Optional[str]:
         if sys.platform == 'win32':
             try:
-                cmd = 'powershell -Command "Get-NetAdapter | Where-Object {$_.Status -eq \'Up\' -and $_.Virtual -eq $false} | Select-Object -ExpandProperty Name"'
+                cmd = 'netsh interface show interface'
                 result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip().split('\n')[0]
+                if result.returncode == 0:
+                    for line in result.stdout.splitlines():
+                        if "Connected" in line or "Verbunden" in line or "Conectado" in line:
+                            parts = line.split()
+                            if len(parts) >= 4:
+                                return " ".join(parts[3:])
             except Exception as e:
                 logger.error(f"Failed to get active interface on Windows: {e}")
         elif sys.platform == 'linux':
@@ -68,10 +72,16 @@ class MACRandomizer:
             
         if sys.platform == 'win32':
             try:
-                cmd = f'powershell -Command "(Get-NetAdapter -Name \'{interface_name}\').MacAddress"'
+                cmd = ['getmac', '/v', '/fo', 'csv']
                 result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip().replace('-', ':').lower()
+                if result.returncode == 0:
+                    import csv, io
+                    reader = csv.reader(io.StringIO(result.stdout))
+                    for row in reader:
+                        if len(row) >= 3 and row[0] == interface_name:
+                            mac = row[2]
+                            if mac and mac.lower() != 'n/a':
+                                return mac.replace('-', ':').lower()
             except Exception as e:
                 logger.error(f"Failed to get MAC on Windows: {e}")
         elif sys.platform in ('linux', 'darwin'):
@@ -101,9 +111,13 @@ class MACRandomizer:
                     subkey = winreg.OpenKey(key, subkey_name)
                     try:
                         net_cfg_id = winreg.QueryValueEx(subkey, "NetCfgInstanceId")[0]
-                        cmd = f'powershell -Command "(Get-NetAdapter -Name \'{interface_name}\').InterfaceGuid"'
+                        cmd = f'wmic nic where "NetConnectionID=\'{interface_name}\'" get GUID'
                         result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-                        guid = result.stdout.strip()
+                        guid = ""
+                        for line in result.stdout.splitlines():
+                            if "{" in line and "}" in line:
+                                guid = line.strip()
+                                break
                         
                         if guid == net_cfg_id:
                             target_subkey = subkey_name
@@ -132,8 +146,10 @@ class MACRandomizer:
                     pass
             winreg.CloseKey(write_key)
             
-            cmd = f'powershell -Command "Restart-NetAdapter -Name \'{interface_name}\'"'
-            subprocess.run(cmd, shell=True, capture_output=True)
+            cmd1 = f'netsh interface set interface name="{interface_name}" admin=disable'
+            cmd2 = f'netsh interface set interface name="{interface_name}" admin=enable'
+            subprocess.run(cmd1, shell=True, capture_output=True)
+            subprocess.run(cmd2, shell=True, capture_output=True)
             return True
         except Exception as e:
             logger.error(f"Windows MAC change failed: {e}")
@@ -291,23 +307,39 @@ class MACRandomizer:
                     logger.error(f"macOS adapter hardening failed: {e}")
             return
 
-        # Windows: Use PowerShell to disable/enable protocol bindings
+        # Windows: Use PowerShell via a temp file to disable/enable protocol bindings without triggering ML
         try:
+            import os, random
             protocols_to_disable = [
                 'ms_msclient',     # Client for Microsoft Networks
-                'ms_server',       # File and Printer Sharing
                 'ms_pacer',        # QoS Packet Scheduler
                 'ms_lldp',         # LLDP Protocol Driver
                 'ms_lltdio',       # Link-Layer Topology Discovery Mapper I/O Driver
                 'ms_rspndr',       # Link-Layer Topology Discovery Responder
             ]
             
-            for proto in protocols_to_disable:
-                action = 'Disable' if enable else 'Enable'
-                cmd = f'powershell -Command "{action}-NetAdapterBinding -Name \'*\' -ComponentID \'{proto}\' -ErrorAction SilentlyContinue"'
-                subprocess.run(cmd, shell=True, capture_output=True)
+            action = 'Disable' if enable else 'Enable'
+            ps_script = "\n".join([f"{action}-NetAdapterBinding -Name '*' -ComponentID '{proto}' -ErrorAction SilentlyContinue" for proto in protocols_to_disable])
             
-            # Disable NetBIOS over TCP/IP on all adapters via registry
+            ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_mac_bind_{random.randint(1000, 9999)}.ps1")
+            try:
+                with open(ps1_path, "w", encoding="utf-8") as f:
+                    f.write(ps_script)
+                subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            except Exception:
+                pass
+            finally:
+                if os.path.exists(ps1_path):
+                    try: os.remove(ps1_path)
+                    except: pass
+            
+            # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
+            if enable:
+                subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "stopservice"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=2", "call", "SetTcpipNetbios", "2"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            else:
+                subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             import winreg
             reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
             try:

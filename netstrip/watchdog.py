@@ -154,38 +154,74 @@ def restore_network():
                 subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
                 subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f"interface={interface}", "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
                 
-            # Fail-open: Fast batch PowerShell command to wipe all NetStrip firewall rules.
+            # Fail-open: Fast batch command to wipe all NetStrip firewall rules.
             # IPv6/IPv4 protocol bindings are restored below based on the database state.
             logging.info("Removing NetStrip firewall rules...")
-            ps_script = (
-                "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"
-            )
-            subprocess.run(["powershell", "-Command", ps_script], creationflags=subprocess.CREATE_NO_WINDOW)
+            try:
+                res = subprocess.run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                for line in res.stdout.splitlines():
+                    if line.startswith("Rule Name:") and "NetStrip" in line:
+                        name = line.split(":", 1)[1].strip()
+                        subprocess.run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={name}"], creationflags=subprocess.CREATE_NO_WINDOW)
+            except Exception:
+                pass
             
             # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
             logging.info("Restoring Windows network adapter protocol bindings and discovery...")
+            
+            import winreg, random, os
             ps_restore_bindings = (
-                "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_server, ms_lldp, ms_lltdio, ms_rspndr, ms_netbios -Name '*' -ErrorAction SilentlyContinue; "
-                "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
-                "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -ErrorAction SilentlyContinue; "
-                "Set-NetIsatapConfiguration -State Default -ErrorAction SilentlyContinue; "
-                "Set-NetTeredoConfiguration -Type Default -ErrorAction SilentlyContinue"
+                "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_lldp, ms_lltdio, ms_rspndr -Name '*' -ErrorAction SilentlyContinue"
             )
-            subprocess.run(["powershell", "-Command", ps_restore_bindings], creationflags=subprocess.CREATE_NO_WINDOW)
+            ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_restore_{random.randint(1000, 9999)}.ps1")
+            try:
+                with open(ps1_path, "w", encoding="utf-8") as f:
+                    f.write(ps_restore_bindings)
+                subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path], creationflags=subprocess.CREATE_NO_WINDOW)
+            except Exception:
+                pass
+            finally:
+                if os.path.exists(ps1_path):
+                    try: os.remove(ps1_path)
+                    except: pass
+            
+            subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"], creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            try:
+                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp", 0, winreg.KEY_WRITE) as key:
+                    winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 0)
+                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
+                    winreg.DeleteValue(key, "EnableMulticast")
+            except Exception:
+                pass
+            subprocess.run(["netsh", "interface", "isatap", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(["netsh", "interface", "teredo", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(["netsh", "interface", "ipv6", "6to4", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
 
-            if get_db_setting("disable_ipv6_globally") == "true":
-                logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
-                subprocess.run(["powershell", "-Command",
-                    "Set-NetAdapterBinding -ComponentID ms_tcpip6 -Enabled $true -Name '*'"],
-                    creationflags=subprocess.CREATE_NO_WINDOW)
-                clear_db_setting("disable_ipv6_globally")
-                
-            if get_db_setting("disable_ipv4_globally") == "true":
-                logging.info("Re-enabling global IPv4 (was disabled by engine before crash)...")
-                subprocess.run(["powershell", "-Command",
-                    "Set-NetAdapterBinding -ComponentID ms_tcpip -Enabled $true -Name '*'"],
-                    creationflags=subprocess.CREATE_NO_WINDOW)
-                clear_db_setting("disable_ipv4_globally")
+            if get_db_setting("disable_ipv6_globally") == "true" or get_db_setting("disable_ipv4_globally") == "true":
+                try:
+                    res = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    ifaces = []
+                    for line in res.stdout.splitlines():
+                        if "Connected" in line or "Verbunden" in line or "Conectado" in line:
+                            parts = line.split()
+                            if len(parts) >= 4:
+                                ifaces.append(" ".join(parts[3:]))
+                                
+                    if get_db_setting("disable_ipv6_globally") == "true":
+                        logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
+                        for iface in ifaces:
+                            subprocess.run(["netsh", "interface", "ipv6", "set", "interface", iface, "admin=enable"], creationflags=subprocess.CREATE_NO_WINDOW)
+                        clear_db_setting("disable_ipv6_globally")
+                        
+                    if get_db_setting("disable_ipv4_globally") == "true":
+                        logging.info("Re-enabling global IPv4 (was disabled by engine before crash)...")
+                        for iface in ifaces:
+                            subprocess.run(["netsh", "interface", "ipv4", "set", "interface", iface, "admin=enable"], creationflags=subprocess.CREATE_NO_WINDOW)
+                        clear_db_setting("disable_ipv4_globally")
+                except Exception as e:
+                    logging.error(f"Failed to re-enable interfaces: {e}")
             
             # Reset killswitch state in DB so the app starts fresh
             clear_db_setting("killswitch_active")

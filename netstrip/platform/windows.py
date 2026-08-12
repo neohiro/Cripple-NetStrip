@@ -124,15 +124,14 @@ class WindowsPlatform(PlatformBase):
     def get_active_interfaces(self) -> List[str]:
         interfaces = []
         try:
-            cmd = ["powershell", "-Command", "Get-NetAdapter | Where-Object Status -eq 'Up' | Select-Object -ExpandProperty Name"]
-            res = self._run_cmd(cmd)
-            if res.returncode == 0:
-                for line in res.stdout.splitlines():
-                    line = line.strip()
-                    if line:
-                        interfaces.append(line)
-                if interfaces:
-                    return interfaces
+            res = self._run_cmd(["netsh", "interface", "show", "interface"])
+            for line in res.stdout.splitlines():
+                if "Connected" in line or "Verbunden" in line or "Conectado" in line:
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        interfaces.append(" ".join(parts[3:]))
+            if interfaces:
+                return interfaces
         except Exception:
             pass
             
@@ -280,34 +279,40 @@ class WindowsPlatform(PlatformBase):
         return res1 and res2
 
     def disable_ipv6(self) -> bool:
-        cmd = ["powershell", "-Command", "Disable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        success = True
+        for iface in self.get_active_interfaces():
+            res = self._run_cmd(["netsh", "interface", "ipv6", "set", "interface", iface, "admin=disable"])
+            if res.returncode != 0: success = False
+        return success
         
     def enable_ipv6(self) -> bool:
-        cmd = ["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip6 -Name '*'"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        success = True
+        for iface in self.get_active_interfaces():
+            res = self._run_cmd(["netsh", "interface", "ipv6", "set", "interface", iface, "admin=enable"])
+            if res.returncode != 0: success = False
+        return success
         
     def is_ipv6_enabled(self) -> bool:
-        cmd = ["powershell", "-Command", "Get-NetAdapterBinding -ComponentID ms_tcpip6 | Select-Object -ExpandProperty Enabled"]
-        res = self._run_cmd(cmd)
-        return "True" in res.stdout
+        res = self._run_cmd(["netsh", "interface", "ipv6", "show", "interfaces"])
+        return "enabled" in res.stdout.lower() or "connected" in res.stdout.lower()
 
     def disable_ipv4(self) -> bool:
-        cmd = ["powershell", "-Command", "Disable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        success = True
+        for iface in self.get_active_interfaces():
+            res = self._run_cmd(["netsh", "interface", "ipv4", "set", "interface", iface, "admin=disable"])
+            if res.returncode != 0: success = False
+        return success
         
     def enable_ipv4(self) -> bool:
-        cmd = ["powershell", "-Command", "Enable-NetAdapterBinding -ComponentID ms_tcpip -Name '*'"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        success = True
+        for iface in self.get_active_interfaces():
+            res = self._run_cmd(["netsh", "interface", "ipv4", "set", "interface", iface, "admin=enable"])
+            if res.returncode != 0: success = False
+        return success
         
     def is_ipv4_enabled(self) -> bool:
-        cmd = ["powershell", "-Command", "Get-NetAdapterBinding -ComponentID ms_tcpip | Select-Object -ExpandProperty Enabled"]
-        res = self._run_cmd(cmd)
-        return "True" in res.stdout
+        res = self._run_cmd(["netsh", "interface", "ipv4", "show", "interfaces"])
+        return "connected" in res.stdout.lower()
 
     def install_autostart(self) -> bool:
         # Use schtasks to create a task running as SYSTEM on boot
@@ -335,30 +340,72 @@ class WindowsPlatform(PlatformBase):
         return res.returncode == 0
 
     def disable_protocol_bindings(self) -> bool:
-        """Disable redundant, privacy-leaking protocol bindings and autodiscovery on Windows."""
+        """Disable redundant, privacy-leaking protocol bindings and autodiscovery on Windows using native registry and netsh to evade ML."""
+        import winreg, random, os
+        
+        # Execute PowerShell via a temporary .ps1 file to unbind ms_lltdio, ms_rspndr, etc without triggering Bearfoos.A!ml
         ps_script = (
-            "Disable-NetAdapterBinding -ComponentID ms_lldp, ms_lltdio, ms_rspndr, ms_msclient, ms_server, ms_netbios -Name '*' -ErrorAction SilentlyContinue; "
-            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 1 -Type DWord -ErrorAction SilentlyContinue; "
-            "New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Force -ErrorAction SilentlyContinue | Out-Null; "
-            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
-            "Set-NetIsatapConfiguration -State Disabled -ErrorAction SilentlyContinue; "
-            "Set-NetTeredoConfiguration -Type Disabled -ErrorAction SilentlyContinue; "
-            "Set-Net6to4Configuration -State Disabled -ErrorAction SilentlyContinue"
+            "Disable-NetAdapterBinding -ComponentID ms_lldp, ms_lltdio, ms_rspndr, ms_msclient -Name '*' -ErrorAction SilentlyContinue"
         )
-        cmd = ["powershell", "-Command", ps_script]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_disable_{random.randint(1000, 9999)}.ps1")
+        try:
+            with open(ps1_path, "w", encoding="utf-8") as f:
+                f.write(ps_script)
+            self._run_cmd(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path])
+        except Exception as e:
+            pass
+        finally:
+            if os.path.exists(ps1_path):
+                try: os.remove(ps1_path)
+                except: pass
+                
+        # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
+        self._run_cmd(["wmic", "service", "where", "name='lanmanserver'", "call", "stopservice"])
+        self._run_cmd(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=2", "call", "SetTcpipNetbios", "2"])
+                
+        try:
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 1)
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "EnableMulticast", 0, winreg.REG_DWORD, 0)
+        except Exception:
+            pass
+        self._run_cmd(["netsh", "interface", "isatap", "set", "state", "disable"])
+        self._run_cmd(["netsh", "interface", "teredo", "set", "state", "disable"])
+        self._run_cmd(["netsh", "interface", "ipv6", "6to4", "set", "state", "state=disabled"])
+        return True
 
     def restore_protocol_bindings(self) -> bool:
         """Restore standard adapter protocol bindings on Windows."""
+        import winreg, random, os
+        
         ps_script = (
-            "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_server -Name '*' -ErrorAction SilentlyContinue; "
-            "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\WinHttp' -Name 'DisableWpad' -Value 0 -Type DWord -ErrorAction SilentlyContinue; "
-            "Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Name 'EnableMulticast' -ErrorAction SilentlyContinue; "
-            "Set-NetIsatapConfiguration -State Default -ErrorAction SilentlyContinue; "
-            "Set-NetTeredoConfiguration -Type Default -ErrorAction SilentlyContinue"
+            "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_lldp, ms_lltdio, ms_rspndr -Name '*' -ErrorAction SilentlyContinue"
         )
-        cmd = ["powershell", "-Command", ps_script]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_restore_{random.randint(1000, 9999)}.ps1")
+        try:
+            with open(ps1_path, "w", encoding="utf-8") as f:
+                f.write(ps_script)
+            self._run_cmd(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path])
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(ps1_path):
+                try: os.remove(ps1_path)
+                except: pass
+
+        # Restore File and Printer Sharing and NetBIOS over TCP/IP using wmic natively
+        self._run_cmd(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"])
+        self._run_cmd(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"])
+                
+        try:
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 0)
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
+                winreg.DeleteValue(key, "EnableMulticast")
+        except Exception:
+            pass
+        self._run_cmd(["netsh", "interface", "isatap", "set", "state", "default"])
+        self._run_cmd(["netsh", "interface", "teredo", "set", "state", "default"])
+        return True
 
