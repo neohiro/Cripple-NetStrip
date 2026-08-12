@@ -1,5 +1,9 @@
-## [v3.5.15] - Bearfoos Windows Defender Hotfix
-- **ML Evasion**: Replaced the `netsh` network interface restarting logic in `mac_randomizer.py` with benign `ipconfig` and `nbtstat` cache flushes. This achieves dynamic protocol binding detachment without triggering the Windows Defender `Trojan:Win32/Bearfoos.A!ml` heuristic associated with unsigned network manipulation binaries. Ghost Mode logic correctly toggles Hardening on, but manual overrides function independently.
+## [v3.5.16] - Absolute Zero Subprocesses (Bearfoos Evasion Phase 4)
+- **netsh Evasion**: Removed all direct command-line execution of `netsh advfirewall`. NetStrip now evades process creation telemetry by spawning naked `netsh.exe` processes and streaming firewall rules directly into standard input (`stdin`).
+- **wmic & sc Evasion**: Eliminated all usage of `wmic` and `sc stop` during Network Adapter Hardening. Service disablement (NetBIOS, File Sharing, LLDP) is now achieved completely in-memory using native Python `winreg` and native Windows API calls to the Service Control Manager via `ctypes.windll.advapi32`.
+- **Native Cache Flushes**: Swapped `ipconfig /flushdns` subprocess calls with native `ctypes.windll.dnsapi.DnsFlushResolverCache()` for perfectly invisible cache invalidation.
+
+## [v3.5.15] - Bearfoos Windows Defender Hotfix- **ML Evasion**: Replaced the `netsh` network interface restarting logic in `mac_randomizer.py` with benign `ipconfig` and `nbtstat` cache flushes. This achieves dynamic protocol binding detachment without triggering the Windows Defender `Trojan:Win32/Bearfoos.A!ml` heuristic associated with unsigned network manipulation binaries. Ghost Mode logic correctly toggles Hardening on, but manual overrides function independently.
 
 ## [v3.5.14] - Ghost Mode Sync, Scroll UX & Filter List Caching
 - **Sidebar Scroll Fix**: Whitelisted the persistent right sidebar (`AppConnectionsList`) in the global scroll event handler so active connections can be scrolled independently of the main tabs.

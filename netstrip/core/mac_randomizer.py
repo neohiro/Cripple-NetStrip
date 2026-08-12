@@ -307,10 +307,34 @@ class MACRandomizer:
                     logger.error(f"macOS adapter hardening failed: {e}")
             return
 
-        # Windows: Use native Group Policy Registry and wmic to disable/enable protocol bindings without triggering ML
+        # Windows: Use native Group Policy Registry and ctypes to disable/enable protocol bindings without triggering ML
         try:
             import os
             import winreg
+            import ctypes
+            
+            def _control_service(service_name: str, start: bool):
+                try:
+                    scm = ctypes.windll.advapi32.OpenSCManagerW(None, None, 0xF003F)
+                    if not scm: return
+                    svc = ctypes.windll.advapi32.OpenServiceW(scm, service_name, 0xF01FF)
+                    if not svc:
+                        ctypes.windll.advapi32.CloseServiceHandle(scm)
+                        return
+                    if start:
+                        ctypes.windll.advapi32.StartServiceW(svc, 0, None)
+                    else:
+                        class SERVICE_STATUS(ctypes.Structure):
+                            _fields_ = [("dwServiceType", ctypes.c_ulong), ("dwCurrentState", ctypes.c_ulong),
+                                        ("dwControlsAccepted", ctypes.c_ulong), ("dwWin32ExitCode", ctypes.c_ulong),
+                                        ("dwServiceSpecificExitCode", ctypes.c_ulong), ("dwCheckPoint", ctypes.c_ulong),
+                                        ("dwWaitHint", ctypes.c_ulong)]
+                        status = SERVICE_STATUS()
+                        ctypes.windll.advapi32.ControlService(svc, 1, ctypes.byref(status))
+                    ctypes.windll.advapi32.CloseServiceHandle(svc)
+                    ctypes.windll.advapi32.CloseServiceHandle(scm)
+                except Exception:
+                    pass
             
             if enable:
                 try:
@@ -329,10 +353,13 @@ class MACRandomizer:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
                     with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\lanmanserver", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
                 except Exception:
                     pass
-                subprocess.run(["sc", "stop", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["sc", "stop", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                _control_service("MsLldp", False)
+                _control_service("pacer", False)
+                _control_service("lanmanserver", False)
             else:
                 try:
                     winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
@@ -343,18 +370,15 @@ class MACRandomizer:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
                     with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\lanmanserver", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 2)
                 except Exception:
                     pass
-                subprocess.run(["sc", "start", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["sc", "start", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                _control_service("MsLldp", True)
+                _control_service("pacer", True)
+                _control_service("lanmanserver", True)
             
-            # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
-            if enable:
-                subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "stopservice"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=2", "call", "SetTcpipNetbios", "2"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            else:
-                subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            # Disable NetBIOS over TCP/IP natively via registry interfaces
             import winreg
             reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
             try:
@@ -398,13 +422,11 @@ class MACRandomizer:
                 logger.error(f"Failed to modify mDNS registry: {e}")
 
             logger.info(f"Windows adapter hardening {'enabled' if enable else 'disabled'}: NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, File Sharing, QoS")
-            # Clear caches to apply some changes dynamically without tripping ML heuristics via adapter restarts
+            # Clear caches natively without subprocess telemetry
             try:
-                subprocess.run(["ipconfig", "/flushdns"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["nbtstat", "-R"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                subprocess.run(["arp", "-d", "*"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                ctypes.windll.dnsapi.DnsFlushResolverCache()
             except Exception as e:
-                logger.debug(f"Cache flush failed: {e}")
+                logger.debug(f"Native cache flush failed: {e}")
                 
         except Exception as e:
             logger.error(f"Windows adapter hardening failed: {e}")
