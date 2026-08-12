@@ -859,19 +859,29 @@ class NetStripEngine:
                     logger.error(f"Failed to apply killswitch adapter hardening: {e}")
                     
             self.platform.enable_killswitch()
+            
+            # Unconditionally enable LAN shield as part of Ghost Mode lockdown
             self.lan_shield.enable()
             if broadcast_lan and hasattr(self.lan_shield, 'broadcast_killswitch'):
                 self.lan_shield.broadcast_killswitch()
         else:
             self.platform.disable_killswitch()
-            self.lan_shield.disable()
+            
+            # Restore Normal Mode settings accurately
+            if self.db.get_setting("lan_shield_enabled", "false") == "true":
+                self.lan_shield.enable()
+            else:
+                self.lan_shield.disable()
+                
             if self.db.get_setting("killswitch_harden_adapters", "true") == "true":
                 try:
+                    # Only disable adapter hardening if it's NOT enabled by the user in Normal mode
                     if self.db.get_setting("block_system_connections", "false") != "true":
                         if hasattr(self.platform, 'harden_network_adapters'):
                             self.platform.harden_network_adapters(enable_hardening=False)
                 except Exception as e:
                     logger.error(f"Failed to restore killswitch adapter hardening: {e}")
+                    
             if broadcast_lan and hasattr(self.lan_shield, 'broadcast_restore'):
                 self.lan_shield.broadcast_restore()
 
