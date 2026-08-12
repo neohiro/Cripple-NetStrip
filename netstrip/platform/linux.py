@@ -149,12 +149,21 @@ class LinuxPlatform(PlatformBase):
     def is_ipv4_enabled(self) -> bool:
         return True
 
+    def kill_all_tcp_connections(self):
+        """Forcefully terminate all active TCP connections on Linux using ss."""
+        try:
+            # Requires iproute2 ss utility with kernel support for killing sockets (usually available as root)
+            self._run_cmd(["ss", "-K", "state", "established"])
+        except Exception as e:
+            logger.error(f"Failed to kill TCP connections on Linux: {e}")
+
     def enable_killswitch(self) -> bool:
         # Absolute ghost mode - block everything unconditionally
         res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
+        self.kill_all_tcp_connections()
         return res1 and res2
 
     def disable_killswitch(self) -> bool:

@@ -105,6 +105,10 @@ class PlatformBase(ABC):
         """Unblock all private IP ranges."""
         pass
 
+    def kill_all_tcp_connections(self) -> None:
+        """Forcefully terminate all active TCP connections. Override in OS specific platforms."""
+        pass
+
     @abstractmethod
     def enable_killswitch(self) -> bool:
         """Completely sever OS connection to the internet while preserving local loopback."""

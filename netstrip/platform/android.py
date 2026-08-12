@@ -112,8 +112,13 @@ class AndroidPlatform(PlatformBase):
     def remove_all_app_block_rules(self) -> bool:
         return True
 
+    def kill_all_tcp_connections(self):
+        """Forcefully terminate all active TCP connections on Android. Handled natively by VpnService."""
+        pass
+
     def enable_killswitch(self) -> bool:
         logger.warning("Android VpnService native killswitch engaged.")
+        self.kill_all_tcp_connections()
         return True
 
     def disable_killswitch(self) -> bool:
