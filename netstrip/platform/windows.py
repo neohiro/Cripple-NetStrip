@@ -208,6 +208,65 @@ class WindowsPlatform(PlatformBase):
         res = self._run_cmd(cmd)
         return res.returncode == 0
 
+    def get_user_firewall_rules(self) -> List[dict]:
+        """
+        Extract non-system firewall rules that were created by the user or third-party apps
+        and not by NetStrip. Returns a list of dicts with 'program', 'action', 'direction'.
+        """
+        script = '''
+        $rules = Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { 
+            $_.DisplayName -notlike 'NetStrip_*' -and 
+            $_.DisplayName -notmatch '^@'
+        }
+        $appFilters = $rules | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue | Where-Object { 
+            $_.Program -and $_.Program -notmatch '(?i)system32' -and $_.Program -notmatch '(?i)syswow64' -and $_.Program -notmatch '(?i)windows\\systemapps'
+        }
+        foreach ($filter in $appFilters) {
+            $rule = $rules | Where-Object { $_.InstanceID -eq $filter.InstanceID } | Select-Object -First 1
+            if ($rule) {
+                [PSCustomObject]@{
+                    Program = $filter.Program
+                    Action = $rule.Action
+                    Direction = $rule.Direction
+                }
+            }
+        }
+        '''
+        
+        rules = []
+        try:
+            # We run this passing the script block to avoid quoting nightmares
+            cmd = ["powershell", "-NoProfile", "-Command", script]
+            res = self._run_cmd(cmd)
+            if res.returncode == 0 and res.stdout:
+                # Parse powershell output blocks
+                current_rule = {}
+                for line in res.stdout.splitlines():
+                    line = line.strip()
+                    if not line:
+                        if current_rule.get('Program') and current_rule.get('Action') and current_rule.get('Direction'):
+                            rules.append(current_rule.copy())
+                            current_rule = {}
+                        continue
+                    
+                    if line.startswith("Program"):
+                        val = line.split(":", 1)
+                        if len(val) == 2: current_rule["Program"] = val[1].strip()
+                    elif line.startswith("Action"):
+                        val = line.split(":", 1)
+                        if len(val) == 2: current_rule["Action"] = val[1].strip()
+                    elif line.startswith("Direction"):
+                        val = line.split(":", 1)
+                        if len(val) == 2: current_rule["Direction"] = val[1].strip()
+                        
+                # Catch the last one if there was no trailing newline
+                if current_rule.get('Program') and current_rule.get('Action') and current_rule.get('Direction'):
+                    rules.append(current_rule.copy())
+        except Exception:
+            pass
+            
+        return rules
+
     def block_lan_traffic(self) -> bool:
         return self.add_firewall_rule("NetStrip_Block_LAN", "out", "block", remote_ip="10.0.0.0-10.255.255.255,172.16.0.0-172.31.255.255,192.168.0.0-192.168.255.255")
 

@@ -28,7 +28,9 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 - **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time.
 - **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click.
 - **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS.
-- **Zero-configuration privacy** — Ships with **3.2+ Million unique blocked domains** out of the box across 42 active threat feeds. Ads, trackers, telemetry, and malware — gone before you even open a browser.
+- **Zero-configuration privacy** — Ships with **3.2+ Million unique blocked domains** out of the box across 49 active threat feeds. Ads, trackers, telemetry, and malware — gone before you even open a browser.
+- **Hardware stealth** — Includes MAC Address Randomization and network adapter hardening to prevent device fingerprinting.
+- **Native OS Firewall Sync** — Automatically detects your manually set Windows Firewall block/allow rules and natively enforces them at the packet level.
 - **Your network, offline** — Run it on a Raspberry Pi, a NUC, or a home server and protect every device on your LAN without installing anything on them.
 
 ---

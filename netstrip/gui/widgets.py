@@ -7,7 +7,7 @@ import customtkinter as ctk
 from netstrip.gui.theme import Colors, Fonts, Spacing, CTK_FRAME_STYLE, CTK_LABEL_STYLE, CTK_LABEL_MUTED_STYLE
 
 class StatCard(ctk.CTkFrame):
-    def __init__(self, master, title, value="0", icon="", color=Colors.ACCENT_PRIMARY, subtitle="", **kwargs):
+    def __init__(self, master, title, value="-", icon="", color=Colors.ACCENT_PRIMARY, subtitle="", **kwargs):
         super().__init__(master, **{**CTK_FRAME_STYLE, **kwargs})
         self.color = color
         

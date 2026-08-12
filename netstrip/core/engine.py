@@ -410,6 +410,23 @@ class NetStripEngine:
             logger.error("Admin privileges required to start NetStrip.")
             return False
 
+        # Import OS User Firewall rules
+        try:
+            if hasattr(self.platform, 'get_user_firewall_rules'):
+                user_rules = self.platform.get_user_firewall_rules()
+                import_count = 0
+                for rule in user_rules:
+                    path = rule.get('Program', '')
+                    if not path or not path.lower().endswith('.exe'): 
+                        continue
+                    
+                    action_str = "block" if str(rule.get('Action')).lower() == 'block' else "allow"
+                    self.db.set_app_rule(path, action_str)
+                    import_count += 1
+                logger.info(f"Imported {import_count} user OS firewall rules into NetStrip DB.")
+        except Exception as e:
+            logger.error(f"Failed to import OS firewall rules: {e}")
+
         # Clean up data older than 24 hours on initialization
         try:
             self.db.prune_old_logs(hours=24)

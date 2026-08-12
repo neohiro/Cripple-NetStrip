@@ -1,3 +1,18 @@
+## [v3.5.2] - OS Firewall Sync, Dashboard Optimization & CI Fixes
+
+- **OS Firewall Integration**: Automatically detects and imports user-defined application block/allow rules from Windows Defender Firewall at startup, ensuring your existing security configurations are natively respected and managed by NetStrip.
+- **Dashboard Optimization**: Eliminated start-up lag and visual artifacting on the dashboard. Stats now initialize cleanly without triggering mass simultaneous UI pulse animations.
+- **GUI Scroll Unification**: Resolved sluggish scrolling in the dashboard and centralizes the ultra-smooth 4x monkey-patch across all views.
+- **GUI Artifact Fixes**: Fixed a bug where background Settings tabs would improperly process scroll events, causing "General" and "Updates" ghost artifacts to bleed into the active Connection Log.
+- **Dynamic Updater UI**: The filter lists view now dynamically queries the exact count of active blocklist sources (49+) rather than falling back to a hardcoded label.
+- **CI Pipeline Stabilized**: Fixed Linux/Windows platform incompatibilities in GitHub Actions, corrected module import validation, and established a bootstrap pytest suite.
+
+## [v3.5.1] - MAC Randomization, OS Adapter Hardening & DoH Tunnels
+
+- **Hardware Identity Protection**: Introduced MAC Address Randomization and advanced network adapter hardening across Windows, macOS, and Linux to prevent local hardware fingerprinting.
+- **Platform-Aware Settings**: Settings UI now dynamically inspects the host OS (`PLATFORM_SUPPORT`) and neatly greys-out toggles for unsupported low-level kernel features (e.g., eBPF on Windows) with explanatory tooltips.
+- **DoH Tunnel Enforcement**: Forcibly redirects untrusted DNS queries through secure DNS-over-HTTPS tunnels.
+
 ## [v3.4.6] - Global UI Polish & Category Mapping
 
 - **Dynamic Logo Redesign**: Restored the sidebar's animated CRIPPLE logo to continuously animate, but carefully re-architected it to prevent the Tkinter/GPU tearing bug. The animation loop is now strictly hardware-capped at a stable 25 FPS (40ms ticks) and includes a window-mapping safeguard that completely suspends the drawing loop when the application is minimized or hidden. The bounce amplitude has also been increased by 140% to make the dynamic motion much more visible and satisfying.
