@@ -1,3 +1,9 @@
+## [v3.6.7] - 2026-08-13
+### Fixed
+- **Connection Log UI**: Completely reverted the Connection Log tab from the native `ttk.Treeview` back to the rich `CTkScrollableFrame` layout. You get the beautiful rounded pill badges, copy-to-clipboard domain tooltips, and dot indicators back!
+- **UI List Freezing**: Fixed the severe lag that originally caused the switch to `Treeview`. The CustomTkinter log frame now updates synchronously using pre-allocated widget pools (delta updates), eliminating all UI freezing and layout thrashing.
+- **Global Scrolling**: Activated the ultra-fast 15x custom scroll wheel speed on all remaining lists in the app (App Rules).
+
 ## [v3.6.6] - 2026-08-13
 ### Fixed
 - **Connection Log Scrolling**: Brought back the ultra-fast 15x scroll wheel speed for the native `ttk.Treeview` connection log, fixing the sluggish 1-tick scroll experience on Windows.
