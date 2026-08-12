@@ -37,28 +37,7 @@ try:
         base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
         internal_dir = os.path.join(base_dir, '_internal')
 
-        # Automatically strip NTFS Zone.Identifier (Mark of the Web) from all files and directories
-        # to ensure seamless execution under Smart App Control / AppLocker
-        try:
-            kernel32 = ctypes.windll.kernel32
-            # Unblock main executable and directory
-            if getattr(sys, 'frozen', False) and sys.executable:
-                kernel32.DeleteFileW(f"\\\\?\\{sys.executable}:Zone.Identifier")
-            kernel32.DeleteFileW(f"\\\\?\\{base_dir}:Zone.Identifier")
-
-            for root, dirs, files in os.walk(base_dir):
-                for d in dirs:
-                    try:
-                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, d)}:Zone.Identifier")
-                    except Exception:
-                        pass
-                for f in files:
-                    try:
-                        kernel32.DeleteFileW(f"\\\\?\\{os.path.join(root, f)}:Zone.Identifier")
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        # (Removed automatic Zone.Identifier stripping to prevent Bearfoos.A!ml ML heuristic detections)
 
         # Ensure base and internal directories are on PATH for standard Windows DLL resolution
         try:

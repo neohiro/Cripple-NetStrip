@@ -1,3 +1,7 @@
+## [v3.6.2] - 2026-08-12
+### Fixed
+- **Anti-Virus False Positive**: Removed automatic NTFS `Zone.Identifier` (Mark of the Web) stripping during boot. This Windows-specific logic was designed to prevent SmartScreen popups on fresh installs, but inadvertently triggered the `Bearfoos.A!ml` machine-learning heuristic in Windows Defender.
+
 ## [v3.6.1] - 2026-08-12
 ### Fixed
 - **UI Freeze & Missing Tab**: Fixed a regression in the `LogView` component where an invalid color attribute and a recursive refresh loop caused the Logs tab to fail rendering and freeze the GUI.
