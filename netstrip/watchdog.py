@@ -158,11 +158,27 @@ def restore_network():
             # IPv6/IPv4 protocol bindings are restored below based on the database state.
             logging.info("Removing NetStrip firewall rules...")
             try:
-                res = subprocess.run(["netsh", "advfirewall", "firewall", "show", "rule", "name=all"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                for line in res.stdout.splitlines():
-                    if line.startswith("Rule Name:") and "NetStrip" in line:
-                        name = line.split(":", 1)[1].strip()
-                        subprocess.run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={name}"], creationflags=subprocess.CREATE_NO_WINDOW)
+                import winreg
+                rule_names_to_delete = []
+                reg_path = r"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules"
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
+                    num_values = winreg.QueryInfoKey(key)[1]
+                    for i in range(num_values):
+                        try:
+                            name, value, _ = winreg.EnumValue(key, i)
+                            if isinstance(value, str):
+                                parts = value.split('|')
+                                for p in parts:
+                                    if p.startswith('Name=') and "NetStrip" in p:
+                                        rule_names_to_delete.append(p.split('=', 1)[1])
+                        except OSError:
+                            pass
+                    winreg.CloseKey(key)
+                except Exception:
+                    pass
+                for rule_name in set(rule_names_to_delete):
+                    subprocess.run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"], creationflags=subprocess.CREATE_NO_WINDOW)
             except Exception:
                 pass
             
