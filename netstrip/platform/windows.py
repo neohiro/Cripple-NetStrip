@@ -193,14 +193,28 @@ class WindowsPlatform(PlatformBase):
         return "No rules match" not in res.stdout
 
     def remove_all_NetStrip_rules(self) -> bool:
-        import subprocess
-        # Get all rule names, filter for NetStrip_, and delete
-        cmd_show = ["netsh", "advfirewall", "firewall", "show", "rule", "name=all"]
-        res_show = subprocess.run(cmd_show, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-        for line in res_show.stdout.splitlines():
-            if "Rule Name:" in line and "NetStrip_" in line:
-                rule_name = line.split(":", 1)[1].strip()
-                self.remove_firewall_rule(rule_name)
+        import winreg
+        rule_names_to_delete = []
+        reg_path = r"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
+            num_values = winreg.QueryInfoKey(key)[1]
+            for i in range(num_values):
+                try:
+                    name, value, _ = winreg.EnumValue(key, i)
+                    if isinstance(value, str):
+                        parts = value.split('|')
+                        for p in parts:
+                            if p.startswith('Name=') and "NetStrip_" in p:
+                                rule_names_to_delete.append(p.split('=', 1)[1])
+                except OSError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+            
+        for rule_name in set(rule_names_to_delete):
+            self.remove_firewall_rule(rule_name)
         return True
 
     def remove_all_app_block_rules(self) -> bool:

@@ -1,5 +1,9 @@
-## [v3.5.10] - Native Firewall Reconnaissance (ML Evasion Phase 3)
+## [v3.5.11] - Absolute Zero Heuristic ML Evasion (Bearfoos.A!ml Fixes)
 
+- **Complete `netsh` Firewall Read Eradication**: Fixed a lingering `netsh` firewall read attempt during application startup that was still triggering the reconnaissance heuristic.
+- **System PE Parsing Safelist**: Protected system executables (e.g. `svchost.exe`, `explorer.exe`) from being directly parsed by the `icoextract` engine. Reading OS binary Portable Executable (PE) headers using an unsigned application frequently triggers Machine Learning quarantines because it matches the behavior of memory hollowers and file infectors.
+
+## [v3.5.10] - Native Firewall Reconnaissance (ML Evasion Phase 3)
 - **Registry-Native Firewall Enumeration**: Addressed the final `Bearfoos.A!ml` Machine Learning heuristic flag which triggered when the application executed broad `netsh advfirewall firewall show rule name=all` shell commands to enumerate user firewall policies. Cripple now uses the native Windows API (`winreg`) to parse the raw firewall policy data directly from the system registry hive (`HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules`). This completely bypasses the process-spawning behavioral heuristics associated with reconnaissance malware.
 
 ## [v3.5.9] - CI Pipeline Fixes

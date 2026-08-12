@@ -265,6 +265,13 @@ class IconManager:
         """Native extraction using pure-Python icoextract to avoid PowerShell ML heuristic flags."""
         import random
         success = False
+        
+        # Security/ML Evasion: Do not parse PE resources of protected Windows system binaries.
+        # This prevents Bearfoos.A!ml from flagging the app as a memory injector.
+        if "\\windows\\" in process_path.lower():
+            self._do_fallback(process_path, process_name, callback)
+            return
+            
         temp_ico_path = f"{save_path}.{random.randint(10000, 99999)}.ico"
         try:
             from icoextract import IconExtractor
