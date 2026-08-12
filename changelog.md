@@ -1,5 +1,8 @@
-## [v3.5.5] - Strict ML Evasion (No Script Dropping) & Native LLTD Control
+## [v3.5.6] - Ghost Mode Hardening & Complete Fail-Open Restoration
 
+- **Absolute Watchdog Restoration**: Ensured the NetBT (NetBIOS over TCP/IP) parameter interfaces are explicitly and thoroughly restored to their default state by the Watchdog during a crash or exit. This guarantees that no adapter is left orphaned with disabled NetBIOS if the PyInstaller bundle terminates abruptly while Ghost Mode is active.
+
+## [v3.5.5] - Strict ML Evasion (No Script Dropping) & Native LLTD Control
 - **Absolute Zero PowerShell**: Completely eliminated the `.ps1` dropper fallback. PyInstaller no longer creates or executes background scripts in `%TEMP%` for icon extraction or protocol binding, ensuring strict compliance with advanced ML heuristic analyzers that flag dropper behavior.
 - **Native LLTD Disablement**: Restored `ms_lltdio` and `ms_rspndr` (Link-Layer Topology Discovery) disablement for Ghost Mode without using PowerShell. This is now achieved cleanly and natively via Windows Group Policy registry injections (`HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\LLTD`), fully neutralizing Responder protocols without triggering antivirus behavior.
 

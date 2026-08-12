@@ -183,6 +183,21 @@ def restore_network():
                 pass
                 
             try:
+                reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
+                for i in range(winreg.QueryInfoKey(key)[0]):
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        subkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{reg_path}\\{subkey_name}", 0, winreg.KEY_SET_VALUE)
+                        winreg.SetValueEx(subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 0)
+                        winreg.CloseKey(subkey)
+                    except OSError:
+                        continue
+                winreg.CloseKey(key)
+            except Exception:
+                pass
+                
+            try:
                 import winreg
                 winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
             except Exception:
