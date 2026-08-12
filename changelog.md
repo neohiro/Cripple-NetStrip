@@ -1,3 +1,9 @@
+## [v3.5.3] - DNS Fail-Open & Malware False Positive Mitigation
+
+- **DNS Restore Guarantee**: Ensured `engine.stop()` triggers the DNS clean-up sequence before flagging the shutdown as a clean exit, ensuring the Watchdog cleanly restores OS network connections even on abrupt main loop termination.
+- **Bearfoos.A!ml Mitigation**: Stripped out legacy PowerShell firewall syncing in favor of high-performance `netsh` parsing to entirely eliminate the Windows Defender Machine Learning heuristic false positive.
+- **Boot Optimization**: Offloaded firewall rule syncing to a background thread and optimized the splash screen to strictly cross-fade only after the main GUI is fully drawn, removing startup UI glitches and eliminating 10s of startup lag.
+
 ## [v3.5.2] - OS Firewall Sync, Dashboard Optimization & CI Fixes
 
 - **OS Firewall Integration**: Automatically detects and imports user-defined application block/allow rules from Windows Defender Firewall at startup, ensuring your existing security configurations are natively respected and managed by NetStrip.

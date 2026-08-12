@@ -703,16 +703,6 @@ class NetStripEngine:
         except Exception as e:
             logger.error(f"Error disabling killswitch: {e}")
         
-        # Write .clean_exit so watchdog knows this is a graceful shutdown
-        try:
-            import os
-            from pathlib import Path
-            clean_exit_path = Path.home() / ".netstrip" / ".clean_exit"
-            clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
-            clean_exit_path.touch()
-        except Exception as e:
-            logger.error(f"Failed to write clean exit flag: {e}")
-        
         # Restore system DNS
         try:
             # Restore all interfaces we ever hijacked, even if currently disconnected
@@ -747,6 +737,16 @@ class NetStripEngine:
                 self.platform.enable_ipv4()
             except Exception as e:
                 logger.error(f"Failed to restore global IPv4: {e}")
+
+        # Write .clean_exit at the very end so watchdog knows all critical cleanup succeeded
+        try:
+            import os
+            from pathlib import Path
+            clean_exit_path = Path.home() / ".netstrip" / ".clean_exit"
+            clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
+            clean_exit_path.touch()
+        except Exception as e:
+            logger.error(f"Failed to write clean exit flag: {e}")
 
         # Restore network adapter protocol bindings and system autodiscovery
         try:
