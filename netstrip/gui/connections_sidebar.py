@@ -463,8 +463,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self._is_expanding_all = False
                 return
                 
-            # Process up to 5 groups per UI cycle to balance speed vs freezing
-            batch_size = 5
+            # Process up to 10 groups per UI cycle to balance speed vs freezing
+            batch_size = 10
             for i in range(index, min(index + batch_size, len(groups_to_update))):
                 group = groups_to_update[i]
                 if getattr(group, '_is_packed', False):
@@ -488,8 +488,20 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
     def set_expanded(self, expanded: bool):
         self.is_expanded = expanded
-        for group in self.app_groups.values():
-            group.set_expanded(expanded)
+        groups_to_update = list(self.app_groups.values())
+        
+        def _update_next(index=0):
+            if not self.winfo_exists() or index >= len(groups_to_update):
+                return
+            batch_size = 10
+            for i in range(index, min(index + batch_size, len(groups_to_update))):
+                groups_to_update[i].set_expanded(expanded)
+            try:
+                self.after(2, lambda: _update_next(index + batch_size))
+            except Exception:
+                pass
+                
+        _update_next()
 
     def destroy(self):
         self._destroyed = True

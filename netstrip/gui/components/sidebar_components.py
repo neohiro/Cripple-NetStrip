@@ -829,9 +829,19 @@ class AppGroupFrame(ctk.CTkFrame):
                 self.lbl_path.pack_forget()
             self.btn_timebomb.pack_forget()
                 
-        for row in self.rows.values():
-            if hasattr(row, 'set_expanded'):
-                row.set_expanded(expanded)
+        rows_list = list(self.rows.values())
+        def _update_rows(index=0):
+            if not self.winfo_exists() or index >= len(rows_list):
+                return
+            batch_size = 20
+            for i in range(index, min(index + batch_size, len(rows_list))):
+                if hasattr(rows_list[i], 'set_expanded'):
+                    rows_list[i].set_expanded(expanded)
+            try:
+                self.after(2, lambda: _update_rows(index + batch_size))
+            except Exception:
+                pass
+        _update_rows()
 
     def _copy_path(self):
         if not self.process_path:
