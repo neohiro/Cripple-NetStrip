@@ -713,7 +713,7 @@ class AppGroupFrame(ctk.CTkFrame):
             p_lower = self.process_name.lower()
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe', 'system', 'system (kernel/driver)', 'system idle process'):
                 is_system = True
-            elif len(self.rows) > 0 and all(r.conn_data.get('category') in ('system', ConnectionCategory.SYSTEM.value) for r in self.rows.values()):
+            elif len(self.rows) > 0 and all(r.conn_data.get('category') in ('system', ConnectionCategory.SYSTEM.value, 'telemetry', 'tracker', 'ad', 'malware') or r.conn_data.get('action') == 'block' for r in self.rows.values()):
                 is_system = True
                 
             if is_system:
