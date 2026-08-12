@@ -166,6 +166,13 @@ Two levels of network isolation, depending on how serious the threat is:
 
 Both require typing `YES` to confirm in the CLI. Pressing Enter always cancels.
 
+#### Ghost Mode Hardening & Stealth
+
+When Ghost Mode is engaged on Windows, Cripple executes advanced system hardening to secure the host natively against reconnaissance and leaks, without relying on suspicious PowerShell droppers:
+* **Absolute Zero PowerShell**: Uses native OS APIs to avoid all Machine Learning heuristic AV flags (`Bearfoos.A!ml`). 
+* **Native Protocol Disablement**: Disables NetBIOS over TCP/IP (NetBT) and File and Printer Sharing (LanmanServer) natively.
+* **LLTD Mapper & Responder Neutralization**: Completely disables `ms_lltdio` and `ms_rspndr` discovery protocols across all network adapters via Windows Group Policy registry injections.
+* **Fail-Open Restoration**: If the PyInstaller payload is unexpectedly closed or crashes, the Watchdog guarantees these stealth registry keys and protocol settings are immediately restored to standard OS defaults.
 ---
 
 ## 📱 Android
