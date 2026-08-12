@@ -304,7 +304,7 @@ Cripple is engineered to align with two major cybersecurity standards:
 | Lazy preloading | Tabs pre-instantiated at 300ms intervals for zero-delay switching |
 | Debounced resize | Batched window resize events prevent layout thrashing |
 | Flicker-free dashboard | Pre-allocated widget pool with in-place `configure()` updates |
-| 3× scroll speed | Framework-level mouse wheel patching |
+| 15x scroll speed | Framework-level mouse wheel patching |
 
 ---
 

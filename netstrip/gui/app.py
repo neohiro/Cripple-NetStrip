@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 8x standard speed
-                    step = -int((event.delta / 120) * 8)
+                    # 15x standard speed for smooth and fast UX
+                    step = -int((event.delta / 120) * 15)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -56,6 +56,27 @@ def fast_check_if_valid_scroll(self, widget):
         # Don't scroll if this scrollable frame is not visible (hidden tab)
         if not self.winfo_viewable():
             return False
+            
+        # Strictly verify that this scrollable frame is inside the currently active tab.
+        # This absolutely prevents invisible background tabs from processing scroll events 
+        # and generating ghost artifacting on the canvas.
+        app = self
+        while app and not hasattr(app, 'current_view'):
+            if app == app.master: break
+            app = app.master
+            
+        if app and hasattr(app, 'current_view') and app.current_view:
+            curr = self
+            is_active_tab = False
+            while curr:
+                if curr == app.current_view:
+                    is_active_tab = True
+                    break
+                if curr == curr.master: break
+                curr = curr.master
+            if not is_active_tab:
+                return False
+                
         canvas = getattr(self, '_parent_canvas', None)
         if not canvas or not canvas.winfo_exists():
             return False

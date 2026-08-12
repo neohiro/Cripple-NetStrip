@@ -1,5 +1,9 @@
-## [v3.5.11] - Absolute Zero Heuristic ML Evasion (Bearfoos.A!ml Fixes)
+## [v3.5.12] - UI Artifacting & Scroll UX Polish
 
+- **Ghost Artifacting Fix**: Rewrote the global scroll event handler to aggressively verify tab visibility. This entirely eliminates the visual bug where components of the Settings view (like the "General" and "Updates" labels) would incorrectly process scroll events and draw ghost artifacts over the Dashboard and Logs tabs.
+- **Scroll Speed Polish**: Increased the application-wide scroll speed multiplier from 8x to 15x for a substantially faster, butter-smooth UX across all lists and tables.
+
+## [v3.5.11] - Absolute Zero Heuristic ML Evasion (Bearfoos.A!ml Fixes)
 - **Complete `netsh` Firewall Read Eradication**: Fixed a lingering `netsh` firewall read attempt during application startup that was still triggering the reconnaissance heuristic.
 - **System PE Parsing Safelist**: Protected system executables (e.g. `svchost.exe`, `explorer.exe`) from being directly parsed by the `icoextract` engine. Reading OS binary Portable Executable (PE) headers using an unsigned application frequently triggers Machine Learning quarantines because it matches the behavior of memory hollowers and file infectors.
 
