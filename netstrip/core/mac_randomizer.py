@@ -398,5 +398,24 @@ class MACRandomizer:
                 logger.error(f"Failed to modify mDNS registry: {e}")
 
             logger.info(f"Windows adapter hardening {'enabled' if enable else 'disabled'}: NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, File Sharing, QoS")
+            
+            # Restart the active network interface to immediately apply protocol binding changes
+            try:
+                active_iface = None
+                res = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                for line in res.stdout.splitlines():
+                    if "Connected" in line:
+                        active_iface = line.split()[-1]
+                        break
+                
+                if active_iface:
+                    logger.info(f"Restarting interface '{active_iface}' to apply hardening bindings...")
+                    subprocess.run(["netsh", "interface", "set", "interface", active_iface, "admin=disable"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                    import time
+                    time.sleep(2)
+                    subprocess.run(["netsh", "interface", "set", "interface", active_iface, "admin=enable"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            except Exception as e:
+                logger.error(f"Failed to restart interface after hardening: {e}")
+                
         except Exception as e:
             logger.error(f"Windows adapter hardening failed: {e}")

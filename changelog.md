@@ -1,5 +1,12 @@
-## [v3.5.13] - Settings Initialization Hotfix
+## [v3.5.14] - Ghost Mode Sync, Scroll UX & Filter List Caching
 
+- **Sidebar Scroll Fix**: Whitelisted the persistent right sidebar (`AppConnectionsList`) in the global scroll event handler so active connections can be scrolled independently of the main tabs.
+- **Scroll Tearing Fix**: Scaled back the global scroll speed multiplier from 15x to 5x to prevent Tkinter canvas horizontal tearing/artifacting while preserving a fast feel.
+- **Ghost Mode Hardening Sync**: Ghost Mode now explicitly visually toggles and activates Network Adapter Hardening without bleeding into MAC randomization. Hardening logic now actively restarts network interfaces to guarantee instantaneous protocol binding termination.
+- **Instant Boot Updates**: Reduced the blocklist background update loop delay from 2 minutes to 5 seconds so online checks trigger almost immediately on app launch.
+- **Domain Cache Invalidated**: Hard-bumped the BlocklistManager cache hash to force a mandatory cold-reload of all local `.txt` lists. This resolves the ingestion bug and restores the 3M+ domain metrics in the UI.
+
+## [v3.5.13] - Settings Initialization Hotfix
 - **Blank Settings Pane Fix**: Resolved a regression where clicking the Settings navigation button failed to load the Settings view. This was caused by an initialization order error (`AttributeError: _switch_refs`) where GUI switches were instantiated before their state-tracking dictionary was declared, causing a silent callback exception.
 
 ## [v3.5.12] - UI Artifacting & Scroll UX Polish

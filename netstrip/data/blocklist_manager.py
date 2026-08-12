@@ -291,7 +291,7 @@ class BlocklistManager:
     def _get_lists_hash(self) -> str:
         """Generate a stable deterministic hash of the current lists directory, updater sources, and DNS settings."""
         h = hashlib.md5()
-        h.update(b"v3.4.1_fast_cache_release")
+        h.update(b"v3.5.14_cache_fix")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:
             try:

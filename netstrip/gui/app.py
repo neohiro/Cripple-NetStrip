@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 15x standard speed for smooth and fast UX
-                    step = -int((event.delta / 120) * 15)
+                    # 5x standard speed for smooth and fast UX (prevents artifacting from 15x)
+                    step = -int((event.delta / 120) * 5)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -57,15 +57,27 @@ def fast_check_if_valid_scroll(self, widget):
         if not self.winfo_viewable():
             return False
             
-        # Strictly verify that this scrollable frame is inside the currently active tab.
+        # Strictly verify that this scrollable frame is inside the currently active tab
+        # OR if it belongs to the persistent right sidebar (which is outside the tab hierarchy).
         # This absolutely prevents invisible background tabs from processing scroll events 
         # and generating ghost artifacting on the canvas.
         app = self
+        is_sidebar = False
         while app and not hasattr(app, 'current_view'):
+            if hasattr(app, 'right_sidebar'): break
             if app == app.master: break
             app = app.master
             
-        if app and hasattr(app, 'current_view') and app.current_view:
+        # Check if the widget is inside the right sidebar
+        curr_sb = self
+        while curr_sb:
+            if hasattr(app, 'right_sidebar') and curr_sb == app.right_sidebar:
+                is_sidebar = True
+                break
+            if curr_sb == curr_sb.master: break
+            curr_sb = curr_sb.master
+            
+        if not is_sidebar and app and hasattr(app, 'current_view') and app.current_view:
             curr = self
             is_active_tab = False
             while curr:
@@ -188,8 +200,17 @@ class NetStripApp(ctk.CTk):
         
         # Prevent black rendering artifacts on window restore without lagging child widgets
         self.bind("<Map>", self._on_window_map)
+        self.bind("<Unmap>", self._on_window_unmap)
         self.bind("<Configure>", self._on_window_resize)
         self._resize_timer = None
+        
+    def _on_window_unmap(self, event):
+        if str(event.widget) == str(self):
+            # Pause animations and intensive redrawing when minimized
+            if hasattr(self, 'persistent_logo'):
+                self.persistent_logo.stop()
+            if hasattr(self, 'connections_list'):
+                self.connections_list._pause_updates = True
         self._map_timer = None
 
     def apply_icon(self):
@@ -222,22 +243,17 @@ class NetStripApp(ctk.CTk):
             pass
 
     def _on_window_map(self, event):
-        # Only act on top-level window restore, not child widget mappings
-        if event.widget is not self:
-            return
-        if self._map_timer is not None:
-            try:
-                self.after_cancel(self._map_timer)
-            except Exception:
-                pass
-        self._map_timer = self.after(30, self._on_map_complete)
-
-    def _on_map_complete(self):
-        self._map_timer = None
-        try:
-            self.update_idletasks()
-        except Exception:
-            pass
+        # Debounce the un-minimize to prevent artifacting, but keep it fast
+        if str(event.widget) == str(self):
+            # Resume animations immediately
+            if hasattr(self, 'persistent_logo'):
+                self.persistent_logo.start()
+            if hasattr(self, 'connections_list'):
+                self.connections_list._pause_updates = False
+                
+            if hasattr(self, '_map_after_id') and self._map_after_id:
+                self.after_cancel(self._map_after_id)
+            self._map_after_id = self.after(50, self._force_redraw)
 
     def _on_window_resize(self, event):
         # Only act on top-level window resize events, not child widget reconfigs

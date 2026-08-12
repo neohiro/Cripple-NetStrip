@@ -529,12 +529,17 @@ class SettingsView(ctk.CTkFrame):
 
             if setting_key == 'block_system_connections':
                 # Flush classifier caches and harden/restore network adapter bindings
-                from netstrip.platform.base import get_platform
-                api = get_platform()
                 is_blocking = (value == 'true')
-                if hasattr(api, 'harden_network_adapters'):
-                    import threading
-                    threading.Thread(target=lambda: api.harden_network_adapters(enable_hardening=is_blocking), daemon=True).start()
+                
+                # Automatically toggle and execute Harden Network Adapter
+                if 'harden_network_adapter' in self._switch_refs:
+                    self._switch_refs['harden_network_adapter'].select() if is_blocking else self._switch_refs['harden_network_adapter'].deselect()
+                    self.engine.db.set_setting('harden_network_adapter', 'true' if is_blocking else 'false')
+                    
+                import threading
+                from netstrip.core.mac_randomizer import MACRandomizer
+                threading.Thread(target=lambda: MACRandomizer.harden_adapter_protocols(enable=is_blocking), daemon=True).start()
+                
                 if hasattr(self.engine, 'classifier'):
                     self.engine.classifier._domain_cache.clear()
                     if hasattr(self.engine.classifier, '_ip_cache'):

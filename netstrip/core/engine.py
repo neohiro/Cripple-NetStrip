@@ -629,8 +629,8 @@ class NetStripEngine:
                 
     def _blocklist_updater_loop(self):
         """Periodically check for blocklist updates every hour."""
-        # Initial sleep for 2 minutes after boot before running first background update check
-        for _ in range(120):
+        # Initial sleep for 5 seconds after boot before running first background update check
+        for _ in range(5):
             if not self.is_running:
                 return
             time.sleep(1)
