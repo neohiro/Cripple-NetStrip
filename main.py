@@ -824,16 +824,16 @@ def main():
             app.apply_icon()
             try:
                 app.update_idletasks()
+                app.update()
             except Exception:
                 pass
             
+            # Signal that the heavy UI layout passes are completely finished
+            ui_ready = True
+            
             def on_transition_done():
                 if not is_headless:
-                    app.attributes('-alpha', 1.0)
-                    app.attributes('-topmost', True)
-                    app.lift()
                     app.focus_force()
-                    app.after(200, lambda: app.attributes('-topmost', False))
                     app.apply_icon()
                     
                     from netstrip.core.sound import sound_manager
@@ -848,10 +848,20 @@ def main():
                     on_transition_done()
                     return
 
-                # Do not pre-reveal the main app to prevent overlap/layering artifacts.
-                # Keep it hidden (alpha=0.0) until the splash screen has fully faded out and withdrawn.
+                # Pre-reveal the main app behind the splash screen so it's fully drawn
+                # BEFORE the splash screen fades out, eliminating glitching frames.
+                app.attributes('-alpha', 1.0)
+                app.attributes('-topmost', True)
+                app.lift()
+                app.after(50, lambda: app.attributes('-topmost', False))
+                try:
+                    app.update_idletasks()
+                except Exception:
+                    pass
                     
                 if splash and splash.winfo_exists():
+                    splash.lift()
+                    splash.attributes('-topmost', True)
                     splash.fade_out(callback=on_transition_done, total_steps=8)
                 else:
                     on_transition_done()
@@ -868,9 +878,9 @@ def main():
                     on_transition_done()
                     return
     
-                # Wait for blocklist ready and minimum 1.2s display duration (or 30.0s safety timeout)
+                # Wait for both the engine's blocklist to load AND our UI to be fully built and packed
                 is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
-                if (is_blocklist_ready and elapsed >= 1.2) or elapsed >= 30.0:
+                if (is_blocklist_ready and ui_ready and elapsed >= 1.2) or elapsed >= 30.0:
                     transition_started = True
                     if splash and splash.winfo_exists():
                         try:

@@ -194,76 +194,71 @@ class WindowsPlatform(PlatformBase):
         return "No rules match" not in res.stdout
 
     def remove_all_NetStrip_rules(self) -> bool:
-        # Use PowerShell to safely remove all rules with the NetStrip_ prefix
-        # NOTE: -DisplayName does NOT support wildcards — must filter via Where-Object
-        cmd = ["powershell", "-Command",
-               "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        import subprocess
+        # Get all rule names, filter for NetStrip_, and delete
+        cmd_show = ["netsh", "advfirewall", "firewall", "show", "rule", "name=all"]
+        res_show = subprocess.run(cmd_show, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        for line in res_show.stdout.splitlines():
+            if "Rule Name:" in line and "NetStrip_" in line:
+                rule_name = line.split(":", 1)[1].strip()
+                self.remove_firewall_rule(rule_name)
+        return True
 
     def remove_all_app_block_rules(self) -> bool:
-        # NOTE: -DisplayName does NOT support wildcards — must filter via Where-Object
-        cmd = ["powershell", "-Command",
-               "Get-NetFirewallRule | Where-Object { $_.DisplayName -like 'NetStrip_AppBlock_*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"]
-        res = self._run_cmd(cmd)
-        return res.returncode == 0
+        import subprocess
+        # Get all rule names, filter for NetStrip_AppBlock_, and delete
+        cmd_show = ["netsh", "advfirewall", "firewall", "show", "rule", "name=all"]
+        res_show = subprocess.run(cmd_show, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        for line in res_show.stdout.splitlines():
+            if "Rule Name:" in line and "NetStrip_AppBlock_" in line:
+                rule_name = line.split(":", 1)[1].strip()
+                self.remove_firewall_rule(rule_name)
+        return True
 
     def get_user_firewall_rules(self) -> List[dict]:
         """
         Extract non-system firewall rules that were created by the user or third-party apps
-        and not by NetStrip. Returns a list of dicts with 'program', 'action', 'direction'.
+        and not by NetStrip. Returns a list of dicts with 'Program', 'Action', 'Direction'.
         """
-        script = '''
-        $rules = Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { 
-            $_.DisplayName -notlike 'NetStrip_*' -and 
-            $_.DisplayName -notmatch '^@'
-        }
-        $appFilters = $rules | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue | Where-Object { 
-            $_.Program -and $_.Program -notmatch '(?i)system32' -and $_.Program -notmatch '(?i)syswow64' -and $_.Program -notmatch '(?i)windows\\systemapps'
-        }
-        foreach ($filter in $appFilters) {
-            $rule = $rules | Where-Object { $_.InstanceID -eq $filter.InstanceID } | Select-Object -First 1
-            if ($rule) {
-                [PSCustomObject]@{
-                    Program = $filter.Program
-                    Action = $rule.Action
-                    Direction = $rule.Direction
-                }
-            }
-        }
-        '''
-        
+        import subprocess
         rules = []
         try:
-            # We run this passing the script block to avoid quoting nightmares
-            cmd = ["powershell", "-NoProfile", "-Command", script]
-            res = self._run_cmd(cmd)
+            cmd = ["netsh", "advfirewall", "firewall", "show", "rule", "name=all", "verbose"]
+            # Start process without creating a console window
+            res = subprocess.run(cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
             if res.returncode == 0 and res.stdout:
-                # Parse powershell output blocks
                 current_rule = {}
+                
+                def _process_rule(rule_dict):
+                    prog = rule_dict.get('Program', '')
+                    name = rule_dict.get('Rule Name', '')
+                    if (prog and prog.lower() != 'any' and not name.startswith('NetStrip_') and not name.startswith('@') 
+                        and 'system32' not in prog.lower() and 'syswow64' not in prog.lower() 
+                        and 'windows\\systemapps' not in prog.lower()):
+                        
+                        rules.append({
+                            'Program': rule_dict.get('Program'),
+                            'Action': rule_dict.get('Action'),
+                            'Direction': rule_dict.get('Direction')
+                        })
+                
                 for line in res.stdout.splitlines():
                     line = line.strip()
-                    if not line:
-                        if current_rule.get('Program') and current_rule.get('Action') and current_rule.get('Direction'):
-                            rules.append(current_rule.copy())
-                            current_rule = {}
-                        continue
-                    
-                    if line.startswith("Program"):
-                        val = line.split(":", 1)
-                        if len(val) == 2: current_rule["Program"] = val[1].strip()
-                    elif line.startswith("Action"):
-                        val = line.split(":", 1)
-                        if len(val) == 2: current_rule["Action"] = val[1].strip()
-                    elif line.startswith("Direction"):
-                        val = line.split(":", 1)
-                        if len(val) == 2: current_rule["Direction"] = val[1].strip()
-                        
-                # Catch the last one if there was no trailing newline
-                if current_rule.get('Program') and current_rule.get('Action') and current_rule.get('Direction'):
-                    rules.append(current_rule.copy())
-        except Exception:
-            pass
+                    if line.startswith("Rule Name:"):
+                        _process_rule(current_rule)
+                        current_rule = {'Rule Name': line.split(":", 1)[1].strip()}
+                    elif line.startswith("Program:"):
+                        current_rule['Program'] = line.split(":", 1)[1].strip()
+                    elif line.startswith("Action:"):
+                        current_rule['Action'] = line.split(":", 1)[1].strip()
+                    elif line.startswith("Direction:"):
+                        current_rule['Direction'] = line.split(":", 1)[1].strip()
+                
+                # Check last rule
+                _process_rule(current_rule)
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch user firewall rules: {e}")
             
         return rules
 
