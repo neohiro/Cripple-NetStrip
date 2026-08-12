@@ -545,10 +545,14 @@ class NetStripResolver(BaseResolver):
             self._dns_cache.move_to_end(cache_key)
             
             # Extract A (1) and AAAA (28) records to populate persistent database cache
+            # Exclude our own telemetry / IP checks from polluting the shared global DNS cache with AWS IPs
+            exclude_domains = ('api.ipify.org', 'ipinfo.io', 'ipapi.co', 'ipwho.is', 'icanhazip.com', 'ifconfig.me', 'raw.githubusercontent.com', 'api.github.com')
+            
             for rr in record.rr:
                 if rr.rtype in (1, 28): 
                     ip = str(rr.rdata)
-                    self.db.cache_domain_mapping(ip, domain)
+                    if domain.lower() not in exclude_domains:
+                        self.db.cache_domain_mapping(ip, domain)
                     
             return record
         except Exception as e:
