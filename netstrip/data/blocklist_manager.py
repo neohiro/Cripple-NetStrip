@@ -164,7 +164,7 @@ try:
 except Exception:
     pass
 
-DOM_RE = re.compile(r'^[a-z0-9_](?:[a-z0-9-_]{0,61}[a-z0-9_])?(?:\.[a-z0-9_](?:[a-z0-9-_]{0,61}[a-z0-9_])?)+$')
+DOM_RE = re.compile(r'^[a-z0-9_\*\-\.\u0080-\uFFFF]+$')
 
 class BlocklistManager:
     def __init__(self, lists_dir: str = None, db=None, progress_callback: Optional[Callable[[str, float], None]] = None, async_load: bool = True, **kwargs):
@@ -450,8 +450,8 @@ class BlocklistManager:
             if not parts:
                 continue
                 
-            # Hosts format
-            if len(parts) >= 2 and parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53', '::', '0'):
+            # Hosts format (any IP prefix)
+            if len(parts) >= 2 and (parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53', '::', '0') or re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]+$', parts[0])):
                 candidates = parts[1:]
             else:
                 candidates = [parts[0]]
@@ -688,6 +688,7 @@ class BlocklistManager:
 
                         for d in domains:
                             if cat:
+                                new_stats[cat] = new_stats.get(cat, 0) + 1
                                 if cat in (ConnectionCategory.AD, ConnectionCategory.TRACKER, ConnectionCategory.TELEMETRY, ConnectionCategory.MALWARE, ConnectionCategory.SECURITY):
                                     if d in ESSENTIAL_DOMAINS or d in SYSTEM_DOMAINS or d in UPDATE_DOMAINS:
                                         continue
@@ -695,15 +696,12 @@ class BlocklistManager:
                                 if d not in new_domain_map:
                                     new_domain_map[d] = cat
                                     new_category_domains[cat].add(d)
-                                    new_stats[cat] = new_stats.get(cat, 0) + 1
                                 else:
                                     existing_cat = new_domain_map[d]
                                     if CATEGORY_PRIORITY.get(cat, 0) > CATEGORY_PRIORITY.get(existing_cat, 0):
                                         new_domain_map[d] = cat
                                         new_category_domains[existing_cat].discard(d)
                                         new_category_domains[cat].add(d)
-                                        new_stats[existing_cat] -= 1
-                                        new_stats[cat] = new_stats.get(cat, 0) + 1
                             if identity_name:
                                 new_identity_map[d] = identity_name
 

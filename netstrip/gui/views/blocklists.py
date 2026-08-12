@@ -101,8 +101,9 @@ class BlocklistView(ctk.CTkFrame):
         def on_complete(updated_count):
             if not self._destroyed:
                 def update_ui():
+                    total_enabled = len([s for s in self.engine.blocklist.get_updater_sources() if s.get('enabled', True)])
                     self._btn_update.configure(state="normal", text=f"{Icons.SHIELD} Update Blocklists")
-                    self._update_status_lbl.configure(text=f"Updated ({updated_count} lists synced)")
+                    self._update_status_lbl.configure(text=f"Updated ({total_enabled} lists active)")
                     self._refresh_stats_grid()
                     self._do_search()
                 self.after(0, update_ui)

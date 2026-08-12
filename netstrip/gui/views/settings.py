@@ -47,11 +47,22 @@ class DNSSelectorModal(ctk.CTkToplevel):
         self.search_entry.pack(fill="x", padx=Spacing.SM, pady=Spacing.SM)
         self.search_entry.bind("<KeyRelease>", self._filter_list)
         
-        # Scrollable list of providers
-        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
-        self.scroll_frame.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, Spacing.LG))
+        # Scrollable list of providers using native Listbox for instant rendering
+        import tkinter as tk
+        self.listbox = tk.Listbox(
+            self,
+            bg=Colors.BG_DARK,
+            fg=Colors.TEXT_PRIMARY,
+            selectbackground=Colors.BG_INPUT,
+            selectforeground=Colors.ACCENT_PRIMARY,
+            font=(Fonts.FAMILY_PRIMARY[0], 12),
+            borderwidth=0,
+            highlightthickness=0,
+            activestyle='none'
+        )
+        self.listbox.pack(fill="both", expand=True, padx=Spacing.LG, pady=(0, Spacing.LG))
+        self.listbox.bind('<<ListboxSelect>>', self._select_item_from_listbox)
         
-        self.buttons = []
         self._populate_list(list(self.dns_options_map.keys()))
         
         # Center window
@@ -67,23 +78,17 @@ class DNSSelectorModal(ctk.CTkToplevel):
         self._populate_list(filtered)
 
     def _populate_list(self, items):
-        for btn in self.buttons:
-            btn.destroy()
-        self.buttons.clear()
-        
+        import tkinter as tk
+        self.listbox.delete(0, tk.END)
         for name in items:
-            btn = ctk.CTkButton(
-                self.scroll_frame, text=name, anchor="w",
-                fg_color=Colors.BG_PANEL, text_color=Colors.TEXT_PRIMARY,
-                hover_color=Colors.BG_ELEVATED, height=36, corner_radius=8,
-                command=lambda n=name: self._select_item(n)
-            )
-            btn.pack(fill="x", pady=2)
-            self.buttons.append(btn)
+            self.listbox.insert(tk.END, name)
             
-    def _select_item(self, name):
-        self.on_select_callback(name)
-        self.destroy()
+    def _select_item_from_listbox(self, event):
+        selection = self.listbox.curselection()
+        if selection:
+            name = self.listbox.get(selection[0])
+            self.on_select_callback(name)
+            self.destroy()
 
 # ═══════════════════════════════════════════════════
 #  SettingsView

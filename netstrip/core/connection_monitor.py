@@ -298,6 +298,10 @@ class ConnectionMonitor:
 
         # Fetch corporate identity if we have a domain
         identity = self.classifier.blocklist.get_identity(domain) if domain else None
+        
+        # Force "Unknown" processes to display their Corporate Identity if known
+        if process_name.startswith("Unknown") and identity:
+            process_name = f"Unknown ({identity})"
 
         # Classify by domain if we found one, else by IP
         target_to_classify = domain if domain else ip

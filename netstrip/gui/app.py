@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 5x standard speed for smooth and fast UX (prevents artifacting from 15x)
-                    step = -int((event.delta / 120) * 5)
+                    # 15x standard speed for ultra-fast UX (artifacting prevented by winfo_viewable guard)
+                    step = -int((event.delta / 120) * 15)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -253,7 +253,7 @@ class NetStripApp(ctk.CTk):
                 
             if hasattr(self, '_map_after_id') and self._map_after_id:
                 self.after_cancel(self._map_after_id)
-            self._map_after_id = self.after(50, self._force_redraw)
+            self._map_after_id = self.after(500, self._force_redraw)
 
     def _on_window_resize(self, event):
         # Only act on top-level window resize events, not child widget reconfigs
@@ -603,27 +603,15 @@ class NetStripApp(ctk.CTk):
         is_dash = getattr(view_class, '__name__', '') == 'DashboardView'
         target_pad = 0 if is_dash else 24
         
-        def _slide_in(view):
+        def _show_view(view):
             if self.current_view and self.current_view != view:
                 self.current_view.grid_remove()
             self.current_view = view
-            
-            # Fast micro-animation: Slide up and fade-in illusion
-            steps = [0.06, 0.03, 0.01, 0.0]
-            def step(idx):
-                if not self.winfo_exists(): return
-                if idx < len(steps):
-                    rely_val = steps[idx]
-                    view.place(relx=0, rely=rely_val, relwidth=1.0, relheight=1.0 - rely_val)
-                    self.after(12, lambda: step(idx+1))
-                else:
-                    view.place_forget()
-                    view.grid(row=0, column=0, sticky="nsew", padx=target_pad, pady=target_pad)
-            step(0)
+            view.grid(row=0, column=0, sticky="nsew", padx=target_pad, pady=target_pad)
 
-        # If view is already cached, show it with animation
+        # If view is already cached, show it
         if view_class in self._cached_views:
-            _slide_in(self._cached_views[view_class])
+            _show_view(self._cached_views[view_class])
             return
         
         # First-time load on-demand
@@ -643,7 +631,7 @@ class NetStripApp(ctk.CTk):
                     self._cached_views[view_class] = view_class(self.main_frame, self.engine)
                 if hasattr(self, '_tab_loading_overlay'):
                     self._tab_loading_overlay.grid_remove()
-                _slide_in(self._cached_views[view_class])
+                _show_view(self._cached_views[view_class])
             except Exception as e:
                 logger.error(f"Failed to load view {view_class}: {e}", exc_info=True)
                 if hasattr(self, '_tab_loading_overlay'):
@@ -972,8 +960,7 @@ class NetStripApp(ctk.CTk):
             else:
                 step -= 1
                 if step <= 0: increasing = True
-                
-            self.after(50, lambda: self._animate_version_glow(step, increasing))
+                if not self.winfo_exists(): return
+        self.after(100, lambda: self._animate_version_glow(step, increasing))
         except Exception:
             pass
-

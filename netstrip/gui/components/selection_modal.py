@@ -60,30 +60,38 @@ class SelectionModal(ctk.CTkToplevel):
         btn_close = ctk.CTkButton(header, text="✕", width=28, height=28, fg_color="transparent", hover_color=Colors.BG_INPUT, text_color=Colors.TEXT_SECONDARY, command=self.destroy)
         btn_close.pack(side="right")
         
-        # Scrollable area for options if there are many
-        scroll = ctk.CTkScrollableFrame(main_frame, fg_color="transparent")
-        scroll.pack(fill="both", expand=True, padx=Spacing.SM, pady=(0, Spacing.SM))
+        # Scrollable area for options using native Listbox for instant 10,000+ item rendering
+        import tkinter as tk
+        listbox = tk.Listbox(
+            main_frame,
+            bg=Colors.BG_DARK,
+            fg=Colors.TEXT_PRIMARY,
+            selectbackground=Colors.BG_INPUT,
+            selectforeground=Colors.ACCENT_PRIMARY,
+            font=(Fonts.FAMILY_PRIMARY[0], 12),
+            borderwidth=0,
+            highlightthickness=0,
+            activestyle='none'
+        )
+        listbox.pack(fill="both", expand=True, padx=Spacing.SM, pady=(0, Spacing.SM))
         
         for opt in options:
-            is_selected = (opt == current_value)
+            listbox.insert(tk.END, opt)
             
-            btn_fg = Colors.BG_INPUT if is_selected else "transparent"
-            text_color = Colors.ACCENT_PRIMARY if is_selected else Colors.TEXT_PRIMARY
-            hover = Colors.BG_ELEVATED
-            
-            btn = ctk.CTkButton(
-                scroll,
-                text=opt,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE),
-                fg_color=btn_fg,
-                text_color=text_color,
-                hover_color=hover,
-                anchor="w",
-                height=40,
-                corner_radius=8,
-                command=lambda o=opt: self._select_option(o)
-            )
-            btn.pack(fill="x", pady=2)
+        def on_select(event):
+            selection = listbox.curselection()
+            if selection:
+                self._select_option(listbox.get(selection[0]))
+                
+        listbox.bind('<<ListboxSelect>>', on_select)
+        
+        if current_value in options:
+            try:
+                idx = options.index(current_value)
+                listbox.selection_set(idx)
+                listbox.see(idx)
+            except Exception:
+                pass
 
     def _select_option(self, option):
         if self.callback:

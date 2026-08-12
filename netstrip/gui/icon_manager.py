@@ -98,34 +98,18 @@ class IconManager:
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir, exist_ok=True)
             
-        self._check_cache_version()
-            
-        # In-memory cache of PIL.Image
-        self._image_cache = {}
+        # In-memory caches
+        self._image_cache = {}      # PIL Images
+        self._ctk_image_cache = {}  # CTkImage objects
+        
+        # Thread safety
+        self._lock = threading.Lock()
+        
         # Prevent multiple threads extracting the same icon
         self._in_progress = set()
+        
         # Bounded worker pool to prevent spawning dozens of PowerShell / download threads
         self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
-
-    def _check_cache_version(self):
-        try:
-            from netstrip import __version__
-            version_file = os.path.join(self.cache_dir, ".version")
-            if os.path.exists(version_file):
-                with open(version_file, "r") as f:
-                    cached_version = f.read().strip()
-                if cached_version == __version__:
-                    return
-                    
-            # Wipe cache
-            for fname in os.listdir(self.cache_dir):
-                try: os.remove(os.path.join(self.cache_dir, fname))
-                except: pass
-                
-            with open(version_file, "w") as f:
-                f.write(__version__)
-        except Exception:
-            pass
 
     def get_icon(self, process_path: str, process_name: str, callback=None) -> Optional[ctk.CTkImage]:
         """
@@ -172,9 +156,14 @@ class IconManager:
             process_path = process_name
             
         # 1. Check memory cache
+        if process_path in self._ctk_image_cache:
+            return self._ctk_image_cache[process_path]
+        
         if process_path in self._image_cache:
             img = self._image_cache[process_path]
-            return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
+            self._ctk_image_cache[process_path] = ctk_img
+            return ctk_img
             
         app_name_base = process_name.lower().replace('.exe', '')
         
@@ -245,7 +234,9 @@ class IconManager:
             return None
             
         # Otherwise, initiate background fetch via bounded worker pool
-        if process_path not in self._in_progress and len(self._in_progress) < 1000:
+        with self._lock:
+            if process_path in self._in_progress or len(self._in_progress) >= 1000:
+                return None
             self._in_progress.add(process_path)
             
             if process_path.endswith('.exe') and os.path.exists(process_path):
@@ -296,8 +287,9 @@ class IconManager:
                 pass
             
         if success:
-            if process_path in self._in_progress:
-                self._in_progress.remove(process_path)
+            with self._lock:
+                if process_path in self._in_progress:
+                    self._in_progress.remove(process_path)
             callback()
         else:
             self._do_fallback(process_path, process_name, callback)
@@ -390,18 +382,8 @@ class IconManager:
                     os.remove(temp_path)
             except Exception:
                 pass
-            if process_path in self._in_progress:
-                self._in_progress.remove(process_path)
+            with self._lock:
+                if process_path in self._in_progress:
+                    self._in_progress.remove(process_path)
 
-import PIL.ImageTk
 import logging
-
-# Monkey patch PhotoImage.__del__ to prevent it from deleting the image from Tcl
-original_del = getattr(PIL.ImageTk.PhotoImage, '__del__', None)
-
-def safe_del(self):
-    # Do nothing, intentionally leaking the Tcl image to prevent 'pyimage doesn't exist'
-    pass
-
-PIL.ImageTk.PhotoImage.__del__ = safe_del
-logging.getLogger(__name__).info("Monkey-patched PIL.ImageTk.PhotoImage.__del__ to prevent Tcl image deletion")
