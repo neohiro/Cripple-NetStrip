@@ -1,3 +1,15 @@
+## [v3.6.8] - 2026-08-13
+### Security & Core
+- **Cross-Platform Ghost Mode (TCP Reset)**: Ghost mode now instantly terminates all active OS connections by injecting raw TCP RST packets using kernel APIs (`iphlpapi.SetTcpEntry` on Windows, `ss -K` on Linux, `tcpdrop` on macOS) rather than just dropping future packets via firewall.
+- **Targeted Connection Drops**: Blocking a specific app or IP from the UI (or via filter lists) now instantly locates and severs its existing TCP connections.
+- **Smart Shield Integrity**: Auto-killswitch triggers during WAN/ARP anomalies now strictly respect the user's Smart Shield toggle state.
+- **DNS Proxy Poisoning**: Excluded upstream telemetry and updater domains (ipify, GitHub, Cloudflare) from the generic CDN IP attribution cache.
+
+### Performance & Fixes
+- **Database Optimization**: Added SQLite indices (`idx_conn_domain`, `idx_conn_process`) for massive performance gains in background processing and UI log rendering.
+- **State Management**: Fixed a major bug where exiting Ghost Mode would blindly turn off features like Adapter Hardening and LAN Shield instead of restoring them to the user's saved Normal Mode preferences.
+- **Background CPU Leak**: Fixed `_animate_version_glow` running infinitely while the app was minimized to the system tray.
+
 ## [v3.6.7] - 2026-08-13
 ### Fixed
 - **Connection Log UI**: Completely reverted the Connection Log tab from the native `ttk.Treeview` back to the rich `CTkScrollableFrame` layout. You get the beautiful rounded pill badges, copy-to-clipboard domain tooltips, and dot indicators back!
