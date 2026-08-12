@@ -166,6 +166,10 @@ class NetStripEngine:
                     
     def trigger_threat_escalation(self, threat_data: dict):
         """Escalate to Paranoid Mode + Killswitch and broadcast anomaly."""
+        if self.db.get_setting("smart_paranoid_mode", "true") != "true":
+            logger.warning("Smart Shield is disabled. Suppressing automatic threat escalation.")
+            return
+            
         logger.critical(f"THREAT ESCALATION: {threat_data}")
         # Log to DB
         self.db.log_connection({
@@ -188,19 +192,16 @@ class NetStripEngine:
             def send_webhook():
                 try:
                     import requests
-                    headers = {"Content-Type": "application/json"}
-                    secret = self.db.get_setting("iot_webhook_secret", "")
-                    if secret: headers["Authorization"] = f"Bearer {secret}"
-                    requests.post(webhook_url, json=threat_data, headers=headers, timeout=3.0)
+                    requests.post(webhook_url, json={'threat': threat_data, 'source': 'NetStrip'}, timeout=2)
                 except Exception as e:
-                    logger.debug(f"IoT Webhook failed: {e}")
+                    logger.debug(f"Webhook delivery failed: {e}")
             import threading
             threading.Thread(target=send_webhook, daemon=True).start()
 
     def _handle_anomaly(self, anomaly_data: dict):
         logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
         
-        # 1. Instantly trigger CRITICAL threat escalation (Paranoid Mode + Killswitch)
+        # 1. Instantly trigger CRITICAL threat escalation (Paranoid Mode + Killswitch) (if Smart Shield is ON)
         self.trigger_threat_escalation({
             'process_name': 'Kernel Bypass Scanner',
             'domain': 'SYSTEM ANOMALY',
@@ -919,12 +920,21 @@ class NetStripEngine:
             logger.info(f"IP Flux Tolerance active. Ignoring: {message}")
             return
             
-        logger.critical(f"Network Intrusion/Anomaly Detected: {message}. ENGAGING AUTO-KILLSWITCH.")
-        self.set_killswitch(True)
         if self.db.get_setting("smart_paranoid_mode", "true") == "true":
+            logger.critical(f"Network Intrusion/Anomaly Detected: {message}. ENGAGING AUTO-KILLSWITCH.")
+            self.set_killswitch(True)
             self.set_mode(ProtectionLevel.PARANOID)
+        else:
+            logger.warning(f"Network Event Detected: {message}. Smart Shield is disabled, ignoring auto-escalation.")
         
         # Send OS desktop notification
+        self.notifier.push({
+            'process_name': 'Smart Shield',
+            'domain': 'NETWORK INTEGRITY ALERT',
+            'category': 'security',
+            'action': 'block',
+            'ip': message
+        })
         try:
             from plyer import notification
             notification.notify(
