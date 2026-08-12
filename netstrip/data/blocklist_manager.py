@@ -164,7 +164,7 @@ try:
 except Exception:
     pass
 
-DOM_RE = re.compile(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$')
+DOM_RE = re.compile(r'^[a-z0-9_](?:[a-z0-9-_]{0,61}[a-z0-9_])?(?:\.[a-z0-9_](?:[a-z0-9-_]{0,61}[a-z0-9_])?)+$')
 
 class BlocklistManager:
     def __init__(self, lists_dir: str = None, db=None, progress_callback: Optional[Callable[[str, float], None]] = None, async_load: bool = True, **kwargs):
@@ -599,9 +599,12 @@ class BlocklistManager:
                                 name = s.get('name', '')
                                 cat_s = s.get('category', 'ad')
                                 safe_n = name.replace(' ', '_').replace('/', '_').replace(':', '')
-                                disabled_file_patterns.add(safe_n.lower())
                                 disabled_file_patterns.add(f"{cat_s}_{safe_n}.txt".lower())
                                 disabled_file_patterns.add(f"{cat_s}s_{safe_n}.txt".lower())
+                                if cat_s.endswith('s'):
+                                    disabled_file_patterns.add(f"{cat_s[:-1]}_{safe_n}.txt".lower())
+                                disabled_file_patterns.add(f"{safe_n}.txt".lower())
+                                disabled_file_patterns.add(f"temp_{cat_s}_{safe_n}.txt".lower())
                     except Exception:
                         pass
 
@@ -609,7 +612,7 @@ class BlocklistManager:
                 active_files = []
                 for filename in all_files:
                     fn_lower = filename.lower()
-                    if fn_lower in disabled_file_patterns or any(p in fn_lower for p in disabled_file_patterns if len(p) > 3):
+                    if fn_lower in disabled_file_patterns:
                         continue
                     active_files.append(filename)
 
@@ -660,6 +663,9 @@ class BlocklistManager:
                         parts = filename.split('_')
                         identity_name = parts[1].title() if len(parts) > 1 else 'Unknown'
                         cat = ConnectionCategory.IDENTITY
+                        
+                    if cat is None:
+                        cat = ConnectionCategory.UNKNOWN
 
                     domains = self._parse_domains_from_file(filepath, is_whitelist_file=is_whitelist_file)
                     dt = datetime.datetime.fromtimestamp(os.path.getmtime(filepath)).strftime('%Y-%m-%d %H:%M:%S')

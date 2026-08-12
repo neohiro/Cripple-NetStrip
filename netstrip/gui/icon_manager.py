@@ -105,7 +105,7 @@ class IconManager:
         # Prevent multiple threads extracting the same icon
         self._in_progress = set()
         # Bounded worker pool to prevent spawning dozens of PowerShell / download threads
-        self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
     def _check_cache_version(self):
         try:
@@ -158,6 +158,13 @@ class IconManager:
             except Exception:
                 pass
                 
+        if not process_path or not os.path.isabs(process_path):
+            if process_name and process_name not in ('Unknown', 'Unknown (DNS)'):
+                import shutil
+                resolved = shutil.which(process_name)
+                if resolved:
+                    process_path = resolved
+            
         if not process_path:
             if not process_name or process_name == 'Unknown' or process_name == 'Unknown (DNS)':
                 return None
@@ -239,7 +246,7 @@ class IconManager:
             return None
             
         # Otherwise, initiate background fetch via bounded worker pool
-        if process_path not in self._in_progress and len(self._in_progress) < 30:
+        if process_path not in self._in_progress and len(self._in_progress) < 1000:
             self._in_progress.add(process_path)
             
             if process_path.endswith('.exe') and os.path.exists(process_path):
@@ -259,11 +266,13 @@ class IconManager:
         """Uses PowerShell to extract the embedded high-res icon from a Windows executable."""
         import subprocess
         import base64
+        import random
         success = False
+        temp_save_path = f"{save_path}.{random.randint(10000, 99999)}.tmp"
         try:
             # We use System.Drawing.Icon.ExtractAssociatedIcon to grab the icon
             safe_process_path = process_path.replace("'", "''")
-            safe_save_path = save_path.replace("'", "''")
+            safe_save_path = temp_save_path.replace("'", "''")
             
             ps_script = f"""
             Add-Type -AssemblyName System.Drawing
@@ -284,18 +293,23 @@ class IconManager:
                 timeout=4
             )
             
-            if os.path.exists(save_path) and os.path.getsize(save_path) > 200:
+            if os.path.exists(temp_save_path) and os.path.getsize(temp_save_path) > 200:
+                os.replace(temp_save_path, save_path)
                 success = True
         except Exception:
             pass
+        finally:
+            try:
+                if os.path.exists(temp_save_path):
+                    os.remove(temp_save_path)
+            except Exception:
+                pass
             
         if success:
             if process_path in self._in_progress:
                 self._in_progress.remove(process_path)
             callback()
         else:
-            try: os.remove(save_path)
-            except Exception: pass
             self._do_fallback(process_path, process_name, callback)
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
@@ -372,14 +386,23 @@ class IconManager:
         return
 
     def _download_icon(self, url: str, save_path: str, process_path: str, callback):
+        import random
+        temp_path = f"{save_path}.{random.randint(10000, 99999)}.tmp"
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'NetStrip/1.0'})
-            with urllib.request.urlopen(req, timeout=4) as response, open(save_path, 'wb') as out_file:
+            with urllib.request.urlopen(req, timeout=4) as response, open(temp_path, 'wb') as out_file:
                 out_file.write(response.read())
+            if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+                os.replace(temp_path, save_path)
             callback()
         except Exception as e:
             logging.getLogger(__name__).debug(f"Failed to download icon from {url}: {e}")
         finally:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
             if process_path in self._in_progress:
                 self._in_progress.remove(process_path)
 

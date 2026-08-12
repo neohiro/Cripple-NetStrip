@@ -19,8 +19,8 @@ def fast_mouse_wheel_all(self, event):
 
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 4x standard speed
-                    step = -int((event.delta / 120) * 4)
+                    # 8x standard speed
+                    step = -int((event.delta / 120) * 8)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -31,7 +31,7 @@ def fast_mouse_wheel_all(self, event):
                             canvas.yview("scroll", step, "units")
             elif sys.platform == "darwin":
                 if hasattr(event, 'delta') and event.delta:
-                    step = -int(event.delta * 4)
+                    step = -int(event.delta * 8)
                     if getattr(self, '_shift_pressed', False):
                         if canvas.xview() != (0.0, 1.0):
                             canvas.xview("scroll", step, "units")
@@ -39,7 +39,7 @@ def fast_mouse_wheel_all(self, event):
                         if canvas.yview() != (0.0, 1.0):
                             canvas.yview("scroll", step, "units")
             else: # Linux / X11
-                step = -4 if getattr(event, 'num', None) == 4 else 4
+                step = -8 if getattr(event, 'num', None) == 4 else 8
                 if getattr(self, '_shift_pressed', False):
                     if canvas.xview() != (0.0, 1.0):
                         canvas.xview_scroll(step, "units")

@@ -32,7 +32,6 @@ fix_*.py
 script.py
 restore.py
 install_service.py
-test_*.py
 scratch/
 .netstrip/
 .netstrip
