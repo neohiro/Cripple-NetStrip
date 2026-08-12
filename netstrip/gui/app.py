@@ -960,7 +960,7 @@ class NetStripApp(ctk.CTk):
             else:
                 step -= 1
                 if step <= 0: increasing = True
-                if not self.winfo_exists(): return
-        self.after(100, lambda: self._animate_version_glow(step, increasing))
+            if not self.winfo_exists(): return
+            self.after(100, lambda: self._animate_version_glow(step, increasing))
         except Exception:
             pass
