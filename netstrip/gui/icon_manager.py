@@ -262,8 +262,38 @@ class IconManager:
         return None
 
     def _extract_icon_native(self, process_path: str, process_name: str, save_path: str, callback):
-        """Native extraction removed to avoid triggering Bearfoos.A!ml ML heuristic flags from PyInstaller binaries."""
-        pass
+        """Native extraction using pure-Python icoextract to avoid PowerShell ML heuristic flags."""
+        import random
+        success = False
+        temp_ico_path = f"{save_path}.{random.randint(10000, 99999)}.ico"
+        try:
+            from icoextract import IconExtractor
+            from PIL import Image
+            
+            # Extract the raw .ico file from the PE resources
+            extractor = IconExtractor(process_path)
+            extractor.export_icon(temp_ico_path)
+            
+            if os.path.exists(temp_ico_path) and os.path.getsize(temp_ico_path) > 0:
+                # Convert the .ico to .png using Pillow for standard Tkinter rendering
+                img = Image.open(temp_ico_path)
+                img.save(save_path, format="PNG")
+                success = True
+        except Exception:
+            pass
+        finally:
+            try:
+                if os.path.exists(temp_ico_path):
+                    os.remove(temp_ico_path)
+            except Exception:
+                pass
+            
+        if success:
+            if process_path in self._in_progress:
+                self._in_progress.remove(process_path)
+            callback()
+        else:
+            self._do_fallback(process_path, process_name, callback)
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
         app_name_base = process_name.lower().replace('.exe', '')

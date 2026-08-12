@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='netstrip',
-    version='3.5.6',
+    version='3.5.7',
     packages=find_packages(),
     install_requires=[
         'customtkinter>=5.2.2',
@@ -15,6 +15,7 @@ setup(
         'requests>=2.31.0',
         'zeroconf',
         'Flask',
+        'icoextract>=0.1.4',
     ],
     package_data={
         'netstrip': [

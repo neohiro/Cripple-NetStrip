@@ -1,5 +1,8 @@
-## [v3.5.6] - Ghost Mode Hardening & Complete Fail-Open Restoration
+## [v3.5.7] - Pure-Python Native Icon Extraction (No PowerShell)
 
+- **icoextract Integration**: Restored high-resolution, local icon extraction from Windows executable (`.exe`) files natively in pure Python by integrating the `icoextract` package. This fulfills the requirement for accurate, offline parent-process favicons in the dashboard's live connection view while strictly adhering to the "Absolute Zero PowerShell" ML-evasion ruleset.
+
+## [v3.5.6] - Ghost Mode Hardening & Complete Fail-Open Restoration
 - **Absolute Watchdog Restoration**: Ensured the NetBT (NetBIOS over TCP/IP) parameter interfaces are explicitly and thoroughly restored to their default state by the Watchdog during a crash or exit. This guarantees that no adapter is left orphaned with disabled NetBIOS if the PyInstaller bundle terminates abruptly while Ghost Mode is active.
 
 ## [v3.5.5] - Strict ML Evasion (No Script Dropping) & Native LLTD Control
