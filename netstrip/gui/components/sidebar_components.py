@@ -6,6 +6,7 @@ from netstrip.gui.icon_manager import IconManager
 from netstrip.gui.utils import safe_loop, bind_copy_tooltip, mask_ip_string
 import os
 import time
+from netstrip.core.classifier import ConnectionCategory
 
 class ConnectionRow(ctk.CTkFrame):
     def __init__(self, master, conn_data: dict, engine: NetStripEngine, **kwargs):

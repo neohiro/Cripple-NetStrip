@@ -391,6 +391,7 @@ class Database:
                 self._rules_cache.clear()
             with self._get_connection() as conn:
                 m_scope = rule_data.get('mode_scope', 'STANDARD')
+                app_name = rule_data.get('app_name')
                 if app_name is None:
                     conn.execute('''
                         DELETE FROM user_rules 

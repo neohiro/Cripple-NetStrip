@@ -15,7 +15,7 @@ import psutil
 from netstrip.core.modes import ProtectionLevel, get_mode, ConnectionAction
 from netstrip.data.database import Database
 from netstrip.data.blocklist_manager import BlocklistManager
-from netstrip.core.classifier import TrafficClassifier
+from netstrip.core.classifier import TrafficClassifier, ConnectionCategory
 from netstrip.core.dns_proxy import DNSProxyService
 from netstrip.core.connection_monitor import ConnectionMonitor
 from netstrip.core.firewall import FirewallController

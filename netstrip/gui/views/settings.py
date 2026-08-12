@@ -4,6 +4,9 @@ Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
 import customtkinter as ctk
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from netstrip.gui.theme import (
     Colors, Fonts, Spacing, Icons,

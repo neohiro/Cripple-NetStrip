@@ -55,6 +55,7 @@ DNS_UPSTREAM_OPTIONS = {
 
 # Dynamically load the online providers list if available
 try:
+    import os, json
     # Load online DoH providers list dynamically from the data directory
     _current_dir = os.path.dirname(os.path.abspath(__file__))
     _doh_file = os.path.join(_current_dir, '..', 'data', 'lists', 'doh_providers_online.json')
