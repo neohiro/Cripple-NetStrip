@@ -1,3 +1,8 @@
+## [v3.6.5] - 2026-08-13
+### Fixed
+- **Complete AI Heuristic Evasion**: Ripped out the `icoextract` and `pefile` dependencies entirely from the project requirements. The PyInstaller build process will no longer bundle the highly signatured `pefile` module, destroying the static heuristic profile that caused `Bearfoos.A!ml` to quarantine the ZIP download.
+- **Persistent Native Icon Engine**: Re-implemented the native icon extractor using an ultra-fast, persistent background PowerShell pipe (`[System.Drawing.Icon]`). This securely extracts high-resolution `.exe` icons in milliseconds using trusted OS APIs without touching the disk or triggering behavioral heuristics!
+
 ## [v3.6.4] - 2026-08-13
 ### Fixed
 - **Safe Native Icon Extraction**: Restored native PE icon extraction without triggering `Bearfoos.A!ml` trojan heuristics! `icoextract` now buffers `.ico` resources strictly in memory (`io.BytesIO`) and transforms them into safe `.png` files via Pillow before ever touching the disk.

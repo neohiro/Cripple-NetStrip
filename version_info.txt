@@ -4,8 +4,8 @@
 # http://msdn.microsoft.com/en-us/library/ms776659%28v=vs.85%29.aspx
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(3, 6, 4, 0),
-    prodvers=(3, 6, 4, 0),
+    filevers=(3, 6, 5, 0),
+    prodvers=(3, 6, 5, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -20,13 +20,13 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'FrenzyPenguin Media'),
         StringStruct('FileDescription', 'NetStrip - Intelligent Network Traffic Debloater & Firewall'),
-        StringStruct('FileVersion', '3.6.4.0'),
+        StringStruct('FileVersion', '3.6.5.0'),
         StringStruct('InternalName', 'Cripple'),
         StringStruct('LegalCopyright', 'Copyright (C) 2026 FrenzyPenguin Media. All rights reserved.'),
         StringStruct('LegalTrademarks', 'FrenzyPenguin Media'),
         StringStruct('OriginalFilename', 'Cripple.exe'),
         StringStruct('ProductName', 'NetStrip'),
-        StringStruct('ProductVersion', '3.6.4.0'),
+        StringStruct('ProductVersion', '3.6.5.0'),
         StringStruct('Comments', 'Intelligent Network Traffic Debloater and Firewall by FrenzyPenguin Media')])
       ]), 
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
