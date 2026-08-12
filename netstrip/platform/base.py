@@ -105,9 +105,41 @@ class PlatformBase(ABC):
         """Unblock all private IP ranges."""
         pass
 
-    def kill_all_tcp_connections(self) -> None:
-        """Forcefully terminate all active TCP connections. Override in OS specific platforms."""
+    def kill_tcp_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None) -> None:
+        """Forcefully terminate active TCP connections, optionally filtered by IP or process path."""
         pass
+
+    def _get_target_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None) -> list:
+        """Return a list of (local_ip, local_port, remote_ip, remote_port) for matching established TCP connections."""
+        import psutil
+        import socket
+        targets = []
+        try:
+            for conn in psutil.net_connections(kind='tcp'):
+                if conn.status != 'ESTABLISHED' or not conn.raddr or not conn.laddr:
+                    continue
+                    
+                match = False
+                if target_ip and conn.raddr.ip == target_ip:
+                    match = True
+                elif target_process_path and conn.pid:
+                    try:
+                        p = psutil.Process(conn.pid)
+                        if p.exe() and p.exe().lower() == target_process_path.lower():
+                            match = True
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                elif not target_ip and not target_process_path:
+                    match = True
+                    
+                if match:
+                    targets.append({
+                        'l_ip': conn.laddr.ip, 'l_port': conn.laddr.port,
+                        'r_ip': conn.raddr.ip, 'r_port': conn.raddr.port
+                    })
+        except Exception:
+            pass
+        return targets
 
     @abstractmethod
     def enable_killswitch(self) -> bool:

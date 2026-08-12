@@ -41,7 +41,11 @@ class FirewallController:
         success = self.platform.block_ip(clean_ip, name)
         if success:
             self.active_rules.add(name)
-        return success
+            # Terminate any existing TCP connections to this IP instantly
+            if hasattr(self.platform, 'kill_tcp_connections'):
+                self.platform.kill_tcp_connections(target_ip=clean_ip)
+            return True
+        return False
 
     def unblock_ip(self, ip: str, rule_name: Optional[str] = None) -> bool:
         """Unblock an IP address."""
@@ -72,6 +76,8 @@ class FirewallController:
         
         if success_out and success_in:
             self.active_rules.add(name)
+            if hasattr(self.platform, 'kill_tcp_connections'):
+                self.platform.kill_tcp_connections(target_process_path=process_path)
             return True
         return False
 

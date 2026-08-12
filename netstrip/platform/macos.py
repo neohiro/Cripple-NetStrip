@@ -104,16 +104,13 @@ class MacOSPlatform(PlatformBase):
     def rule_exists(self, rule_name: str) -> bool:
         return rule_name in self._pf_rules or rule_name in self._route_rules
 
-    def kill_all_tcp_connections(self):
-        """Forcefully terminate all active TCP connections on macOS using tcpdrop."""
+    def kill_tcp_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None):
+        """Forcefully terminate active TCP connections on macOS using tcpdrop."""
         try:
-            import psutil
             import subprocess
-            for conn in psutil.net_connections(kind='tcp'):
-                if conn.status == 'ESTABLISHED' and conn.laddr and conn.raddr:
-                    l_ip, l_port = conn.laddr.ip, conn.laddr.port
-                    r_ip, r_port = conn.raddr.ip, conn.raddr.port
-                    subprocess.run(["tcpdrop", l_ip, str(l_port), r_ip, str(r_port)], capture_output=True)
+            targets = self._get_target_connections(target_ip, target_process_path)
+            for t in targets:
+                subprocess.run(["tcpdrop", t['l_ip'], str(t['l_port']), t['r_ip'], str(t['r_port'])], capture_output=True)
         except Exception as e:
             logger.error(f"Failed to kill TCP connections on macOS: {e}")
 
@@ -127,7 +124,7 @@ class MacOSPlatform(PlatformBase):
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             proc.communicate(input=b"block drop all\n")
             self._run_cmd(["pfctl", "-E"]) # Ensure PF is enabled
-            self.kill_all_tcp_connections()
+            self.kill_tcp_connections()
             return proc.returncode == 0
         except Exception:
             return False

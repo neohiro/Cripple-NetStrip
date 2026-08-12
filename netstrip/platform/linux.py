@@ -149,11 +149,17 @@ class LinuxPlatform(PlatformBase):
     def is_ipv4_enabled(self) -> bool:
         return True
 
-    def kill_all_tcp_connections(self):
-        """Forcefully terminate all active TCP connections on Linux using ss."""
+    def kill_tcp_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None):
+        """Forcefully terminate active TCP connections on Linux using ss."""
         try:
-            # Requires iproute2 ss utility with kernel support for killing sockets (usually available as root)
-            self._run_cmd(["ss", "-K", "state", "established"])
+            if not target_ip and not target_process_path:
+                # Kill all
+                self._run_cmd(["ss", "-K", "state", "established"])
+            else:
+                targets = self._get_target_connections(target_ip, target_process_path)
+                for t in targets:
+                    self._run_cmd(["ss", "-K", "src", t['l_ip'], "sport", f"={t['l_port']}", 
+                                   "dst", t['r_ip'], "dport", f"={t['r_port']}"])
         except Exception as e:
             logger.error(f"Failed to kill TCP connections on Linux: {e}")
 
@@ -163,7 +169,7 @@ class LinuxPlatform(PlatformBase):
         res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
-        self.kill_all_tcp_connections()
+        self.kill_tcp_connections()
         return res1 and res2
 
     def disable_killswitch(self) -> bool:
