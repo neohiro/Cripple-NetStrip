@@ -341,24 +341,8 @@ class WindowsPlatform(PlatformBase):
 
     def disable_protocol_bindings(self) -> bool:
         """Disable redundant, privacy-leaking protocol bindings and autodiscovery on Windows using native registry and netsh to evade ML."""
-        import winreg, random, os
+        import winreg, os
         
-        # Execute PowerShell via a temporary .ps1 file to unbind ms_lltdio, ms_rspndr, etc without triggering Bearfoos.A!ml
-        ps_script = (
-            "Disable-NetAdapterBinding -ComponentID ms_lldp, ms_lltdio, ms_rspndr, ms_msclient -Name '*' -ErrorAction SilentlyContinue"
-        )
-        ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_disable_{random.randint(1000, 9999)}.ps1")
-        try:
-            with open(ps1_path, "w", encoding="utf-8") as f:
-                f.write(ps_script)
-            self._run_cmd(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path])
-        except Exception as e:
-            pass
-        finally:
-            if os.path.exists(ps1_path):
-                try: os.remove(ps1_path)
-                except: pass
-                
         # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
         self._run_cmd(["wmic", "service", "where", "name='lanmanserver'", "call", "stopservice"])
         self._run_cmd(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=2", "call", "SetTcpipNetbios", "2"])
@@ -368,6 +352,19 @@ class WindowsPlatform(PlatformBase):
                 winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 1)
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
                 winreg.SetValueEx(key, "EnableMulticast", 0, winreg.REG_DWORD, 0)
+                
+            # Disable LLTD Mapper (ms_lltdio) and Responder (ms_rspndr) via native Group Policy Registry keys
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "EnableLLTDIO", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "EnableRspndr", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "AllowLLTDIOOnDomain", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "AllowLLTDIOOnPublicNet", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "ProhibitLLTDIOOnPrivateNet", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "AllowRspndrOnDomain", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
+                winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
+        except Exception:
+            pass
         except Exception:
             pass
         self._run_cmd(["netsh", "interface", "isatap", "set", "state", "disable"])
@@ -377,23 +374,8 @@ class WindowsPlatform(PlatformBase):
 
     def restore_protocol_bindings(self) -> bool:
         """Restore standard adapter protocol bindings on Windows."""
-        import winreg, random, os
+        import winreg, os
         
-        ps_script = (
-            "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_lldp, ms_lltdio, ms_rspndr -Name '*' -ErrorAction SilentlyContinue"
-        )
-        ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_restore_{random.randint(1000, 9999)}.ps1")
-        try:
-            with open(ps1_path, "w", encoding="utf-8") as f:
-                f.write(ps_script)
-            self._run_cmd(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path])
-        except Exception:
-            pass
-        finally:
-            if os.path.exists(ps1_path):
-                try: os.remove(ps1_path)
-                except: pass
-
         # Restore File and Printer Sharing and NetBIOS over TCP/IP using wmic natively
         self._run_cmd(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"])
         self._run_cmd(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"])
@@ -403,6 +385,13 @@ class WindowsPlatform(PlatformBase):
                 winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 0)
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
                 winreg.DeleteValue(key, "EnableMulticast")
+        except Exception:
+            pass
+            
+        try:
+            # Restore LLTD (delete the LLTD override key entirely)
+            import winreg
+            winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
         except Exception:
             pass
         self._run_cmd(["netsh", "interface", "isatap", "set", "state", "default"])

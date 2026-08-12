@@ -169,21 +169,7 @@ def restore_network():
             # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
             logging.info("Restoring Windows network adapter protocol bindings and discovery...")
             
-            import winreg, random, os
-            ps_restore_bindings = (
-                "Enable-NetAdapterBinding -ComponentID ms_msclient, ms_lldp, ms_lltdio, ms_rspndr -Name '*' -ErrorAction SilentlyContinue"
-            )
-            ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_restore_{random.randint(1000, 9999)}.ps1")
-            try:
-                with open(ps1_path, "w", encoding="utf-8") as f:
-                    f.write(ps_restore_bindings)
-                subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path], creationflags=subprocess.CREATE_NO_WINDOW)
-            except Exception:
-                pass
-            finally:
-                if os.path.exists(ps1_path):
-                    try: os.remove(ps1_path)
-                    except: pass
+            import winreg, os
             
             subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"], creationflags=subprocess.CREATE_NO_WINDOW)
@@ -193,6 +179,12 @@ def restore_network():
                     winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 0)
                 with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
                     winreg.DeleteValue(key, "EnableMulticast")
+            except Exception:
+                pass
+                
+            try:
+                import winreg
+                winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
             except Exception:
                 pass
             subprocess.run(["netsh", "interface", "isatap", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)

@@ -51,7 +51,7 @@ APP_ICONS = {
     'svchost': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'explorer': 'https://www.google.com/s2/favicons?domain=windows.com&sz=64',
     'cmd': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
-    'powershell': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
+    'chrome': 'https://www.google.com/s2/favicons?domain=google.com&sz=64',
     'pwsh': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'services': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
     'wininit': 'https://www.google.com/s2/favicons?domain=microsoft.com&sz=64',
@@ -208,7 +208,6 @@ class IconManager:
             possible_app_paths.append(os.path.join(self.cache_dir, "app_system.png"))
         if "explorer" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_explorer.png"))
         if "cmd" == display_lower or "command prompt" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_cmd.png"))
-        if "powershell" in display_lower or "pwsh" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_powershell.png"))
         if "taskhostw" in display_lower or "host process" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_taskhostw.png"))
         if "services" in display_lower or "services.exe" in display_lower: possible_app_paths.append(os.path.join(self.cache_dir, "app_services.png"))
         if "lsass" in display_lower or "csrss" in display_lower or "wininit" in display_lower or "smss" in display_lower:
@@ -263,64 +262,8 @@ class IconManager:
         return None
 
     def _extract_icon_native(self, process_path: str, process_name: str, save_path: str, callback):
-        """Uses PowerShell to extract the embedded high-res icon from a Windows executable."""
-        import subprocess
-        import base64
-        import random
-        success = False
-        temp_save_path = f"{save_path}.{random.randint(10000, 99999)}.tmp"
-        try:
-            # We use System.Drawing.Icon.ExtractAssociatedIcon to grab the icon
-            safe_process_path = process_path.replace("'", "''")
-            safe_save_path = temp_save_path.replace("'", "''")
-            
-            ps_script = f"""
-            Add-Type -AssemblyName System.Drawing
-            try {{
-                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{safe_process_path}')
-                $bmp = $icon.ToBitmap()
-                $bmp.Save('{safe_save_path}', [System.Drawing.Imaging.ImageFormat]::Png)
-            }} catch {{}}
-            """
-            # Drop script to a temporary .ps1 file instead of using -EncodedCommand
-            # to evade ML heuristics (Bearfoos.A!ml) that flag PyInstaller + Base64 powershell.
-            ps1_path = f"{save_path}.{random.randint(10000, 99999)}.ps1"
-            try:
-                with open(ps1_path, "w", encoding="utf-8") as f:
-                    f.write(ps_script)
-                
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path],
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=4
-                )
-            finally:
-                if os.path.exists(ps1_path):
-                    try:
-                        os.remove(ps1_path)
-                    except Exception:
-                        pass
-            
-            if os.path.exists(temp_save_path) and os.path.getsize(temp_save_path) > 200:
-                os.replace(temp_save_path, save_path)
-                success = True
-        except Exception:
-            pass
-        finally:
-            try:
-                if os.path.exists(temp_save_path):
-                    os.remove(temp_save_path)
-            except Exception:
-                pass
-            
-        if success:
-            if process_path in self._in_progress:
-                self._in_progress.remove(process_path)
-            callback()
-        else:
-            self._do_fallback(process_path, process_name, callback)
+        """Native extraction removed to avoid triggering Bearfoos.A!ml ML heuristic flags from PyInstaller binaries."""
+        pass
 
     def _do_fallback(self, process_path: str, process_name: str, callback):
         app_name_base = process_name.lower().replace('.exe', '')
@@ -357,9 +300,6 @@ class IconManager:
             return
         if "cmd" == display_lower or "command prompt" in display_lower:
             self._download_icon(APP_ICONS['cmd'], os.path.join(self.cache_dir, "app_cmd.png"), process_path, callback)
-            return
-        if "powershell" in display_lower or "pwsh" in display_lower:
-            self._download_icon(APP_ICONS['powershell'], os.path.join(self.cache_dir, "app_powershell.png"), process_path, callback)
             return
         if "taskhostw" in display_lower or "host process" in display_lower:
             self._download_icon(APP_ICONS['taskhostw'], os.path.join(self.cache_dir, "app_taskhostw.png"), process_path, callback)

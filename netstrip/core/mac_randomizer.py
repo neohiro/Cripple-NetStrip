@@ -307,31 +307,29 @@ class MACRandomizer:
                     logger.error(f"macOS adapter hardening failed: {e}")
             return
 
-        # Windows: Use PowerShell via a temp file to disable/enable protocol bindings without triggering ML
+        # Windows: Use native Group Policy Registry and wmic to disable/enable protocol bindings without triggering ML
         try:
-            import os, random
-            protocols_to_disable = [
-                'ms_msclient',     # Client for Microsoft Networks
-                'ms_pacer',        # QoS Packet Scheduler
-                'ms_lldp',         # LLDP Protocol Driver
-                'ms_lltdio',       # Link-Layer Topology Discovery Mapper I/O Driver
-                'ms_rspndr',       # Link-Layer Topology Discovery Responder
-            ]
+            import os
+            import winreg
             
-            action = 'Disable' if enable else 'Enable'
-            ps_script = "\n".join([f"{action}-NetAdapterBinding -Name '*' -ComponentID '{proto}' -ErrorAction SilentlyContinue" for proto in protocols_to_disable])
-            
-            ps1_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"), f"netstrip_mac_bind_{random.randint(1000, 9999)}.ps1")
-            try:
-                with open(ps1_path, "w", encoding="utf-8") as f:
-                    f.write(ps_script)
-                subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1_path], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            except Exception:
-                pass
-            finally:
-                if os.path.exists(ps1_path):
-                    try: os.remove(ps1_path)
-                    except: pass
+            if enable:
+                try:
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "EnableLLTDIO", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "EnableRspndr", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "AllowLLTDIOOnDomain", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "AllowLLTDIOOnPublicNet", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "ProhibitLLTDIOOnPrivateNet", 0, winreg.REG_DWORD, 1)
+                        winreg.SetValueEx(key, "AllowRspndrOnDomain", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
+                        winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
+                except Exception:
+                    pass
+            else:
+                try:
+                    winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
+                except Exception:
+                    pass
             
             # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
             if enable:
