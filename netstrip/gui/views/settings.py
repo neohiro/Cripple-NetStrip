@@ -107,6 +107,9 @@ class SettingsView(ctk.CTkFrame):
         self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
         self.scroll_frame.pack(fill="both", expand=True)
 
+        # Track switch references for state syncing
+        self._switch_refs = {}
+
         self._build_updates_card()
         self._build_general_card()
         self._build_network_card()
@@ -114,9 +117,6 @@ class SettingsView(ctk.CTkFrame):
         self._build_migration_card()
         self._build_analytics_card()
         self._build_about_card()
-        
-        # Track switch references for state syncing
-        self._switch_refs = {}
         
     def _build_updates_card(self):
         from netstrip import __version__

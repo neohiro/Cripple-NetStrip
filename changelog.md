@@ -1,5 +1,8 @@
-## [v3.5.12] - UI Artifacting & Scroll UX Polish
+## [v3.5.13] - Settings Initialization Hotfix
 
+- **Blank Settings Pane Fix**: Resolved a regression where clicking the Settings navigation button failed to load the Settings view. This was caused by an initialization order error (`AttributeError: _switch_refs`) where GUI switches were instantiated before their state-tracking dictionary was declared, causing a silent callback exception.
+
+## [v3.5.12] - UI Artifacting & Scroll UX Polish
 - **Ghost Artifacting Fix**: Rewrote the global scroll event handler to aggressively verify tab visibility. This entirely eliminates the visual bug where components of the Settings view (like the "General" and "Updates" labels) would incorrectly process scroll events and draw ghost artifacts over the Dashboard and Logs tabs.
 - **Scroll Speed Polish**: Increased the application-wide scroll speed multiplier from 8x to 15x for a substantially faster, butter-smooth UX across all lists and tables.
 
