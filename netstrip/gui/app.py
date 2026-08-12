@@ -303,7 +303,13 @@ class NetStripApp(ctk.CTk):
     def _show_status(self, msg: str):
         def _update():
             try:
-                if hasattr(self, 'status_label'):
+                if msg == "rules_changed":
+                    from netstrip.gui.views.blocklists import BlocklistView
+                    blocklist_view = self._cached_views.get(BlocklistView)
+                    if blocklist_view and hasattr(blocklist_view, '_on_blocklist_data_reloaded_ui'):
+                        blocklist_view._on_blocklist_data_reloaded_ui()
+                        
+                if hasattr(self, 'status_label') and msg != "rules_changed":
                     self.status_label.configure(text=msg)
                     if hasattr(self, '_status_timer'):
                         self.after_cancel(self._status_timer)

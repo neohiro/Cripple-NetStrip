@@ -975,7 +975,10 @@ class BlocklistView(ctk.CTkFrame):
             
             try:
                 norm_cat = cat
-                if norm_cat.startswith("identity_"):
+                if self._active_category_filter:
+                    # Force label to perfectly match the filter to avoid category bleeding (e.g. Essential in Allowed)
+                    norm_cat = self._active_category_filter
+                elif norm_cat.startswith("identity_"):
                     norm_cat = "identity"
                 cat_enum = ConnectionCategory(norm_cat)
             except ValueError:

@@ -10,7 +10,8 @@ from netstrip.gui.theme import (
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
     get_category_color, get_category_label, get_category_icon,
 )
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip, enable_smooth_scrolling
+from netstrip.gui.utils import safe_loop, bind_copy_tooltip, apply_treeview_scroll_patch
+import tkinter.ttk as ttk
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -59,38 +60,61 @@ class LogView(ctk.CTkFrame):
         self._filter_entry.pack(fill="x", pady=(0, Spacing.SM))
         self._filter_entry.bind("<KeyRelease>", lambda e: self._refresh_logs())
 
-        # Column headers (stretches to exact pane width)
-        hdr = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL, corner_radius=0, height=36)
-        hdr.pack(fill="x", pady=(0, 14), padx=(0, 14))
-        
-        for i, (label, cfg) in enumerate(zip(
-            ["Time", "Process", "Domain/IP", "Category", "Action"],
-            self.COL_CONFIGS,
-        )):
-            hdr.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
-            align_anchor = "center" if label in ("Category", "Action") else "w"
-            ctk.CTkLabel(
-                hdr, text=label,
-                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
-                text_color=Colors.TEXT_TERTIARY,
-                anchor=align_anchor
-            ).grid(row=0, column=i, sticky="ew" if label in ("Category", "Action") else "w", padx=Spacing.SM, pady=Spacing.XS)
+        # Apply Treeview styling
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Dark.Treeview",
+                        background=Colors.BG_PANEL,
+                        foreground=Colors.TEXT_PRIMARY,
+                        rowheight=36,
+                        fieldbackground=Colors.BG_PANEL,
+                        bordercolor=Colors.BORDER_SUBTLE,
+                        borderwidth=0,
+                        font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM))
+        style.map('Dark.Treeview', background=[('selected', Colors.BG_ELEVATED)])
+        style.configure("Dark.Treeview.Heading",
+                        background=Colors.BG_DARK,
+                        foreground=Colors.TEXT_SECONDARY,
+                        relief="flat",
+                        font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD))
+        style.map("Dark.Treeview.Heading", background=[('active', Colors.BG_PANEL)])
 
-        # Scrollable body
-        self._log_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
-        self._log_scroll.pack(fill="both", expand=True)
-        enable_smooth_scrolling(self._log_scroll)
+        # Scrollable body (Native Treeview for zero lag)
+        self.tree_frame = ctk.CTkFrame(self, fg_color=Colors.BG_DARK)
+        self.tree_frame.pack(fill="both", expand=True)
+
+        self.tree = ttk.Treeview(self.tree_frame, columns=("time", "proc", "domain", "cat", "act"), show="headings", style="Dark.Treeview", height=30)
+        self.tree.heading("time", text="Time", anchor="w")
+        self.tree.heading("proc", text="Process", anchor="w")
+        self.tree.heading("domain", text="Domain/IP", anchor="w")
+        self.tree.heading("cat", text="Category", anchor="w")
+        self.tree.heading("act", text="Action", anchor="w")
+
+        self.tree.column("time", width=90, minwidth=80, stretch=False)
+        self.tree.column("proc", width=200, minwidth=150, stretch=True)
+        self.tree.column("domain", width=280, minwidth=200, stretch=True)
+        self.tree.column("cat", width=110, minwidth=100, stretch=False)
+        self.tree.column("act", width=80, minwidth=70, stretch=False)
+
+        scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Treeview tag colors
+        for cat_name in ['AD', 'TRACKER', 'MALWARE', 'TELEMETRY', 'SYSTEM', 'SOCIAL', 'NSFW', 'UNKNOWN']:
+            cat_color = get_category_color(cat_name)
+            self.tree.tag_configure(cat_name, foreground=cat_color)
+        self.tree.tag_configure('ALLOW', foreground=Colors.SUCCESS)
+        self.tree.tag_configure('BLOCK', foreground=Colors.DANGER)
+
+        # Apply ultra-fast 15x scrolling patch
+        apply_treeview_scroll_patch(self.tree)
 
         self._last_signature = None
-        self._row_pool = []
-        # Pre-allocate row pool to eliminate first-render widget creation stall
-        for _ in range(50):
-            frame, lbls = self._build_empty_row()
-            self._row_pool.append((frame, lbls))
-        # Rows are built lazily in chunks to prevent UI stutter
 
         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-        self._refresh_logs_id = self.after(50, self._refresh_logs)
+        self._refresh_logs_id = self.after(1000, self._refresh_logs)
 
     def _export_logs(self):
         """Exports the entire connection log to the user's Documents folder."""
@@ -137,19 +161,18 @@ class LogView(ctk.CTkFrame):
             import tkinter.messagebox
             tkinter.messagebox.showerror("Export Failed", f"Failed to export logs:\n{str(e)}")
 
-    @safe_loop(delay_ms=750)
     def _refresh_logs(self):
         if getattr(self, '_destroyed', False):
             return
 
         if not self.winfo_ismapped():
             if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-            self._refresh_logs_id = self.after(750, self._refresh_logs)
+            self._refresh_logs_id = self.after(1000, self._refresh_logs)
             return
 
         if getattr(self, '_is_fetching_logs', False):
             if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-            self._refresh_logs_id = self.after(750, self._refresh_logs)
+            self._refresh_logs_id = self.after(1000, self._refresh_logs)
             return
 
         self._is_fetching_logs = True
@@ -176,205 +199,66 @@ class LogView(ctk.CTkFrame):
                             or query in (r['ip'] or '').lower()
                         ]
 
-                    # Fast signature diffing: skip all widget manipulations if logs & filter didn't change
+                    # Fast signature diffing
                     current_sig = (
                         query,
                         len(filtered_rows),
-                        tuple((r['id'], str(r['timestamp']), str(r['action']), str(r['category'])) for r in filtered_rows[:15])
+                        tuple((r['id'], str(r['timestamp']), str(r['action']), str(r['category'])) for r in filtered_rows[:20])
                     )
-                    if self._last_signature == current_sig and hasattr(self, '_pool_initialized'):
-                        self._is_fetching_logs = False
-                        if not getattr(self, '_destroyed', False):
-                            if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-                            self._refresh_logs_id = self.after(750, self._refresh_logs)
+                    if self._last_signature == current_sig:
                         return
-                        
                     self._last_signature = current_sig
-                    self._pool_initialized = True
 
-                    if not filtered_rows:
-                        if not hasattr(self, 'loading_frame'):
-                            self.loading_frame = ctk.CTkFrame(self._log_scroll, fg_color=Colors.BG_DARK)
-                            self.loading_frame.pack(pady=Spacing.XL, expand=True)
-                            ctk.CTkLabel(self.loading_frame, text="⏳", font=(Fonts.FAMILY_PRIMARY[0], 36)).pack()
-                            ctk.CTkLabel(
-                                self.loading_frame, text="Listening for connections...",
-                                text_color=Colors.TEXT_TERTIARY,
-                                font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-                            ).pack(pady=Spacing.XS)
-                    else:
-                        if hasattr(self, 'loading_frame'):
-                            self.loading_frame.destroy()
-                            delattr(self, 'loading_frame')
-
-                    # In-place UI update (zero layout thrashing, entirely synchronous)
+                    # In-place UI update (zero layout thrashing and scroll-preserving)
                     privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
                     
+                    existing_children = self.tree.get_children()
+                    new_len = len(filtered_rows)
+                    
                     for i, r in enumerate(filtered_rows):
-                        if i >= len(self._row_pool):
-                            frame, lbls = self._build_empty_row()
-                            self._row_pool.append((frame, lbls))
-                            
-                        frame, lbls = self._row_pool[i]
+                        ts = r['timestamp']
+                        if isinstance(ts, str):
+                            time_str = ts[11:19]  # Just HH:MM:SS
+                        else:
+                            time_str = ts.strftime("%H:%M:%S")
+
+                        proc = "HIDDEN" if privacy_on else str(r['process_name'] or 'Unknown')
+                        domain = "HIDDEN" if privacy_on else str(r['domain'] or r['ip'] or 'Unknown')
+                        cat = str(r['category'] or 'unknown').upper()
+                        act = str(r['action'] or 'unknown').upper()
+
+                        tags = (cat, act)
+                        vals = (time_str, proc, domain, cat, act)
                         
-                        bg_color = Colors.BG_ELEVATED if i % 2 == 0 else Colors.BG_PANEL
-                        if getattr(frame, '_last_bg', None) != bg_color:
-                            frame.configure(fg_color=bg_color)
-                            frame._last_bg = bg_color
-
-                        if not frame.winfo_ismapped():
-                            frame.pack(fill="x", pady=2, padx=4)
-                        self._fill_row(lbls, r, privacy_on)
-
-                    # Hide unused rows
-                    for i in range(len(filtered_rows), len(self._row_pool)):
-                        frame, lbls = self._row_pool[i]
-                        if frame.winfo_ismapped():
-                            frame.pack_forget()
+                        if i < len(existing_children):
+                            self.tree.item(existing_children[i], values=vals, tags=tags)
+                        else:
+                            self.tree.insert("", "end", values=vals, tags=tags)
                             
+                    # Delete excess rows
+                    if len(existing_children) > new_len:
+                        self.tree.delete(*existing_children[new_len:])
+
                     self._is_fetching_logs = False
                     if not getattr(self, '_destroyed', False):
                         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-                        self._refresh_logs_id = self.after(750, self._refresh_logs)
+                        self._refresh_logs_id = self.after(1000, self._refresh_logs)
 
                 except Exception as e:
                     self._is_fetching_logs = False
                     if not getattr(self, '_destroyed', False):
                         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
-                        self._refresh_logs_id = self.after(750, self._refresh_logs)
+                        self._refresh_logs_id = self.after(1000, self._refresh_logs)
 
             self.after(0, update_ui)
 
         threading.Thread(target=fetch_task, daemon=True).start()
 
-    def _build_empty_row(self):
-        frame = ctk.CTkFrame(
-            self._log_scroll,
-            fg_color=Colors.BG_PANEL, corner_radius=4, height=36,
-            border_width=0, border_color=Colors.BORDER_SUBTLE,
-        )
-        frame.grid_propagate(False)
-        frame.pack_propagate(False) # Keep both just in case
-        for i, cfg in enumerate(self.COL_CONFIGS):
-            frame.grid_columnconfigure(i, weight=cfg["weight"], minsize=cfg["minsize"])
 
-        lbl_time = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_TERTIARY, anchor="w")
-        lbl_time.grid(row=0, column=0, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
-
-        proc_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        proc_frame.grid(row=0, column=1, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
-        lbl_dot = ctk.CTkLabel(proc_frame, text="●", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS))
-        lbl_dot.pack(side="left", padx=(0, 4))
-        lbl_proc = ctk.CTkLabel(proc_frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY, anchor="w")
-        lbl_proc.pack(side="left")
-
-        lbl_domain = ctk.CTkLabel(frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD), text_color=Colors.TEXT_SECONDARY, anchor="w")
-        lbl_domain.grid(row=0, column=2, sticky="w", padx=Spacing.SM, pady=Spacing.SM)
-
-        # True curved rounded pill badges with zero nested canvas overlap
-        lbl_cat = ctk.CTkLabel(
-            frame, text="", text_color="white",
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
-            width=96, height=22, corner_radius=11, fg_color=Colors.BG_INPUT
-        )
-        lbl_cat.grid(row=0, column=3, padx=Spacing.SM, pady=Spacing.SM)
-
-        lbl_act = ctk.CTkLabel(
-            frame, text="",
-            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
-            width=80, height=22, corner_radius=11, fg_color=Colors.BG_INPUT
-        )
-        lbl_act.grid(row=0, column=4, padx=Spacing.SM, pady=Spacing.SM)
-
-        return frame, {
-            'time': lbl_time,
-            'dot': lbl_dot,
-            'proc': lbl_proc,
-            'domain': lbl_domain,
-            'cat': lbl_cat,
-            'act': lbl_act
-        }
-
-    def _fill_row(self, lbls, row, privacy_on=False):
-        try:
-            ts = row['timestamp']
-            if isinstance(ts, str):
-                if ' ' in ts:
-                    ts = ts.replace(' ', 'T')
-                if not ts.endswith('Z') and '+' not in ts:
-                    ts += '+00:00'
-                d = datetime.fromisoformat(ts).astimezone()
-                time_str = d.strftime("%H:%M:%S (%m-%d)")
-            else:
-                time_str = ts.astimezone().strftime("%H:%M:%S (%m-%d)")
-        except Exception:
-            try:
-                time_str = str(row['timestamp'])[:14]
-            except Exception:
-                time_str = ""
-            
-        cat = row['category'] or 'unknown'
-        c_color = get_category_color(cat)
-        
-        if getattr(lbls['time'], '_last_val', None) != time_str:
-            lbls['time'].configure(text=time_str)
-            lbls['time']._last_val = time_str
-            
-        if getattr(lbls['dot'], '_last_color', None) != c_color:
-            lbls['dot'].configure(text_color=c_color)
-            lbls['dot']._last_color = c_color
-            
-        from netstrip.core.process_utils import normalize_process_name
-        raw_proc = row['process_name'] or ''
-        proc_text = normalize_process_name(raw_proc)
-        if len(proc_text) > 16:
-            proc_text = proc_text[:13] + "..."
-            
-        if getattr(lbls['proc'], '_last_val', None) != proc_text:
-            lbls['proc'].configure(text=proc_text)
-            lbls['proc']._last_val = proc_text
-            
-        raw_domain = row['domain'] or row['ip'] or ''
-        
-        if privacy_on:
-            from netstrip.gui.utils import mask_ip_string
-            raw_domain = mask_ip_string(raw_domain)
-            
-        domain_text = raw_domain
-        if len(domain_text) > 80:
-            domain_text = domain_text[:77] + "..."
-            
-        if getattr(lbls['domain'], '_last_val', None) != domain_text:
-            lbls['domain'].configure(text=domain_text)
-            lbls['domain']._last_val = domain_text
-            
-        if getattr(lbls['domain'], '_last_raw_domain', None) != raw_domain:
-            lbls['domain']._last_raw_domain = raw_domain
-            if raw_domain:
-                bind_copy_tooltip(lbls['domain'], raw_domain)
-            
-        cat_text = get_category_label(cat).upper()
-        if getattr(lbls['cat'], '_last_color', None) != c_color or getattr(lbls['cat'], '_last_val', None) != cat_text:
-            lbls['cat'].configure(text=cat_text, fg_color=c_color)
-            lbls['cat']._last_color = c_color
-            lbls['cat']._last_val = cat_text
-            
-        action = (row['action'] or '').lower()
-        if action == 'allow':
-            act_text = "ALLOW"
-            act_fg = Colors.SUCCESS_DIM
-            act_color = "white"
-        else:
-            act_text = "BLOCK"
-            act_fg = "#4a1525"
-            act_color = "#f43f5e"
-
-        if getattr(lbls['act'], '_last_val', None) != act_text or getattr(lbls['act'], '_last_fg', None) != act_fg or getattr(lbls['act'], '_last_color', None) != act_color:
-            lbls['act'].configure(text=act_text, fg_color=act_fg, text_color=act_color)
-            lbls['act']._last_val = act_text
-            lbls['act']._last_fg = act_fg
-            lbls['act']._last_color = act_color
 
     def destroy(self):
         self._destroyed = True
         super().destroy()
+
+
+

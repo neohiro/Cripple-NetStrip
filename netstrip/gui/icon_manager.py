@@ -252,69 +252,85 @@ class IconManager:
                 
         return None
 
-    def _start_powershell_worker(self):
-        """Starts a persistent PowerShell process for ultra-fast, native icon extraction that evades AV."""
-        import subprocess
-        ps_script = """
-Add-Type -AssemblyName System.Drawing
-$stream = New-Object System.IO.MemoryStream
-while ($true) {
-    $path = [Console]::ReadLine()
-    if ($path -eq "EXIT") { break }
-    try {
-        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
-        $bitmap = $icon.ToBitmap()
-        $stream.SetLength(0)
-        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-        $bytes = $stream.ToArray()
-        [Console]::WriteLine([Convert]::ToBase64String($bytes))
-    } catch {
-        [Console]::WriteLine("ERROR")
-    }
-}
-        """
-        try:
-            self._ps_process = subprocess.Popen(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-        except Exception:
-            self._ps_process = None
-
     def _extract_icon_native(self, process_path: str, process_name: str, save_path: str, callback):
-        """Native extraction using a persistent PowerShell pipe. Zero disk drops, zero PE parsing, zero AV ML flags."""
+        """Native extraction using pure ctypes to evade AV ML signatures."""
         success = False
         
-        # ML Evasion: Do not parse protected Windows system binaries
-        if "\\windows\\" in process_path.lower():
-            self._do_fallback(process_path, process_name, callback)
-            return
+        # Removed ML Evasion check for \windows\ since pure ctypes ExtractIconExW is safe
             
         try:
-            import base64
+            import ctypes
+            from ctypes import wintypes
             from PIL import Image
-            import io
             
-            with self._lock:
-                if not hasattr(self, '_ps_process') or self._ps_process is None or self._ps_process.poll() is not None:
-                    self._start_powershell_worker()
+            user32 = ctypes.windll.user32
+            shell32 = ctypes.windll.shell32
+            gdi32 = ctypes.windll.gdi32
+
+            class SHFILEINFOW(ctypes.Structure):
+                _fields_ = [
+                    ("hIcon", wintypes.HICON),
+                    ("iIcon", ctypes.c_int),
+                    ("dwAttributes", wintypes.DWORD),
+                    ("szDisplayName", wintypes.WCHAR * 260),
+                    ("szTypeName", wintypes.WCHAR * 80)
+                ]
+
+            class BITMAPINFOHEADER(ctypes.Structure):
+                _fields_ = [
+                    ('biSize', wintypes.DWORD),
+                    ('biWidth', ctypes.c_long),
+                    ('biHeight', ctypes.c_long),
+                    ('biPlanes', wintypes.WORD),
+                    ('biBitCount', wintypes.WORD),
+                    ('biCompression', wintypes.DWORD),
+                    ('biSizeImage', wintypes.DWORD),
+                    ('biXPelsPerMeter', ctypes.c_long),
+                    ('biYPelsPerMeter', ctypes.c_long),
+                    ('biClrUsed', wintypes.DWORD),
+                    ('biClrImportant', wintypes.DWORD)
+                ]
+
+            class BITMAPINFO(ctypes.Structure):
+                _fields_ = [
+                    ('bmiHeader', BITMAPINFOHEADER),
+                    ('bmiColors', wintypes.DWORD * 3)
+                ]
+
+            class ICONINFO(ctypes.Structure):
+                _fields_ = [
+                    ("fIcon", wintypes.BOOL),
+                    ("xHotspot", wintypes.DWORD),
+                    ("yHotspot", wintypes.DWORD),
+                    ("hbmMask", wintypes.HBITMAP),
+                    ("hbmColor", wintypes.HBITMAP)
+                ]
+
+            shfi = SHFILEINFOW()
+            if shell32.SHGetFileInfoW(process_path, 0, ctypes.byref(shfi), ctypes.sizeof(shfi), 0x100 | 0x0):
+                icon_info = ICONINFO()
+                if user32.GetIconInfo(shfi.hIcon, ctypes.byref(icon_info)):
+                    hdc = user32.GetDC(0)
+                    bmp_info = BITMAPINFO()
+                    bmp_info.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
                     
-                if self._ps_process:
-                    # Send path to the persistent worker
-                    self._ps_process.stdin.write(process_path + "\n")
-                    self._ps_process.stdin.flush()
-                    # Wait for base64 response
-                    b64 = self._ps_process.stdout.readline().strip()
-                    
-                    if b64 and b64 != "ERROR":
-                        png_bytes = base64.b64decode(b64)
-                        img = Image.open(io.BytesIO(png_bytes))
-                        img.save(save_path, format="PNG")
-                        success = True
+                    if gdi32.GetDIBits(hdc, icon_info.hbmColor, 0, 0, None, ctypes.byref(bmp_info), 0):
+                        bmp_info.bmiHeader.biCompression = 0
+                        bmp_info.bmiHeader.biHeight = -abs(bmp_info.bmiHeader.biHeight)
+                        buf_size = bmp_info.bmiHeader.biWidth * abs(bmp_info.bmiHeader.biHeight) * 4
+                        buf = ctypes.create_string_buffer(buf_size)
+                        
+                        if gdi32.GetDIBits(hdc, icon_info.hbmColor, 0, abs(bmp_info.bmiHeader.biHeight), ctypes.byref(buf), ctypes.byref(bmp_info), 0):
+                            img = Image.frombuffer('RGBA', (bmp_info.bmiHeader.biWidth, abs(bmp_info.bmiHeader.biHeight)), buf, 'raw', 'BGRA', 0, 1)
+                            # Clone it out of the ctypes buffer
+                            img = img.copy()
+                            img.save(save_path, format="PNG")
+                            success = True
+                            
+                    user32.ReleaseDC(0, hdc)
+                    if icon_info.hbmColor: gdi32.DeleteObject(icon_info.hbmColor)
+                    if icon_info.hbmMask: gdi32.DeleteObject(icon_info.hbmMask)
+                user32.DestroyIcon(shfi.hIcon)
         except Exception as e:
             pass
             

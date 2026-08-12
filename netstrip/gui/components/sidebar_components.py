@@ -288,6 +288,10 @@ class ConnectionRow(ctk.CTkFrame):
             # Sync memory instantly for this mode scope
             if hasattr(self.engine.blocklist, 'sync_user_rules'):
                 self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
+                
+            # Dispatch event so Blocklist tab instantly updates counters
+            if hasattr(self.engine, 'on_status_update'):
+                self.engine.on_status_update("rules_changed")
 
 
         if new_action == 'allow':
@@ -471,6 +475,8 @@ class AppGroupFrame(ctk.CTkFrame):
             
             if hasattr(self.engine.blocklist, 'sync_user_rules'):
                 self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
+                if hasattr(self.engine, 'on_status_update'):
+                    self.engine.on_status_update("rules_changed")
                 
             # Give visual feedback
             self.btn_timebomb.configure(text="? Granted", text_color=Colors.SUCCESS)
@@ -651,6 +657,8 @@ class AppGroupFrame(ctk.CTkFrame):
             # Sync memory instantly for this mode scope
             if hasattr(self.engine.blocklist, 'sync_user_rules'):
                 self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
+                if hasattr(self.engine, 'on_status_update'):
+                    self.engine.on_status_update("rules_changed")
                 
             # Apply action to all existing child rows
             if db_action in ('neutral', 'remove'):
