@@ -778,7 +778,11 @@ class NetStripApp(ctk.CTk):
         def on_show(icon, item):
             icon.stop()
             self._tray_icon = None
-            self.after(0, self.deiconify)
+            def _restore():
+                self.deiconify()
+                if getattr(self.engine, 'update_available', False) and not getattr(self, '_update_glow_active', False):
+                    self._start_version_glow_animation()
+            self.after(0, _restore)
 
         def on_quit(icon, item):
             icon.stop()
@@ -966,7 +970,12 @@ class NetStripApp(ctk.CTk):
             else:
                 step -= 1
                 if step <= 0: increasing = True
-            if not self.winfo_exists(): return
+            
+            # Pause animation if window is hidden (e.g. system tray)
+            if not self.winfo_exists() or not self.winfo_viewable():
+                self._update_glow_active = False
+                return
+                
             self.after(100, lambda: self._animate_version_glow(step, increasing))
         except Exception:
             pass

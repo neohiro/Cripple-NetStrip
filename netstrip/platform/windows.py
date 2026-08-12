@@ -309,10 +309,38 @@ class WindowsPlatform(PlatformBase):
     def unblock_lan_traffic(self) -> bool:
         return self.remove_firewall_rule("NetStrip_Block_LAN")
 
+    def kill_all_tcp_connections(self):
+        """Forcefully terminate all active TCP connections using iphlpapi.SetTcpEntry."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            iphlpapi = ctypes.windll.iphlpapi
+            
+            class MIB_TCPROW(ctypes.Structure):
+                _fields_ = [('dwState', wintypes.DWORD), ('dwLocalAddr', wintypes.DWORD), 
+                            ('dwLocalPort', wintypes.DWORD), ('dwRemoteAddr', wintypes.DWORD), ('dwRemotePort', wintypes.DWORD)]
+            
+            size = wintypes.DWORD(0)
+            iphlpapi.GetTcpTable(None, ctypes.byref(size), True)
+            
+            if size.value > 0:
+                class MIB_TCPTABLE(ctypes.Structure):
+                    _fields_ = [('dwNumEntries', wintypes.DWORD), ('table', MIB_TCPROW * int(size.value // ctypes.sizeof(MIB_TCPROW)))]
+                tcp_table = MIB_TCPTABLE()
+                if iphlpapi.GetTcpTable(ctypes.byref(tcp_table), ctypes.byref(size), True) == 0:
+                    for i in range(tcp_table.dwNumEntries):
+                        row = tcp_table.table[i]
+                        if row.dwState == 5:  # ESTABLISHED
+                            row.dwState = 12  # MIB_TCP_STATE_DELETE_TCB
+                            iphlpapi.SetTcpEntry(ctypes.byref(row))
+        except Exception:
+            pass
+
     def enable_killswitch(self) -> bool:
         # Absolute ghost mode - block everything unconditionally (including loopback and IPC)
         res1 = self.add_firewall_rule("NetStrip_Killswitch_Block_In", "in", "block")
         res2 = self.add_firewall_rule("NetStrip_Killswitch_Block_Out", "out", "block")
+        self.kill_all_tcp_connections()
         return res1 and res2
 
     def disable_killswitch(self) -> bool:

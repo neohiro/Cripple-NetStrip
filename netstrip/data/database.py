@@ -119,6 +119,10 @@ class Database:
                     );
                     
                     CREATE INDEX IF NOT EXISTS idx_conn_log_timestamp ON connection_log(timestamp);
+                    CREATE INDEX IF NOT EXISTS idx_conn_log_domain ON connection_log(domain);
+                    CREATE INDEX IF NOT EXISTS idx_conn_log_process ON connection_log(process_name);
+                    
+                    CREATE INDEX IF NOT EXISTS idx_rules_app ON user_rules(app_name);
                 ''')
                 # Initialize today's stats if not exists
                 today = datetime.now().strftime('%Y-%m-%d')
