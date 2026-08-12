@@ -106,7 +106,7 @@ class LogView(ctk.CTkFrame):
             cat_color = get_category_color(cat_name)
             self.tree.tag_configure(cat_name, foreground=cat_color)
         self.tree.tag_configure('ALLOW', foreground=Colors.SUCCESS)
-        self.tree.tag_configure('BLOCK', foreground=Colors.ERROR)
+        self.tree.tag_configure('BLOCK', foreground=Colors.DANGER)
 
         self._last_signature = None
 
@@ -158,7 +158,6 @@ class LogView(ctk.CTkFrame):
             import tkinter.messagebox
             tkinter.messagebox.showerror("Export Failed", f"Failed to export logs:\n{str(e)}")
 
-    @safe_loop(delay_ms=750)
     def _refresh_logs(self):
         if getattr(self, '_destroyed', False):
             return

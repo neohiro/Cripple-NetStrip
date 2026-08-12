@@ -1,3 +1,7 @@
+## [v3.6.1] - 2026-08-12
+### Fixed
+- **UI Freeze & Missing Tab**: Fixed a regression in the `LogView` component where an invalid color attribute and a recursive refresh loop caused the Logs tab to fail rendering and freeze the GUI.
+
 ## [v3.6.0] - 2026-08-12
 ### Added
 - **Native GUI Treeview**: Connection log replaced with zero-lag C-level `ttk.Treeview`.
