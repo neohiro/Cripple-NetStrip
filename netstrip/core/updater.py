@@ -78,6 +78,7 @@ class BlocklistUpdater:
         self.sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         self.is_updating = False
         self.on_update_callback = on_update_callback
+        self.last_update_stats = {"success": 0, "failed": 0, "total": 0}
 
     def check_and_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         """Run the update in a background thread."""
@@ -127,6 +128,7 @@ class BlocklistUpdater:
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
                 
+                self.last_update_stats = {"success": 0, "failed": 0, "total": total_enabled}
                 for idx, source in enumerate(enabled_sources, 1):
                     url = source.get('url')
                     category = source.get('category')
@@ -185,6 +187,7 @@ class BlocklistUpdater:
                                 
                             logger.info(f"Successfully updated '{name}' (attempt {attempt})")
                             state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
+                            self.last_update_stats["success"] += 1
                             any_updated = True
                             updated_count += 1
                             last_error = None
@@ -201,6 +204,7 @@ class BlocklistUpdater:
                             
                     if last_error:
                         logger.error(f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}")
+                        self.last_update_stats["failed"] += 1
                         failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
                         state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
                         

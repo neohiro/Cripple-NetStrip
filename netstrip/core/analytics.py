@@ -153,8 +153,13 @@ class AnalyticsReporter:
 
         try:
             payload["blocklist_domains"] = self.engine.blocklist.total_count if hasattr(self.engine, 'blocklist') else 0
+            if hasattr(self.engine, 'updater') and hasattr(self.engine.updater, 'last_update_stats'):
+                payload["blocklist_download_success_rate"] = self.engine.updater.last_update_stats.get("success", 0)
+                payload["blocklist_download_failures"] = self.engine.updater.last_update_stats.get("failed", 0)
+                payload["blocklist_total_lists"] = self.engine.updater.last_update_stats.get("total", 0)
         except Exception:
             payload["blocklist_domains"] = 0
+            payload["blocklist_download_success_rate"] = 0
 
         try:
             payload["headless"] = self.engine.is_headless

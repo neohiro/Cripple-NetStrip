@@ -267,6 +267,10 @@ class SettingsView(ctk.CTkFrame):
         self._add_switch_row(card, "Block System Connections", 'block_system_connections', tooltip_text="Use Case: Ultimate privacy. Strips redundant OS bindings (LLDP, NetBIOS, WPAD, SRV, ISATAP) and blocks background OS telemetry.")
         self._add_subtitle(card, "Disable redundant OS bindings and all background OS telemetry services globally.")
         
+        # Killswitch Network Hardening
+        self._add_switch_row(card, "Killswitch Adapter Hardening", 'killswitch_harden_adapters', tooltip_text="Use Case: Maximum safety. Inherits Ghost mode's adapter-level hardening (strips OS protocol bindings) specifically during Killswitch lockdown.")
+        self._add_subtitle(card, "Shut down OS adapter protocols automatically when the Master Killswitch engages.")
+        
         # Allow in-browser DNS
         self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns', tooltip_text="Use Case: If you use Chrome/Firefox DoH features and don't want NetStrip filtering your web browsing.")
         self._add_subtitle(card, "Allows browsers to use their own DoH settings (bypasses NetStrip filtering).")
@@ -318,6 +322,7 @@ class SettingsView(ctk.CTkFrame):
         'inbound_lan_bypass':      {'win32', 'linux', 'darwin'},
         'inbound_notifications':   {'win32', 'linux', 'darwin', 'android'},
         'block_system_connections': {'win32', 'linux', 'darwin'},
+        'killswitch_harden_adapters': {'win32', 'linux', 'darwin'},
     }
 
     @staticmethod
