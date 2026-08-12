@@ -729,6 +729,13 @@ def main():
         
     if not is_fallback and not is_headless:
         splash = SplashScreen(app)
+        try:
+            splash.deiconify()
+            splash.lift()
+            splash.attributes('-topmost', True)
+            app.update_idletasks()
+        except Exception:
+            pass
         app.update() # Force draw the splash screen to the OS NOW!
     else:
         splash = None

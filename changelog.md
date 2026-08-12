@@ -1,3 +1,8 @@
+## [v3.6.3] - 2026-08-12
+### Fixed
+- **Anti-Virus False Positive (Runtime)**: Completely removed the `icoextract` dependency and all native PE-parsing code from the Icon Manager. Dropping `.ico` files to the filesystem during runtime was triggering Windows Defender's `Bearfoos.A!ml` heuristic while the GUI was running. The app now securely relies on its robust fallback mechanisms (Favicon API / predefined icons).
+- **Splash Screen Visibility**: Fixed an issue where the loading splash screen would occasionally fail to render because its parent container was withdrawn too early in the boot sequence.
+
 ## [v3.6.2] - 2026-08-12
 ### Fixed
 - **Anti-Virus False Positive**: Removed automatic NTFS `Zone.Identifier` (Mark of the Web) stripping during boot. This Windows-specific logic was designed to prevent SmartScreen popups on fresh installs, but inadvertently triggered the `Bearfoos.A!ml` machine-learning heuristic in Windows Defender.
