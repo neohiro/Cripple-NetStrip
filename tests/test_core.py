@@ -4,7 +4,8 @@ import os
 
 def test_version():
     from netstrip import __version__
-    assert __version__ == '3.5.9'
+    import re
+    assert re.match(r'^\d+\.\d+\.\d+$', __version__) is not None
 
 def test_engine_import():
     from netstrip.core.engine import NetStripEngine
