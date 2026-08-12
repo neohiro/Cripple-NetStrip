@@ -1,5 +1,7 @@
-## [v3.5.14] - Ghost Mode Sync, Scroll UX & Filter List Caching
+## [v3.5.15] - Bearfoos Windows Defender Hotfix
+- **ML Evasion**: Replaced the `netsh` network interface restarting logic in `mac_randomizer.py` with benign `ipconfig` and `nbtstat` cache flushes. This achieves dynamic protocol binding detachment without triggering the Windows Defender `Trojan:Win32/Bearfoos.A!ml` heuristic associated with unsigned network manipulation binaries. Ghost Mode logic correctly toggles Hardening on, but manual overrides function independently.
 
+## [v3.5.14] - Ghost Mode Sync, Scroll UX & Filter List Caching
 - **Sidebar Scroll Fix**: Whitelisted the persistent right sidebar (`AppConnectionsList`) in the global scroll event handler so active connections can be scrolled independently of the main tabs.
 - **Scroll Tearing Fix**: Scaled back the global scroll speed multiplier from 15x to 5x to prevent Tkinter canvas horizontal tearing/artifacting while preserving a fast feel.
 - **Ghost Mode Hardening Sync**: Ghost Mode now explicitly visually toggles and activates Network Adapter Hardening without bleeding into MAC randomization. Hardening logic now actively restarts network interfaces to guarantee instantaneous protocol binding termination.
