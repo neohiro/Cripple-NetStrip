@@ -125,6 +125,49 @@ def enable_smooth_scrolling(scrollable_frame):
     except Exception:
         pass
 
+def apply_treeview_scroll_patch(tree_widget):
+    """Applies ultra-fast custom scroll binding to a ttk.Treeview widget."""
+    import sys
+    
+    def _on_mousewheel(event):
+        try:
+            if not tree_widget.winfo_exists():
+                return
+            if sys.platform.startswith("win"):
+                if hasattr(event, 'delta') and event.delta:
+                    step = -int((event.delta / 120) * 15)
+                    if step == 0:
+                        step = -1 if event.delta > 0 else 1
+                    tree_widget.yview_scroll(step, "units")
+                    return "break"
+            elif sys.platform == "darwin":
+                if hasattr(event, 'delta') and event.delta:
+                    step = -int(event.delta * 8)
+                    if step == 0:
+                        step = -1 if event.delta > 0 else 1
+                    tree_widget.yview_scroll(step, "units")
+                    return "break"
+        except Exception:
+            pass
+
+    def _on_linux_scroll_up(event):
+        try:
+            tree_widget.yview_scroll(-8, "units")
+            return "break"
+        except Exception:
+            pass
+            
+    def _on_linux_scroll_down(event):
+        try:
+            tree_widget.yview_scroll(8, "units")
+            return "break"
+        except Exception:
+            pass
+
+    tree_widget.bind("<MouseWheel>", _on_mousewheel)
+    tree_widget.bind("<Button-4>", _on_linux_scroll_up)
+    tree_widget.bind("<Button-5>", _on_linux_scroll_down)
+
 
 def get_screen_bounds(window=None):
     """

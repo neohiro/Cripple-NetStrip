@@ -1,3 +1,8 @@
+## [v3.6.6] - 2026-08-13
+### Fixed
+- **Connection Log Scrolling**: Brought back the ultra-fast 15x scroll wheel speed for the native `ttk.Treeview` connection log, fixing the sluggish 1-tick scroll experience on Windows.
+- **Connection Log Lag**: Switched the connection log renderer to use an in-place delta update (O(N) row modification) rather than wiping and redrawing the entire table every second. Scrolling is now completely buttery smooth even during heavy network activity.
+
 ## [v3.6.5] - 2026-08-13
 ### Fixed
 - **Complete AI Heuristic Evasion**: Ripped out the `icoextract` and `pefile` dependencies entirely from the project requirements. The PyInstaller build process will no longer bundle the highly signatured `pefile` module, destroying the static heuristic profile that caused `Bearfoos.A!ml` to quarantine the ZIP download.

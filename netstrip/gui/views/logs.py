@@ -10,7 +10,7 @@ from netstrip.gui.theme import (
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
     get_category_color, get_category_label, get_category_icon,
 )
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip
+from netstrip.gui.utils import safe_loop, bind_copy_tooltip, apply_treeview_scroll_patch
 import tkinter.ttk as ttk
 
 
@@ -107,6 +107,9 @@ class LogView(ctk.CTkFrame):
             self.tree.tag_configure(cat_name, foreground=cat_color)
         self.tree.tag_configure('ALLOW', foreground=Colors.SUCCESS)
         self.tree.tag_configure('BLOCK', foreground=Colors.DANGER)
+
+        # Apply ultra-fast 15x scrolling patch
+        apply_treeview_scroll_patch(self.tree)
 
         self._last_signature = None
 
@@ -206,13 +209,12 @@ class LogView(ctk.CTkFrame):
                         return
                     self._last_signature = current_sig
 
-                    # In-place UI update (zero layout thrashing)
+                    # In-place UI update (zero layout thrashing and scroll-preserving)
                     privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
                     
-                    # Clear treeview
-                    for item in self.tree.get_children():
-                        self.tree.delete(item)
-                        
+                    existing_children = self.tree.get_children()
+                    new_len = len(filtered_rows)
+                    
                     for i, r in enumerate(filtered_rows):
                         ts = r['timestamp']
                         if isinstance(ts, str):
@@ -226,7 +228,16 @@ class LogView(ctk.CTkFrame):
                         act = str(r['action'] or 'unknown').upper()
 
                         tags = (cat, act)
-                        self.tree.insert("", "end", values=(time_str, proc, domain, cat, act), tags=tags)
+                        vals = (time_str, proc, domain, cat, act)
+                        
+                        if i < len(existing_children):
+                            self.tree.item(existing_children[i], values=vals, tags=tags)
+                        else:
+                            self.tree.insert("", "end", values=vals, tags=tags)
+                            
+                    # Delete excess rows
+                    if len(existing_children) > new_len:
+                        self.tree.delete(*existing_children[new_len:])
 
                     self._is_fetching_logs = False
                     if not getattr(self, '_destroyed', False):
