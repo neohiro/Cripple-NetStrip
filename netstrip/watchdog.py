@@ -202,6 +202,18 @@ def restore_network():
                 winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
             except Exception:
                 pass
+                
+            try:
+                import winreg
+                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                    winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
+                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                    winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
+            except Exception:
+                pass
+                
+            subprocess.run(["sc", "start", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(["sc", "start", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["netsh", "interface", "isatap", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["netsh", "interface", "teredo", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["netsh", "interface", "ipv6", "6to4", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)

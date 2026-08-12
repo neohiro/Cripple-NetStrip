@@ -1,5 +1,8 @@
-## [v3.5.7] - Pure-Python Native Icon Extraction (No PowerShell)
+## [v3.5.8] - Advanced Kernel Driver Neutralization (LLDP & QoS)
 
+- **Native LLDP & Pacer Disablement**: Successfully restored the neutralization of `ms_lldp` (Link-Layer Discovery Protocol) and `ms_pacer` (QoS Packet Scheduler) for absolute Ghost Mode stealth. Since PowerShell cannot be used for PyInstaller payloads, Cripple now directly modifies the kernel driver start registry keys (`HKLM\\SYSTEM\\CurrentControlSet\\Services\\MsLldp` and `pacer`) and uses native Service Control (`sc stop`) to instantaneously halt the drivers in-memory without emitting any Machine Learning AV signatures.
+
+## [v3.5.7] - Pure-Python Native Icon Extraction (No PowerShell)
 - **icoextract Integration**: Restored high-resolution, local icon extraction from Windows executable (`.exe`) files natively in pure Python by integrating the `icoextract` package. This fulfills the requirement for accurate, offline parent-process favicons in the dashboard's live connection view while strictly adhering to the "Absolute Zero PowerShell" ML-evasion ruleset.
 
 ## [v3.5.6] - Ghost Mode Hardening & Complete Fail-Open Restoration

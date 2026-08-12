@@ -323,13 +323,30 @@ class MACRandomizer:
                         winreg.SetValueEx(key, "AllowRspndrOnDomain", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
+                        
+                    # Disable LLDP (ms_lldp) and QoS Packet Scheduler (ms_pacer) via driver registry start values
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
                 except Exception:
                     pass
+                subprocess.run(["sc", "stop", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                subprocess.run(["sc", "stop", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             else:
                 try:
                     winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
                 except Exception:
                     pass
+                try:
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
+                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                        winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
+                except Exception:
+                    pass
+                subprocess.run(["sc", "start", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                subprocess.run(["sc", "start", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             
             # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
             if enable:

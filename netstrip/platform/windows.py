@@ -363,10 +363,17 @@ class WindowsPlatform(PlatformBase):
                 winreg.SetValueEx(key, "AllowRspndrOnDomain", 0, winreg.REG_DWORD, 0)
                 winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
                 winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
+                
+            # Disable LLDP (ms_lldp) and QoS Packet Scheduler (ms_pacer) via driver registry start values
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
         except Exception:
             pass
-        except Exception:
-            pass
+            
+        self._run_cmd(["sc", "stop", "MsLldp"])
+        self._run_cmd(["sc", "stop", "pacer"])
         self._run_cmd(["netsh", "interface", "isatap", "set", "state", "disable"])
         self._run_cmd(["netsh", "interface", "teredo", "set", "state", "disable"])
         self._run_cmd(["netsh", "interface", "ipv6", "6to4", "set", "state", "state=disabled"])
@@ -394,6 +401,18 @@ class WindowsPlatform(PlatformBase):
             winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
         except Exception:
             pass
+            
+        try:
+            # Restore LLDP and QoS
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
+        except Exception:
+            pass
+            
+        self._run_cmd(["sc", "start", "MsLldp"])
+        self._run_cmd(["sc", "start", "pacer"])
         self._run_cmd(["netsh", "interface", "isatap", "set", "state", "default"])
         self._run_cmd(["netsh", "interface", "teredo", "set", "state", "default"])
         return True
