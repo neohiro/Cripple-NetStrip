@@ -31,6 +31,127 @@ OS_ROOT_LAUNCHERS = {
     'winlogon.exe', 'csrss.exe', 'lsass.exe'
 }
 
+# Comprehensive system process identification across all supported operating systems.
+# Used by the GUI (Block All red-light), classifier and connection monitor so that
+# OS background processes are consistently identified at startup AND during runtime.
+SYSTEM_PROCESSES_WINDOWS = {
+    'system', 'system idle process', 'system (kernel/driver)', 'registry',
+    'memory compression', 'secure system', 'ntoskrnl', 'smss.exe', 'csrss.exe',
+    'wininit.exe', 'winlogon.exe', 'services.exe', 'lsass.exe', 'lsaiso.exe',
+    'svchost.exe', 'svchost', 'service host', 'dwm.exe', 'fontdrvhost.exe',
+    'sihost.exe', 'ctfmon.exe', 'conhost.exe', 'openconsole.exe', 'runtimebroker.exe',
+    'dllhost.exe', 'taskhostw.exe', 'taskhost.exe', 'explorer.exe', 'searchapp.exe',
+    'searchhost.exe', 'shellexperiencehost.exe', 'startmenuexperiencehost.exe',
+    'applicationframehost.exe', 'backgroundtaskhost.exe', 'textinputhost.exe',
+    'widgetservice.exe', 'widgets.exe', 'feedsinfobar.exe', 'lockapp.exe',
+    'logonui.exe', 'wmiprvse.exe', 'wmiapsrv.exe', 'spoolsv.exe', 'wermgr.exe',
+    'werfault.exe', 'werfaultsecure.exe', 'wudfhost.exe', 'audiodg.exe',
+    'wlanext.exe', 'dashost.exe', 'sppsvc.exe', 'vssvc.exe', 'castsrv.exe',
+    'slui.exe', 'provtool.exe', 'systemsettings.exe', 'systemsettingsbroker.exe',
+    'securityhealthsystray.exe', 'securityhealthservice.exe', 'sgrmbroker.exe',
+    'smartscreen.exe', 'msmpeng.exe', 'nissrv.exe', 'winrsphost.exe',
+    'winrshost.exe', 'wsappx.exe', 'appinstaller.exe', 'mousocoreworker.exe',
+    'usoclient.exe', 'wuauclt.exe', 'wuauserv', 'trustedinstaller.exe',
+    'tiworker.exe', 'waasmedicagent.exe', 'sedlauncher.exe', 'remsh.exe',
+    'compattelrunner.exe', 'devicecensus.exe', 'device-census', 'invagent.exe',
+    'diagtrack.exe', 'useroobebroker.exe', 'installagent.exe', 'searchindexer.exe',
+    'searchprotocolhost.exe', 'searchfilterhost.exe', 'settingsynchost.exe',
+    'phoneexperiencehost.exe', 'yourphone.exe', 'gamebar.exe', 'gamebarftserver.exe',
+    'xboxpcapp.exe', 'xboxpcappft.exe', 'gamingservices.exe', 'gamingservicesui.exe',
+    'msedgeupdate.exe', 'microsoftedgeupdate.exe', 'onedrive.exe',
+    'onedrivestandaloneupdater.exe', 'filecoauth.exe', 'officec2rclient.exe',
+    'clicktodisk.exe', 'upfc.exe', 'pnkbstrA.exe', 'pnkbstrB.exe', 'nvcontainer.exe',
+    'nvdisplay.container.exe', 'nvvsvc.exe', 'razercentralservice.exe',
+    'armsvc.exe', 'adobeupdateservice.exe', 'gaosd.exe', 'gfbgsservice.exe',
+    'memcompression', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'wsl.exe',
+    'wslhost.exe', 'wslrelay.exe', 'windowsterminal.exe', 'tabtip.exe',
+    'shellexperiencerunner.exe', 'perfmon.exe', 'resmon.exe', 'msdtc.exe',
+    'smsts.exe', 'scardsvr.exe', 'keyiso.exe', 'sessionmanager',
+    'taskmgr.exe', 'copilot.exe', 'winstore.app', 'microsoft.photos',
+}
+
+SYSTEM_PROCESSES_LINUX = {
+    'systemd', 'init', 'kthreadd', 'ksoftirqd', 'kworker', 'migration',
+    'rcu_sched', 'rcu_bh', 'watchdogd', 'systemd-journald', 'systemd-logind',
+    'systemd-resolved', 'systemd-timesyncd', 'systemd-networkd',
+    'systemd-udevd', 'udevd', 'dbus-daemon', 'dbus', 'networkmanager',
+    'modemmanager', 'wpa_supplicant', 'dhclient', 'dhcpcd', 'avahi-daemon',
+    'cupsd', 'cups-browsed', 'packagekitd', 'snapd', 'fwupd', 'chronyd',
+    'ntpd', 'ntp', 'timesyncd', 'rpcbind', 'unattended-upgrades', 'apt',
+    'dpkg', 'yum', 'dnf', 'zypper', 'pacman', 'dockerd', 'containerd',
+    'kubelet', 'polkitd', 'accounts-daemon', 'rtkit-daemon', 'colord',
+    'udisksd', 'gvfsd', 'gnome-shell', 'gsd-', 'Xorg', 'xinit', 'pulseaudio',
+    'pipewire', 'wireplumber', 'NetworkManager', 'sshd', 'cron', 'crond',
+    'atd', 'rsyslogd', 'syslogd', 'journald', 'login', 'getty', 'agetty',
+    'upowerd', 'thermald', 'irqbalance', 'multipathd', 'lxcfs', 'containerd-shim',
+}
+
+SYSTEM_PROCESSES_MACOS = {
+    'launchd', 'kernel_task', 'mdnsresponder', 'configd', 'syspolicyd',
+    'networkd', 'nsurlsessiond', 'apsd', 'softwareupdated', 'trustd',
+    'rapportd', 'symptomsd', 'rtcreportingd', 'awdd', 'analyticsd',
+    'cloudd', 'touristd', 'locationd', 'identityservicesd', 'securityd',
+    'cfprefsd', 'tcc', 'corelocationagent', 'crashreporter',
+    'submitdiagnosticinfo', 'submitdiaginfo', 'com.apple.geod',
+    'finder', 'dock', 'windowserver', 'loginwindow', 'distnoted',
+    'usernoted', 'pbs', 'pboard', 'cfprefsd', 'diagnosticsd', 'powerd',
+    'iokit', 'bluetoothd', 'coreaudiod', 'hidd', 'diskarbitrationd',
+    'fseventsd', 'notifyd', 'opendirectoryd', 'coreservicesd',
+    'launchservicesd', 'spotlight', 'mds', 'mds_stores', 'appleevents',
+    'sandboxd', 'amfid', 'syslogd', 'asld', 'tailspind', 'reportmemoryexception',
+}
+
+SYSTEM_PROCESSES_ANDROID = {
+    'zygote', 'zygote64', 'system_server', 'servicemanager', 'vold',
+    'netd', 'netd_agent', 'logd', 'lmkd', 'installd', 'surfaceflinger',
+    'audioserver', 'cameraserver', 'mediaserver', 'media.extractor',
+    'media.codec', 'drmserver', 'keystore', 'gatekeeperd', 'incidentd',
+    'statsd', 'traced', 'traced_probes', 'heapprofd', 'perfetto',
+    'adbd', 'debuggerd', 'vndclient', 'radio', 'rild', 'cnd', 'qmuxd',
+    'thermal-engine', 'thermal-engine-845', 'sensors', 'sensors-qcom',
+    'vendor.', 'com.android.systemui',
+    'com.android.phone', 'com.android.providers.telephony',
+}
+
+# Flattened lookup set (lowercase, with and without .exe suffix)
+SYSTEM_PROCESSES = set()
+for _s in (
+    SYSTEM_PROCESSES_WINDOWS | SYSTEM_PROCESSES_LINUX |
+    SYSTEM_PROCESSES_MACOS | SYSTEM_PROCESSES_ANDROID
+):
+    _lower = _s.lower()
+    SYSTEM_PROCESSES.add(_lower)
+    if _lower.endswith('.exe'):
+        SYSTEM_PROCESSES.add(_lower[:-4])
+
+# Prefixes treated as system processes (Service Host groupings, kernel workers, vendor daemons)
+_SYSTEM_PREFIXES = ('service host', 'svchost (', 'gsd-', 'kworker/', 'com.android.', 'android.')
+
+# Remote endpoints contacted by Cripple's own telemetry / GeoIP / update services.
+# Connections to these targets originating from unattributable, system or python
+# processes are re-attributed to "Cripple (Internal)" instead of the wrong process.
+SELF_SERVICE_TARGETS = {
+    'ipwho.is', 'ipinfo.io', 'ipapi.co', 'ip-api.com', 'api.ipify.org',
+    'api.github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com',
+    'github.com', 'geoip.jsdelivr.net', 'updates.netstrip.app',
+    'cripple.frenzypenguin.media', 'api.telemetry.cripple.media',
+}
+
+
+def is_system_process(name: Optional[str]) -> bool:
+    """Return True if the given process name is an OS/system process on any platform."""
+    if not name:
+        return False
+    n = str(name).strip().lower()
+    if not n:
+        return False
+    if n.endswith('.exe'):
+        n = n[:-4]
+    if n in SYSTEM_PROCESSES:
+        return True
+    return any(n.startswith(p) for p in _SYSTEM_PREFIXES)
+
+
 # Canonical display mapping for well-known binaries
 CANONICAL_APP_NAMES = {
     'antigravity.exe': 'AntiGravity',

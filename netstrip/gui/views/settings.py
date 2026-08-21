@@ -115,13 +115,36 @@ class SettingsView(ctk.CTkFrame):
         # Track switch references for state syncing
         self._switch_refs = {}
 
+        # Staged construction: critical cards render immediately; the heavier
+        # cards stream in over subsequent UI ticks so the tab paints instantly
+        # instead of blocking the main thread for hundreds of milliseconds.
         self._build_updates_card()
         self._build_general_card()
-        self._build_network_card()
-        self._build_scheduler_card()
-        self._build_migration_card()
-        self._build_analytics_card()
-        self._build_about_card()
+
+        _deferred_cards = [
+            self._build_network_card,
+            self._build_scheduler_card,
+            self._build_migration_card,
+            self._build_analytics_card,
+            self._build_about_card,
+        ]
+
+        def _build_next_card(index=0):
+            if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                return
+            if index >= len(_deferred_cards):
+                return
+            try:
+                _deferred_cards[index]()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Deferred settings card build failed: {e}")
+            try:
+                self.after(20, lambda: _build_next_card(index + 1))
+            except Exception:
+                pass
+
+        self.after(10, _build_next_card)
         
     def _build_updates_card(self):
         from netstrip import __version__
@@ -274,6 +297,36 @@ class SettingsView(ctk.CTkFrame):
         # Allow in-browser DNS
         self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns', tooltip_text="Use Case: If you use Chrome/Firefox DoH features and don't want NetStrip filtering your web browsing.")
         self._add_subtitle(card, "Allows browsers to use their own DoH settings (bypasses NetStrip filtering).")
+
+        # Scroll Speed (applies live to every list, sidebar and tab)
+        speed_row = ctk.CTkFrame(card, fg_color="transparent")
+        speed_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.XS, 0))
+        ctk.CTkLabel(
+            speed_row, text="Scroll Speed",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        from netstrip.gui.utils import apply_saved_scroll_speed, get_scroll_speed_presets, set_scroll_speed_preset
+
+        current_speed = apply_saved_scroll_speed(self.engine.db)
+        preset_labels = [p.capitalize() for p in get_scroll_speed_presets()]
+        self._scroll_speed_var = ctk.StringVar(value=current_speed.capitalize())
+        opt_speed = ctk.CTkOptionMenu(
+            speed_row,
+            values=preset_labels,
+            variable=self._scroll_speed_var,
+            width=110, height=26,
+            font=(Fonts.FAMILY_PRIMARY[0], 11),
+            fg_color=Colors.BG_ELEVATED, button_color=Colors.BG_ELEVATED,
+            button_hover_color=Colors.BORDER_DEFAULT, dropdown_fg_color=Colors.BG_ELEVATED,
+            command=lambda choice: (
+                set_scroll_speed_preset(choice),
+                self.engine.db.set_setting("gui_scroll_speed", choice.lower()),
+            ),
+        )
+        opt_speed.pack(side="right")
+        self._add_subtitle(card, "Mouse-wheel velocity for all lists, tabs and the connections sidebar. Applies instantly.")
 
         # Bottom padding
         ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()

@@ -237,7 +237,7 @@ class ConnectionRow(ctk.CTkFrame):
             pulse_color = Colors.SUCCESS if action == 'allow' else Colors.DANGER
             self.target_label.configure(text_color=pulse_color)
             
-            steps = ["#143c22", "#102a18", "#0b1910", "transparent"] if action == 'allow' else ["#450a0a", "#300707", "#1a0404", "transparent"]
+            steps = ["#143c22", "#102a18", "#0b1910"] if action == 'allow' else ["#450a0a", "#300707", "#1a0404"]
             
             self._bg_rect.configure(fg_color=steps[0])
             
@@ -250,6 +250,8 @@ class ConnectionRow(ctk.CTkFrame):
                     else:
                         self._is_pulsing = False
                         self.target_label.configure(text_color=Colors.TEXT_SECONDARY)
+                        # Restore the solid zebra tint instead of transparency
+                        self.set_zebra(getattr(self, '_last_zebra_is_even', True))
                 except Exception:
                     pass
                     
@@ -300,12 +302,44 @@ class ConnectionRow(ctk.CTkFrame):
             proceed()
 
     def set_zebra(self, is_even: bool):
-        # Slightly tint the background
-        self.zebra_color = Colors.BG_DARK if is_even else "transparent"
+        # Solid tint colors (never "transparent") — transparency causes CTk to
+        # redraw rounded corners mid-scroll which shows up as horizontal line
+        # artifacts in expanded lists.
+        self._last_zebra_is_even = is_even
+        self.zebra_color = "#0a0a12" if is_even else "#0d1017"
         if not getattr(self, '_is_pulsing', False):
             if getattr(self, '_last_zebra', None) != self.zebra_color:
                 self._bg_rect.configure(fg_color=self.zebra_color)
                 self._last_zebra = self.zebra_color
+
+    def apply_bulk_state(self, bulk_action: str):
+        """
+        Lightweight per-row visual sync for Allow All / Block All / Neutral.
+        Pure UI update: no database writes, no rule re-syncs, no modals.
+        The live classifier re-evaluates real actions on the next poll tick.
+        """
+        if not getattr(self, 'winfo_exists', lambda: True)():
+            return
+        try:
+            if bulk_action == 'allow':
+                self.conn_data['action'] = 'allow'
+                self.btn_allow.configure(fg_color=Colors.SUCCESS_DIM, text_color=Colors.TEXT_PRIMARY)
+                self.btn_block.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                self._last_action = 'allow'
+            elif bulk_action == 'block':
+                self.conn_data['action'] = 'block'
+                self.btn_block.configure(fg_color="#4a1525", text_color=Colors.TEXT_PRIMARY)
+                self.btn_allow.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                self._last_action = 'block'
+            else:
+                # Neutral: clear explicit visuals; next poll repaints from the
+                # live classification result.
+                self.conn_data['action'] = ''
+                self.btn_allow.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                self.btn_block.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                self._last_action = ''
+        except Exception:
+            pass
 
 class AppGroupFrame(ctk.CTkFrame):
     def __init__(self, master, process_name: str, process_path: str, engine: NetStripEngine, icon_manager: IconManager, **kwargs):
@@ -443,6 +477,12 @@ class AppGroupFrame(ctk.CTkFrame):
         
         # Start collapsed by default
         self.btn_expand.configure(text="Expand ▼")
+        
+        # Render the correct initial toggle state immediately (system block
+        # red-light, Ghost implicit block, persisted allow/block) so the state
+        # is correct at program start and not only after the first UI poll.
+        self.visible_count = 0
+        self.refresh_global_state()
 
     def _toggle_expand(self, event=None):
         self.is_expanded = not self.is_expanded
@@ -514,12 +554,21 @@ class AppGroupFrame(ctk.CTkFrame):
         if img:
             _apply_raw_image(img)
         else:
-            first_letter = self.process_name[0].upper() if self.process_name else "?"
-            self.icon_label.configure(text=first_letter, image="")
-            if self.process_name and self.process_name.startswith("Unknown"):
+            # Deterministic fallback glyph: system/OS daemons get a gear,
+            # everything else gets its first letter.
+            from netstrip.core.process_utils import is_system_process
+            if is_system_process(self.process_name):
+                self.icon_label.configure(text="⚙", image="")
+                self.icon_bg.configure(fg_color=Colors.BG_ELEVATED)
+                self.icon_label.configure(text_color=Colors.TEXT_SECONDARY)
+            elif self.process_name and self.process_name.startswith("Unknown"):
+                first_letter = self.process_name[0].upper() if self.process_name else "?"
+                self.icon_label.configure(text=first_letter, image="")
                 self.icon_bg.configure(fg_color=Colors.BG_DARK)
                 self.icon_label.configure(text_color=Colors.TEXT_TERTIARY)
             else:
+                first_letter = self.process_name[0].upper() if self.process_name else "?"
+                self.icon_label.configure(text=first_letter, image="")
                 self.icon_bg.configure(fg_color=Colors.ACCENT_PRIMARY)
 
 
@@ -527,7 +576,7 @@ class AppGroupFrame(ctk.CTkFrame):
         if not hasattr(self, '_is_pulsing') or not self._is_pulsing:
             self._is_pulsing = True
             
-            steps = ["#143c22", "#102a18", "#0b1910", "transparent"] if action == 'allow' else ["#450a0a", "#300707", "#1a0404", "transparent"]
+            steps = ["#143c22", "#102a18", "#0b1910"] if action == 'allow' else ["#450a0a", "#300707", "#1a0404"]
             
             self.header.configure(fg_color=steps[0])
             
@@ -595,6 +644,11 @@ class AppGroupFrame(ctk.CTkFrame):
             
         # The system block visual override is handled in refresh_global_state during the UI loop
     def _toggle_global_action(self, target_action: str):
+        # Prevent double-click stacking which previously froze the GUI thread
+        if getattr(self, '_is_toggling', False):
+            return
+        self._is_toggling = True
+
         def proceed():
             # Determine if we are turning the action ON or OFF (Explicit 3-State Toggle)
             if self._global_action_state == target_action:
@@ -605,9 +659,9 @@ class AppGroupFrame(ctk.CTkFrame):
                 # Toggle ON -> Set state
                 new_state = target_action
                 db_action = target_action
-                
+
             self._global_action_state = new_state
-            
+
             # Update button visuals immediately
             if new_state == 'block':
                 self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
@@ -618,60 +672,79 @@ class AppGroupFrame(ctk.CTkFrame):
             else: # 'neutral' / both off
                 self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
                 self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-                
-            # Update OS Firewall
-            rule_name = f"NetStrip_AppBlock_{self.process_name}"
-            if new_state == 'block' and self.process_path:
-                self.engine.platform.add_firewall_rule(
-                    rule_name=rule_name,
-                    direction="out",
-                    action="block",
-                    program=self.process_path
-                )
-            else:
-                self.engine.platform.remove_firewall_rule(rule_name=rule_name)
-                
-            # Update Database
-            current_mode = self.engine.classifier.mode.name
-            mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
-            
-            # First remove any existing global app rule for this app under the current mode scope
-            try:
-                conn = self.engine.db._get_connection()
-                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
-                conn.commit()
-            except:
-                pass
-                
-            # Store explicit rule (allow, block, or neutral)
-            self.engine.db.add_user_rule({
-                'pattern': '*',
-                'action': db_action,
-                'scope': 'app',
-                'app_name': self.process_name,
-                'category': 'user_allowed' if db_action == 'allow' else ('user_blocked' if db_action == 'block' else 'essential'),
-                'note': self.process_path,
-                'mode_scope': mode_scope
-            })
-                
-            # Sync memory instantly for this mode scope
-            if hasattr(self.engine.blocklist, 'sync_user_rules'):
-                self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
-                if hasattr(self.engine, 'on_status_update'):
-                    self.engine.on_status_update("rules_changed")
-                
-            # Apply action to all existing child rows
-            if db_action in ('neutral', 'remove'):
-                for target, row in list(self.rows.items()):
-                    row.destroy()
-                self.rows.clear()
-                self.visible_count = 0
-            else:
-                for target, row in self.rows.items():
+
+            # Apply instant visual feedback to child rows WITHOUT touching the
+            # database per-row (the old per-row `_on_action` cascade wrote a
+            # global rule + re-synced the whole blocklist for every single row,
+            # freezing the UI for minutes on large app groups).
+            rows_snapshot = list(self.rows.values())
+            def _apply_row_visuals():
+                for row in rows_snapshot:
                     try:
-                        row._on_action(db_action)
+                        row.apply_bulk_state(db_action)
+                    except Exception:
+                        pass
+            try:
+                self.after(0, _apply_row_visuals)
+            except Exception:
+                pass
+
+            # Heavy I/O (OS firewall netsh calls, SQLite writes, rule re-sync)
+            # runs on a background thread so the UI never blocks.
+            import threading
+            def heavy_work():
+                try:
+                    # Update OS Firewall
+                    rule_name = f"NetStrip_AppBlock_{self.process_name}"
+                    if new_state == 'block' and self.process_path:
+                        self.engine.platform.add_firewall_rule(
+                            rule_name=rule_name,
+                            direction="out",
+                            action="block",
+                            program=self.process_path
+                        )
+                    else:
+                        self.engine.platform.remove_firewall_rule(rule_name=rule_name)
+
+                    # Update Database
+                    current_mode = self.engine.classifier.mode.name
+                    mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
+
+                    # First remove any existing global app rule for this app under the current mode scope
+                    try:
+                        conn = self.engine.db._get_connection()
+                        conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
+                        conn.commit()
                     except:
                         pass
+
+                    if db_action != 'neutral':
+                        # Store explicit rule (allow or block). Neutral needs no
+                        # persisted rule: absence of an explicit app rule means
+                        # individual evaluation is restored automatically.
+                        self.engine.db.add_user_rule({
+                            'pattern': '*',
+                            'action': db_action,
+                            'scope': 'app',
+                            'app_name': self.process_name,
+                            'category': 'user_allowed' if db_action == 'allow' else 'user_blocked',
+                            'note': self.process_path,
+                            'mode_scope': mode_scope
+                        })
+
+                    # Sync memory instantly for this mode scope
+                    if hasattr(self.engine.blocklist, 'sync_user_rules'):
+                        self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
+                    status_cb = getattr(self.engine, 'on_status_update', None)
+                    if status_cb:
+                        status_cb("rules_changed")
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Bulk toggle failed for {self.process_name}: {e}")
+                finally:
+                    self._is_toggling = False
+
+            threading.Thread(target=heavy_work, daemon=True).start()
 
         if target_action == 'allow' and self._global_action_state != 'allow':
             check_killswitch_override(self.engine, self, proceed)
@@ -709,9 +782,9 @@ class AppGroupFrame(ctk.CTkFrame):
         # System block indicator applies unless user explicitly allowed
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
         if sys_blocked and not has_explicit_allow:
+            from netstrip.core.process_utils import is_system_process
             is_system = False
-            p_lower = self.process_name.lower()
-            if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe', 'system', 'system (kernel/driver)', 'system idle process'):
+            if is_system_process(self.process_name):
                 is_system = True
             elif len(self.rows) > 0 and all(r.conn_data.get('category') in ('system', ConnectionCategory.SYSTEM.value, 'telemetry', 'tracker', 'ad', 'malware') or r.conn_data.get('action') == 'block' for r in self.rows.values()):
                 is_system = True
@@ -784,6 +857,10 @@ class AppGroupFrame(ctk.CTkFrame):
                 filter_hidden = True
             elif active_filter == "Filter: Blocked" and action != 'block':
                 filter_hidden = True
+            elif active_filter == "Filter: System":
+                from netstrip.core.process_utils import is_system_process
+                if row.conn_data.get('category') not in ('system', ConnectionCategory.SYSTEM.value) and not is_system_process(row.conn_data.get('process_name')):
+                    filter_hidden = True
             elif active_filter == "Filter: DNS/Local" and category not in ('dns', 'lan'):
                 filter_hidden = True
                 

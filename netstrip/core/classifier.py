@@ -50,40 +50,9 @@ class TrafficClassifier:
 
         if process_name:
             p_lower = process_name.lower()
-            system_processes = {
-                # Windows Core & System Subsystems
-                'svchost', 'explorer', 'searchapp', 'system', 'lsass', 'services',
-                'spoolsv', 'wermgr', 'taskhostw', 'smss', 'csrss', 'wininit',
-                'winlogon', 'fontdrvhost', 'dwm', 'sihost', 'ctfmon', 'taskmgr',
-                'dllhost', 'conhost', 'runtimebroker', 'applicationframehost',
-                'systemsettings', 'securityhealthsystray', 'sgrmbroker',
-                'wuauserv', 'mousocoreworker', 'usoclient', 'trustedinstaller',
-                'tiworker', 'sedlauncher', 'remsh', 'waasmedicagent',
-                'compattelrunner', 'devicecensus', 'invagent', 'diagtrack',
-                'device-census', 'wsappx', 'appinstaller', 'winstore.app',
-                'microsoft.photos', 'yourphone', 'phoneexperiencehost', 'searchhost',
-                'shellexperiencehost', 'gamebar', 'gamebarftserver', 'xboxpcapp',
-                'xboxpcappft', 'feedsinfobar', 'widgets', 'copilot', 'onedrive',
-                'onedrivestandaloneupdater', 'settingsynchost', 'searchindexer',
-                'searchprotocolhost', 'searchfilterhost', 'installagent',
-                'lsaiso', 'secure system', 'registry', 'memory compression',
-                'ntoskrnl', 'winrsphost', 'winrshost', 'msedgeupdate', 'microsoftedgeupdate',
-                'upfc', 'wmiapsrv', 'vssvc', 'useroobebroker', 'lockapp', 'logonui',
-                'werfault', 'werfaultsecure', 'systemsettingsbroker', 'castsrv',
-                'textinputhost', 'provtool', 'slui', 'system idle process',
-                'system (kernel/driver)', 'backgroundtaskhost', 'startmenuexperiencehost',
-                'widgetservice', 'wmiprvse', 'wlanext', 'audiodg', 'dashost', 'sppsvc',
-                'backgroundtransferhost',
-                
-                # Linux System Daemons
-                'systemd-resolved', 'systemd-timesyncd', 'networkmanager', 'dhclient', 'avahi-daemon', 'cupsd', 'packagekitd', 'snapd', 'fwupd',
-                'chronyd', 'ntpd', 'dbus-daemon', 'rpcbind', 'systemd-networkd', 'unattended-upgrades', 'apt', 'dpkg', 'yum', 'dnf', 'zypper', 'pacman', 'dockerd', 'containerd', 'kubelet',
-                
-                # macOS Daemons & System
-                'mdnsresponder', 'kernel_task', 'configd', 'syspolicyd', 'networkd', 'nsurlsessiond', 'apsd', 'softwareupdated', 'trustd', 'rapportd',
-                'symptomsd', 'rtcreportingd', 'awdd', 'analyticsd', 'cloudd', 'touristd', 'locationd', 'identityservicesd', 'securityd', 'cfprefsd',
-                'tcc', 'corelocationagent', 'crashreporter', 'submitdiaginfo', 'com.apple.geod'
-            }
+            # Shared comprehensive cross-OS system process identification
+            # (Windows / Linux / macOS / Android) from process_utils.
+            from netstrip.core.process_utils import is_system_process
             
             av_processes = {
                 # Kaspersky
@@ -107,7 +76,7 @@ class TrafficClassifier:
             }
             
             p_base = p_lower.replace('.exe', '')
-            if p_base in system_processes or p_base.startswith('service host (') or p_base.startswith('svchost ('):
+            if is_system_process(p_base) or p_base.startswith('service host (') or p_base.startswith('svchost ('):
                 self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
                 return ConnectionCategory.SYSTEM
             if p_base in av_processes:

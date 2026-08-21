@@ -9,6 +9,7 @@ import threading
 import json
 import pickle
 import hashlib
+import hmac
 import logging
 import re
 import datetime
@@ -180,6 +181,9 @@ class BlocklistManager:
         self.app_blacklist: Set[str] = set()
         self.app_neutral: Set[str] = set()
         self.blacklist: Dict[str, bool] = {}
+        # Per-category bulk overrides set from the Filter Manager UI cards.
+        # {category_value: 'allow' | 'block'} — absent means default behavior.
+        self.category_overrides: Dict[str, str] = {}
         self.lock = threading.RLock()
         self.stats: Dict[ConnectionCategory, int] = {cat: 0 for cat in ConnectionCategory}
         self.sources_metadata: Dict[ConnectionCategory, List[Dict[str, Any]]] = {}
@@ -205,31 +209,71 @@ class BlocklistManager:
                     except Exception: pass
                 else:
                     try:
+                        # Self-healing merge: bundled definitions always win
+                        # (fixes dead/moved/re-named upstream feeds on every
+                        # upgrade), while the user's per-source enabled/disabled
+                        # toggles are preserved by matching name first, then
+                        # URL. Custom user-added sources are kept verbatim.
                         with open(bundled_sources, 'r', encoding='utf-8') as f:
                             b_data = json.load(f)
                         with open(target_sources, 'r', encoding='utf-8') as f:
                             t_data = json.load(f)
-                        
+
                         b_sources = b_data.get('sources', [])
                         t_sources = t_data.get('sources', [])
-                        
-                        t_dict = {s.get('name'): s for s in t_sources if s.get('name')}
+
+                        enabled_by_name = {}
+                        enabled_by_url = {}
+                        custom_sources = []
+                        b_names = {s.get('name') for s in b_sources if s.get('name')}
+
+                        def _norm(s):
+                            return ''.join(ch for ch in str(s).lower() if ch.isalnum())
+
+                        enabled_by_norm = {}
+                        for s in t_sources:
+                            if s.get('name'):
+                                enabled_by_name[s['name']] = s.get('enabled', True)
+                                n = _norm(s['name'])
+                                if n and n not in enabled_by_norm:
+                                    enabled_by_norm[n] = s.get('enabled', True)
+                            if s.get('url'):
+                                enabled_by_url[s['url']] = s.get('enabled', True)
+
+                        for s in t_sources:
+                            if s.get('name') not in b_names and str(s.get('name', '')).startswith('Custom:'):
+                                custom_sources.append(s)
+
+                        merged = []
                         modified = False
-                        
                         for b_s in b_sources:
-                            name = b_s.get('name')
-                            if not name: continue
-                            if name not in t_dict:
-                                t_sources.append(b_s)
-                                modified = True
+                            new_s = dict(b_s)
+                            name = new_s.get('name')
+                            norm = _norm(name) if name else ''
+                            if name in enabled_by_name:
+                                new_s['enabled'] = enabled_by_name[name]
+                            elif new_s.get('url') in enabled_by_url:
+                                new_s['enabled'] = enabled_by_url[new_s['url']]
                             else:
-                                if b_s.get('url') and t_dict[name].get('url') != b_s.get('url'):
-                                    t_dict[name]['url'] = b_s.get('url')
-                                    modified = True
-                        
+                                # Normalized-name containment: keeps a user's
+                                # opt-out alive across upstream renames/repoints
+                                # (e.g. 'KADhosts (Fraud/Scam)' ->
+                                #  'KADhosts Fraud/Scam (PolishFiltersTeam)').
+                                for n_old, en in enabled_by_norm.items():
+                                    if n_old and (norm.startswith(n_old) or n_old.startswith(norm)):
+                                        new_s['enabled'] = en
+                                        break
+                            old = next((t for t in t_sources if t.get('name') == name), None)
+                            if old is None or any(old.get(k) != new_s.get(k) for k in ('url', 'category', 'format', 'enabled')):
+                                modified = True
+                            merged.append(new_s)
+                        merged.extend(custom_sources)
+                        modified = modified or len(merged) != len(t_sources)
+
                         if modified:
+                            t_data['sources'] = merged
                             with open(target_sources, 'w', encoding='utf-8') as f:
-                                json.dump(t_data, f, indent=2)
+                                json.dump(t_data, f, indent=4)
                     except Exception:
                         pass
             
@@ -244,6 +288,8 @@ class BlocklistManager:
                             
         self.lists_dir = lists_dir
         self.is_loading = True
+        
+        self._load_category_overrides()
         
         if async_load:
             threading.Thread(target=self._load_async_worker, daemon=True).start()
@@ -287,6 +333,54 @@ class BlocklistManager:
         if self.lists_dir:
             paths.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
         return paths
+
+    # --- Signed binary cache (anti-tampering) -------------------------------
+    # pickle.load on a user-writable file is arbitrary-code-execution vector.
+    # The cache is therefore sealed with an HMAC-SHA256 tag; a modified or
+    # planted cache file fails verification and is rebuilt from the feeds.
+    CACHE_MAGIC = b"NSPK1"
+
+    def _get_cache_signing_key(self) -> bytes:
+        key_path = os.path.join(os.path.expanduser("~"), ".NetStrip", "cache.key")
+        try:
+            if os.path.exists(key_path):
+                with open(key_path, "rb") as kf:
+                    key = kf.read()
+                if len(key) >= 32:
+                    return key
+            import secrets
+            key = secrets.token_bytes(32)
+            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            with open(key_path, "wb") as kf:
+                os.chmod(key_path, 0o600)
+                kf.write(key)
+            return key
+        except Exception:
+            return b"NetStrip-fallback-cache-key-v1"
+
+    def _load_signed_pickle(self, path: str):
+        """Verify the HMAC seal of a .pkl cache before deserializing it."""
+        with open(path, "rb") as f:
+            blob = f.read()
+        if len(blob) < len(self.CACHE_MAGIC) + 32 + 2:
+            raise ValueError("Cache file too small")
+        magic = blob[:len(self.CACHE_MAGIC)]
+        sig = blob[len(self.CACHE_MAGIC):len(self.CACHE_MAGIC) + 32]
+        payload = blob[len(self.CACHE_MAGIC) + 32:]
+        if magic != self.CACHE_MAGIC:
+            raise ValueError("Legacy unsigned cache format")
+        expected = hmac.new(self._get_cache_signing_key(), payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(sig, expected):
+            raise ValueError("Cache signature verification failed")
+        return pickle.loads(payload)
+
+    @staticmethod
+    def _seal_pickle(payload_obj) -> bytes:
+        """Serialize + HMAC-seal a cache payload into the signed container format."""
+        body = pickle.dumps(payload_obj, protocol=pickle.HIGHEST_PROTOCOL)
+        key = BlocklistManager._get_cache_signing_key(BlocklistManager)
+        sig = hmac.new(key, body, hashlib.sha256).digest()
+        return BlocklistManager.CACHE_MAGIC + sig + body
 
     def _get_lists_hash(self) -> str:
         """Generate a stable deterministic hash of the current lists directory, updater sources, and DNS settings."""
@@ -450,8 +544,15 @@ class BlocklistManager:
             if not parts:
                 continue
                 
+            # v2fly domain-list-community format:
+            #   "domain example.com" / "full:example.com" / "keyword:xxx"
+            # The first token is the rule type — only the second token is a domain.
+            if parts[0] in ('domain', 'full') and len(parts) >= 2:
+                candidates = [parts[1]]
+            elif parts[0] in ('keyword', 'regexp', 'include') or parts[0].startswith(('keyword:', 'regexp:')):
+                continue
             # Hosts format (any IP prefix)
-            if len(parts) >= 2 and (parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53', '::', '0') or re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]+$', parts[0])):
+            elif len(parts) >= 2 and (parts[0] in ('0.0.0.0', '127.0.0.1', '::1', '127.0.0.53', '::', '0') or re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]+$', parts[0])):
                 candidates = parts[1:]
             else:
                 candidates = [parts[0]]
@@ -476,6 +577,10 @@ class BlocklistManager:
                     
                 d = raw_d.strip().lower().rstrip('.')
                 if not d or len(d) > 253 or '.' not in d:
+                    continue
+                # Skip bare IPs (e.g. Feodo C2 IP lists) — they are not domains
+                # and would poison the domain map with useless pseudo-entries.
+                if re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', d) or ':' in d:
                     continue
                 if d in ('0.0.0.0', '127.0.0.1', 'localhost', 'broadcasthost', 'local'):
                     continue
@@ -503,8 +608,8 @@ class BlocklistManager:
                             self._report_progress("Loading domain database cache...", 0.3, cb)
                             cache_data = None
                             if cache_file.endswith('.pkl'):
-                                with open(cache_file, "rb") as f:
-                                    cache_data = pickle.load(f)
+                                # HMAC-sealed container: refuse tampered/planted files
+                                cache_data = self._load_signed_pickle(cache_file)
                             elif cache_file.endswith('.json'):
                                 with open(cache_file, "r", encoding="utf-8") as f:
                                     cache_data = json.load(f)
@@ -738,13 +843,14 @@ class BlocklistManager:
                         pkl_target = os.path.join(t_dir, "NetStrip_cache.pkl")
                         pkl_tmp = pkl_target + ".tmp"
                         try:
+                            sealed = BlocklistManager._seal_pickle(pkl_payload)
                             with open(pkl_tmp, "wb") as f:
-                                pickle.dump(pkl_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+                                f.write(sealed)
                             if os.path.exists(pkl_target):
                                 try: os.remove(pkl_target)
                                 except Exception: pass
                             os.replace(pkl_tmp, pkl_target)
-                            logger.info(f"Updated high-speed binary cache at {pkl_target}")
+                            logger.info(f"Updated signed binary cache at {pkl_target}")
                         except Exception as e:
                             logger.debug(f"Could not write pkl cache to {pkl_target}: {e}")
                             if os.path.exists(pkl_tmp):
@@ -765,10 +871,49 @@ class BlocklistManager:
             self.is_loading = False
             self._notify_loaded()
 
+    def _load_category_overrides(self):
+        """Restore persisted per-category Allow/Block overrides from the DB."""
+        if not self.db:
+            return
+        try:
+            raw = self.db.get_setting("category_overrides", "{}")
+            data = json.loads(raw) if isinstance(raw, str) else (raw or {})
+            if isinstance(data, dict):
+                self.category_overrides = {
+                    str(k).lower(): str(v).lower()
+                    for k, v in data.items() if v in ('allow', 'block')
+                }
+        except Exception as e:
+            logger.debug(f"Failed to load category overrides: {e}")
+
+    def get_category_override(self, category_value: str) -> Optional[str]:
+        with self.lock:
+            return self.category_overrides.get(str(category_value).lower())
+
+    def set_category_override(self, category_value: str, state: Optional[str]):
+        """
+        Bulk-switch an entire indexed category to Allow or Block.
+        state: 'allow' | 'block' | None (reset to default evaluation).
+        Persists to the settings store and applies instantly.
+        """
+        key = str(category_value).lower()
+        with self.lock:
+            if state in ('allow', 'block'):
+                self.category_overrides[key] = state
+            else:
+                self.category_overrides.pop(key, None)
+        if self.db:
+            try:
+                self.db.set_setting("category_overrides", json.dumps(dict(self.category_overrides)))
+            except Exception as e:
+                logger.debug(f"Failed to persist category override: {e}")
+
     def is_blocked(self, domain: str, process_name: str = None) -> Tuple[bool, Optional[ConnectionCategory]]:
         """
         Check if a domain is blocked. Checks whitelist, blacklist, and Maps.
         Subdomain matching: if tracker.com is blocked, sub.tracker.com is also blocked.
+        Priority hierarchy: user domain rules > app rules > category overrides >
+        indexed feed categories > hardcoded essential/system/update presets.
         """
         if not domain:
             return False, ConnectionCategory.UNKNOWN
@@ -776,6 +921,15 @@ class BlocklistManager:
         domain = domain.lower()
         if domain.endswith('.'):
             domain = domain[:-1]
+
+        # Fast-path category override lookup helper
+        def _check_override(cat):
+            ov = self.category_overrides.get(getattr(cat, 'value', str(cat)).lower())
+            if ov == 'allow':
+                return False, ConnectionCategory.USER_ALLOWED
+            if ov == 'block':
+                return True, ConnectionCategory.USER_BLOCKED
+            return None
 
         with self.lock:
             # 1. User overrides (Highest Priority)
@@ -795,6 +949,9 @@ class BlocklistManager:
                 test_domain = '.'.join(parts[i:])
                 if test_domain in self.domain_map:
                     cat = self.domain_map[test_domain]
+                    ov = _check_override(cat)
+                    if ov is not None:
+                        return ov
                     is_blk = cat not in (ConnectionCategory.ESSENTIAL, ConnectionCategory.SYSTEM, ConnectionCategory.UPDATE, ConnectionCategory.USER_ALLOWED)
                     return is_blk, cat
 
@@ -805,10 +962,16 @@ class BlocklistManager:
 
             for sys_dom in SYSTEM_DOMAINS:
                 if domain == sys_dom or domain.endswith('.' + sys_dom):
+                    ov = _check_override(ConnectionCategory.SYSTEM)
+                    if ov is not None:
+                        return ov
                     return False, ConnectionCategory.SYSTEM
 
             for upd_dom in UPDATE_DOMAINS:
                 if domain == upd_dom or domain.endswith('.' + upd_dom):
+                    ov = _check_override(ConnectionCategory.UPDATE)
+                    if ov is not None:
+                        return ov
                     return False, ConnectionCategory.UPDATE
 
             return False, ConnectionCategory.UNKNOWN

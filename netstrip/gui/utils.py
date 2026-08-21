@@ -125,9 +125,56 @@ def enable_smooth_scrolling(scrollable_frame):
     except Exception:
         pass
 
+_SCROLL_SPEED_PRESETS = {
+    "slow": 0.5,
+    "normal": 1.0,
+    "fast": 1.6,
+    "ultra": 2.4,
+}
+_scroll_multiplier = _SCROLL_SPEED_PRESETS["normal"]
+
+
+def get_scroll_speed_presets():
+    return list(_SCROLL_SPEED_PRESETS.keys())
+
+
+def set_scroll_speed_preset(preset: str):
+    """Live-adjust global scroll velocity (Slow / Normal / Fast / Ultra)."""
+    global _scroll_multiplier
+    m = _SCROLL_SPEED_PRESETS.get(str(preset).strip().lower())
+    if m:
+        _scroll_multiplier = m
+
+
+def apply_saved_scroll_speed(db) -> str:
+    """Load the persisted gui_scroll_speed setting into the scroll engine."""
+    preset = "normal"
+    try:
+        preset = str(db.get_setting("gui_scroll_speed", "normal")).lower()
+    except Exception:
+        pass
+    set_scroll_speed_preset(preset)
+    return preset if preset in _SCROLL_SPEED_PRESETS else "normal"
+
+
+def get_scroll_step(platform: str = None) -> int:
+    """Centralized mousewheel scroll speed (units per notch), honoring the
+    user's Scroll Speed setting. Matches the app.py CTkScrollableFrame patch."""
+    import sys
+    platform = platform or sys.platform
+    if platform.startswith("win"):
+        base = 22
+    elif platform == "darwin":
+        base = 12
+    else:
+        base = 10
+    return max(1, int(round(base * _scroll_multiplier)))
+
 def apply_treeview_scroll_patch(tree_widget):
     """Applies ultra-fast custom scroll binding to a ttk.Treeview widget."""
     import sys
+    
+    step_units = get_scroll_step()
     
     def _on_mousewheel(event):
         try:
@@ -135,14 +182,14 @@ def apply_treeview_scroll_patch(tree_widget):
                 return
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    step = -int((event.delta / 120) * 15)
+                    step = -int((event.delta / 120) * step_units)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     tree_widget.yview_scroll(step, "units")
                     return "break"
             elif sys.platform == "darwin":
                 if hasattr(event, 'delta') and event.delta:
-                    step = -int(event.delta * 8)
+                    step = -int(event.delta * step_units / 2)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     tree_widget.yview_scroll(step, "units")
@@ -152,14 +199,14 @@ def apply_treeview_scroll_patch(tree_widget):
 
     def _on_linux_scroll_up(event):
         try:
-            tree_widget.yview_scroll(-8, "units")
+            tree_widget.yview_scroll(-step_units, "units")
             return "break"
         except Exception:
             pass
             
     def _on_linux_scroll_down(event):
         try:
-            tree_widget.yview_scroll(8, "units")
+            tree_widget.yview_scroll(step_units, "units")
             return "break"
         except Exception:
             pass

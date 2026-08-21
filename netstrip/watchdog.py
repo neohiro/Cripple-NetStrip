@@ -49,7 +49,7 @@ def verify_integrity(baseline):
                 with open(filepath, 'rb') as f:
                     content = f.read()
                 current_hmac = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha512).hexdigest()
-                if str(filepath) in baseline and current_hmac != baseline[str(filepath)]:
+                if str(filepath) in baseline and not hmac.compare_digest(current_hmac, baseline[str(filepath)]):
                     tampered.append(filepath.name)
             except Exception:
                 pass

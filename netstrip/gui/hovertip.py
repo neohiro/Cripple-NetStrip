@@ -203,14 +203,29 @@ def apply_global_tooltips():
     orig_sw_init = ctk.CTkSwitch.__init__
     orig_seg_init = ctk.CTkSegmentedButton.__init__
     
+    # Pre-sorted once: longest keys first so substring matching finds the
+    # most specific tooltip without scanning every entry on short texts.
+    _TOOLTIP_KEYS = sorted(
+        ((k, v) for k, v in TOOLTIP_MAP.items() if k),
+        key=lambda kv: len(kv[0]),
+        reverse=True,
+    )
+
     def get_dynamic_tooltip(widget):
         try:
             text = widget.cget('text')
             if not isinstance(text, str): return ""
             text = text.strip()
-            if text in TOOLTIP_MAP: return TOOLTIP_MAP[text]
-            for key, tip in TOOLTIP_MAP.items():
-                if key in text and key != "": return tip
+            if not text:
+                return ""
+            tip = TOOLTIP_MAP.get(text)
+            if tip: return tip
+            # Skip the O(N) scan for long dynamic strings (paths, domains):
+            # no tooltip key is longer than 24 chars.
+            if len(text) > 32:
+                return ""
+            for key, tip in _TOOLTIP_KEYS:
+                if key in text: return tip
         except Exception:
             pass
         return ""

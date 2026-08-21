@@ -28,7 +28,7 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 - **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time.
 - **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click.
 - **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS.
-- **Zero-configuration privacy** — Ships with **3.2+ Million unique blocked domains** out of the box across 49 active threat feeds. Ads, trackers, telemetry, and malware — gone before you even open a browser.
+- **Zero-configuration privacy** — Downloads **4.4+ Million unique blocked domains** out of the box across 58 curated threat feeds (machine-verified URLs). Ads, trackers, telemetry, and malware — gone before you even open a browser.
 - **Hardware stealth** — Includes MAC Address Randomization and network adapter hardening to prevent device fingerprinting.
 - **Native OS Firewall Sync** — Automatically detects your manually set Windows Firewall block/allow rules and natively enforces them at the packet level.
 - **Your network, offline** — Run it on a Raspberry Pi, a NUC, or a home server and protect every device on your LAN without installing anything on them.
@@ -95,7 +95,7 @@ You can customize everything: add your own blocklists (paste any URL), create pe
 
 ## 🛡 Active Blocklists & Threat Feeds
 
-Cripple aggregates **3,236,262+ unique domains** from 42 active, high-reputation blocklists and threat intelligence feeds. Feeds are automatically updated on tailored schedules:
+Cripple aggregates **4,464,000+ unique domains** from 58 curated, high-reputation blocklists and threat intelligence feeds (all URLs machine-verified live). Feeds are automatically downloaded on first start (~40s) and refreshed on tailored per-source schedules:
 
 ### ☠ Rapid Threat Intelligence & Malware Feeds (1h–4h Cycle)
 | Blocklist Source | Category | Update Interval | Description |
@@ -333,6 +333,18 @@ pip install -r requirements.txt
 ---
 
 ## 🚀 Release Notes
+
+### v3.7.0 — Issue #6 Integration: GUI Freeze Fixes, Startup Enforcement & Security Audit
+
+- **Bulk Toggle Freeze Fixed**: Allow All / Block All / Neutral switches are fully responsive — firewall/DB/sync work runs on a background thread and rows repaint instantly. Undo-to-neutral works reliably.
+- **Startup Enforcement**: Live blocklisted TCP connections are terminated right after boot; system-process red-light renders at startup via a shared cross-OS `SYSTEM_PROCESSES` registry; Time Bombs & scheduled killswitch now enforced (watchdog loop actually started).
+- **Log UX**: Connection Log fits pane width, retains 72h, live 300-row window + "Load Older Logs" paging button.
+- **Dashboard**: scrollbar removed — Recent Blocks frame fills the window edge-to-edge dynamically.
+- **Scrolling**: global scroll speed raised (~45% faster), Online Feeds list integrated into the centralized speed setting, zebra line-artifacts on expanded sidebar scrolling eliminated.
+- **Filter Manager**: per-category Bulk Allow/Block switch, click-to-copy hovertips on domain results, staged tab rendering for instant switching.
+- **Feeds**: 58 online sources (+9), **every URL machine-verified live** (new `scripts/check_feeds_online.py`); v2fly identity-list parser fixed; per-source update schedules now honored; duplicate regional feeds deduped.
+- **Security Audit**: removed embedded GitHub PAT, HMAC-signed blocklist cache, LAN Shield replay-window fix, TLS fail-closed everywhere, `shell=False` sandboxing.
+- **Version Pipeline**: single-source versioning via `scripts/bump_version.py` + automated GitHub Actions propagation.
 
 ### v3.4.6 — System Connection Block Visual Indicator & Real-Time App Row Sync
 - **System App Block Active Red Button**: When `Block System Connections` is toggled ON, system process rows (`svchost.exe`, `explorer.exe`, `conhost.exe`, `System`, `services.exe`, etc.) in the live app connections sidebar immediately show their `Block All` button highlighted in **bright red** (`#f43f5e`), clearly indicating an active system process block state.

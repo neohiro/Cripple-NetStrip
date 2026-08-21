@@ -190,17 +190,11 @@ def _get_crash_token() -> str:
     except Exception:
         pass
 
-    # 4. Hardcoded fallback (fine-grained PAT, scoped to issues:write on Cripple-Telemetry only)
-    try:
-        import base64
-        return base64.b64decode(
-            "Z2l0aHViX3BhdF8xMUJCVE1OWEEwTkMzclNoTHFPSDFyX1Zz"
-            "NXVWckJhdWFJcXZrNjBOMElQaTVJenh1Mk56TnJMcXRKTVR1"
-            "VmVKTEtOM0hGRk5HNlhoTnI2aVBl"
-        ).decode("utf-8")
-    except Exception:
-        pass
-
+    # 4. Hardcoded fallbacks are intentionally NOT shipped: embedding a live
+    # token in a public binary leaks it to every user (and the world). Set
+    # NETSTRIP_TELEMETRY_TOKEN, ~/.netstrip/telemetry_token or the
+    # telemetry_github_token DB setting instead. Without a token, crash
+    # reports degrade gracefully to local-only logging.
     return ""
 
 

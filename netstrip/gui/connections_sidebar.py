@@ -79,7 +79,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         
         self.filter_var = ctk.StringVar(value="Filter: All")
         self.opt_filter = ctk.CTkOptionMenu(
-            sf_frame, values=["Filter: All", "Filter: Allowed", "Filter: Blocked", "Filter: DNS/Local"], 
+            sf_frame, values=["Filter: All", "Filter: Allowed", "Filter: Blocked", "Filter: System", "Filter: DNS/Local"], 
             variable=self.filter_var, width=130, height=26,
             font=(Fonts.FAMILY_PRIMARY[0], 11),
             fg_color=Colors.BG_ELEVATED, button_color=Colors.BG_ELEVATED, button_hover_color=Colors.BORDER_DEFAULT, dropdown_fg_color=Colors.BG_ELEVATED,
@@ -384,16 +384,28 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 if hasattr(group, 'refresh_global_state'):
                     group.refresh_global_state()
                 group.apply_filter(self.hide_inactive, current_filter)
-                
+
             # Now repack only if the visible order does not match the desired sorted order
             visible_groups = [g for g in groups if g.visible_count > 0]
             
-            # Force DNS to the very bottom, as it is a less visible internal system group
-            dns_group = next((g for g in visible_groups if g.process_name == 'DNS'), None)
-            if dns_group:
-                visible_groups.remove(dns_group)
-                visible_groups.append(dns_group)
-                
+            # Pin low-signal internal/system pseudo-groups to the very end of
+            # the list (below all real applications): kernel-owned sockets and
+            # Service Host groupings first, with DNS always dead last.
+            def _tail_rank(group):
+                name = group.process_name.lower()
+                if name == 'dns':
+                    return 2
+                if name in ("system idle process", "system (kernel/driver)", "system"):
+                    return 1
+                return 0
+
+            tail_groups = sorted(
+                [g for g in visible_groups if _tail_rank(g) > 0],
+                key=_tail_rank,
+            )
+            visible_groups = [g for g in visible_groups if _tail_rank(g) == 0] + tail_groups
+            
+            
             # Intelligent grid packing to eliminate flicker and stuttering
             current_packed = [c for c in self.scroll_frame.winfo_children() if isinstance(c, AppGroupFrame) and getattr(c, '_is_packed', True)]
             for group in current_packed:
@@ -493,11 +505,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
         def _update_next(index=0):
             if not self.winfo_exists() or index >= len(groups_to_update):
                 return
-            batch_size = 10
+            # Larger batches + tighter ticks keep the redraw fluid instead of
+            # sluggish when expanding the full sidebar
+            batch_size = 30
             for i in range(index, min(index + batch_size, len(groups_to_update))):
                 groups_to_update[i].set_expanded(expanded)
             try:
-                self.after(2, lambda: _update_next(index + batch_size))
+                self.after(1, lambda: _update_next(index + batch_size))
             except Exception:
                 pass
                 

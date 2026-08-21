@@ -118,15 +118,13 @@ class BlocklistUpdater:
                 any_updated = False
                 updated_count = 0
 
-                # Create robust SSL context
+                # Always-verified SSL context (fail closed)
                 import ssl
                 try:
                     import certifi
                     ssl_context = ssl.create_default_context(cafile=certifi.where())
                 except Exception:
                     ssl_context = ssl.create_default_context()
-                    ssl_context.check_hostname = False
-                    ssl_context.verify_mode = ssl.CERT_NONE
                 
                 self.last_update_stats = {"success": 0, "failed": 0, "total": total_enabled}
                 for idx, source in enumerate(enabled_sources, 1):

@@ -40,6 +40,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
+def _looks_like_system_owner(process_name: str) -> bool:
+    """True when a connection owner is an OS daemon / service-host grouping."""
+    from netstrip.core.process_utils import is_system_process
+    return is_system_process(process_name)
+
+
 class ConnectionMonitor:
     def __init__(self, classifier: TrafficClassifier, db: Database, poll_interval: float = 1.0):
         self.classifier = classifier
@@ -219,6 +226,27 @@ class ConnectionMonitor:
                 if len(self._domain_to_process_map) > 2000:
                     self._domain_to_process_map = {k: v for k, v in self._domain_to_process_map.items() if now_ts - v[3] < 300.0}
                 self._domain_to_process_map[domain] = (process_name, process_path, original_exe, now_ts)
+        
+        # --- Self-service target re-attribution ---
+        # GeoIP (ipwho.is / ipinfo.io / ipapi.co ...), update and telemetry endpoints
+        # contacted by Cripple's own background services must never be shown under a
+        # wrong process. Kernel-attributed sockets (PID 0/4), unresolvable PIDs and
+        # OS daemon owners are re-attributed to "Cripple (Internal)".
+        from netstrip.core.process_utils import SELF_SERVICE_TARGETS
+        _t_host = str(domain or "").lower().rstrip('.')
+        if _t_host:
+            _is_self_target = (
+                _t_host in SELF_SERVICE_TARGETS
+                or any(_t_host.endswith("." + t) for t in SELF_SERVICE_TARGETS)
+            )
+            if _is_self_target and (
+                conn.pid in (None, 0, 4, os.getpid())
+                or process_name.startswith(("Unknown", "System"))
+                or _looks_like_system_owner(process_name)
+            ):
+                process_name = "Cripple (Internal)"
+                process_path = sys.executable
+                original_exe = "Cripple"
         
         # --- IoT Botnet Detection ---
         now = time.time()

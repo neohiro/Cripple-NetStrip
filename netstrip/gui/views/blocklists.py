@@ -339,6 +339,22 @@ class BlocklistView(ctk.CTkFrame):
         stats = getattr(self.engine.blocklist, 'stats', {})
         metadata = getattr(self.engine.blocklist, 'sources_metadata', {})
 
+        # Prefer the O(1) per-category UNIQUE-domain index: `stats` sums raw
+        # per-feed rules and double-counts every domain that appears in more
+        # than one feed (e.g. a tracker present in 6 lists counted 6x).
+        # The index reflects the true deduplicated coverage the engine uses.
+        cat_sets = getattr(self.engine.blocklist, 'category_domains', {})
+        indexed = None
+        for c_enum in cat_sets.keys():
+            c_val_i = getattr(c_enum, 'value', str(c_enum)).lower()
+            if c_val_i.startswith('connectioncategory.'):
+                c_val_i = c_val_i.split('.')[-1].lower()
+            if c_enum == cat_enum or c_val_i == cat_val or (c_val_i in ('ad', 'ads') and cat_val in ('ad', 'ads')):
+                indexed = cat_sets.get(c_enum) or ()
+                break
+        if indexed is not None:
+            return len(indexed)
+
         cnt = 0
         for k, v in stats.items():
             k_val = getattr(k, 'value', str(k)).lower()
@@ -355,13 +371,13 @@ class BlocklistView(ctk.CTkFrame):
                 if k == cat_enum or k_val == cat_val or (k_val in ('ad', 'ads') and cat_val in ('ad', 'ads')):
                     cnt += sum(s.get('size', 0) for s in sources if isinstance(s, dict))
 
-        if cnt == 0:
-            domain_map = getattr(self.engine.blocklist, 'domain_map', {})
-            if domain_map:
-                cnt = sum(
-                    1 for v in domain_map.values()
-                    if (v == cat_enum or getattr(v, 'value', str(v)).lower().split('.')[-1] == cat_val)
-                )
+        if cnt == 0 and metadata:
+            for k, sources in metadata.items():
+                k_val = getattr(k, 'value', str(k)).lower()
+                if k_val.startswith('connectioncategory.'):
+                    k_val = k_val.split('.')[-1].lower()
+                if k == cat_enum or k_val == cat_val or (k_val in ('ad', 'ads') and cat_val in ('ad', 'ads')):
+                    cnt += sum(s.get('size', 0) for s in sources if isinstance(s, dict))
 
         return cnt
 
@@ -376,6 +392,44 @@ class BlocklistView(ctk.CTkFrame):
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Error refreshing stats grid: {e}")
+
+    @staticmethod
+    def _style_override_button(btn, state):
+        """Color-code the per-category bulk Allow/Block switch."""
+        if state == 'allow':
+            btn.configure(text="Bulk: ALLOW", fg_color=Colors.SUCCESS_DIM, text_color=Colors.TEXT_PRIMARY)
+        elif state == 'block':
+            btn.configure(text="Bulk: BLOCK", fg_color=Colors.DANGER, text_color=Colors.TEXT_PRIMARY)
+        else:
+            btn.configure(text="Bulk: Default", fg_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_SECONDARY)
+
+    def _cycle_category_override(self, cat_enum):
+        """Default → Allow → Block → Default, applied instantly backend + frontend."""
+        try:
+            current = self.engine.blocklist.get_category_override(cat_enum.value)
+            next_state = {'allow': 'block', 'block': None}.get(current, 'allow')
+            self.engine.blocklist.set_category_override(cat_enum.value, next_state)
+
+            # Invalidate live classification caches so sidebar/DNS re-evaluate now
+            try:
+                self.engine.classifier._domain_cache.clear()
+                if hasattr(self.engine.classifier, '_ip_cache'):
+                    self.engine.classifier._ip_cache.clear()
+            except Exception:
+                pass
+
+            # Re-style this card's switch
+            btn = getattr(self, '_override_buttons', {}).get(cat_enum)
+            if btn is not None:
+                self._style_override_button(btn, next_state)
+
+            label = get_category_label(cat_enum)
+            if hasattr(self.engine, 'on_status') and self.engine.on_status:
+                verb = {'allow': 'ALLOW', 'block': 'BLOCK'}.get(next_state, 'DEFAULT')
+                self.engine.on_status(f"Category '{label}' bulk switch → {verb}")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Category override toggle failed: {e}")
 
     def _build_search_bar(self):
         search_row = ctk.CTkFrame(self._main_scroll, fg_color=Colors.BG_PANEL)
@@ -474,6 +528,26 @@ class BlocklistView(ctk.CTkFrame):
                 text_color=Colors.TEXT_TERTIARY,
             )
             lbl_desc.pack(anchor="w")
+            
+            # Compact 3-state bulk switch: Default → Allow → Block → Default.
+            # Instantly re-evaluates every element of the stack (classifier,
+            # sidebar rows, DNS answers) via the backend override hook.
+            btn_override = ctk.CTkButton(
+                inner,
+                text="Bulk: Default",
+                width=96, height=18, corner_radius=5,
+                font=(Fonts.FAMILY_PRIMARY[0], 9, "bold"),
+                fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_DARK,
+                text_color=Colors.TEXT_SECONDARY,
+                command=lambda cat_enum=category: self._cycle_category_override(cat_enum),
+            )
+            btn_override.pack(anchor="w", pady=(4, 0))
+            
+            if not hasattr(self, '_override_buttons'):
+                self._override_buttons = {}
+            self._override_buttons[category] = btn_override
+            
+            self._style_override_button(btn_override, self.engine.blocklist.get_category_override(category.value))
             
             self._category_ui_elements[category] = (card, inner, lbl_count)
 
@@ -716,16 +790,22 @@ class BlocklistView(ctk.CTkFrame):
 
     def _isolate_sources_scroll(self):
         """Bind mouse wheel events to scroll only the inner sources list and halt propagation."""
+        from netstrip.gui.utils import get_scroll_step
+        _step = get_scroll_step()
+
         def _on_wheel(event):
             try:
                 canvas = getattr(self._sources_list_frame, '_parent_canvas', None)
                 if canvas:
                     if event.delta:
-                        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+                        step = int(-1 * (event.delta / 120) * _step)
+                        if step == 0:
+                            step = -1 if event.delta > 0 else 1
+                        canvas.yview_scroll(step, "units")
                     elif event.num == 4:
-                        canvas.yview_scroll(-1, "units")
+                        canvas.yview_scroll(-_step, "units")
                     elif event.num == 5:
-                        canvas.yview_scroll(1, "units")
+                        canvas.yview_scroll(_step, "units")
             except Exception:
                 pass
             return "break"
@@ -972,6 +1052,14 @@ class BlocklistView(ctk.CTkFrame):
             bg_color = "#181824" if i % 2 == 0 else "#14141f"
             item['frame'].configure(fg_color=bg_color)
             item['domain_lbl'].configure(text=domain)
+            
+            # Click-to-copy with hovertip confirmation (same UX as the
+            # live app connections sidebar)
+            try:
+                from netstrip.gui.utils import bind_copy_tooltip
+                bind_copy_tooltip(item['domain_lbl'], domain)
+            except Exception:
+                pass
             
             try:
                 norm_cat = cat

@@ -53,7 +53,11 @@ class LANShield:
     def _listen_for_broadcasts(self):
         """Resilient listener loop with auto-recovery. If the UDP socket dies
         (e.g. interface down during killswitch), it rebinds after a delay."""
+        # FIFO nonce eviction: wiping the whole set on overflow (old behavior)
+        # re-admitted the last 200 nonces and opened a ~5-minute replay window.
+        from collections import deque
         seen_nonces = set()
+        nonce_order = deque(maxlen=4096)
 
         while self._running:
             sock = None
@@ -94,9 +98,13 @@ class LANShield:
                                 continue
                             if nonce in seen_nonces:
                                 continue
+                            # FIFO eviction: the oldest nonce drops out of both
+                            # structures only once 4096 newer ones arrived —
+                            # no bulk-clear replay window.
+                            if len(nonce_order) == nonce_order.maxlen:
+                                seen_nonces.discard(nonce_order[0])
+                            nonce_order.append(nonce)
                             seen_nonces.add(nonce)
-                            if len(seen_nonces) > 200:
-                                seen_nonces.clear()
 
                             # Validate the payload
                             btype = payload.get('type')

@@ -84,27 +84,38 @@ class ModeConfig:
     ])
 
     def get_action_for_category(self, category: ConnectionCategory, db=None) -> ConnectionAction:
-        """Determine what action to take for a given connection category."""
-        # Check global allowlist overrides first
+        """
+        Determine what action to take for a given connection category.
+
+        Evaluated priority hierarchy (top → bottom):
+          1. USER_ALLOWED / DNS / ESSENTIAL / IDENTITY  → always allow
+          2. USER_BLOCKED                                → always block
+          3. always_blocked presets (MALWARE, TRACKER)   → always block
+          4. GHOST family preset (Ghost/Paranoid/Strict) → deny-by-default stealth
+          5. STANDARD family preset (Normal + Loose)     → mode-config rules,
+             with SYSTEM connections additionally gated by the
+             block_system_connections user setting
+        """
+        # 1. Never-block channels (explicit user allow beats every preset)
         if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL, ConnectionCategory.IDENTITY):
             return ConnectionAction.ALLOW
 
-        if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT):
-            if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL):
-                return ConnectionAction.ALLOW
+        # 2. Explicit user block beats every preset allow
+        if category == ConnectionCategory.USER_BLOCKED:
             return ConnectionAction.BLOCK
-            
+
+        # 3. Confirmed-threat categories are blocked in all modes
         if category in self.always_blocked:
             return ConnectionAction.BLOCK
 
-        if category == ConnectionCategory.USER_ALLOWED:
-            return ConnectionAction.ALLOW
-        if category == ConnectionCategory.USER_BLOCKED:
+        # 4. Ghost-family second preset: zero-leak deny-by-default.
+        #    (Everything not explicitly allowed above is blocked.)
+        if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT):
             return ConnectionAction.BLOCK
-            
-        if category in (ConnectionCategory.SECURITY, ConnectionCategory.SYSTEM):
-            if self.level in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT) and category == ConnectionCategory.SYSTEM:
-                return ConnectionAction.BLOCK
+
+        # 5. Standard family (Normal / Loose share one security bucket):
+        #    system connection gating first, then per-category mode config.
+        if category == ConnectionCategory.SYSTEM:
             if hasattr(db, 'get_setting'):
                 sys_val = db.get_setting("block_system_connections", "false")
             elif isinstance(db, dict):

@@ -418,6 +418,32 @@ class Database:
                     rule_data.get('expires_at'), rule_data.get('mode_scope', 'STANDARD')
                 ))
 
+    def set_app_rule(self, app_path: str, action: str):
+        """Upsert an app-scope rule keyed by executable path (OS firewall import)."""
+        app_path = str(app_path or '').strip()
+        if not app_path:
+            return
+        action = 'block' if str(action).lower() == 'block' else 'allow'
+        app_name = os.path.basename(app_path)
+        with self.lock:
+            if hasattr(self, '_rules_cache'):
+                self._rules_cache.clear()
+            with self._get_connection() as conn:
+                conn.execute('''
+                    DELETE FROM user_rules
+                    WHERE scope = 'app' AND note = ? AND pattern = '*'
+                ''', (app_path,))
+                conn.execute('''
+                    INSERT INTO user_rules
+                    (pattern, action, scope, app_name, category, note, mode_scope)
+                    VALUES ('*', ?, 'app', ?, ?, ?, 'ALL')
+                ''', (
+                    action,
+                    app_name,
+                    'user_blocked' if action == 'block' else 'user_allowed',
+                    app_path,
+                ))
+
     def get_user_rules(self, mode_scope: Optional[str] = None) -> List[sqlite3.Row]:
         """Get user rules filtered by mode_scope (or ALL/STANDARD defaults)"""
         with self.lock:

@@ -436,9 +436,10 @@ class NetStripEngine:
         if self.progress_callback:
             self.progress_callback("Cleaning up old logs...", 0.2)
             
-        # Clean up data older than 24 hours on initialization
+        # Retain 72 hours of connection history (paged UI keeps rendering lag-free;
+        # users can page deeper via "Load Older Logs" in the Connection Log tab)
         try:
-            self.db.prune_old_logs(hours=24)
+            self.db.prune_old_logs(hours=72)
         except Exception as e:
             logger.error(f"Error wiping initial data: {e}")
 
@@ -458,7 +459,6 @@ class NetStripEngine:
         # We no longer block engine startup waiting for blocklists to load.
         # The blocklists will load in the background, and the classifier will use cached/live data until then.
         # Start subsystems
-        self.interceptor.start()
         self.dns_proxy.start()
         
         if self.progress_callback:
@@ -568,6 +568,18 @@ class NetStripEngine:
         # NOW start the packet interceptor — engine is ready to evaluate packets
         self.interceptor.start()
         
+        # Zero-Leak startup sweep: immediately kill already-established TCP
+        # connections that violate the freshly-applied user settings and
+        # filters (blocklisted apps/domains live before boot are terminated).
+        threading.Thread(target=self._startup_connection_sweep, daemon=True).start()
+        
+        # Start the internal settings/schedule watchdog (Time Bombs expiry,
+        # scheduled killswitch windows) — previously defined but never started.
+        if not self.watchdog_thread or not self.watchdog_thread.is_alive():
+            self.watchdog_thread = threading.Thread(target=self._watchdog_loop, daemon=True)
+            self.watchdog_thread.start()
+        
+        
         # Start detached subprocess watchdog to ensure DNS is restored on hard crash
         import subprocess as _subprocess
         if not getattr(sys, 'frozen', False) and not self.is_headless:
@@ -598,6 +610,79 @@ class NetStripEngine:
         self.broadcast_status("✅ Core Engine Initialized")
         return True
         
+    def _startup_connection_sweep(self):
+        """
+        Zero-Leak boot enforcement: scan every live TCP connection, evaluate it
+        against the active mode/blocklists/user rules and forcefully drop the
+        ones that would be blocked. Runs once shortly after startup so that
+        blocklisted connections established BEFORE Cripple launched die instantly.
+        """
+        # Give classifier + blocklists a moment to hydrate from cache
+        for _ in range(10):
+            if not self.is_running:
+                return
+            time.sleep(0.5)
+
+        blocked_ips = set()
+        try:
+            conns = psutil.net_connections(kind='tcp')
+        except Exception as e:
+            logger.debug(f"Startup sweep could not enumerate connections: {e}")
+            return
+
+        own_pid = os.getpid()
+        for conn in conns:
+            if not conn.raddr or conn.pid == own_pid:
+                continue
+            if conn.status not in ('ESTABLISHED', 'SYN_SENT', 'CLOSE_WAIT'):
+                continue
+            ip = getattr(conn.raddr, 'ip', None)
+            if not ip or ip.startswith('127.') or ip == '::1':
+                continue
+
+            process_name = "Unknown"
+            if conn.pid in (0, 4):
+                process_name = "System"
+            else:
+                cached = self._pid_name_cache.get(conn.pid)
+                if cached:
+                    process_name = cached[0]
+                else:
+                    try:
+                        proc = psutil.Process(conn.pid)
+                        from netstrip.core.process_utils import resolve_process_identity
+                        process_name, _, _, _ = resolve_process_identity(proc)
+                        self._pid_name_cache[conn.pid] = (process_name, time.time())
+                    except Exception:
+                        pass
+
+            try:
+                cat, action = self.classifier.classify_ip(ip, conn.raddr.port or 0, process_name)
+            except Exception:
+                continue
+            if action in (ConnectionAction.BLOCK, ConnectionAction.SINKHOLE):
+                blocked_ips.add(ip)
+
+        if not blocked_ips:
+            logger.info("Startup connection sweep complete: no live blocklisted connections found.")
+            return
+
+        killed = 0
+        kill_fn = getattr(self.platform, 'kill_tcp_connections', None)
+        for ip in list(blocked_ips)[:100]:
+            try:
+                if kill_fn:
+                    kill_fn(target_ip=ip)
+                    killed += 1
+            except Exception as e:
+                logger.debug(f"Failed to drop connection to {ip}: {e}")
+
+        logger.info(f"Startup connection sweep terminated {killed}/{len(blocked_ips)} blocklisted live connections.")
+        try:
+            self.broadcast_status(f"🧹 Startup sweep dropped {killed} blocklisted connection(s)")
+        except Exception:
+            pass
+
     def _update_checker_loop(self):
         import urllib.request
         import json
@@ -953,6 +1038,7 @@ class NetStripEngine:
         """Ensure DNS is restored, poll for Scheduled Killswitch, and clear expired Time Bombs."""
         from datetime import datetime
         last_cleanup = 0
+        last_prune = time.time()
         while self.is_running:
             try:
                 # Clean up expired user rules (Time Bombs) every 10 seconds
@@ -967,7 +1053,18 @@ class NetStripEngine:
                             scope = "PARANOID" if current_level.upper() == "PARANOID" else "STANDARD"
                             self.blocklist.sync_user_rules(self.db.get_user_rules(mode_scope=scope))
                     last_cleanup = time.time()
-                
+
+                # Hourly log retention sweep (72h window) — keeps the DB lean
+                # during long-running sessions without blocking anything.
+                if time.time() - last_prune > 3600:
+                    try:
+                        removed = self.db.prune_old_logs(hours=72)
+                        if removed:
+                            logger.info(f"Hourly retention sweep pruned old logs.")
+                    except Exception as e:
+                        logger.debug(f"Retention prune failed: {e}")
+                    last_prune = time.time()
+                    
                 # Scheduled Killswitch Check
                 schedule_enabled = self.db.get_setting("killswitch_schedule_enabled", "false") == "true"
                 

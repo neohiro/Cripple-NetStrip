@@ -1,3 +1,48 @@
+## [v3.7.0] - 2026-08-22
+### GUI / UX (Issue #6 Integration)
+- **Allow All / Block All / Neutral Toggle Fixed**: The per-app bulk toggle no longer freezes the GUI. OS firewall (`netsh`) calls, SQLite writes and blocklist re-syncs moved to a background thread; child rows update via a lightweight in-place visual sync instead of a per-row database write cascade. Undo-to-neutral now works instantly and reliably, and double-click stacking is guarded.
+- **System Block Red-Light at Startup**: App groups now render their correct toggle state (including the `Block System Connections` red light and Ghost implicit block) the moment they are created — not only after the first UI poll.
+- **Comprehensive System Process Detection**: New shared cross-OS registry (`SYSTEM_PROCESSES` — Windows, Linux, macOS, Android) used by classifier, sidebar and connection monitor alike; kernel/Service-Host groupings identified consistently.
+- **Connection Log Fit & Pagination**: Columns dynamically fit pane width (compact Domain/IP + stretch), retention raised to 72h with a 300-row live window plus an on-demand "Load Older Logs" button (same pattern as Filter Lists). Log export moved off the UI thread.
+- **Dashboard Scrollbar Removed**: Dashboard is a fixed layout — Recent Blocks frame stretches to exactly fill remaining height at any window size.
+- **Sidebar Ordering & Filters**: Kernel pseudo-groups (System Idle/System) pinned above DNS at the very end of the list; new "Filter: System" option; deterministic gear glyphs for icon-less system daemons.
+- **Zebra Scroll Artifacts Fixed**: Connection rows now use solid alternating tints instead of transparency, eliminating horizontal line artifacts when scrolling expanded lists.
+- **Faster Scrolling Everywhere**: Global scroll step raised 15→22 units/notch (macOS 8→12, Linux 8→10); Online Feeds list now uses the same centralized speed setting instead of its own ±1 handler.
+- **Faster Tab Switching**: Settings cards build in staged UI ticks; heavy engine modules are warm-imported in the background at boot; sidebar expand batches increased 10→30 groups/tick.
+- **GeoIP Hit Rate Up**: Bounded positive+negative lookup cache for connection rows, `registered_country` and continent fallbacks.
+- **Click-to-Copy Everywhere**: Domain results in Filter Lists now copy on click with the floating hovertip confirmation.
+- **Category Bulk Allow/Block**: Every indexed category card gets a compact Default→Allow→Block switch that instantly re-evaluates backend + frontend (classifier caches invalidated, sidebar/DNS re-evaluate immediately).
+
+### Engine
+- **Startup TCP Sweep**: Established TCP connections that violate freshly-applied settings/blocklists are terminated right after boot (per-platform targeted TCP kill).
+- **Watchdog Loop Started**: Time Bombs expiry and scheduled killswitch windows are now actually enforced (the loop existed but was never started).
+- **OS Firewall Rule Import Fixed**: Missing `Database.set_app_rule` implemented — Windows Firewall rule import no longer silently fails.
+- **Self-Target Attribution**: ipwho.is/ipinfo.io/ipapi.co and other self-telemetry endpoints contacted by Cripple's own services are attributed to "Cripple (Internal)" instead of the wrong process/kernel PID.
+- **Mode Hierarchy Documented & Repaired**: Explicit priority chain (user allow > user block > malware/tracker > Ghost deny-by-default > Standard mode rules with SYSTEM gating); GHOST short-circuit no longer shadows unreachable logic.
+
+### Blocklists & Feeds
+- **58 Online Sources** (+9): URLhaus domains mirror, Phishing Filter mirror, HaGeZi TIF Medium (current repo), Prigent Cryptojacking, KADhosts (PolishFiltersTeam), CyberHost Malware, TR Phishing Blacklist, EasyPrivacy trackers, Lightswitch Ads & Tracking Extended.
+- **Every feed & endpoint verified live** (automated `scripts/check_feeds_online.py`, 64/65 green — ipapi.co rate-limits datacenter IPs only; runtime fallback covers it). Dead legacy URLs replaced: deprecated `dns-blocklists-legacy` files, retired DShield suspicious-domains feed, archived KADhooks repo, moved malware-filter mirror paths.
+- **Parser Upgrades**: v2fly domain-list format (`domain:` / `full:` tokens) now parsed correctly (identity feeds previously yielded ~0 domains); bare IPs skipped instead of poisoning the domain map.
+- **Per-source update schedules fixed**: sources converted to the `update_interval_hours` schema actually read by the updater.
+
+### Performance Polish
+- **O(1) category counters**: Filter Manager card counts now read the maintained per-category index instead of rescanning the multi-million-entry domain map on every refresh (major UI-thread stall removed).
+- **Dashboard fully off-thread**: psutil bandwidth snapshot + all DB queries moved to the background worker; the UI thread only applies pre-computed strings.
+- **Adaptive log polling**: 1s at the default 300-row window, relaxed to 2.5s once paging deep into history.
+- **Tooltip matcher**: longest-key-first matching with a length guard replaces the unbounded substring scan on every widget creation.
+- **Hourly retention sweep**: the (now running) watchdog prunes logs/dns_cache hourly so long sessions stay lean; icon manager caches confirmed healthy.
+
+### Security Audit Fixes
+- **Removed embedded GitHub PAT** from crash reporter and telemetry clients (env/file/DB token only; graceful degradation without one).
+- **Signed blocklist cache**: pickle cache is now sealed with HMAC-SHA256; tampered/planted cache files fail verification and rebuild (blocks code-execution via cache planting).
+- **LAN Shield replay window closed**: nonce cache uses FIFO eviction instead of bulk clear; constant-time compares added for IoT API tokens and watchdog integrity checks.
+- **TLS fail-closed everywhere**: removed silent `CERT_NONE` downgrades (DoT/DoH proxy, GeoIP, updater) and dropped the cleartext `http://ip-api.com` provider.
+- **Shell sandboxing**: MAC randomizer netsh/wmic calls use argument lists (`shell=False`).
+
+### Build & CI
+- **Version Pipeline**: new `scripts/bump_version.py` + `version-bump.yml` workflow propagate one version string to every embedded location and verify consistency automatically.
+
 ## [v3.6.8] - 2026-08-13
 ### Security & Core
 - **Cross-Platform Ghost Mode (TCP Reset)**: Ghost mode now instantly terminates all active OS connections by injecting raw TCP RST packets using kernel APIs (`iphlpapi.SetTcpEntry` on Windows, `ss -K` on Linux, `tcpdrop` on macOS) rather than just dropping future packets via firewall.

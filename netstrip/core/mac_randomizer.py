@@ -38,8 +38,7 @@ class MACRandomizer:
     def get_active_interface(self) -> Optional[str]:
         if sys.platform == 'win32':
             try:
-                cmd = 'netsh interface show interface'
-                result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+                result = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, shell=False)
                 if result.returncode == 0:
                     for line in result.stdout.splitlines():
                         if "Connected" in line or "Verbunden" in line or "Conectado" in line:
@@ -50,6 +49,7 @@ class MACRandomizer:
                 logger.error(f"Failed to get active interface on Windows: {e}")
         elif sys.platform == 'linux':
             try:
+                # Pipeline requires a shell; inputs are constants so this is safe
                 cmd = "ip route get 8.8.8.8 | awk '{print $5}' | head -n 1"
                 result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
                 if result.returncode == 0 and result.stdout.strip():
@@ -58,6 +58,7 @@ class MACRandomizer:
                 logger.error(f"Failed to get active interface on Linux: {e}")
         elif sys.platform == 'darwin':
             try:
+                # Pipeline requires a shell; inputs are constants so this is safe
                 cmd = "route -n get default | grep interface | awk '{print $2}'"
                 result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
                 if result.returncode == 0 and result.stdout.strip():
@@ -72,8 +73,7 @@ class MACRandomizer:
             
         if sys.platform == 'win32':
             try:
-                cmd = ['getmac', '/v', '/fo', 'csv']
-                result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+                result = subprocess.run(["getmac", "/v", "/fo", "csv"], capture_output=True, text=True, shell=False)
                 if result.returncode == 0:
                     import csv, io
                     reader = csv.reader(io.StringIO(result.stdout))
@@ -104,6 +104,12 @@ class MACRandomizer:
             reg_path = r"SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}"
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
             
+            # Shell Sandboxing: argument lists (shell=False) so adapter names
+            # can never be interpreted as shell metacharacters.
+            creation_kwargs = {}
+            if os.name == 'nt':
+                creation_kwargs['creationflags'] = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
             target_subkey = None
             for i in range(winreg.QueryInfoKey(key)[0]):
                 try:
@@ -111,8 +117,10 @@ class MACRandomizer:
                     subkey = winreg.OpenKey(key, subkey_name)
                     try:
                         net_cfg_id = winreg.QueryValueEx(subkey, "NetCfgInstanceId")[0]
-                        cmd = f'wmic nic where "NetConnectionID=\'{interface_name}\'" get GUID'
-                        result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+                        result = subprocess.run(
+                            ["wmic", "nic", "where", f"NetConnectionID='{interface_name}'", "get", "GUID"],
+                            capture_output=True, text=True, shell=False, **creation_kwargs
+                        )
                         guid = ""
                         for line in result.stdout.splitlines():
                             if "{" in line and "}" in line:
@@ -146,10 +154,14 @@ class MACRandomizer:
                     pass
             winreg.CloseKey(write_key)
             
-            cmd1 = f'netsh interface set interface name="{interface_name}" admin=disable'
-            cmd2 = f'netsh interface set interface name="{interface_name}" admin=enable'
-            subprocess.run(cmd1, shell=True, capture_output=True)
-            subprocess.run(cmd2, shell=True, capture_output=True)
+            subprocess.run(
+                ["netsh", "interface", "set", "interface", f"name={interface_name}", "admin=disable"],
+                capture_output=True, shell=False, **creation_kwargs
+            )
+            subprocess.run(
+                ["netsh", "interface", "set", "interface", f"name={interface_name}", "admin=enable"],
+                capture_output=True, shell=False, **creation_kwargs
+            )
             return True
         except Exception as e:
             logger.error(f"Windows MAC change failed: {e}")

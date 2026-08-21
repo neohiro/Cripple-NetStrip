@@ -113,13 +113,12 @@ class _DNSConnectionPool:
         try:
             import socket
             import ssl
+            # Always-verified TLS context (fail closed) — no CERT_NONE downgrade
             try:
                 import certifi
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
 
             raw_sock = socket.create_connection((ip, port), timeout=timeout)
             tls_sock = ctx.wrap_socket(raw_sock)
@@ -180,13 +179,12 @@ class _DNSConnectionPool:
         try:
             import http.client
             import ssl
+            # Always-verified TLS context (fail closed) — no CERT_NONE downgrade
             try:
                 import certifi
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
 
             conn = http.client.HTTPSConnection(ip, 443, context=ctx, timeout=timeout)
             return conn

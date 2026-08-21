@@ -9,7 +9,7 @@ from netstrip.gui.hovertip import apply_global_tooltips
 # Apply global auto-tooltips monkey-patch
 apply_global_tooltips()
 
-# Monkey-patch CustomTkinter Scrollable Frame for centralized, ultra-smooth 4x scrolling
+# Monkey-patch CustomTkinter Scrollable Frame for centralized, ultra-smooth scrolling
 def fast_mouse_wheel_all(self, event):
     try:
         if self._check_if_valid_scroll(event.widget):
@@ -17,10 +17,13 @@ def fast_mouse_wheel_all(self, event):
             if not canvas or not canvas.winfo_exists():
                 return
 
+            from netstrip.gui.utils import get_scroll_step
+            step_units = get_scroll_step()
+
             if sys.platform.startswith("win"):
                 if hasattr(event, 'delta') and event.delta:
-                    # 15x standard speed for ultra-fast UX (artifacting prevented by winfo_viewable guard)
-                    step = -int((event.delta / 120) * 15)
+                    # Units per notch follow the user's Scroll Speed setting
+                    step = -int((event.delta / 120) * step_units)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     if getattr(self, '_shift_pressed', False):
@@ -31,7 +34,7 @@ def fast_mouse_wheel_all(self, event):
                             canvas.yview("scroll", step, "units")
             elif sys.platform == "darwin":
                 if hasattr(event, 'delta') and event.delta:
-                    step = -int(event.delta * 8)
+                    step = -int(event.delta * max(1, int(step_units / 2)))
                     if getattr(self, '_shift_pressed', False):
                         if canvas.xview() != (0.0, 1.0):
                             canvas.xview("scroll", step, "units")
@@ -39,7 +42,7 @@ def fast_mouse_wheel_all(self, event):
                         if canvas.yview() != (0.0, 1.0):
                             canvas.yview("scroll", step, "units")
             else: # Linux / X11
-                step = -8 if getattr(event, 'num', None) == 4 else 8
+                step = -step_units if getattr(event, 'num', None) == 4 else step_units
                 if getattr(self, '_shift_pressed', False):
                     if canvas.xview() != (0.0, 1.0):
                         canvas.xview_scroll(step, "units")
@@ -109,6 +112,26 @@ def fast_check_if_valid_scroll(self, widget):
 
 ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
+
+# Warm-import heavy engine modules in a background thread so first tab
+# switches (Filter Manager / Settings) don't pay the import cost on the UI
+# thread.
+def _warm_import_heavy_modules():
+    import importlib
+    for _mod in (
+        "netstrip.core.dns_proxy",
+        "netstrip.data.blocklist_manager",
+        "netstrip.gui.views.settings",
+        "netstrip.gui.views.blocklists",
+    ):
+        try:
+            importlib.import_module(_mod)
+        except Exception:
+            pass
+
+import threading as _threading
+_threading.Thread(target=_warm_import_heavy_modules, daemon=True).start()
+
 import logging
 from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
 from netstrip.core.engine import NetStripEngine
@@ -281,6 +304,13 @@ class NetStripApp(ctk.CTk):
     def build_ui(self, engine: NetStripEngine):
         self.engine = engine
         ctk.set_appearance_mode("dark")
+
+        # Restore the user's Scroll Speed preference into the scroll engine
+        try:
+            from netstrip.gui.utils import apply_saved_scroll_speed
+            apply_saved_scroll_speed(self.engine.db)
+        except Exception:
+            pass
 
         # Register notification badge callback
         self.engine.notifier.on_count_changed = self._update_pending_badge

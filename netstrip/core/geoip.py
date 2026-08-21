@@ -84,13 +84,13 @@ class GeoIPService:
         old_ip = self.current_data.get('ip')
         
         import ssl
+        # Always-verified TLS context (fail closed): a missing certifi no
+        # longer silently disables certificate verification.
         try:
             import certifi
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
 
         # Helper to try a provider URL
         def try_provider(url: str, is_json: bool = True, timeout: float = 3.0) -> Optional[Dict]:
@@ -105,15 +105,20 @@ class GeoIPService:
                 logger.debug(f"GeoIP fetch failed for {url}: {ex}")
                 return None
 
-        # Randomize provider pool for redundancy and privacy (don't always hit same domain)
-        providers = [
-            {'url': 'https://ipapi.co/json/', 'type': 'ipapi'},
-            {'url': 'https://ipinfo.io/json', 'type': 'ipinfo'},
-            {'url': 'https://ipwho.is/', 'type': 'ipwho'},
-            {'url': 'http://ip-api.com/json/', 'type': 'ip-api'}
-        ]
+        # Priority-ordered providers with light rotation for redundancy and
+        # privacy. Verified-reliable HTTPS endpoints first; ipapi.co last
+        # (aggressive rate-limiting on some networks).
         import random
-        random.shuffle(providers)
+        primary = [
+            {'url': 'https://ipwho.is/', 'type': 'ipwho'},
+            {'url': 'https://ipinfo.io/json', 'type': 'ipinfo'},
+        ]
+        secondary = [
+            {'url': 'https://ipapi.co/json/', 'type': 'ipapi'},
+        ]
+        random.shuffle(primary)
+        random.shuffle(secondary)
+        providers = primary + secondary
         
         for prov in providers:
             d = try_provider(prov['url'])
@@ -174,6 +179,13 @@ class OfflineGeoIP:
         self.reader = None
         self.is_ready = False
         self._download_thread = None
+        # Bounded lookup cache (positive AND negative) so every connection row
+        # render doesn't re-query the mmdb — dramatically raises the share of
+        # rows that show a location without extra latency.
+        self._loc_cache = {}
+        self._loc_cache_order = []
+        self._loc_cache_lock = threading.Lock()
+        self._loc_cache_ttl = 3600.0
         self._init_db()
         
     def _init_db(self):
@@ -223,8 +235,14 @@ class OfflineGeoIP:
             return ""
         try:
             res = self.reader.get(ip_str)
-            if res and 'country' in res and 'iso_code' in res['country']:
-                return res['country']['iso_code']
+            if res:
+                country = res.get('country') or res.get('registered_country') or {}
+                code = country.get('iso_code')
+                if code:
+                    return code
+                # Last-resort continent fallback keeps rows labeled
+                cont = res.get('continent', {})
+                return (cont.get('code') or "").upper() or ""
         except Exception:
             pass
         return ""
@@ -247,6 +265,15 @@ class OfflineGeoIP:
         return chr(ord(code[0]) + 127397) + chr(ord(code[1]) + 127397)
         
     def get_full_location(self, ip_str: str) -> str:
+        if not ip_str:
+            return ""
+
+        now = time.time()
+        with self._loc_cache_lock:
+            cached = self._loc_cache.get(ip_str)
+            if cached and (now - cached[0]) < self._loc_cache_ttl:
+                return cached[1]
+
         flag = self.get_flag(ip_str)
         city = self.get_city(ip_str)
         
@@ -257,5 +284,17 @@ class OfflineGeoIP:
             # Fallback to country name if city is unknown
             country = self.get_country(ip_str)
             if country: parts.append(country)
-            
-        return " ".join(parts) if parts else "" 
+                
+        loc = " ".join(parts) if parts else ""
+
+        # Bounded cache (8k entries, FIFO eviction)
+        with self._loc_cache_lock:
+            if len(self._loc_cache) > 8000:
+                oldest = self._loc_cache_order[:2000]
+                for k in oldest:
+                    self._loc_cache.pop(k, None)
+                self._loc_cache_order = self._loc_cache_order[2000:]
+            self._loc_cache[ip_str] = (now, loc)
+            self._loc_cache_order.append(ip_str)
+
+        return loc

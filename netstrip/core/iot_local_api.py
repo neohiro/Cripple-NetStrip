@@ -29,10 +29,11 @@ class IoTLocalAPI:
             # Security Authentication Audit: Validate token if set in database
             required_token = self.engine.db.get_setting("iot_sensor_auth_token", "")
             if required_token:
+                import hmac as _hmac
                 auth_header = request.headers.get("Authorization", "")
                 custom_header = request.headers.get("X-NetStrip-Token", "")
                 token_provided = auth_header.replace("Bearer ", "").strip() if auth_header else custom_header.strip()
-                if token_provided != required_token:
+                if not _hmac.compare_digest(str(token_provided), str(required_token)):
                     logger.warning(f"Unauthorized IoT Local API access attempt from {request.remote_addr}")
                     return jsonify({"error": "Unauthorized"}), 401
                 

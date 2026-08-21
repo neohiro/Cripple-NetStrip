@@ -8,14 +8,16 @@ from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_FRAME_STYLE
 from netstrip.gui.widgets import StatCard, ModeSelector, ShieldIndicator
 from netstrip.gui.utils import safe_loop, bind_copy_tooltip
 
-class DashboardView(ctk.CTkScrollableFrame):
+class DashboardView(ctk.CTkFrame):
     def __init__(self, master, engine, **kwargs):
-        super().__init__(master, fg_color=Colors.BG_DARK, **kwargs)
+        super().__init__(master, fg_color=Colors.BG_DARK, corner_radius=0, **kwargs)
         self.engine = engine
         
-        # Inner Frame with generous bottom padding so the user can scroll all the way down
+        # Plain frame layout (no scrollbar): every element fits the visible
+        # pane and the Recent Blocks frame stretches to exactly fill the
+        # remaining height at any window size.
         self.inner = ctk.CTkFrame(self, fg_color="transparent")
-        self.inner.pack(fill="both", expand=True, padx=24, pady=(20, 60))
+        self.inner.pack(fill="both", expand=True, padx=24, pady=(16, 12))
         
         # Grid layout - enforce uniform column widths so dynamic text doesn't shift the UI
         self.inner.grid_columnconfigure((0, 1), weight=1, uniform="stat_cols")
@@ -219,101 +221,104 @@ class DashboardView(ctk.CTkScrollableFrame):
 
         self._is_fetching_stats = True
         
-        # Run DB queries in background thread to prevent UI micro-stutters
+        # All I/O (DB queries + psutil counters) happens on this background
+        # thread; the UI thread only applies pre-computed strings.
         def fetch():
             try:
                 today_stats = self.engine.db.get_24h_statistics()
                 recent_conns = self.engine.db.get_recent_connections(limit=300)
-                
+
+                # Bandwidth snapshot (off the UI thread — psutil syscall)
+                bandwidth_payload = None
+                try:
+                    import psutil
+                    import time as _time
+                    current_io = psutil.net_io_counters()
+                    current_time = _time.time()
+                    last_io = getattr(self, '_last_io', None)
+                    if not last_io:
+                        self._last_io = current_io
+                        self._last_io_time = current_time
+                        bandwidth_payload = ("0 B/s | 0 B/s", None)
+                    else:
+                        dt = current_time - self._last_io_time
+                        if dt > 0:
+                            up_speed = max(0, current_io.bytes_sent - last_io.bytes_sent) / dt
+                            down_speed = max(0, current_io.bytes_recv - last_io.bytes_recv) / dt
+
+                            def format_speed(bps):
+                                if bps < 1024: return f"{bps:.0f} B/s"
+                                elif bps < 1024 * 1024: return f"{bps/1024:.1f} KB/s"
+                                else: return f"{bps/(1024*1024):.1f} MB/s"
+
+                            def format_volume(bytes_val):
+                                if bytes_val < 1024: return f"{bytes_val} B"
+                                elif bytes_val < 1024**2: return f"{bytes_val/1024:.1f} KB"
+                                elif bytes_val < 1024**3: return f"{bytes_val/(1024**2):.1f} MB"
+                                else: return f"{bytes_val/(1024**3):.2f} GB"
+
+                            db_sent, db_recv = getattr(self, '_cached_bandwidth', (0, 0))
+                            if db_sent > 0 or db_recv > 0:
+                                total_vol = db_sent + db_recv
+                                label_suffix = "Last 24h"
+                            else:
+                                total_vol = current_io.bytes_sent + current_io.bytes_recv
+                                label_suffix = "Since Boot"
+                            bandwidth_payload = (
+                                f"{format_speed(down_speed)} | {format_speed(up_speed)}",
+                                f"Vol: {format_volume(total_vol)} ({label_suffix})",
+                            )
+                        self._last_io = current_io
+                        self._last_io_time = current_time
+                except Exception:
+                    pass
+
                 if today_stats:
                     try:
                         unique_allowed = self.engine.db.get_unique_allowed_24h()
                     except AttributeError:
                         unique_allowed = today_stats.get('total_allowed', 0)
-                        
-                    def update_ui():
-                        try:
-                            if not getattr(self, '_destroyed', False) and self.winfo_exists():
-                                self.stat_traffic.set_value(f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}")
-                                self.stat_queries.set_value(f"{today_stats['total_queries']:,}")
-                                self.engine._cached_recent = recent_conns
-                                self._update_recent_blocks(recent_conns)
-                        except Exception:
-                            pass
-                        finally:
-                            self._is_fetching_stats = False
-                    self.after(0, update_ui)
+                    stats_snapshot = (
+                        f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}",
+                        f"{today_stats['total_queries']:,}",
+                    )
+                    self.after(0, lambda: self._apply_stats(stats_snapshot, recent_conns, bandwidth_payload))
                 else:
-                    def update_empty():
-                        try:
-                            if not getattr(self, '_destroyed', False) and self.winfo_exists():
-                                self.stat_traffic.set_value("0  |  0")
-                                self.stat_queries.set_value("0")
-                                self.engine._cached_recent = recent_conns
-                                self._update_recent_blocks(recent_conns)
-                        except Exception:
-                            pass
-                        finally:
-                            self._is_fetching_stats = False
-                    self.after(0, update_empty)
+                    self.after(0, lambda: self._apply_stats(("0  |  0", "0"), recent_conns, bandwidth_payload))
             except Exception:
                 self._is_fetching_stats = False
-                
+
         import threading
         threading.Thread(target=fetch, daemon=True).start()
-        
+
+        # Cheap cached value only — no syscalls on the UI thread
         try:
-            is_killswitch = getattr(self.engine, 'killswitch_active', False)
-            
-            if is_killswitch:
+            if getattr(self.engine, 'killswitch_active', False):
                 self.stat_active.set_value("0")
             else:
-                # MED-4: Use cached active apps from sidebar to avoid redundant 1500 calls/sec
                 active_apps = getattr(self.engine, '_cached_active_apps', set())
                 self.stat_active.set_value(str(len(active_apps)))
-            
-            # Bandwidth (Traffic Meter) calculation
-            import psutil
-            import time
-            current_io = psutil.net_io_counters()
-            current_time = time.time()
-            if not hasattr(self, '_last_io'):
-                self._last_io = current_io
-                self._last_io_time = current_time
-                self.stat_bandwidth.set_value("0 B/s | 0 B/s")
-            else:
-                dt = current_time - self._last_io_time
-                if dt > 0:
-                    up_speed = max(0, current_io.bytes_sent - self._last_io.bytes_sent) / dt
-                    down_speed = max(0, current_io.bytes_recv - self._last_io.bytes_recv) / dt
-                    
-                    def format_speed(bps):
-                        if bps < 1024: return f"{bps:.0f} B/s"
-                        elif bps < 1024 * 1024: return f"{bps/1024:.1f} KB/s"
-                        else: return f"{bps/(1024*1024):.1f} MB/s"
-                        
-                    def format_volume(bytes_val):
-                        if bytes_val < 1024: return f"{bytes_val} B"
-                        elif bytes_val < 1024**2: return f"{bytes_val/1024:.1f} KB"
-                        elif bytes_val < 1024**3: return f"{bytes_val/(1024**2):.1f} MB"
-                        else: return f"{bytes_val/(1024**3):.2f} GB"
-                        
-                    self.stat_bandwidth.set_value(f"{format_speed(down_speed)} | {format_speed(up_speed)}")
-                    
-                    db_sent, db_recv = getattr(self, '_cached_bandwidth', (0, 0))
-                    if db_sent > 0 or db_recv > 0:
-                        total_vol = db_sent + db_recv
-                        label_suffix = "Last 24h"
-                    else:
-                        total_vol = current_io.bytes_sent + current_io.bytes_recv
-                        label_suffix = "Since Boot"
-                        
-                    self.stat_bandwidth.set_subtitle(f"Vol: {format_volume(total_vol)} ({label_suffix})")
-                self._last_io = current_io
-                self._last_io_time = current_time
-            
-        except Exception as e:
+        except Exception:
             pass
+
+    def _apply_stats(self, stats_snapshot, recent_conns, bandwidth_payload):
+        """Apply pre-computed stat strings on the UI thread."""
+        try:
+            if not getattr(self, '_destroyed', False) and self.winfo_exists():
+                traffic_txt, queries_txt = stats_snapshot
+                self.stat_traffic.set_value(traffic_txt)
+                self.stat_queries.set_value(queries_txt)
+                if bandwidth_payload:
+                    speed_txt, subtitle_txt = bandwidth_payload
+                    self.stat_bandwidth.set_value(speed_txt)
+                    if subtitle_txt:
+                        self.stat_bandwidth.set_subtitle(subtitle_txt)
+                self.engine._cached_recent = recent_conns
+                self._update_recent_blocks(recent_conns)
+        except Exception:
+            pass
+        finally:
+            self._is_fetching_stats = False
             
     def _update_recent_blocks(self, recent):
         if not recent:
@@ -335,6 +340,8 @@ class DashboardView(ctk.CTkScrollableFrame):
                 delattr(self, 'lbl_no_blocks')
             
             from netstrip.gui.theme import get_category_color
+            
+            privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
             
             # Ensure pool has enough rows (max 15)
             while len(self._activity_pool) < len(blocked_only):
@@ -365,14 +372,12 @@ class DashboardView(ctk.CTkScrollableFrame):
                     
                 d_text = r['domain'] or r['ip'] or ""
                 
-                privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
                 if privacy_on:
                     from netstrip.gui.utils import mask_ip_string
                     d_text = mask_ip_string(d_text)
                 
                 if lbl_domain.cget("text") != d_text:
                     lbl_domain.configure(text=d_text)
-                    
             # Hide unused rows
             for i in range(len(blocked_only), len(self._activity_pool)):
                 row = self._activity_pool[i][0]
