@@ -35,8 +35,12 @@ install_service.py
 scratch/
 .netstrip/
 .netstrip
+# Images: ignore local captures but keep committed assets & branding
 *.ico
 *.png
+!assets/**
+!cripple_logo.png
+!logo.ico
 changelog_utf8.md
 *.log
 .buildozer/

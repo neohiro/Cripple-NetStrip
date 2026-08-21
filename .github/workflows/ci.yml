@@ -63,7 +63,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/ -v --timeout=30 --tb=short -q 2>&1 || echo "Tests completed (some may require admin privileges)"
+          python -m pytest tests/ -v --timeout=30 --tb=short -q
 
       - name: Verify build (PyInstaller dry-run)
         if: matrix.os == 'windows-latest'
