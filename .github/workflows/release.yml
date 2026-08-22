@@ -152,7 +152,8 @@ jobs:
           if (-not $exe) { Write-Host "built exe not found under dist\"; exit 1 }
           $ver = (Get-Item $exe).VersionInfo.ProductVersion
           if (-not $ver) { $ver = "0.0.0" }
-          & $exeAbs = (Resolve-Path $exe).Path; & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exeAbs" scripts\installer.iss
+          $exeAbs = (Resolve-Path $exe).Path
+          & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exeAbs" scripts\installer.iss
 
       - name: Generate SHA256SUMS manifest
         if: matrix.target == 'windows'
