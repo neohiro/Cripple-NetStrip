@@ -72,8 +72,19 @@ jobs:
 
       - name: Build debug APK (buildozer gate)
         run: |
-          set -o pipefail
-          buildozer -v android debug 2>&1 | tail -80
+          buildozer -v android debug > build_output.log 2>&1
+          rc=$?
+          echo "=== buildozer exit code: $rc ==="
+          tail -150 build_output.log || true
+          exit $rc
+
+      - name: Upload raw build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildozer-log
+          path: build_output.log
+          retention-days: 14
 
       - name: Verify APK structure
         run: |
