@@ -113,7 +113,9 @@ jobs:
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          yes | buildozer android debug || true
+          # No '|| true' here: a failed APK build must fail the release, not
+          # silently ship a source-only zip (that lie shipped broken releases).
+          yes | buildozer android debug
           mkdir -p bin
           if [ -d "bin" ] && [ "$(ls -A bin/*.apk 2>/dev/null)" ]; then
             mv bin/*.apk bin/NetStrip-${RELEASE_TAG}-Android.apk
@@ -121,8 +123,8 @@ jobs:
             zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
             cd ..
           else
-            echo "Building Android fallback bundle"
-            zip -r NetStrip-${RELEASE_TAG}-Android.zip main.py netstrip/ buildozer.spec
+            echo "APK missing after successful exit — failing the release"
+            exit 1
           fi
 
       - name: Upload Release Asset
