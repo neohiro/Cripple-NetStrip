@@ -28,9 +28,13 @@ class TrafficClassifier:
         cache_key = (domain, process_name)
         if cache_key in self._domain_cache:
             return self._domain_cache[cache_key]
-            
+
+        # FIFO trim (keep newest 60%) instead of a full clear: a full clear
+        # every 5000 entries caused recurring all-miss latency spikes on
+        # long-running sessions with high-entropy DNS traffic.
         if len(self._domain_cache) > 5000:
-            self._domain_cache.clear()
+            for k in list(self._domain_cache.keys())[:2000]:
+                self._domain_cache.pop(k, None)
             
         # Check loopback specifically (local DNS resolvers)
         if domain.startswith("127.") or domain == "::1":
@@ -127,9 +131,11 @@ class TrafficClassifier:
             
         if cache_key in self._ip_cache:
             return self._ip_cache[cache_key]
-            
+
+        # FIFO trim — same rationale as the domain cache
         if len(self._ip_cache) > 5000:
-            self._ip_cache.clear()
+            for k in list(self._ip_cache.keys())[:2000]:
+                self._ip_cache.pop(k, None)
             
         if self._is_lan_ip(ip):
             cat = ConnectionCategory.LAN

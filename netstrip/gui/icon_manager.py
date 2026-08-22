@@ -101,6 +101,16 @@ class IconManager:
         # In-memory caches
         self._image_cache = {}      # PIL Images
         self._ctk_image_cache = {}  # CTkImage objects
+
+        # Long-run guard: a months-long session can touch hundreds of unique
+        # process paths; cap both caches (FIFO half-flush) so memory stays flat.
+        self._cache_cap = 512
+
+    def _trim_caches(self):
+        for cache in (self._image_cache, self._ctk_image_cache):
+            if len(cache) > self._cache_cap:
+                for k in list(cache.keys())[: len(cache) // 2]:
+                    cache.pop(k, None)
         
         # Thread safety
         self._lock = threading.Lock()
@@ -163,6 +173,7 @@ class IconManager:
             img = self._image_cache[process_path]
             ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             self._ctk_image_cache[process_path] = ctk_img
+            self._trim_caches()
             return ctk_img
             
         app_name_base = process_name.lower().replace('.exe', '')
@@ -175,6 +186,7 @@ class IconManager:
                 img.verify() # Validate it's a real image
                 img = Image.open(cached_exe_icon) # Re-open after verify
                 self._image_cache[process_path] = img
+                self._trim_caches()
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
                 try: os.remove(cached_exe_icon)
@@ -211,6 +223,7 @@ class IconManager:
                     img.verify()
                     img = Image.open(app_icon_path)
                     self._image_cache[process_path] = img
+                    self._trim_caches()
                     return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
                 except Exception:
                     try: os.remove(app_icon_path)
@@ -224,6 +237,7 @@ class IconManager:
                 img.verify()
                 img = Image.open(cached_os_icon_path)
                 self._image_cache[process_path] = img
+                self._trim_caches()
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
                 try: os.remove(cached_os_icon_path)

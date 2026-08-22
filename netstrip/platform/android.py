@@ -140,6 +140,14 @@ class AndroidPlatform(PlatformBase):
     def is_ipv4_enabled(self) -> bool:
         return True
 
+    def disable_protocol_bindings(self) -> bool:
+        # Android exposes no LLTD/NetBIOS/mDNS binding surface like desktop OSes.
+        # The VPN tunnel itself is the privacy boundary; nothing to harden here.
+        return True
+
+    def restore_protocol_bindings(self) -> bool:
+        return True
+
     def install_autostart(self) -> bool:
         # Requires BOOT_COMPLETED broadcast receiver in java.
         return False

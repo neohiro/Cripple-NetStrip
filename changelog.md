@@ -33,6 +33,18 @@
 - **Tooltip matcher**: longest-key-first matching with a length guard replaces the unbounded substring scan on every widget creation.
 - **Hourly retention sweep**: the (now running) watchdog prunes logs/dns_cache hourly so long sessions stay lean; icon manager caches confirmed healthy.
 
+### Android & CI
+- **Android Gate pipeline** (`android.yml`): device-free unit tests for every Android code path (TUN packet parsing, response synthesis, DNS port contract, JNI-mocked platform layer) run on every push/PR; a buildozer cross-compile gate then produces a debug APK verified structurally (manifest/dex/native libs/size floor) before artifact upload.
+- **Fixed: Android DNS forwarding dead port** — the VPN interceptor forwarded intercepted DNS queries to port 5053 while the engine binds 5353 on Android; every query silently timed out. Now single-sourced via `ANDROID_DNS_PORT`.
+- **Fixed: crash on-device with "Block System Connections" ON** — `AndroidPlatform` never implemented the protocol-binding hardening abstract methods (`NotImplementedError` at startup); safe no-ops added.
+- **New test suites**: `tests/test_android.py` (7 tests) and `tests/test_longevity.py` (8 tests), all runnable without a device.
+
+### Long-Duration Uptime Hardening (months/years)
+- **DNS flood resilience**: DNS servers previously spawned an unbounded thread per packet (`ThreadingMixIn`) — a LAN scan storm could exhaust memory. Now capped at 256 concurrent handlers with load-shedding; `daemon_threads` ensures clean shutdown after long uptimes.
+- **DoT/DoH pool fd leak fixed**: idle sockets for abandoned upstream hosts were never reaped (up to 4 fds leaked per host, forever). A reaper closes stale sockets, prunes dead hosts, and hard-caps pools at 128 distinct hosts.
+- **Classifier caches**: replaced full-clear-at-5000 with FIFO trim (keeps newest 60%) — eliminates recurring all-miss latency spikes under high-entropy DNS traffic.
+- **Icon caches**: LRU-style half-flush cap (512) so years of unique process paths keep GUI memory flat.
+
 ### Security Audit Fixes
 - **Full static-analysis sweep** (ruff 700+ findings triaged, bandit, vulture): all remaining `shell=True` confined to constant pipelines; MAC generation moved to CSPRNG (`secrets`) — predictable pseudo-random MACs would have defeated randomization; SQL datetime modifiers parameterized; `usedforsecurity=False` on non-crypto MD5 cache key.
 - **Killswitch correctness (Linux)**: IPv6 rule install/removal failures are now logged and reflected in the return value — previously an IPv6-only leak path could report success.

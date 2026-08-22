@@ -9,11 +9,26 @@ import threading
 import logging
 import time
 from netstrip.core.classifier import TrafficClassifier
-from netstrip.core.modes import ConnectionAction
+from netstrip.core.modes import ConnectionAction, ConnectionCategory
 from netstrip.data.database import Database
 from typing import Callable
 
 logger = logging.getLogger(__name__)
+
+# Port the on-device VPN interceptor forwards intercepted DNS queries to.
+# Android forbids binding port 53 without root, so the proxy listens here
+# (see NetStripEngine). Single source of truth for both sides.
+ANDROID_DNS_PORT = 5353
+
+# Cap on concurrently-executing DNS request handlers per server socket.
+# socketserver's ThreadingMixIn otherwise spawns an unbounded thread per
+# packet — a LAN scan storm or malware flood would exhaust memory. Excess
+# packets are shed (dropped) instead of queued into thread explosion.
+DNS_MAX_CONCURRENT_HANDLERS = 256
+# Upper bound of distinct upstream hosts kept in the DoT/DoH pools. The
+# dynamic resolver list rotates through 100+ IPs; without a cap the pools
+# accumulate dead entries for months-long sessions.
+DNS_MAX_POOL_HOSTS = 128
 
 # NetStrip supports DoH, DoT, and UDP. Upstream queries can be configured to force
 # DoH/DoT to prevent ISP snooping, or fallback to standard UDP.
@@ -205,6 +220,77 @@ class _DNSConnectionPool:
             conn.close()
         except Exception:
             pass
+
+    # ── Long-run hygiene (months/years uptime) ──────────────────────────
+    # Idle pooled sockets were previously only reaped when the SAME host was
+    # queried again; hosts queried once then abandoned kept up to
+    # max_connections_per_host live TLS file-descriptors forever. A reaper
+    # closes them and prunes dead host keys on a schedule.
+    MAX_POOL_HOSTS = DNS_MAX_POOL_HOSTS
+
+    def _sweep_once(self):
+        """Close stale idle sockets and prune over-cap host entries. Safe to call directly in tests."""
+        now = time.time()
+        with self._lock:
+            for ip in list(self._dot_pool.keys()):
+                keep = []
+                for tls_sock, raw_sock, ts in self._dot_pool[ip]:
+                    if now - ts <= self.idle_timeout:
+                        keep.append((tls_sock, raw_sock, ts))
+                    else:
+                        self._close_sock(tls_sock, raw_sock)
+                if keep:
+                    self._dot_pool[ip] = keep
+                else:
+                    del self._dot_pool[ip]
+            for key in list(self._doh_pool.keys()):
+                keep = []
+                for conn, ts in self._doh_pool[key]:
+                    if now - ts <= self.idle_timeout:
+                        keep.append((conn, ts))
+                    else:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                if keep:
+                    self._doh_pool[key] = keep
+                else:
+                    del self._doh_pool[key]
+            # Hard cap distinct hosts (oldest-inserted first) to bound memory
+            while len(self._dot_pool) > self.MAX_POOL_HOSTS:
+                ip, entries = next(iter(self._dot_pool.items()))
+                for tls_sock, raw_sock, _ts in entries:
+                    self._close_sock(tls_sock, raw_sock)
+                del self._dot_pool[ip]
+            while len(self._doh_pool) > self.MAX_POOL_HOSTS:
+                key, entries = next(iter(self._doh_pool.items()))
+                for conn, _ts in entries:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                del self._doh_pool[key]
+
+    def start_reaper(self, interval: float = 60.0):
+        if getattr(self, '_reaper_started', False):
+            return
+        self._reaper_started = True
+        self._reaper_stop = threading.Event()
+
+        def _loop():
+            while not self._reaper_stop.wait(interval):
+                try:
+                    self._sweep_once()
+                except Exception as e:
+                    logger.debug(f"DNS pool sweep error: {e}")
+
+        threading.Thread(target=_loop, daemon=True, name="DNSPoolReaper").start()
+
+    def stop_reaper(self):
+        ev = getattr(self, '_reaper_stop', None)
+        if ev:
+            ev.set()
 
     def discard_doh_connection(self, conn):
         if conn:
@@ -575,15 +661,55 @@ class DNSProxyService:
         self.resolver = NetStripResolver(classifier, db, engine=engine)
         self.bind_ip = bind_ip
         self.port = port
-        self.dns_logger = DNSLogger(log="") 
+        self.dns_logger = DNSLogger(log="")
         import socketserver
-        self.udp_server = DNSServer(self.resolver, port=port, address=bind_ip, logger=self.dns_logger, server=socketserver.ThreadingUDPServer)
-        self.tcp_server = DNSServer(self.resolver, port=port, address=bind_ip, tcp=True, logger=self.dns_logger, server=socketserver.ThreadingTCPServer)
-        
+
+        # Flood-safe servers: socketserver.ThreadingMixIn otherwise spawns an
+        # unbounded thread per packet — a scan storm would exhaust memory on a
+        # months-long session. We cap concurrent handlers; excess UDP packets
+        # are shed (dropped) rather than queued into thread explosion.
+        class _BoundedMixIn:
+            daemon_threads = True
+            allow_reuse_address = True
+            max_concurrent_handlers = DNS_MAX_CONCURRENT_HANDLERS
+
+            def __init__(self, *args, **kwargs):
+                self._handler_sem = threading.BoundedSemaphore(self.max_concurrent_handlers)
+                super().__init__(*args, **kwargs)
+
+            def process_request(self, request, client_address):
+                if not self._handler_sem.acquire(blocking=False):
+                    # Shed load — drop this datagram/connection
+                    try:
+                        self.shutdown_request(request)
+                    except Exception:
+                        pass
+                    return
+                try:
+                    super().process_request(request, client_address)
+                except Exception:
+                    self._handler_sem.release()
+                    raise
+
+            def process_request_thread(self, request, client_address):
+                try:
+                    super().process_request_thread(request, client_address)
+                finally:
+                    self._handler_sem.release()
+
+        class BoundedThreadingUDPServer(_BoundedMixIn, socketserver.ThreadingUDPServer):
+            pass
+
+        class BoundedThreadingTCPServer(_BoundedMixIn, socketserver.ThreadingTCPServer):
+            pass
+
+        self.udp_server = DNSServer(self.resolver, port=port, address=bind_ip, logger=self.dns_logger, server=BoundedThreadingUDPServer)
+        self.tcp_server = DNSServer(self.resolver, port=port, address=bind_ip, tcp=True, logger=self.dns_logger, server=BoundedThreadingTCPServer)
+
         # IPv6 Support
-        class ThreadingUDPServer6(socketserver.ThreadingUDPServer): address_family = __import__('socket').AF_INET6
-        class ThreadingTCPServer6(socketserver.ThreadingTCPServer): address_family = __import__('socket').AF_INET6
-        
+        class ThreadingUDPServer6(BoundedThreadingUDPServer): address_family = __import__('socket').AF_INET6
+        class ThreadingTCPServer6(BoundedThreadingTCPServer): address_family = __import__('socket').AF_INET6
+
         self.udp_server_v6 = None
         self.tcp_server_v6 = None
         try:
@@ -591,7 +717,7 @@ class DNSProxyService:
             self.tcp_server_v6 = DNSServer(self.resolver, port=port, address="fd00::127", tcp=True, logger=self.dns_logger, server=ThreadingTCPServer6)
         except Exception as e:
             logger.warning(f"Could not bind IPv6 DNS Proxy: {e}")
-            
+
         self.is_running = False
 
     def start(self):
@@ -603,6 +729,10 @@ class DNSProxyService:
         if self.udp_server_v6:
             self.udp_server_v6.start_thread()
             self.tcp_server_v6.start_thread()
+        # Start the idle-socket reaper so pooled DoT/DoH connections for
+        # abandoned hosts cannot leak file descriptors over long uptimes.
+        if hasattr(self.resolver, '_conn_pool'):
+            self.resolver._conn_pool.start_reaper()
         logger.info(f"DNS Proxy started on {self.bind_ip}:{self.port} and [fd00::127]:{self.port}")
 
     def stop(self):
@@ -615,5 +745,6 @@ class DNSProxyService:
             self.udp_server_v6.stop()
             self.tcp_server_v6.stop()
         if hasattr(self.resolver, '_conn_pool'):
+            self.resolver._conn_pool.stop_reaper()
             self.resolver._conn_pool.close_all()
         logger.info("DNS Proxy stopped")

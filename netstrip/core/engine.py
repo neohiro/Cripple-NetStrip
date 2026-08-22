@@ -52,7 +52,8 @@ class NetStripEngine:
         # On Android, binding to port 53 is forbidden without root. Bind to 5353 instead.
         is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
         dns_bind_ip = "127.0.0.1" if is_android else "127.127.127.127"
-        dns_port = 5353 if is_android else 53
+        from netstrip.core.dns_proxy import ANDROID_DNS_PORT
+        dns_port = ANDROID_DNS_PORT if is_android else 53
         
         self.dns_proxy = DNSProxyService(self.classifier, self.db, bind_ip=dns_bind_ip, port=dns_port, engine=self)
         poll_interval = 2.0 if self.is_headless else 0.2

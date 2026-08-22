@@ -200,10 +200,13 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
     def _process_dns(self, payload):
         """Forward a DNS payload to NetStrip's internal DNS proxy and return the response."""
+        # NOTE: must match the port the engine binds on Android (root-less
+        # devices cannot use 53). Single source of truth in dns_proxy.
+        from netstrip.core.dns_proxy import ANDROID_DNS_PORT
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(3.0)
-            sock.sendto(payload, ("127.0.0.1", 5053))
+            sock.sendto(payload, ("127.0.0.1", ANDROID_DNS_PORT))
             resp, _ = sock.recvfrom(4096)
             sock.close()
             return resp
