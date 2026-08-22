@@ -43,13 +43,10 @@ Name: "autostart"; Description: "Start NetStrip when Windows starts"; GroupDescr
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
-    ValueType: string; ValueName: "NetStrip"; ValueData: """{app}\Cripple.exe"" --minimized"; \
+    ValueType: string; ValueName: "NetStrip"; ValueData: """{app}\Cripple.exe"""; \
     Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\Cripple.exe"; Description: "Launch NetStrip"; \
     Flags: nowait postinstall skipifsilent runascurrentuser
 
-[UninstallRun]
-; Safety net: restore DNS / firewall rules even if the app never got to clean up
-Filename: "{app}\Cripple.exe"; Parameters: "--restore-network"; RunOnceId: "RestoreNet"; Flags: runhidden waituntilterminated skipifdoesntexist

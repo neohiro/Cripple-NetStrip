@@ -1,0 +1,91 @@
+name: Installer Self-Test
+
+# Downloads the published Windows installer from the latest release and runs a
+# full lifecycle verification on a real Windows VM (silent install → file &
+# registry assertions → silent uninstall → cleanup assertions).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Resolve latest release assets
+        shell: bash
+        run: |
+          gh api repos/${{ github.repository }}/releases/latest --jq '.assets[].browser_download_url' > assets.txt
+          grep -E "(Setup-.*\.exe|SHA256SUMS\.txt)$" assets.txt || { echo "required assets missing"; exit 1; }
+
+      - name: Download installer + manifest
+        shell: pwsh
+        run: |
+          $urls = Get-Content assets.txt
+          foreach ($u in $urls) {
+            if ($u -match 'Setup-.*\.exe$') { Invoke-WebRequest $u -OutFile Setup.exe }
+            if ($u -match 'SHA256SUMS') { Invoke-WebRequest $u -OutFile SHA256SUMS.txt }
+          }
+          Get-ChildItem | Select-Object Name, Length
+
+      - name: Verify SHA-256 against manifest
+        shell: pwsh
+        run: |
+          $expected = (Get-Content SHA256SUMS.txt | Where-Object { $_ -match 'Setup-' }) -split '\s+' | Select-Object -First 1
+          $actual = (Get-FileHash .\Setup.exe -Algorithm SHA256).Hash.ToLower()
+          Write-Host "expected=$expected actual=$actual"
+          if ($actual -ne $expected.ToLower()) { Write-Error 'hash mismatch'; exit 1 }
+
+      - name: Silent install (admin runner — no UAC)
+        shell: pwsh
+        run: |
+          $p = Start-Process .\Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "installer exit $($p.ExitCode)"; exit 1 }
+
+      - name: Assert installed state
+        shell: pwsh
+        run: |
+          $app = "$env:ProgramFiles\NetStrip"
+          $exe = Join-Path $app 'Cripple.exe'
+          if (-not (Test-Path $exe)) { Write-Error "Cripple.exe missing"; exit 1 }
+          $v = (Get-Item $exe).VersionInfo.ProductVersion
+          Write-Host "installed ProductVersion: $v"
+          if (-not $v) { Write-Error 'empty ProductVersion'; exit 1 }
+          if (-not (Test-Path (Join-Path $app 'unins000.exe'))) { Write-Error 'uninstaller missing'; exit 1 }
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NetStrip_is1'
+          if (-not (Test-Path $key)) { Write-Error 'uninstall registry key missing'; exit 1 }
+          $dn = (Get-ItemProperty $key).DisplayName
+          if ($dn -notlike '*NetStrip*') { Write-Error "bad DisplayName: $dn"; exit 1 }
+          Write-Host "INSTALLED STATE OK (v$v)"
+
+      - name: Silent uninstall
+        shell: pwsh
+        run: |
+          $app = "$env:ProgramFiles\NetStrip"
+          $p = Start-Process (Join-Path $app 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "uninstaller exit $($p.ExitCode)"; exit 1 }
+
+      - name: Assert clean uninstall
+        shell: pwsh
+        run: |
+          $deadline = (Get-Date).AddSeconds(30)
+          do {
+            Start-Sleep -Seconds 2
+            $gone = -not (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe")
+          } while (-not $gone -and (Get-Date) -lt $deadline)
+          if (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe") { Write-Error 'exe survived uninstall'; exit 1 }
+          if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NetStrip_is1') {
+            Write-Error 'uninstall registry key survived'; exit 1
+          }
+          Write-Host 'CLEAN UNINSTALL OK'
+
+      - name: Result
+        shell: pwsh
+        run: Write-Host 'INSTALLER SELF-TEST PASS ✅'
