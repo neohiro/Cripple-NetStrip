@@ -31,7 +31,7 @@ WizardStyle=modern
 
 [Files]
 Source: "{#ExeSource}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "assets\logo.ico"; DestDir: "{app}"
+Source: "..\assets\logo.ico"; DestDir: "{app}"
 
 [Icons]
 Name: "{group}\NetStrip"; Filename: "{app}\Cripple.exe"
