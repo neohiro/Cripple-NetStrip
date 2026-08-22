@@ -10,8 +10,6 @@ Boundaries covered:
 
 import os
 import random
-import socket
-import struct
 import sys
 import types
 
@@ -126,7 +124,6 @@ def test_checksum_known_vector():
 
 def test_dns_resolver_rejects_malformed_requests():
     """resolve() must not crash on junk — malformed queries get empty replies."""
-    from netstrip.core.dns_proxy import ANDROID_DNS_PORT  # ensure module imports cleanly
     from dnslib import DNSRecord
 
     class FakeClassifier:

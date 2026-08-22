@@ -12,5 +12,8 @@
   "nav.settings": "Configuración",
   "dashboard.recent_blocks": "Bloqueos Recientes",
   "dashboard.block_system": "Bloquear Conexiones del Sistema",
-  "dashboard.smart_shield": "Escudo Inteligente"
+  "dashboard.smart_shield": "Escudo Inteligente",
+  "modal.smart.title": "ESCUDO INTELIGENTE ACTIVADO",
+  "modal.smart.disable": "DESACTIVAR AUTO-ESCALADA",
+  "modal.smart.stay": "MANTENER MODO FANTASMA"
 }

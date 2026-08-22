@@ -5,6 +5,7 @@ Displays a critical alert when Smart Ghost Mode is triggered.
 
 import customtkinter as ctk
 from netstrip.gui.theme import Colors, Fonts
+from netstrip.i18n import t
 
 class SmartParanoidModal(ctk.CTkToplevel):
     def __init__(self, master, engine, conn_data, **kwargs):
@@ -40,7 +41,7 @@ class SmartParanoidModal(ctk.CTkToplevel):
             lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
             lbl_logo.pack(side="left", padx=(0, 10))
             
-        lbl_title = ctk.CTkLabel(header, text="SMART SHIELD ACTIVATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title = ctk.CTkLabel(header, text=t("modal.smart.title"), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
         lbl_title.pack(side="left")
         
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
@@ -60,13 +61,13 @@ class SmartParanoidModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_disable = ctk.CTkButton(
-            btn_frame, text="TURN OFF AUTO-ESCALATION", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            btn_frame, text=t("modal.smart.disable"), fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, height=36, command=self._disable_smart_shield
         )
         btn_disable.pack(side="left", expand=True, padx=(0, 5))
         
         btn_keep = ctk.CTkButton(
-            btn_frame, text="STAY IN GHOST MODE", fg_color=Colors.DANGER, 
+            btn_frame, text=t("modal.smart.stay"), fg_color=Colors.DANGER, 
             hover_color="#991b1b", text_color="white", bg_color=Colors.BG_DARKEST, corner_radius=8, height=36, command=self.destroy
         )
         btn_keep.pack(side="right", expand=True, padx=(5, 0))

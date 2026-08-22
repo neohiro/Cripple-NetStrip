@@ -115,16 +115,6 @@ def mask_ip_string(text: str) -> str:
     text = re.sub(r'\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b', '<HIDDEN_IP>', text)
     return text
 
-def enable_smooth_scrolling(scrollable_frame):
-    """
-    Ensures smooth, fast scrolling on a CTkScrollableFrame using the centralized scroll engine.
-    """
-    try:
-        if hasattr(scrollable_frame, '_set_scroll_increments'):
-            scrollable_frame._set_scroll_increments()
-    except Exception:
-        pass
-
 _SCROLL_SPEED_PRESETS = {
     "slow": 0.5,
     "normal": 1.0,

@@ -59,12 +59,13 @@ def set_language(lang: str):
     global _current_lang, _catalog
     lang = (lang or "en").lower()
     path = _LOCALES_DIR / f"{lang}.json"
-    if lang != "en" and not path.exists():
+    if not path.exists():
         logger.debug(f"no catalog for '{lang}', falling back to English")
         lang = "en"
+        path = _LOCALES_DIR / f"{lang}.json"
     _current_lang = lang
     _catalog = {}
-    if lang != "en" and path.exists():
+    if path.exists():
         try:
             _catalog = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:

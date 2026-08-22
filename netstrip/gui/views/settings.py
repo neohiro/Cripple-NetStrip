@@ -3,6 +3,8 @@ Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
+import os
+
 import customtkinter as ctk
 import logging
 
@@ -184,17 +186,17 @@ class SettingsView(ctk.CTkFrame):
         self.btn_check_update.pack(side="left")
         
         self.btn_download_update = ctk.CTkButton(
-            btn_frame, text="Download Update (Browser)",
+            btn_frame, text="Download & Verify Update",
             width=200, height=32, corner_radius=6,
             fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS,
             text_color=Colors.TEXT_PRIMARY,
-            command=lambda: __import__('webbrowser').open("https://github.com/neohiro/Cripple-NetStrip/releases/latest")
+            command=self._download_verified_update
         )
         self.btn_download_update.pack(side="right")
         self.btn_download_update.pack_forget() # Hidden by default
-        
+
         self._refresh_update_status()
-        
+
     def _refresh_update_status(self):
         if getattr(self.engine, 'update_available', False):
             self.lbl_update_status.configure(text=f"New version available: v{self.engine.latest_version}", text_color="#facc15")
@@ -202,6 +204,58 @@ class SettingsView(ctk.CTkFrame):
         else:
             self.lbl_update_status.configure(text="Up to date", text_color=Colors.SUCCESS)
             self.btn_download_update.pack_forget()
+
+    def _download_verified_update(self):
+        """Download the latest release zip and verify it against SHA256SUMS.txt
+        before anything is executed. Runs fully in a background thread."""
+        import threading
+        from pathlib import Path
+        import tkinter.messagebox
+
+        btn = self.btn_download_update
+        btn.configure(state="disabled", text="Downloading & verifying...")
+
+        def _work():
+            from netstrip.core.self_update import SelfUpdater, SelfUpdateError
+            dest = Path.home() / "Downloads" / "NetStrip"
+            try:
+                path = SelfUpdater().download_verified(dest)
+                def _ok():
+                    try:
+                        tkinter.messagebox.showinfo(
+                            "Update verified",
+                            f"SHA-256 verified against the published manifest.\n\n"
+                            f"Saved to:\n{path}\n\n"
+                            "Extract and run the new version when ready.")
+                        try:
+                            os.startfile(path.parent)  # open Explorer at the file
+                        except Exception:
+                            pass
+                    finally:
+                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        except Exception: pass
+                self.after(0, _ok)
+            except SelfUpdateError as e:
+                msg = str(e)
+                def _err():
+                    try:
+                        tkinter.messagebox.showerror("Update verification failed", msg)
+                    finally:
+                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        except Exception: pass
+                self.after(0, _err)
+            except Exception as e:
+                net_err = str(e)
+
+                def _err2():
+                    try:
+                        tkinter.messagebox.showerror("Update failed", f"Network error:\n{net_err}")
+                    finally:
+                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        except Exception: pass
+                self.after(0, _err2)
+
+        threading.Thread(target=_work, daemon=True).start()
             
     def _manual_update_check(self):
         self.btn_check_update.configure(state="disabled", text="Checking...")
@@ -324,6 +378,48 @@ class SettingsView(ctk.CTkFrame):
         )
         opt_speed.pack(side="right")
         self._add_subtitle(card, "Mouse-wheel velocity for all lists, tabs and the connections sidebar. Applies instantly.")
+
+        # Interface Language (new dialogs adopt it immediately; full re-render
+        # of already-visible views happens on next launch)
+        lang_row = ctk.CTkFrame(card, fg_color="transparent")
+        lang_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.XS, 0))
+        ctk.CTkLabel(
+            lang_row, text="Language",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
+        from netstrip.i18n import available_languages, set_language as _i18n_set
+
+        saved_lang = str(self.engine.db.get_setting("gui_language", "auto"))
+        if saved_lang == "auto":
+            from netstrip.i18n import detect_language
+            saved_lang = detect_language()
+        _i18n_set(saved_lang)
+
+        lang_labels = ["Auto"] + [l.capitalize() for l in available_languages()]
+        self._lang_var = ctk.StringVar(
+            value="Auto" if str(self.engine.db.get_setting("gui_language", "auto")) == "auto"
+                  else saved_lang.capitalize()
+        )
+        opt_lang = ctk.CTkOptionMenu(
+            lang_row,
+            values=lang_labels,
+            variable=self._lang_var,
+            width=110, height=26,
+            font=(Fonts.FAMILY_PRIMARY[0], 11),
+            fg_color=Colors.BG_ELEVATED, button_color=Colors.BG_ELEVATED,
+            button_hover_color=Colors.BORDER_DEFAULT, dropdown_fg_color=Colors.BG_ELEVATED,
+            command=lambda choice: (
+                self.engine.db.set_setting(
+                    "gui_language",
+                    "auto" if choice == "Auto" else choice.lower()),
+                _i18n_set(
+                    detect_language() if choice == "Auto" else choice.lower()),
+            ),
+        )
+        opt_lang.pack(side="right")
+        self._add_subtitle(card, "Language for dialogs and labels. New dialogs follow immediately; open views refresh on next start.")
 
         # Bottom padding
         ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()

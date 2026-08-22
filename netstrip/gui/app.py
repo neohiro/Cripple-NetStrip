@@ -312,6 +312,14 @@ class NetStripApp(ctk.CTk):
         except Exception:
             pass
 
+        # Restore interface language (i18n) before any view is built
+        try:
+            from netstrip.i18n import set_language as _set_lang, detect_language
+            lang = str(self.engine.db.get_setting("gui_language", "auto"))
+            _set_lang(detect_language() if lang == "auto" else lang)
+        except Exception:
+            pass
+
         # Register notification badge callback
         self.engine.notifier.on_count_changed = self._update_pending_badge
         self.engine.on_smart_trigger = self._show_smart_modal

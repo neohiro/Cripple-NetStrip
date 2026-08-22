@@ -12,5 +12,8 @@
   "nav.settings": "Einstellungen",
   "dashboard.recent_blocks": "Letzte Blockierungen",
   "dashboard.block_system": "Systemverbindungen blockieren",
-  "dashboard.smart_shield": "Smart Shield"
+  "dashboard.smart_shield": "Smart Shield",
+  "modal.smart.title": "SMART SHIELD AKTIVIERT",
+  "modal.smart.disable": "AUTO-ESKALATION DEAKTIVIEREN",
+  "modal.smart.stay": "IM GHOST-MODUS BLEIBEN"
 }

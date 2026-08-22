@@ -7,7 +7,6 @@ periodic latency spikes, and asserts it now stays bounded / smooth.
 
 import time
 
-import pytest
 
 from netstrip.core.dns_proxy import DNS_MAX_POOL_HOSTS, _DNSConnectionPool
 
@@ -163,8 +162,6 @@ def test_icon_cache_trim_bounds_both_caches():
 
 def test_lan_shield_nonce_fifo_survives_wraparound():
     """Replay protection must NOT bulk-clear nonces (old bug reopened a window)."""
-    import hashlib
-    from unittest import mock
 
     from netstrip.core.lan_shield import LANShield
 

@@ -1,3 +1,16 @@
+## [v3.7.2] - 2026-08-22
+### Verified Self-Update (roadmap #11 — completes part 1)
+- **New `netstrip/core/self_update.py`**: downloads this platform's release zip + the published SHA256SUMS.txt over verified TLS, recomputes SHA-256 and **refuses on any mismatch** (tampered file deleted, never executed). Optional ed25519 detached-signature hook (`NETSTRIP_UPDATE_PUBKEY` + `.sig`) for out-of-band signing later.
+- Settings → Updates: browser-only button replaced with **"Download & Verify Update"** — verified file lands in `~/Downloads/NetStrip/` with an Explorer handoff; failures surface exact reason (missing asset / absent manifest entry / hash mismatch / bad signature).
+- 10 new tests (`tests/test_self_update.py`) covering manifest parsing (BSD markers, escaped spaces, comments), streaming hashes, platform asset selection, mismatch abort semantics, missing-entry refusal, no-platform-asset refusal — all offline via a mocked transport.
+
+### i18n completion of foundation
+- Language picker in Settings → General (Auto + installed catalogs), persisted as `gui_language`, applied at startup before views build.
+- Critical modals (Killswitch confirm, Auto-Killswitch recovery, Smart Shield) now render through `t()`; en/es/de catalogs extended with Smart Shield keys; fixed `set_language('en')` skipping catalog load.
+
+### Cleanup
+- Removed the long-dead `enable_smooth_scrolling` no-op and its call sites; explicit `__all__` for view re-exports; unused imports swept from tests.
+
 ## [v3.7.1] - 2026-08-22
 ### Flagship Hardening Roadmap (part 1 of the 14-point plan)
 - **Vetted crypto backend is now primary**: `cryptography` (OpenSSL) performs AES-256-CBC; the pure-Python engine is retained only as a WDAC/AppLocker fallback. Token format unchanged — native↔pure interop proven by `tests/test_crypto_interop.py` (both directions, legacy 32-byte keys, tamper, TTL).

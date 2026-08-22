@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from netstrip.gui.theme import Fonts, Colors
+from netstrip.i18n import t
 
 class ManualKillswitchModal(ctk.CTkToplevel):
     def __init__(self, parent, engine, callback):
@@ -35,14 +36,14 @@ class ManualKillswitchModal(ctk.CTkToplevel):
             lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
             lbl_logo.pack(side="left", padx=(0, 10))
             
-        lbl_title = ctk.CTkLabel(header, text="CONFIRM SYSTEM LOCKDOWN", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title = ctk.CTkLabel(header, text=t("modal.killswitch.title"), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
         lbl_title.pack(side="left")
         
         # Subtle separator
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
         lbl_desc = ctk.CTkLabel(inner, text=(
-            "About to sever ALL OS network connections.\n\n"
+            t("modal.killswitch.body") + "\n\n"
             "> Every internet connection will be dropped immediately\n"
             "> Nothing leaves or enters this machine until you disengage\n\n"
             "Keep a physical failsafe handy (unplug ethernet) for emergencies."
@@ -53,14 +54,14 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_cancel = ctk.CTkButton(
-            btn_frame, text="CANCEL (SAFE)", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
+            btn_frame, text=t("modal.killswitch.cancel"), fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_cancel
         )
         btn_cancel.pack(side="left", expand=True, padx=(0, 5))
         btn_cancel.focus_set()   # Safe default: Enter/Space cancels
         
         btn_confirm = ctk.CTkButton(
-            btn_frame, text="ENGAGE KILLSWITCH", fg_color=Colors.DANGER, 
+            btn_frame, text=t("modal.killswitch.engage"), fg_color=Colors.DANGER, 
             hover_color="#991b1b", text_color="#ffffff", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_confirm
         )
         btn_confirm.pack(side="right", expand=True, padx=(5, 0))
@@ -110,7 +111,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
             lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
             lbl_logo.pack(side="left", padx=(0, 10))
             
-        lbl_title = ctk.CTkLabel(header, text="AUTO-KILLSWITCH ENGAGED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.WARNING)
+        lbl_title = ctk.CTkLabel(header, text=t("modal.recovery.title"), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.WARNING)
         lbl_title.pack(side="left")
         
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
@@ -126,14 +127,14 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_keep = ctk.CTkButton(
-            btn_frame, text="STAY LOCKED DOWN", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            btn_frame, text=t("modal.recovery.stay"), fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_keep
         )
         btn_keep.pack(side="left", expand=True, padx=(0, 5))
         btn_keep.focus_set()   # Safe default: staying locked down
         
         btn_restore = ctk.CTkButton(
-            btn_frame, text="RESTORE NETWORK", fg_color=Colors.WARNING, 
+            btn_frame, text=t("modal.recovery.restore"), fg_color=Colors.WARNING, 
             hover_color="#b45309", text_color="white", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_restore
         )
         btn_restore.pack(side="right", expand=True, padx=(5, 0))

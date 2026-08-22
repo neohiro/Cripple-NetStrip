@@ -9,7 +9,6 @@ from netstrip.gui.theme import (
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
     get_category_color, get_category_label, get_category_icon,
 )
-from netstrip.gui.utils import enable_smooth_scrolling
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -30,7 +29,6 @@ class BlocklistView(ctk.CTkFrame):
         # Main scrollable container for the entire tab
         self._main_scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_PANEL)
         self._main_scroll.pack(fill="both", expand=True)
-        enable_smooth_scrolling(self._main_scroll)
 
         # Header Row
         header_row = ctk.CTkFrame(self._main_scroll, fg_color="transparent")
@@ -623,7 +621,6 @@ class BlocklistView(ctk.CTkFrame):
             self._sources_container, fg_color=Colors.BG_DARK,
             height=280, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
         )
-        enable_smooth_scrolling(self._sources_list_frame)
 
     def _toggle_sources_view(self):
         if self._sources_expanded:
@@ -856,7 +853,6 @@ class BlocklistView(ctk.CTkFrame):
             height=440, corner_radius=6, border_width=1, border_color=Colors.BORDER_SUBTLE
         )
         self._results_scroll.pack(fill="both", expand=True)
-        enable_smooth_scrolling(self._results_scroll)
         
         self._loaded_results = []
         self._results_row_pool = []

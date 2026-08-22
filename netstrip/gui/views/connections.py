@@ -11,7 +11,7 @@ import os
 
 
 from netstrip.gui.components.sidebar_components import AppGroupFrame
-from netstrip.gui.utils import safe_loop, enable_smooth_scrolling
+from netstrip.gui.utils import safe_loop
 from netstrip.gui.popups import check_killswitch_override
 
 class ConnectionsView(ctk.CTkFrame):
@@ -136,7 +136,6 @@ class ConnectionsView(ctk.CTkFrame):
             self.lan_toggle.deselect()
         
         # Smooth mousewheel scroll handling
-        enable_smooth_scrolling(self.scroll_frame)
 
         self._refresh_loop()
 

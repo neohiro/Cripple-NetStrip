@@ -9,7 +9,7 @@ from netstrip.gui.theme import (
     Colors, Fonts, Spacing, Icons,
     CTK_FRAME_STYLE, get_category_color,
 )
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip, enable_smooth_scrolling
+from netstrip.gui.utils import safe_loop, bind_copy_tooltip
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -80,7 +80,6 @@ class AppRulesView(ctk.CTkFrame):
             self, height=250, **CTK_FRAME_STYLE,
         )
         self._pending_scroll.pack(fill="x", pady=(0, Spacing.LG))
-        enable_smooth_scrolling(self._pending_scroll)
 
     def _build_rules_section(self):
         ctk.CTkLabel(
@@ -91,7 +90,6 @@ class AppRulesView(ctk.CTkFrame):
 
         self._rules_scroll = ctk.CTkScrollableFrame(self, **CTK_FRAME_STYLE)
         self._rules_scroll.pack(fill="both", expand=True)
-        enable_smooth_scrolling(self._rules_scroll)
 
     # ── Pending refresh ─────────────────────────────────
 
