@@ -6,6 +6,7 @@ Fully functional views with auto-refresh, color-coding, and error handling.
 import os
 
 import customtkinter as ctk
+from netstrip.i18n import t as _t
 import logging
 
 logger = logging.getLogger(__name__)
@@ -151,7 +152,7 @@ class SettingsView(ctk.CTkFrame):
         card.pack(fill="x", pady=(0, Spacing.MD))
 
         ctk.CTkLabel(
-            card, text="Updates",
+            card, text=_t('settings.updates'),
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
             text_color=Colors.TEXT_PRIMARY,
         ).pack(anchor="w", padx=Spacing.LG, pady=(Spacing.LG, Spacing.SM))
@@ -177,7 +178,7 @@ class SettingsView(ctk.CTkFrame):
         btn_frame.pack(fill="x", padx=Spacing.LG, pady=(0, Spacing.LG))
         
         self.btn_check_update = ctk.CTkButton(
-            btn_frame, text="Check for Updates",
+            btn_frame, text=_t('btn.check_updates'),
             width=140, height=32, corner_radius=6,
             fg_color=Colors.BG_INPUT, hover_color=Colors.BG_ELEVATED,
             text_color=Colors.TEXT_PRIMARY,
@@ -199,10 +200,10 @@ class SettingsView(ctk.CTkFrame):
 
     def _refresh_update_status(self):
         if getattr(self.engine, 'update_available', False):
-            self.lbl_update_status.configure(text=f"New version available: v{self.engine.latest_version}", text_color="#facc15")
+            self.lbl_update_status.configure(text=_t("status.new_version").format(version=self.engine.latest_version), text_color="#facc15")
             self.btn_download_update.pack(side="right")
         else:
-            self.lbl_update_status.configure(text="Up to date", text_color=Colors.SUCCESS)
+            self.lbl_update_status.configure(text=_t("status.up_to_date"), text_color=Colors.SUCCESS)
             self.btn_download_update.pack_forget()
 
     def _download_verified_update(self):
@@ -213,7 +214,7 @@ class SettingsView(ctk.CTkFrame):
         import tkinter.messagebox
 
         btn = self.btn_download_update
-        btn.configure(state="disabled", text="Downloading & verifying...")
+        btn.configure(state="disabled", text=_t("status.downloading_verify"))
 
         def _work():
             from netstrip.core.self_update import SelfUpdater, SelfUpdateError
@@ -232,7 +233,7 @@ class SettingsView(ctk.CTkFrame):
                         except Exception:
                             pass
                     finally:
-                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        try: btn.configure(state="normal", text=_t("btn.download_verify"))
                         except Exception: pass
                 self.after(0, _ok)
             except SelfUpdateError as e:
@@ -241,7 +242,7 @@ class SettingsView(ctk.CTkFrame):
                     try:
                         tkinter.messagebox.showerror("Update verification failed", msg)
                     finally:
-                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        try: btn.configure(state="normal", text=_t("btn.download_verify"))
                         except Exception: pass
                 self.after(0, _err)
             except Exception as e:
@@ -251,7 +252,7 @@ class SettingsView(ctk.CTkFrame):
                     try:
                         tkinter.messagebox.showerror("Update failed", f"Network error:\n{net_err}")
                     finally:
-                        try: btn.configure(state="normal", text="Download & Verify Update")
+                        try: btn.configure(state="normal", text=_t("btn.download_verify"))
                         except Exception: pass
                 self.after(0, _err2)
 
@@ -259,7 +260,7 @@ class SettingsView(ctk.CTkFrame):
             
     def _manual_update_check(self):
         self.btn_check_update.configure(state="disabled", text="Checking...")
-        self.lbl_update_status.configure(text="Checking GitHub API & blocklists...", text_color=Colors.TEXT_TERTIARY)
+        self.lbl_update_status.configure(text=_t("status.checking"), text_color=Colors.TEXT_TERTIARY)
         self.btn_download_update.pack_forget()
         
         def _check():

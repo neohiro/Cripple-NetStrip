@@ -9,6 +9,7 @@ from netstrip.gui.theme import (
 )
 from netstrip.gui.utils import apply_treeview_scroll_patch
 import tkinter.ttk as ttk
+from netstrip.i18n import t as _t
 
 
 #  AppRulesView — Pending Approvals + User Rules
@@ -41,7 +42,7 @@ class LogView(ctk.CTkFrame):
         ).pack(side="left")
 
         ctk.CTkButton(
-            header_frame, text="Export Logs", width=100, height=28, corner_radius=6,
+            header_frame, text=_t('btn.export_logs'), width=100, height=28, corner_radius=6,
             fg_color=Colors.BG_ELEVATED, hover_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_SECONDARY,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),

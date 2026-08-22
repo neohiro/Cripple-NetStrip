@@ -1,0 +1,29 @@
+name: Feed Integrity
+
+# Nightly machine-verification that every published blocklist URL is still
+# reachable. Catches upstream link-rot (retired feeds, moved mirrors) within
+# 24h instead of whenever a user happens to notice missing coverage.
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # daily 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-feeds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify all feed URLs are reachable
+        env:
+          ALLOWED_DEAD: ipapi.co   # rate-limits datacenter IPs; runtime fallback covers it
+        run: |
+          python scripts/check_feeds_online.py

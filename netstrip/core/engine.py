@@ -56,7 +56,10 @@ class NetStripEngine:
         dns_port = ANDROID_DNS_PORT if is_android else 53
         
         self.dns_proxy = DNSProxyService(self.classifier, self.db, bind_ip=dns_bind_ip, port=dns_port, engine=self)
-        poll_interval = 2.0 if self.is_headless else 0.2
+        # 1 Hz on desktop (was 5 Hz): psutil.net_connections() is a heavy
+        # syscall; the interceptor enforces blocking at line rate, so this
+        # loop only feeds visibility/logging.
+        poll_interval = 2.0 if self.is_headless else 1.0
         self.connection_monitor = ConnectionMonitor(self.classifier, self.db, poll_interval=poll_interval)
         
         self.firewall = FirewallController()

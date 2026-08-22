@@ -548,10 +548,25 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
         
-        img = self.icon_manager.get_icon(self.process_path, self.process_name, callback=on_loaded)
-        if img:
-            _apply_raw_image(img)
-        else:
+        # Memory-cached icon? Apply instantly. Otherwise paint the fallback
+        # glyph NOW and resolve the real icon off the UI thread (first call
+        # for a path does disk probing / possible extraction).
+        try:
+            cached = self.icon_manager.get_icon_cached(self.process_path, self.process_name)
+        except Exception:
+            cached = None
+        if cached:
+            _apply_raw_image(cached)
+            return
+
+        import threading as _th
+        _th.Thread(
+            target=lambda: self.icon_manager.get_icon(
+                self.process_path, self.process_name, callback=on_loaded),
+            daemon=True,
+        ).start()
+
+        if True:
             # Deterministic fallback glyph: system/OS daemons get a gear,
             # everything else gets its first letter.
             from netstrip.core.process_utils import is_system_process

@@ -121,6 +121,12 @@ class IconManager:
         # Bounded worker pool to prevent spawning dozens of PowerShell / download threads
         self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 
+    def get_icon_cached(self, process_path: str, process_name: str):
+        """Memory-cache lookup ONLY — safe to call on the UI thread."""
+        if process_path and process_path in self._ctk_image_cache:
+            return self._ctk_image_cache[process_path]
+        return None
+
     def get_icon(self, process_path: str, process_name: str, callback=None) -> Optional[ctk.CTkImage]:
         """
         Attempts to get the icon. 

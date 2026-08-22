@@ -55,10 +55,48 @@ def detect_language() -> str:
 import sys  # noqa: E402
 
 
+# Native display names (shown in the Settings picker)
+LANGUAGE_NAMES = {
+    "en": "English", "es": "Español", "de": "Deutsch", "fr": "Français",
+    "it": "Italiano", "pt": "Português", "nl": "Nederlands", "pl": "Polski",
+    "tr": "Türkçe", "ru": "Русский", "uk": "Українська", "ja": "日本語",
+    "ko": "한국어", "zh-cn": "简体中文", "zh-tw": "繁體中文", "hi": "हिन्दी",
+    "id": "Bahasa Indonesia", "vi": "Tiếng Việt", "ar": "العربية",
+    "sv": "Svenska", "da": "Dansk", "fi": "Suomi", "cs": "Čeština",
+    "el": "Ελληνικά", "hu": "Magyar", "ro": "Română",
+}
+
+
+def language_name(code: str) -> str:
+    return LANGUAGE_NAMES.get(code, code.capitalize())
+
+
+def has(key: str) -> bool:
+    return key in _catalog
+
+
+def tooltip_for(english_key: str):
+    """Translated hovertip for a TOOLTIP_MAP key, or None (English fallback)."""
+    return _catalog.get("tooltip." + english_key)
+
+
+def tr(english: str) -> str:
+    """Translate a literal English UI string (gettext-style flat lookup).
+    Falls back to the English text when no translation exists — safe to wrap
+    every string without inventing keys."""
+    return _catalog.get(english, english)
+
+
 def set_language(lang: str):
     global _current_lang, _catalog
     lang = (lang or "en").lower()
     path = _LOCALES_DIR / f"{lang}.json"
+    if not path.exists() and "-" in lang:
+        # 'pt-br' -> 'pt' style fallback before giving up
+        primary = lang.split("-")[0]
+        p2 = _LOCALES_DIR / f"{primary}.json"
+        if p2.exists():
+            lang, path = primary, p2
     if not path.exists():
         logger.debug(f"no catalog for '{lang}', falling back to English")
         lang = "en"

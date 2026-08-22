@@ -1,5 +1,6 @@
 """One-off: verify every online feed/endpoint used by Cripple is reachable."""
 import json
+import os
 import urllib.request
 import ssl
 import concurrent.futures
@@ -38,8 +39,11 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
 
 results.sort(key=lambda r: (r[4], r[0]))
 dead = [r for r in results if not r[4]]
-print(f"TOTAL {len(results)} | ALIVE {len(results)-len(dead)} | DEAD {len(dead)}")
+allowed = {a.strip().lower() for a in os.environ.get("ALLOWED_DEAD", "ipapi.co").split(",") if a.strip()}
+unexpected = [r for r in dead if not any(a in (r[1] or "") for a in allowed)]
+print(f"TOTAL {len(results)} | ALIVE {len(results)-len(dead)} | DEAD {len(dead)} | UNEXPECTED {len(unexpected)}")
 for name, url, code, size, ok in results:
     if not ok:
-        print(f"DEAD [{code}] {name} :: {url}")
-print("--- all alive:" if not dead else "---")
+        marker = "ALLOWED" if any(a in (url or "") for a in allowed) else "DEAD"
+        print(f"{marker} [{code}] {name} :: {url}")
+raise SystemExit(1 if unexpected else 0)

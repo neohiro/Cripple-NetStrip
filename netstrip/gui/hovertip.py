@@ -212,11 +212,15 @@ def apply_global_tooltips():
 
     def get_dynamic_tooltip(widget):
         try:
+            from netstrip.i18n import tooltip_for
             text = widget.cget('text')
             if not isinstance(text, str): return ""
             text = text.strip()
             if not text:
                 return ""
+            localized = tooltip_for(text)
+            if localized:
+                return localized
             tip = TOOLTIP_MAP.get(text)
             if tip: return tip
             # Skip the O(N) scan for long dynamic strings (paths, domains):
@@ -224,7 +228,8 @@ def apply_global_tooltips():
             if len(text) > 32:
                 return ""
             for key, tip in _TOOLTIP_KEYS:
-                if key in text: return tip
+                if key in text:
+                    return tooltip_for(key) or tip
         except Exception:
             pass
         return ""

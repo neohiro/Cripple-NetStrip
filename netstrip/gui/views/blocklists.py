@@ -4,6 +4,7 @@ Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
 import customtkinter as ctk
+from netstrip.i18n import t as _t
 from netstrip.gui.theme import (
     Colors, Fonts, Spacing, Icons,
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
@@ -41,7 +42,7 @@ class BlocklistView(ctk.CTkFrame):
         ).pack(side="left")
         
         self._btn_update = ctk.CTkButton(
-            header_row, text=f"{Icons.SHIELD} Update Blocklists",
+            header_row, text=f"{Icons.SHIELD} {_t('btn.update_blocklists')}",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
             fg_color=Colors.ACCENT_PRIMARY,
             hover_color=Colors.ACCENT_LIGHT,
@@ -273,7 +274,7 @@ class BlocklistView(ctk.CTkFrame):
                             sources = self.engine.blocklist.get_updater_sources()
                             count = len(sources) if sources else 0
                             if not self._sources_expanded:
-                                self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
+                                self._btn_toggle_sources.configure(text=f"▼ {_t('btn.show_online_feeds')} ({count})")
                             else:
                                 self._populate_sources_list()
                             if self._active_category_filter or (hasattr(self, '_search_entry') and self._search_entry.get().strip()):
@@ -627,12 +628,12 @@ class BlocklistView(ctk.CTkFrame):
             self._sources_list_frame.pack_forget()
             sources = self.engine.blocklist.get_updater_sources()
             count = len(sources) if sources else 0
-            self._btn_toggle_sources.configure(text=f"▼ Show Online Feeds ({count})")
+            self._btn_toggle_sources.configure(text=f"▼ {_t('btn.show_online_feeds')} ({count})")
             self._sources_expanded = False
         else:
             self._sources_list_frame.pack(fill="x", pady=(Spacing.XS, 0))
             self._populate_sources_list()
-            self._btn_toggle_sources.configure(text="▲ Hide Online Feeds")
+            self._btn_toggle_sources.configure(text=f"▲ {_t('btn.hide_online_feeds')}")
             self._sources_expanded = True
 
     def _populate_sources_list(self):

@@ -7,6 +7,7 @@ import customtkinter as ctk
 from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_FRAME_STYLE
 from netstrip.gui.widgets import StatCard, ModeSelector, ShieldIndicator
 from netstrip.gui.utils import safe_loop
+from netstrip.i18n import t as _t
 
 class DashboardView(ctk.CTkFrame):
     def __init__(self, master, engine, **kwargs):
@@ -38,7 +39,7 @@ class DashboardView(ctk.CTkFrame):
         self.system_frame = ctk.CTkFrame(self.mode_frame, fg_color=Colors.BG_DARK)
         self.system_frame.pack(fill="x", pady=(0, Spacing.XS))
         
-        ctk.CTkLabel(self.system_frame, text="Block System Connections", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(self.system_frame, text=_t('dashboard.block_system'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
         self.system_toggle = ctk.CTkSwitch(
             self.system_frame, text="", width=36,
@@ -51,7 +52,7 @@ class DashboardView(ctk.CTkFrame):
         self.smart_frame = ctk.CTkFrame(self.mode_frame, fg_color=Colors.BG_DARK)
         self.smart_frame.pack(fill="x", pady=(0, Spacing.MD))
         
-        ctk.CTkLabel(self.smart_frame, text="Smart Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(self.smart_frame, text=_t('dashboard.smart_shield'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
         
         self.smart_toggle = ctk.CTkSwitch(
             self.smart_frame, text="", width=36,
@@ -65,16 +66,16 @@ class DashboardView(ctk.CTkFrame):
         self.mode_selector.pack(fill="x")
         
         # 2. Stats Rows (2x2 Grid)
-        self.stat_traffic = StatCard(self.inner, title="Allowed | Blocked", icon=Icons.BLOCKED, color=Colors.DANGER, subtitle="Last 24h")
+        self.stat_traffic = StatCard(self.inner, title=_t('stat.allowed_blocked'), icon=Icons.BLOCKED, color=Colors.DANGER, subtitle=_t('sub.last24h'))
         self.stat_traffic.grid(row=1, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
         
-        self.stat_queries = StatCard(self.inner, title="Total Queries", icon=Icons.CONNECTIONS, color=Colors.INFO, subtitle="Last 24h")
+        self.stat_queries = StatCard(self.inner, title=_t('stat.total_queries'), icon=Icons.CONNECTIONS, color=Colors.INFO, subtitle="Last 24h")
         self.stat_queries.grid(row=1, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
         
-        self.stat_active = StatCard(self.inner, title="Active Connections", icon="⚡", color=Colors.ACCENT_PRIMARY, subtitle="Currently")
+        self.stat_active = StatCard(self.inner, title=_t('stat.active'), icon="⚡", color=Colors.ACCENT_PRIMARY, subtitle=_t('sub.currently'))
         self.stat_active.grid(row=2, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
         
-        self.stat_bandwidth = StatCard(self.inner, title="Download / Upload", icon="🖧", color=Colors.SUCCESS, subtitle="Down | Up")
+        self.stat_bandwidth = StatCard(self.inner, title=_t('stat.down_up'), icon="🖧", color=Colors.SUCCESS, subtitle=_t('sub.vert'))
         self.stat_bandwidth.grid(row=2, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
         
         # Add Fading Hovertips
@@ -95,7 +96,7 @@ class DashboardView(ctk.CTkFrame):
         self.activity_frame.grid_columnconfigure(0, weight=1)
         self.activity_frame.grid_rowconfigure(1, weight=1)
         
-        header = ctk.CTkLabel(self.activity_frame, text="Recent Blocks", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY)
+        header = ctk.CTkLabel(self.activity_frame, text=_t('dashboard.recent_blocks'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY)
         header.grid(row=0, column=0, sticky="w", padx=Spacing.MD, pady=Spacing.MD)
         
         self.activity_list = ctk.CTkFrame(self.activity_frame, fg_color=Colors.BG_DARK)

@@ -1,3 +1,23 @@
+## [v3.8.0] - 2026-08-22
+### 🌍 26-Language Interface (GUI-wide, including hovertips)
+- **23 new languages**: Français, Italiano, Português, Nederlands, Polski, Türkçe, Русский, Українська, 日本語, 한국어, 简体中文, 繁體中文, हिन्दी, Bahasa Indonesia, Tiếng Việt, العربية, Svenska, Dansk, Suomi, Čeština, Ελληνικά, Magyar, Română — joining English, Español and Deutsch.
+- **Full-surface wiring**: nav labels, dashboard stat cards/subtitles/Recent Blocks/system+Smart-Shield toggles, Settings (Updates card incl. statuses & verify flow, General/Language/Scroll-Speed rows), Filter Lists buttons (Update Blocklists, Show/Hide Online Feeds), Logs export button, and the **hovertip system** (`tooltip.*` namespace with graceful English fallback for the long descriptive entries).
+- `netstrip.i18n` upgrades: native language names for the picker (`LANGUAGE_NAMES`), gettext-style `tr()` literal lookup, `has()`, subtag fallback (`pt-br`→`pt`), and `tooltip_for()`.
+- Language picker now shows native names; choice persisted as `gui_language` and applied at startup before any view builds.
+- `scripts/build_locales.py`: single source of truth for catalogs — merge-safe (hand edits preserved), rerun to extend.
+- **Drift-proofing**: `tests/test_locales_parity.py` enforces core-key coverage for every catalog, complete tooltip sets where started, an always-complete English source, and `{version}`/`{count}` placeholder integrity.
+
+### ⚡ Performance & Sanity Pass
+- **Connection monitor cadence 5 Hz → 1 Hz on desktop** (2 Hz headless): `psutil.net_connections()` is a heavy syscall run continuously; blocking enforcement happens at line rate in the interceptor, so this loop only feeds visibility/logging. ~80% monitoring-CPU reduction on long sessions.
+- **Async first-paint app icons**: new `IconManager.get_icon_cached()` memory fast-path renders instant glyphs; disk probing/extraction moved off the UI thread into the existing background path.
+- Sanity sweep re-verified: compile, ruff correctness gate, bandit medium+, 56 tests, 22.4% core/data coverage over the enforced floor.
+
+### 🔧 Dependencies
+- Raised minimums per Dependabot: `cryptography>=50.0.0`, `Pillow>=12.3.0`, `requests>=2.34.2`, `maxminddb>=3.1.1` (validated against installed versions; full suite green).
+
+### 🤖 CI
+- New nightly **Feed Integrity** workflow: machine-verifies all 58 feed URLs daily with proper exit codes (`ALLOWED_DEAD` allowlist for rate-limited endpoints) — upstream link-rot now surfaces within 24h instead of silently shrinking coverage.
+
 ## [v3.7.2] - 2026-08-22
 ### Verified Self-Update (roadmap #11 — completes part 1)
 - **New `netstrip/core/self_update.py`**: downloads this platform's release zip + the published SHA256SUMS.txt over verified TLS, recomputes SHA-256 and **refuses on any mismatch** (tampered file deleted, never executed). Optional ed25519 detached-signature hook (`NETSTRIP_UPDATE_PUBKEY` + `.sig`) for out-of-band signing later.

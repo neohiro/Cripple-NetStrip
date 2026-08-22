@@ -599,6 +599,14 @@ class NetStripApp(ctk.CTk):
             pass
 
     def _add_nav_btn(self, row, text, icon, view_class):
+        # Localized display; English remains the stable lookup identity
+        try:
+            from netstrip.i18n import tr as _tr
+            text = _tr({"DashboardView": "Dashboard", "LogView": "Logs",
+                        "BlocklistView": "Filter Lists",
+                        "SettingsView": "Settings"}.get(view_class, text))
+        except Exception:
+            pass
         btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=40)
         btn_frame.grid(row=row, column=0, sticky="ew", padx=10, pady=2)
         btn_frame.grid_columnconfigure(0, weight=1)
