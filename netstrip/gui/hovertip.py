@@ -1,5 +1,4 @@
 import customtkinter as ctk
-import time
 from netstrip.gui.theme import Colors, Fonts
 
 class TooltipManager:

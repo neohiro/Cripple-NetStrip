@@ -3,7 +3,6 @@ import json
 import urllib.request
 import ssl
 import concurrent.futures
-from pathlib import Path
 
 UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 ctx = ssl.create_default_context()

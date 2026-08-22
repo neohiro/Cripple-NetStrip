@@ -12,7 +12,7 @@ from typing import Callable, Optional
 
 import psutil
 
-from netstrip.core.modes import ProtectionLevel, get_mode, ConnectionAction
+from netstrip.core.modes import ProtectionLevel, ConnectionAction
 from netstrip.data.database import Database
 from netstrip.data.blocklist_manager import BlocklistManager
 from netstrip.core.classifier import TrafficClassifier, ConnectionCategory
@@ -293,7 +293,7 @@ class NetStripEngine:
                     try:
                         if ipaddress.ip_address(remote_ip).is_private:
                             return True
-                    except:
+                    except Exception:
                         pass
                 
                 notify = self.db.get_setting('inbound_notifications', 'true') == 'true'
@@ -322,7 +322,7 @@ class NetStripEngine:
                         'action': action.value,
                         'mode': self.classifier.mode.name
                     })
-                except:
+                except Exception:
                     pass
                 return False
             return True
@@ -393,7 +393,7 @@ class NetStripEngine:
                     'action': action.value,
                     'mode': self.classifier.mode.name
                 })
-            except:
+            except Exception:
                 pass
             return False
             
@@ -575,9 +575,11 @@ class NetStripEngine:
         
         # Start the internal settings/schedule watchdog (Time Bombs expiry,
         # scheduled killswitch windows) — previously defined but never started.
-        if not self.watchdog_thread or not self.watchdog_thread.is_alive():
-            self.watchdog_thread = threading.Thread(target=self._watchdog_loop, daemon=True)
-            self.watchdog_thread.start()
+        # NOTE: kept separate from self.watchdog_thread, which holds the detached
+        # Popen crash-recovery watchdog (different type, different lifecycle).
+        if not getattr(self, '_settings_watchdog_thread', None) or not self._settings_watchdog_thread.is_alive():
+            self._settings_watchdog_thread = threading.Thread(target=self._watchdog_loop, daemon=True)
+            self._settings_watchdog_thread.start()
         
         
         # Start detached subprocess watchdog to ensure DNS is restored on hard crash
@@ -850,7 +852,6 @@ class NetStripEngine:
 
         # Write .clean_exit at the very end so watchdog knows all critical cleanup succeeded
         try:
-            import os
             from pathlib import Path
             clean_exit_path = Path.home() / ".netstrip" / ".clean_exit"
             clean_exit_path.parent.mkdir(parents=True, exist_ok=True)

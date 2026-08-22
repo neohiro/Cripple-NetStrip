@@ -34,6 +34,14 @@
 - **Hourly retention sweep**: the (now running) watchdog prunes logs/dns_cache hourly so long sessions stay lean; icon manager caches confirmed healthy.
 
 ### Security Audit Fixes
+- **Full static-analysis sweep** (ruff 700+ findings triaged, bandit, vulture): all remaining `shell=True` confined to constant pipelines; MAC generation moved to CSPRNG (`secrets`) — predictable pseudo-random MACs would have defeated randomization; SQL datetime modifiers parameterized; `usedforsecurity=False` on non-crypto MD5 cache key.
+- **Killswitch correctness (Linux)**: IPv6 rule install/removal failures are now logged and reflected in the return value — previously an IPv6-only leak path could report success.
+- **Engine integrity**: settings-watchdog thread no longer aliases the detached crash-recovery Popen handle (type-conflict hazard).
+- **Zero bare `except:`** across the codebase (22 converted); critical-path failures now logged (watchdog flag cleanup, tampered-process kill, IPv6 firewall rules).
+- **Dead code eliminated**: unused TLS context in updater, shadowed imports, dead locals; vulture @90% confidence reports zero remaining dead symbols.
+- **Modal safety**: killswitch confirmation no longer claims lockdown is already active pre-confirmation; "ACKNOWLEDGE" renamed to "RESTORE NETWORK" (it restores networking — previously dangerously ambiguous); Smart Shield modal states its consequences explicitly; safe defaults focused, Escape takes the protective path on all critical modals.
+
+### Security Audit Fixes
 - **Removed embedded GitHub PAT** from crash reporter and telemetry clients (env/file/DB token only; graceful degradation without one).
 - **Signed blocklist cache**: pickle cache is now sealed with HMAC-SHA256; tampered/planted cache files fail verification and rebuild (blocks code-execution via cache planting).
 - **LAN Shield replay window closed**: nonce cache uses FIFO eviction instead of bulk clear; constant-time compares added for IoT API tokens and watchdog integrity checks.

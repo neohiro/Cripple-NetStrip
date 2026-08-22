@@ -4,13 +4,10 @@ Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
 import customtkinter as ctk
-from datetime import datetime
 from netstrip.gui.theme import (
-    Colors, Fonts, Spacing, Icons,
-    CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
-    get_category_color, get_category_label, get_category_icon,
+    Colors, Fonts, Spacing, CTK_ENTRY_STYLE, get_category_color,
 )
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip, apply_treeview_scroll_patch
+from netstrip.gui.utils import apply_treeview_scroll_patch
 import tkinter.ttk as ttk
 
 
@@ -306,7 +303,7 @@ class LogView(ctk.CTkFrame):
                         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)
                         self._refresh_logs_id = self.after(self._refresh_interval(), self._refresh_logs)
 
-                except Exception as e:
+                except Exception:
                     self._is_fetching_logs = False
                     if not getattr(self, '_destroyed', False):
                         if hasattr(self, '_refresh_logs_id'): self.after_cancel(self._refresh_logs_id)

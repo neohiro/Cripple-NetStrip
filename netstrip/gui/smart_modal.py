@@ -4,7 +4,7 @@ Displays a critical alert when Smart Ghost Mode is triggered.
 """
 
 import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_BUTTON_DANGER_STYLE, CTK_BUTTON_SECONDARY_STYLE
+from netstrip.gui.theme import Colors, Fonts
 
 class SmartParanoidModal(ctk.CTkToplevel):
     def __init__(self, master, engine, conn_data, **kwargs):
@@ -16,7 +16,7 @@ class SmartParanoidModal(ctk.CTkToplevel):
         self.resizable(False, False)
         self.attributes("-topmost", True)
         self.configure(fg_color=Colors.BG_DARKEST)
-        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        from netstrip.gui.utils import center_window, apply_window_icon
         apply_window_icon(self)
         center_window(self, 500, 320, parent=master)
 
@@ -50,8 +50,8 @@ class SmartParanoidModal(ctk.CTkToplevel):
         
         lbl_desc = ctk.CTkLabel(inner, text=(
             "CRITICAL SECURITY EVENT INTERCEPTED.\n\n"
-            "> Threat detected automatically.\n"
-            "> Forcing lock-down to GHOST mode...\n\n"
+            "> Threat detected and blocked automatically.\n"
+            "> Protection escalated to GHOST mode (deny-by-default).\n\n"
             f"Process: {process}\nTarget: {target}"
         ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
         lbl_desc.pack(anchor="w", pady=(0, 20))
@@ -60,22 +60,28 @@ class SmartParanoidModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_disable = ctk.CTkButton(
-            btn_frame, text="DISABLE SMART SHIELD", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            btn_frame, text="TURN OFF AUTO-ESCALATION", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, height=36, command=self._disable_smart_shield
         )
         btn_disable.pack(side="left", expand=True, padx=(0, 5))
         
         btn_keep = ctk.CTkButton(
-            btn_frame, text="KEEP LOCKED DOWN", fg_color=Colors.DANGER, 
+            btn_frame, text="STAY IN GHOST MODE", fg_color=Colors.DANGER, 
             hover_color="#991b1b", text_color="white", bg_color=Colors.BG_DARKEST, corner_radius=8, height=36, command=self.destroy
         )
         btn_keep.pack(side="right", expand=True, padx=(5, 0))
+        btn_keep.focus_set()
+        
+        # Escape keeps the protective state
+        self.bind("<Escape>", lambda e: self.destroy())
+        
+        self.grab_set()
 
     def _disable_smart_shield(self):
         from netstrip.core.modes import ProtectionLevel
         self.engine.db.set_setting("smart_paranoid_mode", "false")
         
-        # Revert mode to Normal
+        # Revert mode to Normal — the modal subtitle explains this consequence
         self.engine.set_mode(ProtectionLevel.NORMAL)
         self.destroy()
 

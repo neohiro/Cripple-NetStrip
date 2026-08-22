@@ -11,7 +11,6 @@ import time
 from netstrip.core.classifier import TrafficClassifier
 from netstrip.core.modes import ConnectionAction
 from netstrip.data.database import Database
-import urllib.request
 from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -393,7 +392,7 @@ class NetStripResolver(BaseResolver):
         return False
 
     def resolve(self, request, handler):
-        from netstrip.core.modes import ProtectionLevel, ConnectionCategory, ConnectionAction
+        from netstrip.core.modes import ProtectionLevel
         from dnslib import RCODE
         
         qname = str(request.q.qname)

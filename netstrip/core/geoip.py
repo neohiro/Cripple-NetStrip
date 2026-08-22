@@ -160,7 +160,6 @@ class GeoIPService:
                 self.fetch_now()
 
 
-import os
 import maxminddb
 from pathlib import Path
 

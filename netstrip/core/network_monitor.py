@@ -5,10 +5,8 @@ to detect potential network intrusion/spoofing (Man-in-the-Middle).
 """
 
 import subprocess
-import platform
 import logging
 import threading
-import time
 import re
 from typing import Callable, Optional, Dict
 from netstrip.platform.base import get_platform

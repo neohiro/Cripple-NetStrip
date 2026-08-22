@@ -6,7 +6,7 @@ Dashboard View for Cripple GUI
 import customtkinter as ctk
 from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_FRAME_STYLE
 from netstrip.gui.widgets import StatCard, ModeSelector, ShieldIndicator
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip
+from netstrip.gui.utils import safe_loop
 
 class DashboardView(ctk.CTkFrame):
     def __init__(self, master, engine, **kwargs):
@@ -169,7 +169,7 @@ class DashboardView(ctk.CTkFrame):
             self.engine.db.set_setting("block_system_connections", val)
             if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
                 try: self.engine.gui_update_callback("MODE_CHANGED")
-                except: pass
+                except Exception: pass
 
         is_on = self.system_toggle.get()
         if not is_on: # They toggled it to OFF

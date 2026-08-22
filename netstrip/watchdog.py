@@ -1,6 +1,5 @@
 import sys
 import time
-import os
 import subprocess
 import logging
 import hashlib
@@ -359,7 +358,8 @@ def main():
     if clean_exit_file.exists():
         try:
             clean_exit_file.unlink()
-        except: pass
+        except Exception as e:
+            logging.warning(f'Could not remove stale clean-exit flag: {e}')
     
     # Check if process exists immediately
     if not psutil.pid_exists(parent_pid):
@@ -387,7 +387,8 @@ def main():
                     if not verify_integrity(baseline_hashes):
                         logging.critical("Live tampering detected during process execution! Terminating process...")
                         try: parent_process.kill()
-                        except: pass
+                        except Exception as e:
+                            logging.critical(f'Failed to kill tampered parent process: {e}')
                         restore_network()
                         break
 
@@ -400,7 +401,7 @@ def main():
             if clean_exit_file.exists():
                 logging.info("User requested clean exit flag detected. Watchdog terminating cleanly.")
                 try: clean_exit_file.unlink()
-                except: pass
+                except Exception: pass
                 break
             
             # If the exit code is 0 (or specifically 100 which some apps use for manual exit), it was gracefully closed by the user.

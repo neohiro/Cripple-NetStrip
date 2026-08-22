@@ -27,7 +27,7 @@ import socket
 import sys
 import os
 import concurrent.futures
-from typing import Callable, List, Dict
+from typing import Callable
 from netstrip.core.classifier import TrafficClassifier
 from netstrip.core.modes import ConnectionAction, ConnectionCategory
 from netstrip.core.sound import sound_manager

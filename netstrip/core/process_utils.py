@@ -4,7 +4,6 @@ Provides canonical process name normalization and deep parent tree resolution (h
 """
 
 import os
-import sys
 import time
 import threading
 from typing import Tuple, Optional

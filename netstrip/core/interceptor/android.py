@@ -183,11 +183,8 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
         # DNS queries
         if next_header == PROTO_UDP and dst_port == 53:
-            # For IPv6 DNS, we still forward to our local IPv4 DNS proxy
-            payload = packet[header_len + 8:]
-            response_payload = self._process_dns(payload)
-            # IPv6 DNS response building is complex; for now, just drop and
-            # let it fall back to IPv4 DNS resolution
+            # IPv6 DNS response building is complex; drop and let the client
+            # fall back to IPv4 DNS resolution through our proxy.
             return
 
         try:

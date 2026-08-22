@@ -142,7 +142,6 @@ def submit_issue(title: str, body: str, label: str) -> bool:
 
 def submit_analytics(payload: dict) -> bool:
     """Submit an analytics report as a GitHub Issue."""
-    from netstrip import __version__
 
     title = f"[Analytics] v{payload.get('version', '?')} — {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
 

@@ -14,7 +14,6 @@ import logging
 import re
 import datetime
 from typing import Tuple, Optional, Dict, Set, List, Any, Callable
-from concurrent.futures import ThreadPoolExecutor
 from netstrip.core.modes import ConnectionCategory
 
 logger = logging.getLogger(__name__)
@@ -372,7 +371,7 @@ class BlocklistManager:
         expected = hmac.new(self._get_cache_signing_key(), payload, hashlib.sha256).digest()
         if not hmac.compare_digest(sig, expected):
             raise ValueError("Cache signature verification failed")
-        return pickle.loads(payload)
+        return pickle.loads(payload)  # nosec B301 - container is HMAC-SHA256 verified above
 
     @staticmethod
     def _seal_pickle(payload_obj) -> bytes:
@@ -384,7 +383,7 @@ class BlocklistManager:
 
     def _get_lists_hash(self) -> str:
         """Generate a stable deterministic hash of the current lists directory, updater sources, and DNS settings."""
-        h = hashlib.md5()
+        h = hashlib.md5(usedforsecurity=False)  # non-crypto cache key only
         h.update(b"v3.5.15_cache_fix")
         allow_doh = "false"
         if hasattr(self, 'db') and self.db:

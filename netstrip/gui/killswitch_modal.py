@@ -10,7 +10,7 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         self.title("WARNING: Master Killswitch")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        from netstrip.gui.utils import center_window, apply_window_icon
         apply_window_icon(self)
         center_window(self, 450, 250, parent=parent)
         
@@ -35,17 +35,17 @@ class ManualKillswitchModal(ctk.CTkToplevel):
             lbl_logo = ctk.CTkLabel(header, image=logo_img, text="")
             lbl_logo.pack(side="left", padx=(0, 10))
             
-        lbl_title = ctk.CTkLabel(header, text="SYSTEM LOCKDOWN INITIATED", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
+        lbl_title = ctk.CTkLabel(header, text="CONFIRM SYSTEM LOCKDOWN", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, "bold"), text_color=Colors.DANGER)
         lbl_title.pack(side="left")
         
         # Subtle separator
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
         lbl_desc = ctk.CTkLabel(inner, text=(
-            "SEVERING ALL OS NETWORK CONNECTIONS.\n\n"
-            "> Dropping all internet traffic...\n"
-            "> Blocking all active ports...\n\n"
-            "Hardware intervention (unplugging ethernet) is recommended."
+            "About to sever ALL OS network connections.\n\n"
+            "> Every internet connection will be dropped immediately\n"
+            "> Nothing leaves or enters this machine until you disengage\n\n"
+            "Keep a physical failsafe handy (unplug ethernet) for emergencies."
         ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
         lbl_desc.pack(anchor="w", pady=(0, 20))
         
@@ -53,16 +53,20 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_cancel = ctk.CTkButton(
-            btn_frame, text="ABORT", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
+            btn_frame, text="CANCEL (SAFE)", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_cancel
         )
         btn_cancel.pack(side="left", expand=True, padx=(0, 5))
+        btn_cancel.focus_set()   # Safe default: Enter/Space cancels
         
         btn_confirm = ctk.CTkButton(
-            btn_frame, text="ENGAGE", fg_color=Colors.DANGER, 
+            btn_frame, text="ENGAGE KILLSWITCH", fg_color=Colors.DANGER, 
             hover_color="#991b1b", text_color="#ffffff", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_confirm
         )
         btn_confirm.pack(side="right", expand=True, padx=(5, 0))
+        
+        # Escape always takes the safe path
+        self.bind("<Escape>", lambda e: self.on_cancel())
 
     def on_cancel(self):
         self.callback(False)
@@ -80,7 +84,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         self.title("CRITICAL: Network Intrusion Detected")
         self.attributes("-topmost", True)
         self.resizable(False, False)
-        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        from netstrip.gui.utils import center_window, apply_window_icon
         apply_window_icon(self)
         center_window(self, 500, 250, parent=parent)
         
@@ -111,23 +115,31 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
         
         ctk.CTkFrame(inner, fg_color=Colors.BORDER_SUBTLE, height=1).pack(fill="x", pady=(0, 20))
         
-        lbl_msg = ctk.CTkLabel(inner, text=f"> Watchdog Event:\n{self.message}", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
+        lbl_msg = ctk.CTkLabel(inner, text=(
+            f"> Trigger:\n{self.message}\n\n"
+            "Your network is fully locked down right now.\n"
+            "Choose to keep the lockdown, or restore connectivity."
+        ), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_BASE), justify="left", text_color=Colors.TEXT_SECONDARY)
         lbl_msg.pack(anchor="w", pady=(0, 20))
         
         btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_keep = ctk.CTkButton(
-            btn_frame, text="MAINTAIN LOCKDOWN", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
+            btn_frame, text="STAY LOCKED DOWN", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE,
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_keep
         )
         btn_keep.pack(side="left", expand=True, padx=(0, 5))
+        btn_keep.focus_set()   # Safe default: staying locked down
         
         btn_restore = ctk.CTkButton(
-            btn_frame, text="ACKNOWLEDGE", fg_color=Colors.WARNING, 
+            btn_frame, text="RESTORE NETWORK", fg_color=Colors.WARNING, 
             hover_color="#b45309", text_color="white", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_restore
         )
         btn_restore.pack(side="right", expand=True, padx=(5, 0))
+        
+        # Escape keeps the protective state (safe default)
+        self.bind("<Escape>", lambda e: self.on_keep())
 
     def on_keep(self):
         self.destroy()

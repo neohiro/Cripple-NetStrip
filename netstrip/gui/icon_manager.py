@@ -331,7 +331,7 @@ class IconManager:
                     if icon_info.hbmColor: gdi32.DeleteObject(icon_info.hbmColor)
                     if icon_info.hbmMask: gdi32.DeleteObject(icon_info.hbmMask)
                 user32.DestroyIcon(shfi.hIcon)
-        except Exception as e:
+        except Exception:
             pass
             
         if success:

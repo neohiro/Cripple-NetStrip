@@ -1,5 +1,4 @@
 import os
-import time
 import logging
 import threading
 import subprocess
@@ -102,7 +101,7 @@ class AnomalyScanner:
                     res = subprocess.run(["sc", "query", "npf"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
                     if "RUNNING" in res.stdout:
                         anomalies.append({'name': 'npf', 'message': "WinPcap Driver is ACTIVE."})
-            except: pass
+            except Exception: pass
             
         elif os.uname().sysname == 'Linux':
             try:
@@ -111,7 +110,7 @@ class AnomalyScanner:
                         lines = f.readlines()
                         if len(lines) > 1:
                             anomalies.append({'name': 'af_packet', 'message': f"Raw AF_PACKET sockets detected ({len(lines)-1} open). Dropping via eBPF."})
-            except: pass
+            except Exception: pass
             
         return anomalies
 

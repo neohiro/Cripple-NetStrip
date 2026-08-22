@@ -1,11 +1,10 @@
 import os
 import sys
 import re
-import random
 import logging
 import subprocess
 import threading
-from typing import Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +24,16 @@ class MACRandomizer:
         Generate locally administered MAC address.
         The second hex character must be 2, 6, A, or E.
         """
+        # CSPRNG required: predictable (Mersenne-Twister) MACs would defeat the
+        # purpose of randomization — an observer could correlate/predict IDs.
+        import secrets
         mac = [
-            random.randint(0x00, 0x0f) << 4 | random.choice([0x02, 0x06, 0x0A, 0x0E]),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff)
+            secrets.randbelow(0x10) << 4 | secrets.choice((0x02, 0x06, 0x0A, 0x0E)),
+            secrets.randbelow(0x100),
+            secrets.randbelow(0x100),
+            secrets.randbelow(0x100),
+            secrets.randbelow(0x100),
+            secrets.randbelow(0x100),
         ]
         return ':'.join(f'{x:02x}' for x in mac)
 
@@ -321,7 +323,6 @@ class MACRandomizer:
 
         # Windows: Use native Group Policy Registry and ctypes to disable/enable protocol bindings without triggering ML
         try:
-            import os
             import winreg
             import ctypes
             

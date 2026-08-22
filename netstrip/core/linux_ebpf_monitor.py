@@ -9,7 +9,7 @@ import threading
 import socket
 import struct
 import subprocess
-from typing import Callable, Optional
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 

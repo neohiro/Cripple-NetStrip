@@ -112,7 +112,6 @@ class PlatformBase(ABC):
     def _get_target_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None) -> list:
         """Return a list of (local_ip, local_port, remote_ip, remote_port) for matching established TCP connections."""
         import psutil
-        import socket
         targets = []
         try:
             for conn in psutil.net_connections(kind='tcp'):

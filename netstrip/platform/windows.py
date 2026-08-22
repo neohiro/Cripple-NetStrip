@@ -173,7 +173,7 @@ class WindowsPlatform(PlatformBase):
                     parts = line.split()
                     if len(parts) >= 3:
                         return parts[2]
-        except:
+        except Exception:
             pass
         return None
 
@@ -427,7 +427,7 @@ class WindowsPlatform(PlatformBase):
 
     def disable_protocol_bindings(self) -> bool:
         """Disable redundant, privacy-leaking protocol bindings and autodiscovery on Windows using native registry and netsh to evade ML."""
-        import winreg, os
+        import winreg
         
         # Disable File and Printer Sharing (LanmanServer) and NetBIOS over TCP/IP using wmic natively
         self._run_cmd(["wmic", "service", "where", "name='lanmanserver'", "call", "stopservice"])
@@ -467,7 +467,7 @@ class WindowsPlatform(PlatformBase):
 
     def restore_protocol_bindings(self) -> bool:
         """Restore standard adapter protocol bindings on Windows."""
-        import winreg, os
+        import winreg
         
         # Restore File and Printer Sharing and NetBIOS over TCP/IP using wmic natively
         self._run_cmd(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"])

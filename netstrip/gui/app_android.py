@@ -74,7 +74,7 @@ def fast_check_if_valid_scroll(self, widget):
 ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
 import logging
-from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
+from netstrip.gui.theme import Colors, Fonts, Icons
 from netstrip.core.engine import NetStripEngine
 
 def _resolve_view_class(view_target):
@@ -159,7 +159,7 @@ class NetStripApp(ctk.CTk):
                 if hicon:
                     ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
                     ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
-        except Exception as e:
+        except Exception:
             pass
 
     def _on_window_resize(self, event):
@@ -277,7 +277,6 @@ class NetStripApp(ctk.CTk):
                                       fg_color=Colors.DANGER, text_color="white", font=(Fonts.FAMILY_PRIMARY[0], 9, "bold"))
 
         # Version Check
-        from netstrip import __version__
         self.engine.gui_update_callback = self._on_engine_event
         if getattr(self.engine, 'update_available', False):
             self._on_engine_event("UPDATE_AVAILABLE")

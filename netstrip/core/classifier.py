@@ -3,8 +3,8 @@ Classifier Engine for NetStrip
 Decides the category of a domain or IP based purely on the blocklist manager and modes.
 """
 
-from typing import Tuple, Optional
-from netstrip.core.modes import ConnectionCategory, ModeConfig, ProtectionLevel, get_mode
+from typing import Optional
+from netstrip.core.modes import ConnectionCategory, ProtectionLevel, get_mode
 from netstrip.data.blocklist_manager import BlocklistManager
 
 class TrafficClassifier:
@@ -144,7 +144,7 @@ class TrafficClassifier:
                 row = self.db._get_connection().execute("SELECT domain FROM dns_cache WHERE ip = ?", (ip,)).fetchone()
                 if row:
                     domain = row['domain']
-            except:
+            except Exception:
                 pass
                 
         target_to_classify = domain if domain else ip

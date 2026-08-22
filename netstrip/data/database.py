@@ -271,13 +271,16 @@ class Database:
 
     def prune_old_logs(self, hours: int = 24):
         """Keep only the latest logs within the last N hours to prevent SQLite bloat."""
+        # Clamp to a sane integer range — `hours` flows into the datetime modifier.
+        hours = max(1, min(int(hours), 24 * 365))
+        cutoff = f"-{hours} hours"
         with self.lock:
             with self._get_connection() as conn:
                 conn.execute(
-                    f"DELETE FROM connection_log WHERE timestamp < datetime('now', '-{hours} hours')"
+                    "DELETE FROM connection_log WHERE timestamp < datetime('now', ?)", (cutoff,)
                 )
                 conn.execute(
-                    f"DELETE FROM dns_cache WHERE last_seen < datetime('now', '-{hours} hours')"
+                    "DELETE FROM dns_cache WHERE last_seen < datetime('now', ?)", (cutoff,)
                 )
 
     def cache_domain_mapping(self, ip: str, domain: str):
@@ -296,27 +299,44 @@ class Database:
     def get_recent_connections(self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None) -> List[sqlite3.Row]:
         with self.lock:
             with self._get_connection() as conn:
-                where_clause = ""
-                params = []
+                params: list = []
                 if since_timestamp:
-                    where_clause = "WHERE timestamp >= ?"
                     params.append(since_timestamp)
                     
                 if unique_only:
-                    query = f'''
-                        SELECT *, max(id) as max_id 
-                        FROM (
-                            SELECT * FROM connection_log {where_clause} ORDER BY id DESC LIMIT 5000
-                        )
-                        GROUP BY process_name, coalesce(domain, ip) 
-                        ORDER BY max_id DESC LIMIT ?
-                    '''
+                    # where_clause is a compile-time constant ('WHERE ...' or '');
+                    # all dynamic values flow through bound parameters.
+                    if since_timestamp:
+                        query = '''
+                            SELECT *, max(id) as max_id
+                            FROM (
+                                SELECT * FROM connection_log WHERE timestamp >= ? ORDER BY id DESC LIMIT 5000
+                            )
+                            GROUP BY process_name, coalesce(domain, ip)
+                            ORDER BY max_id DESC LIMIT ?
+                        '''
+                    else:
+                        query = '''
+                            SELECT *, max(id) as max_id
+                            FROM (
+                                SELECT * FROM connection_log ORDER BY id DESC LIMIT 5000
+                            )
+                            GROUP BY process_name, coalesce(domain, ip)
+                            ORDER BY max_id DESC LIMIT ?
+                        '''
                     params.append(limit)
                     cursor = conn.execute(query, params)
                 else:
-                    query = f'SELECT * FROM connection_log {where_clause} ORDER BY id DESC LIMIT ?'
                     params.append(limit)
-                    cursor = conn.execute(query, params)
+                    if since_timestamp:
+                        cursor = conn.execute(
+                            'SELECT * FROM connection_log WHERE timestamp >= ? ORDER BY id DESC LIMIT ?',
+                            params,
+                        )
+                    else:
+                        cursor = conn.execute(
+                            'SELECT * FROM connection_log ORDER BY id DESC LIMIT ?', params
+                        )
                 return cursor.fetchall()
 
     def get_unique_allowed_24h(self) -> int:

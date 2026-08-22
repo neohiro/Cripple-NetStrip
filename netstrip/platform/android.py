@@ -1,6 +1,4 @@
 import logging
-import os
-import subprocess
 from typing import List, Optional
 
 from netstrip.platform.base import PlatformBase
@@ -44,9 +42,8 @@ class AndroidPlatform(PlatformBase):
         """
         if not self.VpnService: return False
         try:
-            context = self.PythonActivity.mActivity
-            # Note: We must have a running VpnService instance.
-            # In a full implementation, we'd pass this via an IPC or bound service.
+            # Note: DNS on Android is applied via VpnService builder.addDnsServer()
+            # when the tunnel is established; a running VPN instance is required.
             logger.info(f"Android VpnService builder will intercept DNS queries and route to {dns_server}")
             return True
         except Exception as e:

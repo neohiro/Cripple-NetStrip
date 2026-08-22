@@ -262,7 +262,7 @@ class NetStripApp(ctk.CTk):
                 if hicon:
                     ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
                     ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
-        except Exception as e:
+        except Exception:
             pass
 
     def _on_window_map(self, event):
@@ -485,7 +485,7 @@ class NetStripApp(ctk.CTk):
                 if settings_view and hasattr(settings_view, 'scroll_frame') and hasattr(settings_view.scroll_frame, '_parent_canvas'):
                     try:
                         settings_view.scroll_frame._parent_canvas.yview_moveto(0)
-                    except: pass
+                    except Exception: pass
                     
             self.after(50, _scroll_to_top)
             
@@ -799,7 +799,7 @@ class NetStripApp(ctk.CTk):
     
             if getattr(self, '_tray_icon', None) is not None:
                 return
-        except Exception as e:
+        except Exception:
             # Pystray requires a display server (X11/Wayland/Explorer).
             # If we fail here, we are on a truly headless OS or broken environment.
             self._tray_icon = None

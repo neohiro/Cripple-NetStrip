@@ -10,7 +10,7 @@ import urllib.request
 import threading
 import logging
 import time
-from typing import Dict, Any, Tuple
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -118,14 +118,7 @@ class BlocklistUpdater:
                 any_updated = False
                 updated_count = 0
 
-                # Always-verified SSL context (fail closed)
-                import ssl
-                try:
-                    import certifi
-                    ssl_context = ssl.create_default_context(cafile=certifi.where())
-                except Exception:
-                    ssl_context = ssl.create_default_context()
-                
+                # Downloads go through requests (TLS-verified by default).
                 self.last_update_stats = {"success": 0, "failed": 0, "total": total_enabled}
                 for idx, source in enumerate(enabled_sources, 1):
                     url = source.get('url')

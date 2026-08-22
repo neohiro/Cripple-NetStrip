@@ -17,7 +17,6 @@ import traceback
 import json
 import os
 import sys
-import threading
 from pathlib import Path
 from typing import Optional
 from email.mime.text import MIMEText

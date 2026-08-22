@@ -164,20 +164,26 @@ class LinuxPlatform(PlatformBase):
             logger.error(f"Failed to kill TCP connections on Linux: {e}")
 
     def enable_killswitch(self) -> bool:
-        # Absolute ghost mode - block everything unconditionally
+        # Absolute ghost mode - block everything unconditionally (v4 AND v6).
         res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
+        if not (res1 and res2):
+            logger.error("IPv4 killswitch rules failed to install")
+        if not (res3 and res4):
+            logger.error("IPv6 killswitch rules failed to install — possible IPv6 leak path")
         self.kill_tcp_connections()
-        return res1 and res2
+        return res1 and res2 and res3 and res4
 
     def disable_killswitch(self) -> bool:
         res1 = self._run_cmd(["iptables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
         res2 = self._run_cmd(["iptables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
-        return res1 and res2
+        if not (res3 and res4):
+            logger.error("IPv6 killswitch rules failed to remove — network may stay blocked")
+        return res1 and res2 and res3 and res4
 
     def block_lan_traffic(self) -> bool:
         lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]

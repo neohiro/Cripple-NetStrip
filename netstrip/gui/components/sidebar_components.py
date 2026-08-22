@@ -1,11 +1,9 @@
 from netstrip.gui.popups import check_killswitch_override
 import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, get_category_color, get_category_label
+from netstrip.gui.theme import Colors, Fonts, Spacing, get_category_color
 from netstrip.core.engine import NetStripEngine
 from netstrip.gui.icon_manager import IconManager
-from netstrip.gui.utils import safe_loop, bind_copy_tooltip, mask_ip_string
-import os
-import time
+from netstrip.gui.utils import mask_ip_string
 from netstrip.core.classifier import ConnectionCategory
 
 class ConnectionRow(ctk.CTkFrame):
@@ -54,7 +52,7 @@ class ConnectionRow(ctk.CTkFrame):
                 loc = geoip_engine.get_full_location(raw_ip)
                 if loc:
                     target = f"[{loc}] {target}"
-        except Exception as e:
+        except Exception:
             pass
         
         self.target_label = ctk.CTkLabel(
@@ -715,7 +713,7 @@ class AppGroupFrame(ctk.CTkFrame):
                         conn = self.engine.db._get_connection()
                         conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
                         conn.commit()
-                    except:
+                    except Exception:
                         pass
 
                     if db_action != 'neutral':

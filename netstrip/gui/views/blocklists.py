@@ -4,7 +4,6 @@ Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
 import customtkinter as ctk
-from datetime import datetime
 from netstrip.gui.theme import (
     Colors, Fonts, Spacing, Icons,
     CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,

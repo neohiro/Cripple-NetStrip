@@ -12,7 +12,6 @@ Supports two VPN modes:
 import os
 import sys
 import threading
-import time
 
 # Ensure we are treated as Android
 os.environ['NETSTRIP_ANDROID'] = '1'

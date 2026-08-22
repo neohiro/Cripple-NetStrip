@@ -36,7 +36,7 @@ class WinDivertInterceptor(PacketInterceptor):
         if self._w:
             try:
                 self._w.close()
-            except:
+            except Exception:
                 pass
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
@@ -90,7 +90,7 @@ class WinDivertInterceptor(PacketInterceptor):
                             if not is_killswitch:
                                 try:
                                     w.send(packet)
-                                except:
+                                except Exception:
                                     pass
                             # else: packet is silently dropped (correct behavior under killswitch)
             except Exception as e:

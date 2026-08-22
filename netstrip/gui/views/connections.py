@@ -4,13 +4,13 @@ Displays a live list of connections grouped by app name, target, classification 
 """
 
 import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, get_category_color, get_category_label
+from netstrip.gui.theme import Colors, Fonts, Spacing
 from netstrip.core.engine import NetStripEngine
 from netstrip.gui.icon_manager import IconManager
 import os
 
 
-from netstrip.gui.components.sidebar_components import ConnectionRow, AppGroupFrame
+from netstrip.gui.components.sidebar_components import AppGroupFrame
 from netstrip.gui.utils import safe_loop, enable_smooth_scrolling
 from netstrip.gui.popups import check_killswitch_override
 
@@ -216,8 +216,6 @@ class ConnectionsView(ctk.CTkFrame):
 
     def _process_connections(self, conns, sys_val):
         try:
-            db_cache = {"block_system_connections": sys_val}
-            
             if len(conns) > 0:
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
                 from netstrip.core.process_utils import normalize_process_name
@@ -288,7 +286,6 @@ class ConnectionsView(ctk.CTkFrame):
                     
                     if p_name not in self.app_groups:
                         # Create new group
-                        import time
                         group = AppGroupFrame(self.scroll_frame, p_name, p_path, self.engine, self.icon_manager)
                         self.app_groups[p_name] = group
                         group.set_expanded(getattr(self, 'is_expanded', False))
@@ -319,7 +316,6 @@ class ConnectionsView(ctk.CTkFrame):
                 # 2. Bucket the time into 5-second chunks (prevents micro-jittering/flickering)
                 # 3. Secondary sort by app name for perfect stability within the bucket
                 def get_sort_key(g):
-                    import time
                     if not g.rows: return (0, g.process_name)
                     latest = max(getattr(r, 'last_updated', 0) for r in g.rows.values())
                     bucket = round(latest / 5.0) * 5

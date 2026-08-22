@@ -169,7 +169,7 @@ class IoTTelemetrySync:
             requests.post(url, json=payload, headers=headers, timeout=2.0)
         except requests.exceptions.RequestException as e:
             logger.debug(f"Failed to post telemetry to {url}: {e}")
-        except Exception as e:
+        except Exception:
             # Fallback to urllib if requests isn't available or fails strangely
             try:
                 req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')

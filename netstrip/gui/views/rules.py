@@ -7,8 +7,7 @@ import customtkinter as ctk
 from datetime import datetime
 from netstrip.gui.theme import (
     Colors, Fonts, Spacing, Icons,
-    CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
-    get_category_color, get_category_label, get_category_icon,
+    CTK_FRAME_STYLE, get_category_color,
 )
 from netstrip.gui.utils import safe_loop, bind_copy_tooltip, enable_smooth_scrolling
 

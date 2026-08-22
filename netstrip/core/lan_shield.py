@@ -10,7 +10,7 @@ import json
 import time
 import os
 import sys
-from netstrip.core.crypto_utils import Fernet, InvalidToken
+from netstrip.core.crypto_utils import Fernet
 from netstrip.platform.base import get_platform
 from netstrip.core.modes import ProtectionLevel, get_mode
 
@@ -71,7 +71,7 @@ class LANShield:
                 logger.error(f"LAN Shield listener failed to bind: {e}, retrying in 3s...")
                 if sock:
                     try: sock.close()
-                    except: pass
+                    except Exception: pass
                 time.sleep(3)
                 continue
 
@@ -134,7 +134,7 @@ class LANShield:
             # Clean up dead socket before rebind attempt
             if sock:
                 try: sock.close()
-                except: pass
+                except Exception: pass
             if self._running:
                 time.sleep(3)  # Backoff before rebind
 
@@ -176,7 +176,7 @@ class LANShield:
         finally:
             if sock:
                 try: sock.close()
-                except: pass
+                except Exception: pass
 
     def broadcast_anomaly(self, anomaly_data: dict):
         self._send_encrypted_broadcast('LAN_THREAT_BROADCAST', anomaly_data.get('note', 'Unknown Threat'))

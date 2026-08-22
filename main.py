@@ -689,7 +689,7 @@ def main():
             try:
                 clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
                 clean_exit_path.touch()
-            except: pass
+            except Exception: pass
         finally:
             engine_instance.stop()
             sys.exit(0)

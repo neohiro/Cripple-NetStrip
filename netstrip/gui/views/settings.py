@@ -7,11 +7,8 @@ import customtkinter as ctk
 import logging
 
 logger = logging.getLogger(__name__)
-from datetime import datetime
 from netstrip.gui.theme import (
-    Colors, Fonts, Spacing, Icons,
-    CTK_FRAME_STYLE, CTK_ENTRY_STYLE, CTK_SWITCH_STYLE,
-    get_category_color, get_category_label, get_category_icon,
+    Colors, Fonts, Spacing, CTK_FRAME_STYLE, CTK_ENTRY_STYLE,
 )
 
 
@@ -238,7 +235,7 @@ class SettingsView(ctk.CTkFrame):
                         self.engine.update_available = True
                         if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
                             try: self.engine.gui_update_callback("UPDATE_AVAILABLE")
-                            except: pass
+                            except Exception: pass
                     else:
                         self.engine.update_available = False
             except Exception:
@@ -609,7 +606,7 @@ class SettingsView(ctk.CTkFrame):
                         self.engine.classifier._ip_cache.clear()
                 if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
                     try: self.engine.gui_update_callback("MODE_CHANGED")
-                    except: pass
+                    except Exception: pass
 
             if setting_key == 'mac_randomization':
                 import threading
@@ -1009,7 +1006,7 @@ class SettingsView(ctk.CTkFrame):
     def _open_dns_selector(self):
         try:
             dns_val = self.engine.db.get_setting('dns_upstream', '1.1.1.1')
-        except:
+        except Exception:
             dns_val = '1.1.1.1'
         DNSSelectorModal(self.winfo_toplevel(), self.dns_options_map, dns_val, self._save_dns)
 

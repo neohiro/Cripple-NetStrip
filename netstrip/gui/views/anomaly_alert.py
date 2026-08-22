@@ -21,7 +21,7 @@ class CTkAnomalyAlert(ctk.CTkToplevel):
         self.attributes('-topmost', True)
         self.grab_set() # Force focus
         
-        from netstrip.gui.utils import center_window, apply_window_icon, get_app_logo_image
+        from netstrip.gui.utils import center_window, apply_window_icon
         apply_window_icon(self)
         center_window(self, 500, 350, parent=master)
         

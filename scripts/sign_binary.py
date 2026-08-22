@@ -4,9 +4,7 @@ Automatically signs Windows binaries for FrenzyPenguin Media with Authenticode S
 when an official PFX certificate is provided via CI environment variables.
 """
 import os
-import sys
 import subprocess
-import shutil
 import base64
 import tempfile
 from pathlib import Path
