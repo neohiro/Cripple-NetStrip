@@ -12,6 +12,11 @@ on:
         required: true
         default: 'v3.1.0'
 
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '.gitignore'
+      - 'docs/**'
 permissions:
   contents: write
 
@@ -44,6 +49,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+        cache: 'pip'
           
       - name: Install System Dependencies (Linux & Android)
         if: matrix.os == 'ubuntu-latest'
@@ -123,7 +129,7 @@ jobs:
             zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
             cd ..
           else
-            echo "APK missing after successful exit — failing the release"
+            echo "APK missing after successful exit â€” failing the release"
             exit 1
           fi
 
