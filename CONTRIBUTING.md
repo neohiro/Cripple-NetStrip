@@ -37,3 +37,11 @@ Please match the existing module boundaries rather than growing monoliths.
 ## Contact
 
 [frenzypenguin.media](https://linktr.ee/frenzypenguin.media)
+
+## Releasing
+
+1. Bump the version (code constant / README).
+2. Commit and push.
+3. **Draft a new Release** on GitHub with tag `vX.Y.Z` and publish it - CI
+   builds every platform binary automatically and attaches them; release
+   notes are generated from merged commits since the last tag.
