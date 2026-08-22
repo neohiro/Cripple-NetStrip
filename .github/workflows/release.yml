@@ -147,11 +147,12 @@ jobs:
           $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe",
                     "$env:ProgramFiles\Inno Setup 6\iscc.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $iscc) { Write-Host 'iscc not found; skipping installer'; exit 0 }
-          $exe = "dist\Cripple.exe"
-          if (-not (Test-Path $exe)) { Write-Host "built exe not found at $exe"; exit 1 }
+          $exe = @("dist\Cripple\Cripple.exe", "dist\Cripple.exe") |
+                  Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { Write-Host "built exe not found under dist\"; exit 1 }
           $ver = (Get-Item $exe).VersionInfo.ProductVersion
           if (-not $ver) { $ver = "0.0.0" }
-          & $iscc "/DMyAppVersion=$ver" scripts\installer.iss
+          & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exe" scripts\installer.iss
 
       - name: Generate SHA256SUMS manifest
         if: matrix.target == 'windows'

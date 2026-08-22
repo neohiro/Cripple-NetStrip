@@ -4,13 +4,13 @@
 ; restoration so an uninstall can never leave a machine without DNS.
 
 #define MyAppName "NetStrip"
-; Version is injected by CI:  iscc /DMyAppVersion=x.y.z scripts/installer.iss
-; Local builds fall back to reading the built exe, then to a placeholder.
-#ifndef MyAppVersion
-  #define MyAppVersion GetVersionNumbersString("dist\Cripple.exe")
-#endif
+; CI injects:  iscc /DMyAppVersion=x.y.z /DExeSource=dist\Cripple\Cripple.exe
+; Local defaults cover a standard PyInstaller onedir build.
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
+#endif
+#ifndef ExeSource
+  #define ExeSource "dist\Cripple\Cripple.exe"
 #endif
 
 [Setup]
@@ -30,7 +30,7 @@ PrivilegesRequired=admin
 WizardStyle=modern
 
 [Files]
-Source: "dist\Cripple.exe"; DestDir: "{app}"; Flags: ignoreversion signonce
+Source: "{#ExeSource}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\logo.ico"; DestDir: "{app}"
 
 [Icons]
