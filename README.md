@@ -447,3 +447,10 @@ pip install -r requirements.txt
 ## 📄 License
 
 Copyright © 2026 FrenzyPenguin Media — All rights reserved. Free for personal, non-commercial use. Redistribution and modification are not permitted without written permission. See [LICENSE.md](LICENSE.md) for the full terms.
+
+---
+
+<p align="center">
+  <a href="https://github.com/sponsors/neohiro"><img src="https://img.shields.io/badge/Sponsor%20on%20GitHub-%E2%9D%A4-EA4AAA?logo=githubsponsors&style=for-the-badge" alt="GitHub Sponsors"></a>&nbsp;&nbsp;
+  <a href="https://www.patreon.com/frenzypenguin_media"><img src="https://img.shields.io/badge/Patreon-frenzypenguin__media-F96854?logo=patreon&style=for-the-badge" alt="Support on Patreon"></a>
+</p>
