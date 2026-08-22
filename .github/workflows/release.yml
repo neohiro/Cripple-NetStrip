@@ -31,7 +31,7 @@ jobs:
           - os: ubuntu-latest
             name: Linux
             target: linux
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             name: Android
             target: android
           - os: macos-latest

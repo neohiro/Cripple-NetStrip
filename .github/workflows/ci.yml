@@ -82,6 +82,7 @@ jobs:
           python -c "from netstrip.core.crash_reporter import send_crash_report; print('Crash Reporter module OK')"
 
       - name: Run unit tests with coverage floor
+        shell: bash   # backslash continuations are invalid in Windows PowerShell
         run: |
           python -m pytest tests/ -v --timeout=30 --tb=short -q \
             --cov=netstrip/core --cov=netstrip/data --cov-report=term \
