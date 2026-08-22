@@ -115,10 +115,15 @@ jobs:
             zip -r NetStrip-${RELEASE_TAG}-Linux.zip main.py netstrip/ assets/ requirements.txt build.sh run.sh
           fi
 
+      - name: Set up Java (Android)
+        if: matrix.target == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Build Android Package
         if: matrix.target == 'android'
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
           # No '|| true' here: a failed APK build must fail the release, not
           # silently ship a source-only zip (that lie shipped broken releases).
@@ -141,7 +146,12 @@ jobs:
           choco install innosetup -y --no-progress
           $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe",
                     "$env:ProgramFiles\Inno Setup 6\iscc.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if ($iscc) { & $iscc scripts/installer.iss } else { Write-Host 'iscc not found; skipping installer' }
+          if (-not $iscc) { Write-Host 'iscc not found; skipping installer'; exit 0 }
+          $exe = "dist\Cripple.exe"
+          if (-not (Test-Path $exe)) { Write-Host "built exe not found at $exe"; exit 1 }
+          $ver = (Get-Item $exe).VersionInfo.ProductVersion
+          if (-not $ver) { $ver = "0.0.0" }
+          & $iscc "/DMyAppVersion=$ver" scripts\installer.iss
 
       - name: Generate SHA256SUMS manifest
         if: matrix.target == 'windows'

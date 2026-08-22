@@ -4,7 +4,14 @@
 ; restoration so an uninstall can never leave a machine without DNS.
 
 #define MyAppName "NetStrip"
-#define MyAppVersion GetVersionNumbersString("dist\Cripple.exe")
+; Version is injected by CI:  iscc /DMyAppVersion=x.y.z scripts/installer.iss
+; Local builds fall back to reading the built exe, then to a placeholder.
+#ifndef MyAppVersion
+  #define MyAppVersion GetVersionNumbersString("dist\Cripple.exe")
+#endif
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.0"
+#endif
 
 [Setup]
 AppId={{8E7B6C1D-52A4-4F0E-9C3B-NETSTRIP64}}
