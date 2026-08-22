@@ -55,7 +55,7 @@ android.accept_sdk_license = True
 # glibc host headers rely on, which breaks Kivy/SDL2 C extensions; unpinned
 # python-for-android also drifted onto Python 3.14 snapshots. This exact pair
 # cross-compiles cleanly.
-android.ndk = 26b
+android.ndk = 25b
 p4a.branch = v2024.01.21
 
 # (str) Android entry point, default is ok for Kivy-based app
