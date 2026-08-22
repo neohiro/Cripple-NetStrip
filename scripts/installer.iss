@@ -10,7 +10,7 @@
   #define MyAppVersion "0.0.0"
 #endif
 #ifndef ExeSource
-  #define ExeSource "dist\Cripple\Cripple.exe"
+  #define ExeSource "..\dist\Cripple\Cripple.exe"
 #endif
 
 [Setup]
@@ -20,7 +20,7 @@ AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\NetStrip
 DefaultGroupName=NetStrip
 UninstallDisplayIcon={app}\Cripple.exe
-LicenseFile=LICENSE.md
+LicenseFile=..\LICENSE.md
 OutputDir=installer\
 OutputBaseFilename=NetStrip-Setup-{#MyAppVersion}
 Compression=lzma2/max
