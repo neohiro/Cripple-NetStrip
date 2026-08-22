@@ -84,6 +84,9 @@ def fake_transport(monkeypatch, *, zip_bytes=ZIP_BYTES, sums_text=None):
         assert url in payloads, f"unexpected URL requested: {url}"
         return FakeResp(payloads[url])
 
+    # Tests must be host-OS independent: always exercise the Windows asset path
+    monkeypatch.setattr("netstrip.core.self_update.platform_token",
+                        lambda platform=None: "Windows")
     monkeypatch.setattr("netstrip.core.self_update.urllib.request.urlopen", fake_urlopen)
     return payloads
 
