@@ -39,5 +39,18 @@
   "status.up_to_date": "محدَّث",
   "sub.currently": "حالياً",
   "sub.down_up": "تنزيل / رفع",
-  "sub.last24h": "آخر 24 ساعة"
+  "sub.last24h": "آخر 24 ساعة",
+  "tooltip.Allow": "سماح",
+  "tooltip.Block": "حجب",
+  "tooltip.Dashboard": "لوحة التحكم",
+  "tooltip.Export Logs": "تصدير السجلات",
+  "tooltip.Filter Lists": "قوائم الفلاتر",
+  "tooltip.Logs": "السجلات",
+  "tooltip.Refresh Blocklists": "تحديث القوائم",
+  "tooltip.Reset Custom Rules": "إعادة تعيين القواعد",
+  "tooltip.Settings": "الإعدادات",
+  "tooltip.Sinkhole": "حوض DNS",
+  "tooltip.View Custom Rules": "قواعد مخصصة",
+  "tooltip.🔇": "تشغيل الأصوات",
+  "tooltip.🔊": "كتم الأصوات"
 }

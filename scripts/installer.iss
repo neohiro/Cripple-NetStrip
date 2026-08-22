@@ -49,4 +49,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
 [Run]
 Filename: "{app}\Cripple.exe"; Description: "Launch NetStrip"; \
     Flags: nowait postinstall skipifsilent runascurrentuser
+; After a silent upgrade (/SILENT), bring the new version back up so
+; "Update & Restart" truly restarts.
+Filename: "{app}\Cripple.exe"; Flags: nowait runhidden skipifsilent
 

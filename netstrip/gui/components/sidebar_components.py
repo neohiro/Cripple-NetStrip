@@ -405,6 +405,14 @@ class AppGroupFrame(ctk.CTkFrame):
             command=self._toggle_expand
         )
         self.btn_expand.pack(side="right", padx=Spacing.XS)
+        self.lbl_bandwidth.pack(side="right", padx=(0, 4))
+        
+        # Per-app bandwidth (session totals; visible collapsed & expanded)
+        self.lbl_bandwidth = ctk.CTkLabel(
+            self.header, text="", font=(Fonts.FAMILY_PRIMARY[0], 9),
+            text_color=Colors.TEXT_TERTIARY
+        )
+        # packed right of btn_expand so it sits before the expand chevron
         
         # Check current global status
         self._global_action_state = None
@@ -764,6 +772,27 @@ class AppGroupFrame(ctk.CTkFrame):
         else:
             proceed()
 
+    def update_bandwidth_label(self):
+        """Pull session byte totals from the engine and format compactly."""
+        try:
+            sent, recv = self.engine.get_app_bytes(self.process_name)
+        except Exception:
+            return
+        if not sent and not recv:
+            return
+
+        def _fmt(n):
+            for unit in ("B", "KB", "MB", "GB", "TB"):
+                if n < 1024:
+                    return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+                n /= 1024
+            return f"{n:.1f}PB"
+
+        text = f"↑{_fmt(sent)} ↓{_fmt(recv)}"
+        if getattr(self, '_last_bw_text', None) != text:
+            self.lbl_bandwidth.configure(text=text)
+            self._last_bw_text = text
+
     def refresh_global_state(self):
         # Check current global status
         self._global_action_state = None
@@ -900,6 +929,7 @@ class AppGroupFrame(ctk.CTkFrame):
                 row.set_zebra(idx % 2 == 0)
                 
         self.visible_count = len(visible_rows)
+        self.update_bandwidth_label()
 
     def set_expanded(self, expanded: bool):
         self.is_expanded_ui = expanded

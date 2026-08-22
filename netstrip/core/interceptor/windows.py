@@ -74,7 +74,11 @@ class WinDivertInterceptor(PacketInterceptor):
                                 src_port = 0
                                 
                             # Evaluate packet via callback
-                            allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip, packet.is_inbound)
+                            try:
+                                _plen = len(packet.raw)
+                            except Exception:
+                                _plen = 0
+                            allowed = self.callback(dst_ip, dst_port, protocol, src_port, src_ip, packet.is_inbound, length=_plen)
                             
                             if allowed:
                                 w.send(packet) # Re-inject packet into network stack

@@ -194,7 +194,17 @@ class SettingsView(ctk.CTkFrame):
             command=self._download_verified_update
         )
         self.btn_download_update.pack(side="right")
-        self.btn_download_update.pack_forget() # Hidden by default
+        self.btn_update_restart.pack(side="right", padx=(0, Spacing.SM))
+        self.btn_download_update.pack_forget()
+        self.btn_update_restart.pack_forget() # Hidden by default
+
+        self.btn_update_restart = ctk.CTkButton(
+            btn_frame, text=_t("⟳ Update & Restart"),
+            width=170, height=32, corner_radius=6,
+            fg_color="#7c3aed", hover_color="#6d28d9",
+            text_color=Colors.TEXT_PRIMARY,
+            command=self._update_and_restart
+        )
 
         self._refresh_update_status()
 
@@ -202,9 +212,58 @@ class SettingsView(ctk.CTkFrame):
         if getattr(self.engine, 'update_available', False):
             self.lbl_update_status.configure(text=_t("status.new_version").format(version=self.engine.latest_version), text_color="#facc15")
             self.btn_download_update.pack(side="right")
+            self.btn_update_restart.pack(side="right", padx=(0, Spacing.SM))
         else:
             self.lbl_update_status.configure(text=_t("status.up_to_date"), text_color=Colors.SUCCESS)
             self.btn_download_update.pack_forget()
+            self.btn_update_restart.pack_forget()
+
+    def _update_and_restart(self):
+        """Verify → launch silent installer → app restarts automatically."""
+        import threading
+        import subprocess
+        from pathlib import Path as _P
+        import tkinter.messagebox
+
+        btn = self.btn_update_restart
+        btn.configure(state="disabled", text="Verifying…")
+
+        def _work():
+            from netstrip.core.self_update import SelfUpdater, SelfUpdateError
+            dest = _P.home() / "Downloads" / "NetStrip"
+            try:
+                setup_exe = SelfUpdater().download_verified(dest)
+
+                def _go():
+                    try:
+                        go = tkinter.messagebox.askyesno(
+                            "Update verified",
+                            f"v{setup_exe.name} verified.\n\n"
+                            "Install silently and restart NetStrip now?")
+                        if go:
+                            subprocess.Popen([
+                                str(setup_exe),
+                                "/SILENT", "/SUPPRESSMSGBOXES",
+                                "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS",
+                            ], close_fds=True)
+                            self.after(1500, lambda: (
+                                getattr(self.winfo_toplevel(), "on_closing", lambda: None)(),
+                                os._exit(0),
+                            ))
+                    finally:
+                        try: btn.configure(state="normal")
+                        except Exception: pass
+                self.after(0, _go)
+            except SelfUpdateError as e:
+                err = str(e)
+
+                def _err():
+                    tkinter.messagebox.showerror("Update failed", err)
+                    try: btn.configure(state="normal")
+                    except Exception: pass
+                self.after(0, _err)
+
+        threading.Thread(target=_work, daemon=True).start()
 
     def _download_verified_update(self):
         """Download the latest release zip and verify it against SHA256SUMS.txt
@@ -230,8 +289,7 @@ class SettingsView(ctk.CTkFrame):
                             "Launch the installer now?")
                         if launch_now:
                             from netstrip.core.self_update import launch_update
-                            from netstrip.core.self_update import launch_update as _lu  # noqa
-                            _lu(path)
+                            launch_update(path)
                         else:
                             os.startfile(path.parent)  # open Explorer at the file
                     finally:
@@ -264,6 +322,7 @@ class SettingsView(ctk.CTkFrame):
         self.btn_check_update.configure(state="disabled", text="Checking...")
         self.lbl_update_status.configure(text=_t("status.checking"), text_color=Colors.TEXT_TERTIARY)
         self.btn_download_update.pack_forget()
+        self.btn_update_restart.pack_forget()
         
         def _check():
             import urllib.request, json

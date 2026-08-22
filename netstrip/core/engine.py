@@ -113,6 +113,10 @@ class NetStripEngine:
         self._pid_name_cache = {}  # {pid: (name, timestamp)}
         self._pid_cache_ttl = 60  # seconds
         
+        # Per-app bandwidth accounting (session totals, thread-safe)
+        self._app_bytes = {}
+        self._app_bytes_lock = threading.Lock()
+
         self.connection_monitor.on_new_connection = self._handle_new_connection
         self.connection_monitor.on_malware_detected = self._handle_malware_detected
         self.connection_monitor.on_status = self.broadcast_status
@@ -257,7 +261,7 @@ class NetStripEngine:
             logger.error(f"Failed to show Anomaly Alert GUI: {e}")
             _handle_decision('neutralize')
 
-    def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False) -> bool:
+    def _evaluate_packet(self, dst_ip: str, dst_port: int, protocol: str, src_port: int, src_ip: str, is_inbound: bool = False, length: int = 0) -> bool:
         """High-speed synchronous packet evaluation for WinDivert/NFQueue."""
 
         # SSH Safeguard: Always allow inbound SSH (port 22, 2222) when enabled.
@@ -385,8 +389,15 @@ class NetStripEngine:
                 return False
         # ----------------------------------------------------
                 
+        # ── Per-app bandwidth accounting ────────────────────────────────
+        if length:
+            try:
+                self._note_app_bytes(process_name, not is_inbound, length)
+            except Exception:
+                pass
+
         cat, action = self.classifier.classify_ip(dst_ip, dst_port, process_name)
-        
+
         if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
             try:
                 self.db.log_connection({
@@ -402,6 +413,22 @@ class NetStripEngine:
             return False
             
         return True
+
+    def _note_app_bytes(self, process_name: str, is_upload: bool, length: int):
+        """Called per packet from the interceptor hot path — O(1), no locks held
+        longer than a dict update."""
+        key = process_name or "Unknown"
+        with self._app_bytes_lock:
+            sent, recv = self._app_bytes.get(key, (0, 0))
+            if is_upload:
+                sent += length
+            else:
+                recv += length
+            self._app_bytes[key] = (sent, recv)
+
+    def get_app_bytes(self, process_name: str):
+        with self._app_bytes_lock:
+            return self._app_bytes.get(process_name, (0, 0))
 
     def start(self) -> bool:
         """Start all subsystems."""

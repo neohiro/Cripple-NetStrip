@@ -71,6 +71,13 @@ def language_name(code: str) -> str:
     return LANGUAGE_NAMES.get(code, code.capitalize())
 
 
+RTL_LANGUAGES = {"ar", "he", "fa", "ur"}
+
+
+def is_rtl() -> bool:
+    return get_language() in RTL_LANGUAGES
+
+
 def has(key: str) -> bool:
     return key in _catalog
 

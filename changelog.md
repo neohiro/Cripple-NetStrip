@@ -1,3 +1,21 @@
+## [v3.8.2] - 2026-08-22
+### Update & Restart Button
+- New **⟳ Update & Restart** button on Settings → Updates card (appears alongside Download & Verify when a new version is available). Downloads + verifies the installer, then offers one-click silent install with automatic app restart (`/SILENT /RESTARTAPPLICATIONS`). The app exits gracefully so Inno replaces files cleanly, and the new version relaunches via the `[Run]` restart entry.
+
+### Per-App Bandwidth in Sidebar
+- **Session byte totals per app** now shown on every parent row header (visible collapsed and expanded): `↑2.4MB ↓18.1GB` format. Data comes from the Windows packet interceptor which feeds per-packet lengths into a lock-free accumulator keyed by canonical process name. Zero DB writes; pure memory counters.
+
+### Arabic & Hebrew (RTL)
+- **Full RTL catalogs** for العربية and עברית — 54 keys each including complete tooltip sets. New `i18n.is_rtl()` helper for future layout mirroring.
+- Language count now **28**.
+
+### Free Artifact Signing
+- **`scripts/release_sign.py`**: ed25519 signing/verification for SHA256SUMS.txt using the already-shipped `cryptography` library — zero purchase required. Generate a keypair once, store the private key as a GitHub secret, commit the public key. Self-update's existing `.sig` verification hook picks it up automatically.
+
+### Installer Self-Test (CI)
+- **New `Installer Self-Test` workflow**: downloads the published installer from Releases, runs silent install → asserts ProductVersion/uninstaller/registry → silent uninstall → asserts complete cleanup. Runs on every dispatch to catch packaging regressions before users do.
+- Fixed malformed `AppId` GUID and removed unsafe uninstall-time `--restore-network` call (flag not implemented — would launch full GUI during uninstall).
+
 ## [v3.8.1] - 2026-08-22
 ### Single Windows Download (installer-only releases)
 - **Exactly one Windows artifact per release**: the Inno Setup installer, built automatically in CI and published as the release asset — the duplicate portable Windows zip is gone.
