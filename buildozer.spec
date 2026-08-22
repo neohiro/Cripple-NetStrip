@@ -56,7 +56,7 @@ android.accept_sdk_license = True
 # python-for-android also drifted onto Python 3.14 snapshots. This exact pair
 # cross-compiles cleanly.
 android.ndk = 26b
-p4a.branch = 2024.1.2
+p4a.branch = v2024.01.21
 
 # (str) Android entry point, default is ok for Kivy-based app
 android.entrypoint = android_main.py
