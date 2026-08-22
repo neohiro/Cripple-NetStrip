@@ -9,6 +9,7 @@
   [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-lightgray.svg)](https://github.com/)
   [![License: Custom EULA](https://img.shields.io/badge/license-Custom%20EULA-red.svg)](LICENSE.md)
   [![Build Status](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/release.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions)
+[![CodeQL](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/codeql.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/codeql.yml)
 [![Android Gate](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/android.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/android.yml)
 
   > **Compatibility :** Cripple is designed to work seamlessly alongside your existing network and security tools—including dnscrypt-proxy, torifier, YogaDNS, NextDNS, AVG and other antivirus & VPN programs. It intelligently detects local proxies and security suites to operate cooperatively without creating network conflicts or infinite DNS loops.
