@@ -159,10 +159,13 @@ jobs:
 
       - name: Generate SHA256SUMS manifest
         if: matrix.target == 'windows'
+        shell: bash
         run: |
           # Supply-chain: every published zip gets a recorded hash; users and
           # the updater can verify downloads against this manifest.
-          sha256sum NetStrip-*-*.zip NetStrip-Setup-*.exe > SHA256SUMS.txt 2>/dev/null || sha256sum NetStrip-*-*.zip > SHA256SUMS.txt
+          shopt -s nullglob
+          files=(NetStrip-*-*.zip NetStrip-Setup-*.exe)
+          (( ${#files[@]} )) && sha256sum "${files[@]}" > SHA256SUMS.txt
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
