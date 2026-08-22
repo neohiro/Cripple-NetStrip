@@ -43,12 +43,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install --retries 3 --timeout 60 -r requirements.txt
-          pip install --retries 3 --timeout 60 pytest pytest-timeout flake8
+          pip install --retries 3 --timeout 60 pytest pytest-timeout flake8 ruff bandit pytest-cov
           pip install -e .
 
       - name: Lint (flake8 - critical errors only)
         run: |
           flake8 netstrip/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      # Correctness-focused ruff gate (undefined names, unused, bugbear class).
+      # Style rules are intentionally NOT enforced here.
+      - name: Ruff (correctness gate)
+        run: |
+          ruff check netstrip/ main.py scripts/ tests/ --select E9,F63,F7,F82,F821,B006,B904
+
+      # Security gate: fail on MEDIUM+ severity findings. Low-severity and
+      # annotated nosec items are accepted by policy.
+      - name: Bandit (security gate, medium+ severity)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          bandit -r netstrip -q -ll
 
       - name: Verify imports
         run: |
@@ -61,9 +74,11 @@ jobs:
           python -c "from netstrip.core.updater import BlocklistUpdater; print('Updater module OK')"
           python -c "from netstrip.core.crash_reporter import send_crash_report; print('Crash Reporter module OK')"
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage floor
         run: |
-          python -m pytest tests/ -v --timeout=30 --tb=short -q
+          python -m pytest tests/ -v --timeout=30 --tb=short -q \
+            --cov=netstrip/core --cov=netstrip/data --cov-report=term \
+            --cov-fail-under=19
 
       - name: Verify build (PyInstaller dry-run)
         if: matrix.os == 'windows-latest'

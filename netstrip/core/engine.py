@@ -282,12 +282,12 @@ class NetStripEngine:
             # For inbound connections, the "remote attacker" is the src_ip
             remote_ip = src_ip
             
-            strict_shield = self.db.get_setting('strict_inbound_shield', 'true') == 'true'
+            strict_shield = self.db.get_setting_cached('strict_inbound_shield', 'true') == 'true'
             if strict_shield:
                 
                 # Headless Admin Bypass / LAN Shield Bypass
                 default_bypass = 'true' if self.is_headless else 'false'
-                inbound_lan_bypass = self.db.get_setting('inbound_lan_bypass', default_bypass) == 'true'
+                inbound_lan_bypass = self.db.get_setting_cached('inbound_lan_bypass', default_bypass) == 'true'
                 
                 if inbound_lan_bypass:
                     import ipaddress
@@ -297,7 +297,7 @@ class NetStripEngine:
                     except Exception:
                         pass
                 
-                notify = self.db.get_setting('inbound_notifications', 'true') == 'true'
+                notify = self.db.get_setting_cached('inbound_notifications', 'true') == 'true'
                 if notify:
                     self.notifier.push({
                         'process_name': 'Inbound Shield',
@@ -361,10 +361,10 @@ class NetStripEngine:
         # ----------------------------------------------------
         # When allow_in_browser_dns is disabled (false), direct external queries on port 53 (DNS)
         # and port 853 (DoT) from non-NetStrip processes are blocked to enforce local proxy usage.
-        allow_external_dns = self.db.get_setting("allow_in_browser_dns", "false") == "true"
+        allow_external_dns = self.db.get_setting_cached("allow_in_browser_dns", "false") == "true"
         if not allow_external_dns and dst_port in (53, 853) and not (dst_ip.startswith("127.") or dst_ip == "::1"):
             # Check if this is a detected local DNS proxy tool (e.g. dnscrypt-proxy, AdGuard Home, CoreDNS)
-            local_tool = self.db.get_setting("local_dns_tool", "")
+            local_tool = self.db.get_setting_cached("local_dns_tool", "")
             is_local_proxy = bool(local_tool and (local_tool.lower() in process_name.lower() or process_name.lower() in local_tool.lower()))
             
             if not is_local_proxy:
@@ -1056,8 +1056,9 @@ class NetStripEngine:
                             self.blocklist.sync_user_rules(self.db.get_user_rules(mode_scope=scope))
                     last_cleanup = time.time()
 
-                # Hourly log retention sweep (72h window) — keeps the DB lean
-                # during long-running sessions without blocking anything.
+                # Hourly log retention sweep (72h window) + WAL hygiene —
+                # without periodic checkpoints the -wal file grows unboundedly
+                # on months-long sessions.
                 if time.time() - last_prune > 3600:
                     try:
                         removed = self.db.prune_old_logs(hours=72)
@@ -1065,6 +1066,10 @@ class NetStripEngine:
                             logger.info(f"Hourly retention sweep pruned old logs.")
                     except Exception as e:
                         logger.debug(f"Retention prune failed: {e}")
+                    try:
+                        self.db.maintenance_checkpoint()
+                    except Exception as e:
+                        logger.debug(f"WAL checkpoint failed: {e}")
                     last_prune = time.time()
                     
                 # Scheduled Killswitch Check
@@ -1105,6 +1110,25 @@ class NetStripEngine:
         last_interfaces = self.platform.get_active_interfaces()
         while self.is_running and not self._stop_event.is_set():
             time.sleep(3)
+
+            # Feed the bandwidth_stats table with real 60s interface deltas so
+            # the dashboard can show a true 24-hour volume (the table existed
+            # but nothing ever sampled into it).
+            now_ts = time.time()
+            if now_ts - getattr(self, '_last_bw_sample', 0) >= 60.0:
+                self._last_bw_sample = now_ts
+                try:
+                    io = psutil.net_io_counters()
+                    prev = getattr(self, '_last_bw_io', None)
+                    if prev is not None:
+                        d_sent = max(0, io.bytes_sent - prev.bytes_sent)
+                        d_recv = max(0, io.bytes_recv - prev.bytes_recv)
+                        if d_sent or d_recv:
+                            self.db.log_bandwidth(d_sent, d_recv)
+                    self._last_bw_io = io
+                except Exception as e:
+                    logger.debug(f"bandwidth sample failed: {e}")
+
             current_interfaces = self.platform.get_active_interfaces()
             if set(current_interfaces) != set(last_interfaces):
                 logger.info("Network topology change detected, re-applying DNS hooks...")

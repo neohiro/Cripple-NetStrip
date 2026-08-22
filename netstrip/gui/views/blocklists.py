@@ -182,29 +182,31 @@ class BlocklistView(ctk.CTkFrame):
         pattern = self._add_entry.get().strip()
         if not pattern:
             return
-            
+
         action = "block" if self._action_var.get() == "Block" else "allow"
 
-        # Check if it is a URL to an online list
-        if pattern.startswith("http://") or pattern.startswith("https://"):
+        # Online list URL? (scheme-locked: never allow file:// or other
+        # local-scheme reads from user input)
+        lowered = pattern.lower()
+        if lowered.startswith(("http://", "https://")):
             self._add_entry.delete(0, 'end')
             if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                self.engine.on_status(f"Downloading new online list...")
-                
+                self.engine.on_status("Downloading new online list...")
+
             import threading
             import urllib.request
             import os, json
-            
+
             def download_list():
                 try:
                     req = urllib.request.Request(pattern, headers={'User-Agent': 'Mozilla/5.0'})
                     with urllib.request.urlopen(req, timeout=15) as response:
                         content = response.read()
-                        
+
                     name = pattern.split("/")[-1]
                     if not name or name == "hosts":
                         name = pattern.split("/")[-2] + "_list"
-                        
+
                     # Intelligent Category Scanning
                     detected_category = "user_blocked"
                     if action == "block":
@@ -214,7 +216,7 @@ class BlocklistView(ctk.CTkFrame):
                         kw_tracker = ["tracker", "tracking", "track", "pixel", "fingerprint", "beacon", "stat", "audience"]
                         kw_malware = ["malware", "phish", "ransom", "botnet", "c2", "command-and-control", "crypto", "miner", "exploit", "scam", "fraud", "virus", "trojan", "malicious"]
                         kw_system = ["system", "os", "native", "windows", "apple", "linux", "ubuntu", "debian", "android", "ios", "microsoft", "mac"]
-                        
+
                         # Layer 1: URL Heuristics
                         if any(k in url_lower for k in kw_telemetry):
                             detected_category = "telemetry"
@@ -238,37 +240,35 @@ class BlocklistView(ctk.CTkFrame):
                                     detected_category = "system"
                             except Exception:
                                 pass
-                                
+
                     final_category = "whitelist" if action == "allow" else detected_category
-                        
+
                     # Save to updater_sources.json
                     sources_file = os.path.join(self.engine.blocklist.lists_dir, '..', 'updater_sources.json')
+                    new_source = {
+                        "name": "Custom: " + name,
+                        "url": pattern,
+                        "format": "domains" if ".txt" in pattern else "hosts",
+                        "category": final_category,
+                        "enabled": True
+                    }
                     if os.path.exists(sources_file):
                         with open(sources_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
-                            
-                        new_source = {
-                            "name": "Custom: " + name,
-                            "url": pattern,
-                            "format": "domains" if ".txt" in pattern else "hosts",
-                            "category": final_category,
-                            "enabled": True
-                        }
                         data.setdefault('sources', []).append(new_source)
-                        
                         with open(sources_file, 'w', encoding='utf-8') as f:
                             json.dump(data, f, indent=2)
-                            
+
                     # Save the downloaded file directly to lists dir
                     safe_name = new_source['name'].replace(' ', '_').replace('/', '_').replace(':', '')
                     file_prefix = f"{final_category}_" if action == "block" else "whitelist_"
                     target_file = os.path.join(self.engine.blocklist.lists_dir, f"{file_prefix}{safe_name}.txt")
                     with open(target_file, 'wb') as f:
                         f.write(content)
-                        
+
                     # Reload core memory with new source
                     self.engine.blocklist.load_all()
-                    
+
                     if not self._destroyed:
                         def on_success():
                             self._refresh_stats_grid(f"Added permanent blocklist: {name}")
@@ -280,12 +280,15 @@ class BlocklistView(ctk.CTkFrame):
                                 self._populate_sources_list()
                             if self._active_category_filter or (hasattr(self, '_search_entry') and self._search_entry.get().strip()):
                                 self._do_search()
-                        self.after(0, on_success)
-                        
+                        try:
+                            self.after(0, on_success)
+                        except Exception:
+                            pass
+
                 except Exception as e:
                     if hasattr(self.engine, 'on_status') and self.engine.on_status:
                         self.engine.on_status(f"Failed to add online list: {e}")
-            
+
             threading.Thread(target=download_list, daemon=True).start()
             return
 
@@ -308,17 +311,17 @@ class BlocklistView(ctk.CTkFrame):
             self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
 
         self._add_entry.delete(0, 'end')
-        
+
         # Show feedback
         if hasattr(self.engine, 'on_status') and self.engine.on_status:
             self.engine.on_status(f"Added custom {action} rule for {pattern}")
-            
+
         self._refresh_stats_grid()
-            
+
         self._search_entry.delete(0, 'end')
         self._search_entry.insert(0, pattern)
         self._do_search()
-        
+
     def _get_category_count(self, cat_enum):
         from netstrip.core.modes import ConnectionCategory
         cat_val = getattr(cat_enum, 'value', str(cat_enum)).lower()

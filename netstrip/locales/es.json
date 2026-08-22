@@ -1,0 +1,16 @@
+{
+  "modal.killswitch.title": "CONFIRMAR BLOQUEO DEL SISTEMA",
+  "modal.killswitch.body": "Está a punto de cortar TODAS las conexiones de red del sistema.",
+  "modal.killswitch.cancel": "CANCELAR (SEGURO)",
+  "modal.killswitch.engage": "ACTIVAR KILLSWITCH",
+  "modal.recovery.title": "KILLSWITCH AUTOMÁTICO ACTIVADO",
+  "modal.recovery.stay": "MANTENER BLOQUEADO",
+  "modal.recovery.restore": "RESTAURAR RED",
+  "nav.dashboard": "Panel",
+  "nav.logs": "Registros",
+  "nav.filter_lists": "Listas de Filtros",
+  "nav.settings": "Configuración",
+  "dashboard.recent_blocks": "Bloqueos Recientes",
+  "dashboard.block_system": "Bloquear Conexiones del Sistema",
+  "dashboard.smart_shield": "Escudo Inteligente"
+}

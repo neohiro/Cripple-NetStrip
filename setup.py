@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='netstrip',
-    version='3.7.0',
+    version='3.7.1',
     packages=find_packages(),
     install_requires=[
         'customtkinter>=5.2.2',

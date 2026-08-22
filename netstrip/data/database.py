@@ -23,6 +23,9 @@ class Database:
             
         self.db_path = db_path
         self.lock = threading.RLock()
+        # WAL gives concurrent readers; read paths take this lock so they never
+        # queue behind the async writer commit lock.
+        self._read_lock = threading.RLock()
         self._init_db()
         
         # Async Writer Queue for optimizations
@@ -297,7 +300,7 @@ class Database:
                     logging.getLogger(__name__).error(f"Error caching domain mapping: {e}")
 
     def get_recent_connections(self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None) -> List[sqlite3.Row]:
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 params: list = []
                 if since_timestamp:
@@ -341,7 +344,7 @@ class Database:
 
     def get_unique_allowed_24h(self) -> int:
         """Returns the number of unique allowed connections (process + destination) for the last 24 hours."""
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT COUNT(*) FROM (
@@ -354,13 +357,27 @@ class Database:
                 row = cursor.fetchone()
                 return row[0] if row else 0
 
+    def maintenance_checkpoint(self):
+        """Truncate the WAL and run the SQLite optimizer. Called hourly by the
+        engine watchdog so months-long sessions don't accumulate a giant -wal
+        file or degraded query plans."""
+        with self._get_connection() as conn:
+            try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except Exception:
+                pass
+            try:
+                conn.execute("PRAGMA optimize")
+            except Exception:
+                pass
+
     def get_setting(self, key: str, default: Any = None) -> Any:
-        with self.lock:
+        with self._read_lock:
             if not hasattr(self, '_settings_cache'):
                 self._settings_cache = {}
             if key in self._settings_cache:
                 return self._settings_cache[key]
-                
+
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT value FROM settings WHERE key = ?', (key,))
                 row = cursor.fetchone()
@@ -371,9 +388,28 @@ class Database:
                         val = row['value']
                     self._settings_cache[key] = val
                     return val
-                
+
                 self._settings_cache[key] = default
                 return default
+
+    # ── Hot-path memoization ────────────────────────────────────────────
+    # Packet evaluation runs hundreds of times per second; even a cached
+    # dict lookup under the writer RLock serializes it against log commits.
+    # get_setting_cached() takes NO lock and serves from a tiny per-key TTL
+    # map, so per-packet settings reads never contend with the writer.
+    HOT_SETTING_TTL = 1.0  # seconds — bounded staleness for packet decisions
+
+    def get_setting_cached(self, key: str, default: Any = None) -> Any:
+        cache = getattr(self, '_hot_settings', None)
+        now = time.monotonic()
+        if cache is None:
+            cache = self._hot_settings = {}
+        entry = cache.get(key)
+        if entry is not None and (now - entry[1]) < self.HOT_SETTING_TTL:
+            return entry[0]
+        val = self.get_setting(key, default)
+        cache[key] = (val, now)
+        return val
 
     def set_setting(self, key: str, value: Any):
         if not hasattr(self, '_settings_cache'):
@@ -466,7 +502,7 @@ class Database:
 
     def get_user_rules(self, mode_scope: Optional[str] = None) -> List[sqlite3.Row]:
         """Get user rules filtered by mode_scope (or ALL/STANDARD defaults)"""
-        with self.lock:
+        with self._read_lock:
             if not hasattr(self, '_rules_cache'):
                 self._rules_cache = {}
             if mode_scope in self._rules_cache:
@@ -504,14 +540,14 @@ class Database:
 
     def get_statistics(self) -> List[sqlite3.Row]:
         """Get historical statistics"""
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT * FROM statistics ORDER BY date DESC LIMIT 30')
                 return cursor.fetchall()
 
     def get_24h_statistics(self) -> dict:
         """Get accurate rolling statistics for the last 24 hours from the connection log."""
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT 
@@ -555,7 +591,7 @@ class Database:
 
     def get_24h_bandwidth(self) -> tuple:
         """Get the sum of bytes sent and received over the last 24 hours. Returns (sent, recv)."""
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cutoff_time = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d %H:00:00')
                 cursor = conn.execute('''
@@ -662,7 +698,7 @@ class Database:
 
 
     def get_cached_domain(self, ip: str) -> Optional[str]:
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT domain FROM dns_cache WHERE ip = ?', (ip,))
                 row = cursor.fetchone()
@@ -675,7 +711,7 @@ class Database:
                 conn.commit()
 
     def is_anomaly_whitelisted(self, name: str) -> bool:
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 cursor = conn.execute('SELECT 1 FROM whitelisted_anomalies WHERE name = ?', (name,))
                 return cursor.fetchone() is not None
@@ -705,7 +741,7 @@ class Database:
         reinitialize default rows, vacuum database, and reset all in-memory caches.
         """
         self.flush()
-        with self.lock:
+        with self._read_lock:
             with self._get_connection() as conn:
                 conn.executescript('''
                     DELETE FROM user_rules;

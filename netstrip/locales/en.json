@@ -1,0 +1,16 @@
+{
+  "modal.killswitch.title": "CONFIRM SYSTEM LOCKDOWN",
+  "modal.killswitch.body": "About to sever ALL OS network connections.",
+  "modal.killswitch.cancel": "CANCEL (SAFE)",
+  "modal.killswitch.engage": "ENGAGE KILLSWITCH",
+  "modal.recovery.title": "AUTO-KILLSWITCH ENGAGED",
+  "modal.recovery.stay": "STAY LOCKED DOWN",
+  "modal.recovery.restore": "RESTORE NETWORK",
+  "nav.dashboard": "Dashboard",
+  "nav.logs": "Logs",
+  "nav.filter_lists": "Filter Lists",
+  "nav.settings": "Settings",
+  "dashboard.recent_blocks": "Recent Blocks",
+  "dashboard.block_system": "Block System Connections",
+  "dashboard.smart_shield": "Smart Shield"
+}

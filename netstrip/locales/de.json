@@ -1,0 +1,16 @@
+{
+  "modal.killswitch.title": "SYSTEMSPERRE BESTÄTIGEN",
+  "modal.killswitch.body": "Alle Netzwerkverbindungen des Systems werden getrennt.",
+  "modal.killswitch.cancel": "ABBRECHEN (SICHER)",
+  "modal.killswitch.engage": "KILLSWITCH AKTIVIEREN",
+  "modal.recovery.title": "AUTO-KILLSWITCH AKTIV",
+  "modal.recovery.stay": "GESPERRT BLEIBEN",
+  "modal.recovery.restore": "NETZWERK WIEDERHERSTELLEN",
+  "nav.dashboard": "Übersicht",
+  "nav.logs": "Protokolle",
+  "nav.filter_lists": "Filterlisten",
+  "nav.settings": "Einstellungen",
+  "dashboard.recent_blocks": "Letzte Blockierungen",
+  "dashboard.block_system": "Systemverbindungen blockieren",
+  "dashboard.smart_shield": "Smart Shield"
+}

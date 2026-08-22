@@ -51,20 +51,26 @@ class MACRandomizer:
                 logger.error(f"Failed to get active interface on Windows: {e}")
         elif sys.platform == 'linux':
             try:
-                # Pipeline requires a shell; inputs are constants so this is safe
-                cmd = "ip route get 8.8.8.8 | awk '{print $5}' | head -n 1"
-                result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
+                # No shell pipeline: parse the default-route device directly
+                result = subprocess.run(["ip", "route", "show", "default"],
+                                        capture_output=True, text=True, shell=False)
+                if result.returncode == 0:
+                    for token in result.stdout.split():
+                        if token == "dev":
+                            continue
+                    parts = result.stdout.split()
+                    if "dev" in parts:
+                        return parts[parts.index("dev") + 1]
             except Exception as e:
                 logger.error(f"Failed to get active interface on Linux: {e}")
         elif sys.platform == 'darwin':
             try:
-                # Pipeline requires a shell; inputs are constants so this is safe
-                cmd = "route -n get default | grep interface | awk '{print $2}'"
-                result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
+                result = subprocess.run(["route", "-n", "get", "default"],
+                                        capture_output=True, text=True, shell=False)
+                if result.returncode == 0:
+                    for line in result.stdout.splitlines():
+                        if line.strip().startswith("interface:"):
+                            return line.split(":", 1)[1].strip()
             except Exception as e:
                 logger.error(f"Failed to get active interface on macOS: {e}")
         return None

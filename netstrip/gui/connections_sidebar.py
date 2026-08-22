@@ -8,6 +8,7 @@ from netstrip.gui.theme import Colors, Fonts, Spacing
 from netstrip.core.engine import NetStripEngine
 from netstrip.gui.icon_manager import IconManager
 import os
+import threading
 
 
 from netstrip.gui.components.sidebar_components import AppGroupFrame
@@ -209,46 +210,73 @@ class ConnectionsSidebar(ctk.CTkFrame):
             return
             
         self._is_fetching = True
-        # Fetch recent connections in background thread to prevent UI micro-stutters
+        # Persistent worker: a single long-lived fetcher consumes queued jobs,
+        # instead of spawning (and tearing down) a fresh thread every second —
+        # thousands of thread churns avoided over months-long sessions.
+        import queue
+        if not hasattr(self, '_fetch_queue'):
+            self._fetch_queue = queue.Queue(maxsize=2)
+            self._worker_stop = threading.Event()
+            self._fetch_worker = threading.Thread(
+                target=self._fetch_worker_loop, daemon=True, name="SidebarFetcher"
+            )
+            self._fetch_worker.start()
+
         def fetch():
             try:
                 conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
-                
+
                 def process_ui_batch(index=0, current_counts=None):
                     try:
                         if getattr(self, '_destroyed', False) or not self.winfo_exists():
                             self._is_fetching = False
                             return
-                        
+
                         if current_counts is None:
                             current_counts = {}
-                            
+
                         batch_size = 25
                         batch_conns = conns[index:index + batch_size]
-                        
+
                         if batch_conns:
                             if index == 0:
                                 self.engine._cached_recent = conns
                             is_final_batch = (index + batch_size >= len(conns))
                             self._process_connections(batch_conns, sys_val, current_counts, is_final_batch=is_final_batch)
-                            
+
                         if not is_final_batch:
                             self.after(20, lambda: process_ui_batch(index + batch_size, current_counts))
                         else:
                             self._is_fetching = False
                     except Exception:
                         self._is_fetching = False
-                        
+
                 self.after(0, process_ui_batch)
             except Exception:
                 self._is_fetching = False
                 # Reschedule even on fetch failure so the loop survives
                 if not getattr(self, '_destroyed', False):
                     self.after(1000, self._refresh_loop)
-                
-        import threading
-        threading.Thread(target=fetch, daemon=True).start()
+
+        try:
+            self._fetch_queue.put_nowait(fetch)
+        except queue.Full:
+            pass  # worker already has a pending refresh; skip this tick
+
+    def _fetch_worker_loop(self):
+        while not self._worker_stop.is_set():
+            try:
+                job = self._fetch_queue.get(timeout=1.0)
+            except Exception:
+                continue
+            if job is None:
+                break
+            try:
+                job()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).debug(f"sidebar worker job failed: {e}")
 
     def _process_connections(self, conns, sys_val, app_conn_counts=None, is_final_batch=True):
         try:
@@ -515,4 +543,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
     def destroy(self):
         self._destroyed = True
+        try:
+            self._worker_stop.set()
+            self._fetch_queue.put_nowait(None)
+        except Exception:
+            pass
         super().destroy()

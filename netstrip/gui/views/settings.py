@@ -721,7 +721,8 @@ class SettingsView(ctk.CTkFrame):
         )
         pq_badge.pack(side="left", padx=(Spacing.SM, 0))
 
-        psk_val = getattr(self.engine.db, 'get_setting', lambda k, d: d)("lan_shield_psk", "Waiting for LAN Shield initialization...")
+        from netstrip.core.secure_store import load_psk as _load_psk
+        psk_val = _load_psk(self.engine.db) or "Waiting for LAN Shield initialization..."
 
         # Key display — clean monospace entry
         psk_entry = ctk.CTkEntry(

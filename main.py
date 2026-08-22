@@ -216,7 +216,7 @@ def main():
                 print("Error: Invalid Post-Quantum key format.")
                 sys.exit(1)
             db = _get_db()
-            db.set_setting("lan_shield_psk", psk)
+            from netstrip.core.secure_store import store_psk; store_psk(db, psk)
             db.stop()
             key_type = "512-bit Native Post-Quantum" if len(psk) == 88 else "256-bit Legacy (HKDF-SHA512 Upgraded)"
             print(f"LAN Shield PSK saved successfully ({key_type}).")
@@ -230,7 +230,8 @@ def main():
     if "--get-psk" in sys.argv:
         try:
             db = _get_db()
-            psk = db.get_setting("lan_shield_psk", "")
+            from netstrip.core.secure_store import load_psk
+            psk = load_psk(db) or ""
             db.stop()
             if psk:
                 print(f"LAN Shield PSK: {psk}")

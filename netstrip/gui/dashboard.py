@@ -228,6 +228,12 @@ class DashboardView(ctk.CTkFrame):
                 today_stats = self.engine.db.get_24h_statistics()
                 recent_conns = self.engine.db.get_recent_connections(limit=300)
 
+                # Real 24h volume from bandwidth_stats (sampled by the engine)
+                try:
+                    self._cached_bandwidth = self.engine.db.get_24h_bandwidth()
+                except Exception:
+                    pass
+
                 # Bandwidth snapshot (off the UI thread — psutil syscall)
                 bandwidth_payload = None
                 try:

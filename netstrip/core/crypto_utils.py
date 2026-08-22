@@ -1,8 +1,11 @@
 """
-Post-Quantum Cryptography Engine for NetStrip
-Provides 100% pure-Python Post-Quantum symmetric encryption (AES-256 + HMAC-SHA512 + HKDF-SHA512).
-Guarantees full resistance against Grover's algorithm with zero external C/DLL dependencies,
-maintaining complete resilience against Windows Defender Application Control (WDAC) and AppLocker.
+Symmetric encryption engine for NetStrip.
+
+Primary backend: the vetted `cryptography` library (AES-256-CBC + HMAC-SHA512,
+identical token format and key schedule as the original design). The pure-Python
+AES implementation is kept ONLY as a fallback for locked-down environments where
+loading the native binding is blocked (WDAC/AppLocker). Tokens from either
+backend are fully interoperable — peers never need to agree on a backend.
 """
 
 import os
@@ -172,6 +175,38 @@ def aes_256_cbc_decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
         raise ValueError("Invalid PKCS7 padding")
     return bytes(out[:-pad_len])
 
+# ── Vetted native backend (preferred) ──────────────────────────────────────
+try:
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher as _NativeCipher, algorithms as _algs, modes as _modes,
+    )
+    _NATIVE_AVAILABLE = True
+except Exception:
+    _NATIVE_AVAILABLE = False
+
+
+def _native_cbc_encrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
+    """AES-256-CBC with PKCS7 padding via the vetted OpenSSL-backed library."""
+    pad_len = 16 - (len(data) % 16)
+    padded = data + bytes([pad_len] * pad_len)
+    enc = _NativeCipher(_algs.AES(key), _modes.CBC(iv)).encryptor()
+    return enc.update(padded) + enc.finalize()
+
+
+def _native_cbc_decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
+    """AES-256-CBC decrypt + PKCS7 unpad. Raises ValueError on bad padding."""
+    if len(data) % 16 != 0:
+        raise ValueError("Ciphertext length must be a multiple of 16")
+    dec = _NativeCipher(_algs.AES(key), _modes.CBC(iv)).decryptor()
+    out = dec.update(data) + dec.finalize()
+    if not out:
+        raise ValueError("Decrypted output is empty")
+    pad_len = out[-1]
+    if pad_len < 1 or pad_len > 16 or out[-pad_len:] != bytes([pad_len] * pad_len):
+        raise ValueError("Invalid PKCS7 padding")
+    return bytes(out[:-pad_len])
+
+
 def hkdf_sha512(ikm: bytes, length: int = 64, salt: bytes = b"", info: bytes = b"NetStrip-PostQuantum-v3.3") -> bytes:
     """RFC 5869 HKDF Key Derivation using SHA-512."""
     if not salt:
@@ -200,13 +235,13 @@ class QuantumFernet:
     VERSION_POST_QUANTUM = 0x90
     VERSION_LEGACY = 0x80
 
-    def __init__(self, key):
+    def __init__(self, key, prefer_native: bool = True):
         if isinstance(key, str):
             key = key.strip().encode('utf-8')
         try:
             raw_key = base64.urlsafe_b64decode(key)
         except Exception as e:
-            raise ValueError(f"Invalid Quantum key encoding: {e}")
+            raise ValueError(f"Invalid Quantum key encoding: {e}") from e
         
         # Dual Compatibility: Support native 64-byte keys or expand 32-byte legacy keys
         if len(raw_key) == 64:
@@ -221,7 +256,20 @@ class QuantumFernet:
             self._signing_key = expanded[32:]
             self.is_native_pq = False
         else:
-            raise ValueError(f"Quantum Fernet key must be 32 or 64 URL-safe base64 bytes, got {len(raw_key)}")
+            raise ValueError(f"Quantum Fernet key must be 32 or 64 URL-safe base64 bytes, got {len(raw_key)}") from None
+
+        # Backend selection: vetted native OpenSSL binding when loadable;
+        # pure-Python fallback keeps WDAC/AppLocker-locked machines working.
+        # Wire format is identical either way — full peer interoperability.
+        self.prefer_native = prefer_native and _NATIVE_AVAILABLE
+        if self.prefer_native:
+            self._cbc_encrypt = _native_cbc_encrypt
+            self._cbc_decrypt = _native_cbc_decrypt
+            self.backend_name = "cryptography(AES-256-CBC)"
+        else:
+            self._cbc_encrypt = aes_256_cbc_encrypt
+            self._cbc_decrypt = aes_256_cbc_decrypt
+            self.backend_name = "pure-python(AES-256-CBC)"
 
     @classmethod
     def generate_key(cls, native_pq: bool = True) -> bytes:
@@ -235,7 +283,7 @@ class QuantumFernet:
             data = data.encode('utf-8')
         current_time = int(time.time())
         iv = os.urandom(16)
-        ciphertext = aes_256_cbc_encrypt(data, self._encryption_key, iv)
+        ciphertext = self._cbc_encrypt(data, self._encryption_key, iv)
         # Format: Version (1 byte) | Timestamp (8 bytes uint64) | IV (16 bytes) | Ciphertext
         basic_parts = bytes([self.VERSION_POST_QUANTUM]) + struct.pack('>Q', current_time) + iv + ciphertext
         # 32-byte truncated HMAC-SHA512 for optimal packet efficiency and quantum integrity
@@ -248,8 +296,8 @@ class QuantumFernet:
             token = token.strip().encode('utf-8')
         try:
             raw = base64.urlsafe_b64decode(token)
-        except Exception:
-            raise InvalidToken("Malformed base64 token")
+        except Exception as e:
+            raise InvalidToken("Malformed base64 token") from e
             
         if len(raw) < 57:
             raise InvalidToken("Invalid token length")
@@ -272,13 +320,15 @@ class QuantumFernet:
             
         if ttl is not None:
             now = int(time.time())
-            if timestamp + ttl < now or timestamp > now + 60:
+            # Inclusive comparison: a token is valid for strictly LESS than
+            # ttl seconds (the old strict-< let ttl=1 live for ~2 seconds).
+            if now - timestamp >= ttl or timestamp > now + 60:
                 raise InvalidToken("Token expired")
                 
         try:
-            return aes_256_cbc_decrypt(ciphertext, self._encryption_key, iv)
+            return self._cbc_decrypt(ciphertext, self._encryption_key, iv)
         except Exception as e:
-            raise InvalidToken(f"Decryption failed: {e}")
+            raise InvalidToken(f"Decryption failed: {e}") from e
 
 # Transparent drop-in alias
 Fernet = QuantumFernet

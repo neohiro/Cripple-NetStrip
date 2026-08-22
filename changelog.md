@@ -1,3 +1,23 @@
+## [v3.7.1] - 2026-08-22
+### Flagship Hardening Roadmap (part 1 of the 14-point plan)
+- **Vetted crypto backend is now primary**: `cryptography` (OpenSSL) performs AES-256-CBC; the pure-Python engine is retained only as a WDAC/AppLocker fallback. Token format unchanged — native↔pure interop proven by `tests/test_crypto_interop.py` (both directions, legacy 32-byte keys, tamper, TTL).
+- **Fixed TTL off-by-one**: tokens were valid up to a second longer than requested (`ttl=1` lived ~2s). Inclusive boundary now enforced.
+- **PSK at rest**: LAN Shield key moved out of SQLite into `~/.NetStrip/psk.key` — DPAPI-wrapped on Windows, chmod-600 elsewhere; legacy DB rows auto-migrate and are scrubbed. CLI (`--get/--set-psk`) and Settings card read/write through the same store. *(No peer allowlist: PSK possession remains the pairing link by design.)*
+- **Packet-eval hot path lock-free**: new `get_setting_cached()` (1s TTL, zero locks) replaces per-packet `get_setting` calls for strict-shield/inbound/DoH/DNS-tool decisions.
+- **Split database locking**: all `get_*` reads take a dedicated read lock under WAL and no longer queue behind async log-writer commits.
+- **Hourly WAL hygiene**: watchdog now runs `wal_checkpoint(TRUNCATE)` + `PRAGMA optimize` alongside retention pruning.
+- **Persistent sidebar worker**: one long-lived fetcher thread with a bounded queue replaces ~86k thread spawns/day.
+- **Real 24h volume**: engine samples interface deltas into `bandwidth_stats` every 60s; dashboard "Vol:" now shows true Last-24h instead of Since-Boot.
+- **Deterministic fuzz suite** (`tests/test_fuzz.py`): 5k hostile feed lines, 3k random packets through both TUN parsers, 500 junk DNS payloads — no crashes, no token leakage; checksum RFC-vector test included.
+- **CI quality gates enforced**: ruff correctness rules, bandit at medium+ severity (B104/B310 skipped by documented policy), coverage floor `--cov-fail-under=19` on core+data.
+- **Supply chain**: release workflow publishes SHA256SUMS.txt for every artifact.
+- **Foundations laid**: i18n layer (`netstrip/i18n.py` + en/es/de catalogs) applied to critical modal/nav strings; Windows installer script (`scripts/installer.iss`, wired into the Windows release job); `ARCHITECTURE.md` with data-flow + threat model + secrets inventory.
+
+### Known next steps (roadmap part 2)
+- Full i18n sweep across remaining views; language picker in Settings.
+- Signed auto-update downloader consuming SHA256SUMS.txt.
+- MSIX/signing certificate for SmartScreen reputation.
+
 ## [v3.7.0] - 2026-08-22
 ### GUI / UX (Issue #6 Integration)
 - **Allow All / Block All / Neutral Toggle Fixed**: The per-app bulk toggle no longer freezes the GUI. OS firewall (`netsh`) calls, SQLite writes and blocklist re-syncs moved to a background thread; child rows update via a lightweight in-place visual sync instead of a per-row database write cascade. Undo-to-neutral now works instantly and reliably, and double-click stacking is guarded.

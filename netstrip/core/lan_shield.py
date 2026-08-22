@@ -29,10 +29,12 @@ class LANShield:
     def _init_psk(self):
         if not self.engine:
             return None
-        psk = self.engine.db.get_setting("lan_shield_psk", "")
+        from netstrip.core.secure_store import load_psk
+        psk = load_psk(self.engine.db)
         if not psk:
             psk = Fernet.generate_key().decode('utf-8')
-            self.engine.db.set_setting("lan_shield_psk", psk)
+            from netstrip.core.secure_store import store_psk
+            store_psk(self.engine.db, psk)
         return psk.encode('utf-8')
 
     def start(self):
