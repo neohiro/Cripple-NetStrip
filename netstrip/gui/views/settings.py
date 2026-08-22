@@ -223,15 +223,17 @@ class SettingsView(ctk.CTkFrame):
                 path = SelfUpdater().download_verified(dest)
                 def _ok():
                     try:
-                        tkinter.messagebox.showinfo(
+                        launch_now = tkinter.messagebox.askyesno(
                             "Update verified",
                             f"SHA-256 verified against the published manifest.\n\n"
                             f"Saved to:\n{path}\n\n"
-                            "Extract and run the new version when ready.")
-                        try:
+                            "Launch the installer now?")
+                        if launch_now:
+                            from netstrip.core.self_update import launch_update
+                            from netstrip.core.self_update import launch_update as _lu  # noqa
+                            _lu(path)
+                        else:
                             os.startfile(path.parent)  # open Explorer at the file
-                        except Exception:
-                            pass
                     finally:
                         try: btn.configure(state="normal", text=_t("btn.download_verify"))
                         except Exception: pass

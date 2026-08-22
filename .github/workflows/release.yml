@@ -1,21 +1,20 @@
 name: Auto-Build Executables
 
+# Per-OS native builds → single consolidated, checksummed Release.
+#
+# Windows ships EXACTLY ONE download: the Inno Setup installer (the portable
+# zip was removed deliberately). Self-update verifies the installer against
+# SHA256SUMS.txt before launching it.
+
 on:
   push:
-    paths-ignore:
-      - '**.md'
-      - '**.txt'
-      - '.gitignore'
-      - 'docs/**'
-    branches: [ main ]
-  release:
-    types: [published]
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to attach binaries to (e.g., v3.1.0)'
-        required: true
-        default: 'v3.1.0'
+        description: 'Release tag (default: v<package version>)'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -24,6 +23,7 @@ jobs:
   build:
     name: Build on ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -51,14 +51,12 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-          
       - name: Install System Dependencies (Linux & Android)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk build-essential libssl-dev libffi-dev python3-dev openjdk-17-jdk
           sudo apt-get install -y zip unzip autoconf libtool libltdl-dev automake autotools-dev m4 pkg-config zlib1g-dev libncurses-dev libtinfo6 cmake libstdc++6
-          rustup target add aarch64-linux-android || true
 
       - name: Install Python Dependencies
         run: |
@@ -77,15 +75,44 @@ jobs:
           fi
           echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
 
-      - name: Build Windows Executable
+      # ── Windows: PyInstaller → Inno installer (THE Windows download) ────
+      - name: Build Windows Executable + Installer
         if: matrix.target == 'windows'
+        shell: pwsh
         run: |
           cmd.exe /c build.bat
           if (-not (Test-Path "dist\Cripple\Cripple.exe")) {
               Write-Host "native exe missing - failing instead of shipping source"
               exit 1
           }
-          Compress-Archive -Path "dist\Cripple\*" -DestinationPath "NetStrip-${env:RELEASE_TAG}-Windows.zip" -Force
+          choco install innosetup -y --no-progress
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe",
+                    "$env:ProgramFiles\Inno Setup 6\iscc.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { Write-Host 'iscc not found'; exit 1 }
+          $exe = (Resolve-Path "dist\Cripple\Cripple.exe").Path
+          $ver = (Get-Item $exe).VersionInfo.ProductVersion
+          if (-not $ver) { $ver = "0.0.0" }
+          & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exe" scripts\installer.iss
+          $setup = Get-ChildItem "scripts\installer\*.exe" | Select-Object -First 1
+          if (-not $setup) { Write-Host 'installer output missing'; exit 1 }
+          Copy-Item $setup.FullName "NetStrip-Setup-$($env:RELEASE_TAG).exe"
+
+      - name: Upload Windows installer
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: NetStrip-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+      # ── macOS: app bundle, loud-fail, verified pre/post-zip ─────────────
+      - name: Set up Java (Android)
+        if: matrix.target == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Build macOS Executable
         if: matrix.target == 'macos'
@@ -100,6 +127,16 @@ jobs:
           unzip -l NetStrip-${RELEASE_TAG}-macOS.zip | grep -q "NetStrip.app/Contents/MacOS/" \
             || { echo "Mach-O binary absent from published zip"; exit 1; }
 
+      - name: Upload macOS zip
+        if: matrix.target == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: NetStrip-*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      # ── Linux: binary + desktop entry, loud-fail, verified ──────────────
       - name: Build Linux Executable
         if: matrix.target == 'linux'
         run: |
@@ -112,18 +149,19 @@ jobs:
           unzip -l NetStrip-${RELEASE_TAG}-Linux.zip | grep -q "NetStrip/NetStrip" \
             || { echo "executable absent from published zip"; exit 1; }
 
-      - name: Set up Java (Android)
-        if: matrix.target == 'android'
-        uses: actions/setup-java@v4
+      - name: Upload Linux zip
+        if: matrix.target == 'linux'
+        uses: actions/upload-artifact@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          name: linux-zip
+          path: NetStrip-*.zip
+          if-no-files-found: error
+          retention-days: 7
 
+      # ── Android: APK via pinned toolchain, loud-fail ────────────────────
       - name: Build Android Package
         if: matrix.target == 'android'
         run: |
-          # No '|| true' here: a failed APK build must fail the release, not
-          # silently ship a source-only zip (that lie shipped broken releases).
           yes | buildozer android debug
           mkdir -p bin
           if [ -d "bin" ] && [ "$(ls -A bin/*.apk 2>/dev/null)" ]; then
@@ -132,45 +170,69 @@ jobs:
             zip ../NetStrip-${RELEASE_TAG}-Android.zip NetStrip-${RELEASE_TAG}-Android.apk
             cd ..
           else
-            echo "APK missing after successful exit â€” failing the release"
+            echo "APK missing after successful exit — failing the release"
             exit 1
           fi
 
-      - name: Build Windows installer (Inno Setup)
-        if: matrix.target == 'windows'
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress
-          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe",
-                    "$env:ProgramFiles\Inno Setup 6\iscc.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $iscc) { Write-Host 'iscc not found; skipping installer'; exit 0 }
-          $exe = @("dist\Cripple\Cripple.exe", "dist\Cripple.exe") |
-                  Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $exe) { Write-Host "built exe not found under dist\"; exit 1 }
-          $ver = (Get-Item $exe).VersionInfo.ProductVersion
-          if (-not $ver) { $ver = "0.0.0" }
-          $exeAbs = (Resolve-Path $exe).Path
-          & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exeAbs" scripts\installer.iss
-          $setup = Get-ChildItem "scripts\installer\*.exe" | Select-Object -First 1
-          if ($setup) { Copy-Item $setup.FullName "NetStrip-Setup-${{ env.RELEASE_TAG }}.exe" }
+      - name: Upload Android zip
+        if: matrix.target == 'android'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-zip
+          path: NetStrip-*.zip
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Generate SHA256SUMS manifest
-        if: matrix.target == 'windows'
+  # ── Consolidated, fully-checksummed publication ─────────────────────────
+  publish:
+    name: Publish Release (all OS + SHA256SUMS)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (resolve version)
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve release tag
         shell: bash
         run: |
-          # Supply-chain: every published zip gets a recorded hash; users and
-          # the updater can verify downloads against this manifest.
-          shopt -s nullglob
-          files=(NetStrip-*-*.zip NetStrip-Setup-*.exe)
-          (( ${#files[@]} )) && sha256sum "${files[@]}" > SHA256SUMS.txt
+          VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="v$VERSION"; fi
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          files: |
-            NetStrip-*-*.zip
-            NetStrip-Setup-*.exe
-            SHA256SUMS.txt
+          path: release
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS over EVERY published file
+        shell: bash
+        run: |
+          cd release
+          ls -la
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish release (idempotent — stale assets purged)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="$RELEASE_TAG"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "NetStrip $TAG" \
+              --notes "Native builds for Windows (installer), Linux, macOS and Android. SHA256SUMS.txt covers every asset."
+          # Idempotent re-publish: purge stale assets so there is never more
+          # than one download per platform.
+          RID=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '.id')
+          gh api "repos/${{ github.repository }}/releases/$RID/assets" --jq '.[].id' \
+            | while read -r aid; do
+                gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$aid"
+              done
+          gh release upload "$TAG" release/* --clobber

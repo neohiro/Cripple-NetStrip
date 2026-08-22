@@ -95,20 +95,30 @@ def platform_token(platform: str = None) -> str:
 
 
 def pick_assets(assets, platform: str = None):
-    """Return (zip_asset, sums_asset) from a release-assets JSON list.
+    """Return (update_asset, sums_asset) from a release-assets JSON list.
 
-    Matching is prefix-based on our published naming scheme
-    (NetStrip-vX.Y.Z-<Platform>.zip) so version bumps never break selection.
+    Windows ships exactly ONE artifact: the Inno installer
+    (NetStrip-Setup-<tag>.exe). Other platforms ship native zips. A legacy
+    platform zip is accepted as fallback so older releases keep working.
     """
     want = platform_token(platform)
-    zip_asset = sums_asset = None
+    update_asset = sums_asset = None
+    want_l = want.lower()
     for a in assets or []:
         name = (a.get("name") or "").lower()
         if name.endswith("sha256sums.txt"):
             sums_asset = a
-        elif name.startswith("netstrip-") and name.endswith(".zip") and want.lower() in name:
-            zip_asset = a
-    return zip_asset, sums_asset
+            continue
+        if not name.startswith("netstrip-"):
+            continue
+        if want_l == "windows":
+            if name.startswith("netstrip-setup-") and name.endswith(".exe"):
+                update_asset = a          # preferred installer
+            elif update_asset is None and name.endswith(".zip") and "windows" in name:
+                update_asset = a          # legacy portable fallback
+        elif name.endswith(".zip") and want_l in name:
+            update_asset = a
+    return update_asset, sums_asset
 
 
 def _tls_context():
@@ -230,15 +240,20 @@ class SelfUpdater:
             raise SelfUpdateError(f"signature verification failed: {e}") from e
 
 
-def launch_installer_or_explorer(verified_zip: Path):
-    """Best-effort handoff to the user after a verified download."""
-    target = verified_zip.parent
+def launch_update(verified_file: Path):
+    """Hand off a verified update to the user.
+    Windows: launches the verified installer directly (Inno UI).
+    Other OS: opens the folder containing the native build."""
     try:
-        if sys.platform.startswith("win"):
-            os.startfile(target)  # noqa: S606 - opens Explorer at the verified file
-        else:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
+        if verified_file.suffix.lower() == ".exe":
+            os.startfile(str(verified_file))  # noqa: S606 - hash-verified installer
+            return
+        target = verified_file.parent
+        if sys.platform == "darwin":
             import subprocess
-            subprocess.Popen([opener, str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(["open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            import subprocess
+            subprocess.Popen(["xdg-open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        logger.debug(f"could not open {target}: {e}")
+        logger.debug(f"could not hand off {verified_file}: {e}")

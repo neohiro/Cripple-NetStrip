@@ -315,7 +315,14 @@ Cripple is engineered to align with two major cybersecurity standards:
 ## 📖 Getting Started
 
 ### Option 1: Download (Recommended)
-Grab the pre-compiled binary from [Releases](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator/sudo. No Python required.
+Grab your platform download from [Releases](https://github.com/neohiro/Cripple-NetStrip/releases):
+
+| OS | Download |
+|----|----------|
+| Windows | `NetStrip-Setup-*.exe` (single installer — verifies itself against SHA256SUMS during self-update) |
+| Linux / macOS / Android | `NetStrip-*-<OS>.zip` (native build) |
+
+Run as Administrator/sudo. No Python required.
 
 ### Option 2: Run from Source
 ```bash

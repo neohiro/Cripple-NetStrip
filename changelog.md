@@ -1,3 +1,11 @@
+## [v3.8.1] - 2026-08-22
+### Single Windows Download (installer-only releases)
+- **Exactly one Windows artifact per release**: the Inno Setup installer, built automatically in CI and published as the release asset — the duplicate portable Windows zip is gone.
+- **Self-update on Windows now launches the verified installer**: downloads `NetStrip-Setup-*.exe`, verifies SHA-256 against SHA256SUMS.txt, then offers one-click launch (`launch_update()`). Legacy portable zips remain accepted as a fallback so older releases keep updating.
+- **Consolidated publish job**: all four platform artifacts are gathered, and SHA256SUMS.txt is generated over *every* published file in one place — previously each build job only hashed its own output, leaving Linux/macOS/Android zips out of the manifest.
+- **Idempotent re-publish**: stale release assets are purged on every rebuild, so a platform can never accumulate duplicate downloads.
+- Settings dialog offers "Launch the installer now?" after verification.
+
 ## [v3.8.0] - 2026-08-22
 ### 🌍 26-Language Interface (GUI-wide, including hovertips)
 - **23 new languages**: Français, Italiano, Português, Nederlands, Polski, Türkçe, Русский, Українська, 日本語, 한국어, 简体中文, 繁體中文, हिन्दी, Bahasa Indonesia, Tiếng Việt, العربية, Svenska, Dansk, Suomi, Čeština, Ελληνικά, Magyar, Română — joining English, Español and Deutsch.

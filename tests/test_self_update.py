@@ -21,8 +21,9 @@ from netstrip.core.self_update import (
 )
 
 API_URL = "https://api.github.com/repos/neohiro/Cripple-NetStrip/releases/latest"
-ZIP_ASSET_NAME = "NetStrip-v9.9.9-Windows.zip"   # exact published asset name
-ZIP_NAME = ZIP_ASSET_NAME.lower()                # manifest lists lowercase
+SETUP_NAME = "NetStrip-Setup-v9.9.9.exe"          # THE single Windows artifact
+LEGACY_ZIP_NAME = "netstrip-v9.9.9-windows.zip"   # old portable fallback
+ZIP_NAME = LEGACY_ZIP_NAME                        # manifest lists lowercase
 ZIP_BYTES = b"PK\x03\x04 fake-but-deterministic zip payload \x00\x01\x02"
 GOOD_HASH = hashlib.sha256(ZIP_BYTES).hexdigest()
 
@@ -30,7 +31,7 @@ GOOD_HASH = hashlib.sha256(ZIP_BYTES).hexdigest()
 def make_manifest():
     return (
         f"# SHA256SUMS for v9.9.9\n"
-        f"{GOOD_HASH}  {ZIP_NAME}\n"
+        f"{GOOD_HASH}  {SETUP_NAME.lower()}\n"
         f"{'a'*64}  netstrip-v9.9.9-linux.zip\n"
     )
 
@@ -58,14 +59,12 @@ def _asset(name, size=10):
     return {"name": name, "browser_download_url": f"https://example/{name}", "size": size}
 
 
-def build_release():
-    return {
-        "tag_name": "v9.9.9",
-        "assets": [
-            _asset(ZIP_ASSET_NAME, len(ZIP_BYTES)),
-            _asset("SHA256SUMS.txt", 200),
-        ],
-    }
+def build_release(include_legacy_zip=False):
+    assets = [_asset(SETUP_NAME, len(ZIP_BYTES))]
+    if include_legacy_zip:
+        assets.append(_asset(LEGACY_ZIP_NAME.capitalize(), len(ZIP_BYTES)))
+    assets.append(_asset("SHA256SUMS.txt", 200))
+    return {"tag_name": "v9.9.9", "assets": assets}
 
 
 def fake_transport(monkeypatch, *, zip_bytes=ZIP_BYTES, sums_text=None):
@@ -76,7 +75,8 @@ def fake_transport(monkeypatch, *, zip_bytes=ZIP_BYTES, sums_text=None):
         API_URL: json.dumps(release).encode(),
         f"https://example/SHA256SUMS.txt":
             (sums_text if sums_text is not None else make_manifest()).encode(),
-        f"https://example/{ZIP_ASSET_NAME}": zip_bytes,
+        f"https://example/{SETUP_NAME}": zip_bytes,
+        f"https://example/{LEGACY_ZIP_NAME.capitalize()}": zip_bytes,
     }
 
     def fake_urlopen(req, timeout=None, context=None):
@@ -132,19 +132,29 @@ def test_sha256_of_file_streams(tmp_path):
 # Asset selection
 
 
-def test_pick_assets_windows():
+def test_pick_assets_prefers_installer_over_legacy_zip():
     assets = [
         _asset("NetStrip-v9.9.9-Linux.zip"),
-        _asset(ZIP_ASSET_NAME),
+        _asset(SETUP_NAME),
+        _asset(LEGACY_ZIP_NAME.capitalize()),
         _asset("SHA256SUMS.txt"),
     ]
     z, s = pick_assets(assets, platform="win32")
-    assert z["name"] == ZIP_ASSET_NAME
+    assert z["name"] == SETUP_NAME            # installer wins
     assert s["name"] == "SHA256SUMS.txt"
 
 
+def test_pick_assets_legacy_zip_fallback():
+    assets = [
+        _asset(LEGACY_ZIP_NAME.capitalize()),
+        _asset("SHA256SUMS.txt"),
+    ]
+    z, _s = pick_assets(assets, platform="win32")
+    assert z["name"].lower() == LEGACY_ZIP_NAME
+
+
 def test_pick_assets_missing_sums_detected():
-    z, s = pick_assets([_asset(ZIP_ASSET_NAME)], platform="win32")
+    z, s = pick_assets([_asset(SETUP_NAME)], platform="win32")
     assert z is not None and s is None  # caller must refuse to update
 
 
@@ -159,7 +169,7 @@ def test_download_verified_happy_path(tmp_path, monkeypatch):
     got = SelfUpdater().download_verified(dest)
 
     assert got.exists()
-    assert got.name == ZIP_ASSET_NAME
+    assert got.name == SETUP_NAME
     assert got.read_bytes() == ZIP_BYTES
     assert verify_file_hash(got, GOOD_HASH)
 
@@ -172,7 +182,7 @@ def test_download_aborts_on_hash_mismatch(tmp_path, monkeypatch):
         SelfUpdater().download_verified(dest)
 
     # The tampered file must be deleted, never left for the user to run
-    assert not (dest / ZIP_ASSET_NAME).exists()
+    assert not (dest / SETUP_NAME).exists()
 
 
 def test_download_refuses_when_manifest_missing_entry(tmp_path, monkeypatch):
