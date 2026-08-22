@@ -154,13 +154,15 @@ jobs:
           if (-not $ver) { $ver = "0.0.0" }
           $exeAbs = (Resolve-Path $exe).Path
           & $iscc "/DMyAppVersion=$ver" "/DExeSource=$exeAbs" scripts\installer.iss
+          $setup = Get-ChildItem "scripts\installer\*.exe" | Select-Object -First 1
+          if ($setup) { Copy-Item $setup.FullName "NetStrip-Setup-${{ env.RELEASE_TAG }}.exe" }
 
       - name: Generate SHA256SUMS manifest
         if: matrix.target == 'windows'
         run: |
           # Supply-chain: every published zip gets a recorded hash; users and
           # the updater can verify downloads against this manifest.
-          sha256sum NetStrip-*-*.zip > SHA256SUMS.txt
+          sha256sum NetStrip-*-*.zip NetStrip-Setup-*.exe > SHA256SUMS.txt 2>/dev/null || sha256sum NetStrip-*-*.zip > SHA256SUMS.txt
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
@@ -168,6 +170,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           files: |
             NetStrip-*-*.zip
+            NetStrip-Setup-*.exe
             SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
