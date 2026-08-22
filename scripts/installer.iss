@@ -14,7 +14,7 @@
 #endif
 
 [Setup]
-AppId={{8E7B6C1D-52A4-4F0E-9C3B-NETSTRIP64}}
+AppId=NetStrip
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\NetStrip

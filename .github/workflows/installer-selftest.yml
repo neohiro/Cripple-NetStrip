@@ -61,10 +61,11 @@ jobs:
           Write-Host "installed ProductVersion: $v"
           if (-not $v) { Write-Error 'empty ProductVersion'; exit 1 }
           if (-not (Test-Path (Join-Path $app 'unins000.exe'))) { Write-Error 'uninstaller missing'; exit 1 }
-          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NetStrip_is1'
-          if (-not (Test-Path $key)) { Write-Error 'uninstall registry key missing'; exit 1 }
-          $dn = (Get-ItemProperty $key).DisplayName
-          if ($dn -notlike '*NetStrip*') { Write-Error "bad DisplayName: $dn"; exit 1 }
+          $key = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' |
+            Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -like '*NetStrip*' } |
+            Select-Object -First 1
+          if (-not $key) { Write-Error 'uninstall registry key missing'; exit 1 }
+          Write-Host "uninstall key: $($key.PSChildName)" 
           Write-Host "INSTALLED STATE OK (v$v)"
 
       - name: Silent uninstall
@@ -83,9 +84,9 @@ jobs:
             $gone = -not (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe")
           } while (-not $gone -and (Get-Date) -lt $deadline)
           if (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe") { Write-Error 'exe survived uninstall'; exit 1 }
-          if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NetStrip_is1') {
-            Write-Error 'uninstall registry key survived'; exit 1
-          }
+          $leftover = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' |
+            Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -like '*NetStrip*' }
+          if ($leftover) { Write-Error 'uninstall registry key survived'; exit 1 }
           Write-Host 'CLEAN UNINSTALL OK'
 
       - name: Result
