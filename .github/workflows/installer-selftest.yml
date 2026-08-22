@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Resolve latest release assets
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh api repos/${{ github.repository }}/releases/latest --jq '.assets[].browser_download_url' > assets.txt
           grep -E "(Setup-.*\.exe|SHA256SUMS\.txt)$" assets.txt || { echo "required assets missing"; exit 1; }
