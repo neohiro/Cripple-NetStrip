@@ -69,6 +69,7 @@ def is_newer_version(remote: str, current: str) -> bool:
 
 class BlocklistUpdater:
     def __init__(self, lists_dir: str = None, on_update_callback: callable = None):
+        self._update_lock = threading.Lock()
         if lists_dir is None:
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             self.lists_dir = os.path.join(user_dir, "lists")
@@ -77,24 +78,28 @@ class BlocklistUpdater:
             self.lists_dir = lists_dir
         self.sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         self.is_updating = False
+
         self.on_update_callback = on_update_callback
         self.last_update_stats = {"success": 0, "failed": 0, "total": 0}
 
     def check_and_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
-        """Run the update in a background thread."""
-        if self.is_updating:
-            return
-            
+        """Run the update in a background thread (TOCTOU-safe)."""
+        with self._update_lock:
+            if self.is_updating:
+                return
+            self.is_updating = True
         threading.Thread(target=self._perform_update, args=(force, on_complete, on_progress), daemon=True).start()
 
     def _perform_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         self.is_updating = True
+        _completed = False
         try:
             try:
                 if not os.path.exists(self.sources_file):
                     logger.warning(f"Updater sources file not found: {self.sources_file}")
                     if on_complete:
                         on_complete(0)
+                    _completed = True
                     return False
 
                 with open(self.sources_file, 'r', encoding='utf-8') as f:
@@ -230,6 +235,7 @@ class BlocklistUpdater:
                 self._fetch_dnscrypt_resolvers()
                 
                 if on_complete:
+                    _completed = True
                     try: on_complete(updated_count)
                     except Exception: pass
                     
@@ -239,6 +245,11 @@ class BlocklistUpdater:
                 return False
         finally:
             self.is_updating = False
+            # Guarantee on_complete fires even on catastrophic errors so the
+            # GUI Update button never gets stuck in "Updating..." state.
+            if not _completed and on_complete:
+                try: on_complete(0)
+                except Exception: pass
 
     def _decode_stamp(self, stamp_str):
         import base64

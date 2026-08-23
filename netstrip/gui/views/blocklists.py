@@ -180,6 +180,8 @@ class BlocklistView(ctk.CTkFrame):
     def _add_custom_rule(self):
         pattern = self._add_entry.get().strip()
         if not pattern:
+            if hasattr(self.engine, "broadcast_status"):
+                self.engine.broadcast_status("Enter a domain or URL first")
             return
 
         action = "block" if self._action_var.get() == "Block" else "allow"
@@ -189,7 +191,7 @@ class BlocklistView(ctk.CTkFrame):
         lowered = pattern.lower()
         if lowered.startswith(("http://", "https://")):
             self._add_entry.delete(0, 'end')
-            if hasattr(self.engine, 'on_status') and self.engine.on_status:
+            if hasattr(self.engine, 'broadcast_status'):
                 self.engine.on_status("Downloading new online list...")
 
             import threading
@@ -285,8 +287,8 @@ class BlocklistView(ctk.CTkFrame):
                             pass
 
                 except Exception as e:
-                    if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                        self.engine.on_status(f"Failed to add online list: {e}")
+                    if hasattr(self.engine, 'broadcast_status'):
+                        self.engine.broadcast_status(f"Failed to add online list: {e}")
 
             threading.Thread(target=download_list, daemon=True).start()
             return
@@ -312,8 +314,8 @@ class BlocklistView(ctk.CTkFrame):
         self._add_entry.delete(0, 'end')
 
         # Show feedback
-        if hasattr(self.engine, 'on_status') and self.engine.on_status:
-            self.engine.on_status(f"Added custom {action} rule for {pattern}")
+        if hasattr(self.engine, 'broadcast_status'):
+            self.engine.broadcast_status(f"Added custom {action} rule for {pattern}")
 
         self._refresh_stats_grid()
 
@@ -383,7 +385,7 @@ class BlocklistView(ctk.CTkFrame):
         return cnt
 
     def _refresh_stats_grid(self, msg=None):
-        if msg and hasattr(self.engine, 'on_status') and self.engine.on_status:
+        if msg and hasattr(self.engine, 'broadcast_status'):
             self.engine.on_status(msg)
             
         try:
@@ -425,9 +427,9 @@ class BlocklistView(ctk.CTkFrame):
                 self._style_override_button(btn, next_state)
 
             label = get_category_label(cat_enum)
-            if hasattr(self.engine, 'on_status') and self.engine.on_status:
+            if hasattr(self.engine, 'broadcast_status'):
                 verb = {'allow': 'ALLOW', 'block': 'BLOCK'}.get(next_state, 'DEFAULT')
-                self.engine.on_status(f"Category '{label}' bulk switch → {verb}")
+                self.engine.broadcast_status(f"Category '{label}' bulk switch → {verb}")
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Category override toggle failed: {e}")
@@ -772,8 +774,8 @@ class BlocklistView(ctk.CTkFrame):
                     self.engine.blocklist.toggle_updater_source(src_name, val)
                     n_lbl.configure(text_color=Colors.TEXT_PRIMARY if val else Colors.TEXT_TERTIARY)
                     d_lbl.configure(text_color=Colors.SUCCESS if val else Colors.TEXT_TERTIARY)
-                    if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                        self.engine.on_status(f"{'Enabled' if val else 'Disabled'} feed: {src_name}")
+                    if hasattr(self.engine, 'broadcast_status'):
+                        self.engine.broadcast_status(f"{'Enabled' if val else 'Disabled'} feed: {src_name}")
                 return on_toggle
 
             item['switch'].configure(command=make_toggle_handler())
@@ -1101,8 +1103,8 @@ class BlocklistView(ctk.CTkFrame):
                 rules = self.engine.db.get_user_rules(mode_scope=mode_scope)
                 if hasattr(self.engine.blocklist, 'sync_user_rules'):
                     self.engine.blocklist.sync_user_rules(rules)
-                if hasattr(self.engine, 'on_status') and self.engine.on_status:
-                    self.engine.on_status(f"{act.capitalize()}ed domain: {d}")
+                if hasattr(self.engine, 'broadcast_status'):
+                    self.engine.broadcast_status(f"{act.capitalize()}ed domain: {d}")
                 self._refresh_stats_grid()
                 self._do_search()
 

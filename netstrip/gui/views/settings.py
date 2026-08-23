@@ -194,9 +194,6 @@ class SettingsView(ctk.CTkFrame):
             command=self._download_verified_update
         )
         self.btn_download_update.pack(side="right")
-        self.btn_update_restart.pack(side="right", padx=(0, Spacing.SM))
-        self.btn_download_update.pack_forget()
-        self.btn_update_restart.pack_forget() # Hidden by default
 
         self.btn_update_restart = ctk.CTkButton(
             btn_frame, text=_t("⟳ Update & Restart"),
@@ -205,6 +202,9 @@ class SettingsView(ctk.CTkFrame):
             text_color=Colors.TEXT_PRIMARY,
             command=self._update_and_restart
         )
+        self.btn_update_restart.pack(side="right", padx=(0, Spacing.SM))
+        self.btn_download_update.pack_forget()
+        self.btn_update_restart.pack_forget() # Hidden by default
 
         self._refresh_update_status()
 
@@ -251,7 +251,7 @@ class SettingsView(ctk.CTkFrame):
                                 os._exit(0),
                             ))
                     finally:
-                        try: btn.configure(state="normal")
+                        try: btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
                         except Exception: pass
                 self.after(0, _go)
             except SelfUpdateError as e:
@@ -259,9 +259,17 @@ class SettingsView(ctk.CTkFrame):
 
                 def _err():
                     tkinter.messagebox.showerror("Update failed", err)
-                    try: btn.configure(state="normal")
+                    try: btn.configure(state="normal", text=_t("⟳ Update & Restart"))
                     except Exception: pass
                 self.after(0, _err)
+            except Exception as e:
+                net_err = str(e)
+
+                def _err_net():
+                    tkinter.messagebox.showerror("Network error", net_err)
+                    try: btn.configure(state="normal", text=_t("⟳ Update & Restart"))
+                    except Exception: pass
+                self.after(0, _err_net)
 
         threading.Thread(target=_work, daemon=True).start()
 

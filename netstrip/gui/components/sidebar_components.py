@@ -405,14 +405,13 @@ class AppGroupFrame(ctk.CTkFrame):
             command=self._toggle_expand
         )
         self.btn_expand.pack(side="right", padx=Spacing.XS)
-        self.lbl_bandwidth.pack(side="right", padx=(0, 4))
         
         # Per-app bandwidth (session totals; visible collapsed & expanded)
         self.lbl_bandwidth = ctk.CTkLabel(
             self.header, text="", font=(Fonts.FAMILY_PRIMARY[0], 9),
             text_color=Colors.TEXT_TERTIARY
         )
-        # packed right of btn_expand so it sits before the expand chevron
+        self.lbl_bandwidth.pack(side="right", padx=(0, 4))
         
         # Check current global status
         self._global_action_state = None

@@ -1170,10 +1170,12 @@ class NetStripEngine:
             try:
                 import socket
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 53))
-                current_local_ip = s.getsockname()[0]
-                s.close()
-                
+                try:
+                    s.connect(("8.8.8.8", 53))
+                    current_local_ip = s.getsockname()[0]
+                finally:
+                    s.close()
+
                 # If we have a tracked IP and it just changed, the routing table shifted
                 if self._last_wan_local_ip and current_local_ip != self._last_wan_local_ip:
                     # Ignore loopback/disconnected shifts
