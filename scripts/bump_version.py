@@ -75,8 +75,9 @@ def bump(new_ver):
     rel = "version_info.txt"
     original = read(rel)
     patched = patch_version_info(original, new_ver)
-    if patched == original:
-        sys.exit(f"ERROR: no substitutions applied to {rel}")
+    tuple_ver = "(" + new_ver.replace(".", ", ") + ", 0)"
+    if f"'{new_ver}.0'" not in patched or f"filevers={tuple_ver}" not in patched:
+        sys.exit(f"ERROR: substitutions failed for {rel}")
     write(rel, patched)
     print(f"  updated {rel}")
     print(f"Version bumped to {new_ver} in 4 files.")
