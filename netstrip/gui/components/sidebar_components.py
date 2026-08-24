@@ -1033,7 +1033,8 @@ class AppGroupFrame(ctk.CTkFrame):
         _update_rows()
 
     def _update_bw_bar(self):
-        """Resize the proportional sent/recv bar based on current totals."""
+        """Resize the proportional sent/recv bar. Creates bars once, then
+        reconfigures width on subsequent calls (no widget churn)."""
         if not hasattr(self, '_bw_detail') or not self._bw_detail.winfo_exists():
             return
         try:
@@ -1042,21 +1043,37 @@ class AppGroupFrame(ctk.CTkFrame):
             pct = min(1.0, sent / total) if total > 0 else 0.5
         except Exception:
             return
+
+        # Find the bar container frame (height=6)
+        bar_container = None
         for w in self._bw_detail.winfo_children():
             if isinstance(w, ctk.CTkFrame) and int(w.cget("height")) <= 8:
-                for child in w.winfo_children():
-                    child.destroy()
-                if pct > 0.01:
-                    bar_s = ctk.CTkFrame(w, fg_color="#22c55e", height=6,
-                                         corner_radius=3,
-                                         width=max(2, int(w.winfo_width() * pct)))
-                    bar_s.pack(side="left", padx=0)
-                if pct < 0.99:
-                    bar_r = ctk.CTkFrame(w, fg_color="#3b82f6", height=6,
-                                         corner_radius=3,
-                                         width=max(2, int(w.winfo_width() * (1 - pct))))
-                    bar_r.pack(side="left", padx=0)
+                bar_container = w
                 break
+        if bar_container is None:
+            return
+
+        # Create bars once on first call; reuse on subsequent calls
+        if not hasattr(self, '_bar_sent_widget') or not self._bar_sent_widget.winfo_exists():
+            for child in bar_container.winfo_children():
+                child.destroy()
+            inner_w = max(10, bar_container.winfo_width())
+            self._bar_sent_widget = ctk.CTkFrame(
+                bar_container, fg_color="#22c55e", height=6,
+                corner_radius=3, width=max(2, int(inner_w * 0.5)))
+            self._bar_sent_widget.pack(side="left", padx=0)
+            self._bar_recv_widget = ctk.CTkFrame(
+                bar_container, fg_color="#3b82f6", height=6,
+                corner_radius=3, width=max(2, int(inner_w * 0.5)))
+            self._bar_recv_widget.pack(side="left", padx=0)
+
+        # Reconfigure widths proportionally (no widget destruction)
+        total_px = max(10, bar_container.winfo_width())
+        try:
+            self._bar_sent_widget.configure(width=max(1, int(total_px * pct)))
+            self._bar_recv_widget.configure(width=max(1, int(total_px * (1 - pct))))
+        except Exception:
+            pass
 
     def _copy_path(self):
         if not self.process_path:

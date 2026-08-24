@@ -121,9 +121,10 @@ class NetStripEngine:
         # labels show real usage immediately on startup.
         try:
             persisted = self.db.get_app_bandwidth()
-            for name, (sent, recv) in persisted.items():
-                if sent or recv:
-                    self._app_bytes[name] = (sent, recv)
+            with self._app_bytes_lock:
+                for name, (sent, recv) in persisted.items():
+                    if sent or recv:
+                        self._app_bytes[name] = (sent, recv)
         except Exception:
             pass  # first run — table may not exist yet
 

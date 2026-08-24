@@ -253,10 +253,10 @@ class SettingsView(ctk.CTkFrame):
             lbl.pack_forget()
 
         def _set_progress(fraction):
+            # No update_idletasks() here — it can cause re-entrant event
+            # processing under rapid-fire updates. The mainloop handles redraw.
             try:
                 bar.set(min(1.0, max(0.0, fraction)))
-                root_update = self.winfo_toplevel()
-                root_update.update_idletasks()
             except Exception:
                 pass
 
