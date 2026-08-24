@@ -428,6 +428,10 @@ class Database:
             
         with self.lock:
             self._settings_cache[key] = value
+            # Invalidate hot-path cache so packet decisions reflect the change
+            hot = getattr(self, '_hot_settings', None)
+            if hot:
+                hot.pop(key, None)
             with self._get_connection() as conn:
                 conn.execute(
                     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',

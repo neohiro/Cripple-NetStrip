@@ -17,11 +17,9 @@ if "jnius" not in sys.modules:
     sys.modules["jnius"] = stub
 
 from netstrip.core.interceptor.android import (
-    PROTO_TCP,
     PROTO_UDP,
     AndroidVPNInterceptor,
 )
-from netstrip.core.dns_proxy import ANDROID_DNS_PORT
 
 
 def _build_ipv4_udp(src_ip, dst_ip, src_port, dst_port, payload, ttl=64):

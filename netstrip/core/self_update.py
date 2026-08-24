@@ -221,6 +221,10 @@ class SelfUpdater:
 
         self._verify_optional_signature(zip_path)
 
+        # Clean up manifest (already consumed)
+        try: sums_path.unlink(missing_ok=True)
+        except Exception: pass
+
         logger.info(f"Self-update verified: {zip_path}")
         prog("done")
         return zip_path

@@ -840,6 +840,11 @@ class NetStripEngine:
             return
             
         logger.info("Stopping NetStrip Engine...")
+        # Flush any buffered notification digest events so they aren't lost
+        try:
+            self._flush_notification_digest()
+        except Exception:
+            pass
         
         self.is_running = False
         self._stop_event.set()

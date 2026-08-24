@@ -4,7 +4,6 @@ and catalogs advertising tooltips must cover the full tooltip namespace.
 """
 
 import json
-import os
 from pathlib import Path
 
 LOCALES = Path(__file__).resolve().parent.parent / "netstrip" / "locales"

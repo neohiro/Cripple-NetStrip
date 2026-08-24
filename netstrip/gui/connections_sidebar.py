@@ -177,6 +177,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
             return False
 
     def _on_sort_filter_change(self, choice=None):
+        self._last_visible_order = None  # force re-evaluation after sort/filter change
         self._refresh_loop()
         
     def _get_poll_interval(self):
@@ -485,6 +486,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         self.sort_var.set("Sort by: Recent")
         self.filter_var.set("Filter: All")
         self.hide_inactive = False
+        self._last_visible_order = None  # force re-evaluation
         self._on_sort_filter_change()
         
     def _toggle_expand_all(self):

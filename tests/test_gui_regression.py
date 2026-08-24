@@ -5,7 +5,6 @@ widget-before-creation ordering bugs that previously broke Settings and Sidebar.
 """
 
 import os
-import sys
 
 import pytest
 
