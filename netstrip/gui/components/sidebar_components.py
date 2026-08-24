@@ -339,6 +339,14 @@ class ConnectionRow(ctk.CTkFrame):
         except Exception:
             pass
 
+def _fmt_bytes(n):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(n) < 1024:
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024
+    return f"{n:.1f}PB"
+
+
 class AppGroupFrame(ctk.CTkFrame):
     def __init__(self, master, process_name: str, process_path: str, engine: NetStripEngine, icon_manager: IconManager, **kwargs):
         super().__init__(master, fg_color=Colors.BG_DARK, **kwargs)
@@ -956,9 +964,44 @@ class AppGroupFrame(ctk.CTkFrame):
                 
         self.visible_count = len(visible_rows)
         self.update_bandwidth_label()
+        if getattr(self, 'is_expanded_ui', False) and hasattr(self, '_bw_detail'):
+            try:
+                self._update_bw_bar()
+            except Exception:
+                pass
 
     def set_expanded(self, expanded: bool):
         self.is_expanded_ui = expanded
+        # Bandwidth detail row: only visible when expanded
+        if expanded and (hasattr(self.engine, 'get_app_bytes')):
+            sent, recv = self.engine.get_app_bytes(self.process_name)
+            if sent or recv:
+                if not hasattr(self, '_bw_detail') or not getattr(self._bw_detail, 'winfo_exists', lambda: False)():
+                    self._bw_detail = ctk.CTkFrame(self, fg_color="transparent", height=22)
+                    # Proportional bar: green=sent, blue=recv
+                    bar_frame = ctk.CTkFrame(self._bw_detail, fg_color="transparent", height=6)
+                    bar_frame.pack(fill="x", padx=(30, Spacing.SM), pady=(0, 2))
+                    total = max(1, sent + recv)
+                    pct_sent = min(1.0, sent / total)
+                    bar_sent = ctk.CTkFrame(bar_frame, fg_color="#22c55e", height=6, corner_radius=3)
+                    bar_recv = ctk.CTkFrame(bar_frame, fg_color="#3b82f6", height=6, corner_radius=3)
+                    lbl_bw = ctk.CTkLabel(
+                        self._bw_detail,
+                        text=f"↑ {_fmt_bytes(sent)}   ↓ {_fmt_bytes(recv)}",
+                        font=(Fonts.FAMILY_PRIMARY[0], 9),
+                        text_color=Colors.TEXT_TERTIARY, anchor="w",
+                    )
+                    lbl_bw.pack(fill="x", padx=(30, 0))
+                    # Store refs for proportional resize
+                    self._bw_bars = (bar_sent, bar_recv, total)
+                else:
+                    self._bw_detail.pack(fill="x", before=self.rows_container)
+                self._update_bw_bar()
+            elif hasattr(self, '_bw_detail'):
+                self._bw_detail.pack_forget()
+        elif hasattr(self, '_bw_detail'):
+            self._bw_detail.pack_forget()
+
         if expanded:
             if not hasattr(self, 'lbl_path') or not getattr(self.lbl_path, 'winfo_exists', lambda: False)():
                 self.lbl_path = ctk.CTkButton(
@@ -988,6 +1031,32 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
         _update_rows()
+
+    def _update_bw_bar(self):
+        """Resize the proportional sent/recv bar based on current totals."""
+        if not hasattr(self, '_bw_detail') or not self._bw_detail.winfo_exists():
+            return
+        try:
+            sent, recv = self.engine.get_app_bytes(self.process_name)
+            total = max(1, sent + recv)
+            pct = min(1.0, sent / total) if total > 0 else 0.5
+        except Exception:
+            return
+        for w in self._bw_detail.winfo_children():
+            if isinstance(w, ctk.CTkFrame) and int(w.cget("height")) <= 8:
+                for child in w.winfo_children():
+                    child.destroy()
+                if pct > 0.01:
+                    bar_s = ctk.CTkFrame(w, fg_color="#22c55e", height=6,
+                                         corner_radius=3,
+                                         width=max(2, int(w.winfo_width() * pct)))
+                    bar_s.pack(side="left", padx=0)
+                if pct < 0.99:
+                    bar_r = ctk.CTkFrame(w, fg_color="#3b82f6", height=6,
+                                         corner_radius=3,
+                                         width=max(2, int(w.winfo_width() * (1 - pct))))
+                    bar_r.pack(side="left", padx=0)
+                break
 
     def _copy_path(self):
         if not self.process_path:

@@ -206,6 +206,19 @@ class SettingsView(ctk.CTkFrame):
         self.btn_download_update.pack_forget()
         self.btn_update_restart.pack_forget() # Hidden by default
 
+        # Determinate download progress bar (hidden by default)
+        self.update_progress = ctk.CTkProgressBar(
+            btn_frame, width=200, height=6, corner_radius=3,
+            fg_color=Colors.BG_INPUT, progress_color=Colors.ACCENT_PRIMARY,
+        )
+        self.update_progress.set(0)
+
+        # Progress status label
+        self.lbl_progress_status = ctk.CTkLabel(
+            btn_frame, text="", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
+            text_color=Colors.TEXT_TERTIARY,
+        )
+
         self._refresh_update_status()
 
     def _refresh_update_status(self):
@@ -226,19 +239,50 @@ class SettingsView(ctk.CTkFrame):
         import tkinter.messagebox
 
         btn = self.btn_update_restart
-        btn.configure(state="disabled", text="Verifying…")
+        btn.configure(state="disabled", text=_t("status.downloading_verify"))
+        bar = self.update_progress
+        lbl = self.lbl_progress_status
+
+        def _show_progress():
+            bar.pack(fill="x", padx=Spacing.LG, pady=(0, 4))
+            lbl.pack(anchor="w", padx=Spacing.LG)
+            btn.configure(text="Downloading…")
+
+        def _hide_progress():
+            bar.pack_forget()
+            lbl.pack_forget()
+
+        def _set_progress(fraction):
+            try:
+                bar.set(min(1.0, max(0.0, fraction)))
+                root_update = self.winfo_toplevel()
+                root_update.update_idletasks()
+            except Exception:
+                pass
+
+        # Show progress bar on UI thread immediately
+        self.after(0, _show_progress)
 
         def _work():
             from netstrip.core.self_update import SelfUpdater, SelfUpdateError
             dest = _P.home() / "Downloads" / "NetStrip"
+
+            def on_progress(stage, done=0, total=0):
+                if stage == "download" and total > 0:
+                    frac = done / total
+                    self.after(0, lambda f=frac: _set_progress(f * 0.9))  # 0-90% for download
+
             try:
-                setup_exe = SelfUpdater().download_verified(dest)
+                setup_exe = SelfUpdater().download_verified(dest, progress=on_progress)
+
+                # Verification phase: 90-100%
+                self.after(0, lambda: _set_progress(1.0))
 
                 def _go():
                     try:
-                        # User explicitly clicked "Update & Restart" — no extra confirmation.
-                        # Launch installer detached; Inno's /RESTARTAPPLICATIONS brings
-                        # the app back up after file replacement completes.
+                        _hide_progress()
+                        # Launch installer detached; Inno's /RESTARTAPPLICATIONS
+                        # brings the app back up after file replacement completes.
                         creationflags = 0
                         if hasattr(subprocess, "DETACHED_PROCESS"):
                             creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -258,10 +302,24 @@ class SettingsView(ctk.CTkFrame):
                     except Exception as e:
                         tkinter.messagebox.showerror(
                             "Update failed", f"Could not launch installer:\n{e}")
+                        _hide_progress()
                         try: btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
                         except Exception: pass
                 self.after(0, _go)
             except SelfUpdateError as e:
+                err = str(e)
+                self.after(0, lambda: (
+                    _hide_progress(),
+                    tkinter.messagebox.showerror("Update failed", err),
+                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart")),
+                ))
+            except Exception as e:
+                net_err = str(e)
+                self.after(0, lambda: (
+                    _hide_progress(),
+                    tkinter.messagebox.showerror("Network error", net_err),
+                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart")),
+                ))
                 err = str(e)
 
                 def _err():

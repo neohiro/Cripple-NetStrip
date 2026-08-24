@@ -1,3 +1,10 @@
+## [v3.8.8] - 2026-08-22
+### Per-App Bandwidth Sparkline (Expanded Rows)
+- **Proportional ↑↓ bar chart** in each expanded sidebar row: green segment = sent, blue = received, sized by ratio. Updates live every sidebar poll tick. Only visible when the row is expanded — collapsed rows show the compact ↑↓ text label.
+
+### Auto-Update Progress Bar
+- **Determinate progress bar** during "Update & Restart" download: fills 0→90% as bytes stream in, jumps to 100% during hash verification, then hides when the installer launches. No more indeterminate "Downloading…" text.
+
 ## [v3.8.7] - 2026-08-22
 ### Auto-Update Silent Apply (one-click, zero dialogs)
 - **Update & Restart button now truly one-click**: downloads → verifies SHA-256 → launches installer detached with `/SILENT /RESTARTAPPLICATIONS` → app exits gracefully so Inno replaces files cleanly → new version relaunches via the `[Run]` restart entry. No intermediate confirmation dialog.
