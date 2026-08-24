@@ -602,10 +602,12 @@ class Database:
     def save_app_bandwidth(self, app_bytes: dict):
         import time as _t
         now = _t.strftime('%Y-%m-%d %H:%M:%S')
+        rows = [(name, d[0], d[1], now, d[0], d[1], now)
+                for name, d in app_bytes.items() if d[0] or d[1]]
+        if not rows:
+            return
         with self.lock:
             with self._get_connection() as conn:
-                rows = [(name, d[0], d[1], now, d[0], d[1], now)
-                        for name, d in app_bytes.items() if d[0] or d[1]]
                 conn.executemany(
                     'INSERT INTO app_bandwidth (app_name, bytes_sent, bytes_recv, updated)'
                     ' VALUES (?, ?, ?, ?) ON CONFLICT(app_name) DO UPDATE SET'

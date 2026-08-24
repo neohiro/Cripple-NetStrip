@@ -803,6 +803,22 @@ class AppGroupFrame(ctk.CTkFrame):
             self.lbl_bandwidth.configure(text=text)
             self._last_bw_text = text
 
+    _cached_sys_blocked = None
+    _cached_sys_blocked_ts = 0
+
+    @classmethod
+    def _get_sys_blocked(cls, engine):
+        """TTL-cached read of block_system_connections (1s) shared across all groups."""
+        import time as _time
+        now = _time.monotonic()
+        if cls._cached_sys_blocked is None or now - getattr(cls, '_sys_blocked_ts', 0) > 1.0:
+            try:
+                cls._cached_sys_blocked = engine.db.get_setting("block_system_connections", "false") == "true"
+            except Exception:
+                cls._cached_sys_blocked = False
+            cls._sys_blocked_ts = now
+        return cls._cached_sys_blocked
+
     def refresh_global_state(self):
         # Check current global status
         self._global_action_state = None
@@ -832,7 +848,7 @@ class AppGroupFrame(ctk.CTkFrame):
                 pass
 
         # System block indicator applies unless user explicitly allowed
-        sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
+        sys_blocked = self._get_sys_blocked(self.engine)
         if sys_blocked and not has_explicit_allow:
             from netstrip.core.process_utils import is_system_process
             is_system = False
