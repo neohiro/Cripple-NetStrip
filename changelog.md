@@ -1,3 +1,12 @@
+## [v3.8.3] - 2026-08-22
+### --restore-network CLI Flag
+- **New `--restore-network` flag**: restores DNS on every interface, removes all NetStrip firewall rules, re-enables IPv6/IPv4 protocol bindings, and clears killswitch state — all without starting the GUI. This fulfills the promise the Windows installer's uninstaller already made (referenced but never implemented).
+
+### Performance & UX Polish
+- **Log search debouncing**: 300ms debounce instead of per-keystroke full tree rebuild — eliminates typing lag in the Connection Log filter.
+- **Sidebar anti-flicker**: skips grid repack when visible order is unchanged — eliminates visual jitter when multiple apps share the same recency bucket.
+- **Status bar batching**: drops intermediate status messages within a 500ms window to prevent rapid-fire label changes.
+
 ## [v3.8.2] - 2026-08-22
 ### Update & Restart Button
 - New **⟳ Update & Restart** button on Settings → Updates card (appears alongside Download & Verify when a new version is available). Downloads + verifies the installer, then offers one-click silent install with automatic app restart (`/SILENT /RESTARTAPPLICATIONS`). The app exits gracefully so Inno replaces files cleanly, and the new version relaunches via the `[Run]` restart entry.

@@ -429,6 +429,15 @@ class ConnectionsSidebar(ctk.CTkFrame):
             )
             visible_groups = [g for g in visible_groups if _tail_rank(g) == 0] + tail_groups
             
+            # Anti-flicker: skip grid repack if order is unchanged
+            new_order = [g.process_name for g in visible_groups]
+            if new_order == getattr(self, '_last_visible_order', None):
+                for group in groups:
+                    if hasattr(group, 'refresh_global_state'):
+                        group.refresh_global_state()
+                return
+            self._last_visible_order = new_order
+            
             
             # Intelligent grid packing to eliminate flicker and stuttering
             current_packed = [c for c in self.scroll_frame.winfo_children() if isinstance(c, AppGroupFrame) and getattr(c, '_is_packed', True)]

@@ -11,6 +11,53 @@ import time
 
 # If this process was launched successfully (e.g. as an elevated process), 
 # assassinate the restricted parent process so we don't have duplicate GUIs.
+# ── --restore-network: undo all NetStrip changes without starting the GUI ──
+if "--restore-network" in sys.argv:
+    import logging as _log
+    _log.basicConfig(level=_log.INFO, format="%(message)s")
+    print("Restoring network configuration...")
+    from netstrip.data.database import Database
+    db = Database()
+    try:
+        # Restore DNS on every interface we ever hijacked
+        rows = db._get_connection().execute(
+            "SELECT key, value FROM settings WHERE key LIKE 'backup_dns_%'"
+        ).fetchall()
+        for row in rows:
+            iface = row["key"].replace("backup_dns_", "")
+            dns = row["value"]
+            print(f"  Restoring DNS on {iface} -> {dns}")
+            import subprocess
+            cmd = ["netsh", "interface", "ip", "set", "dns",
+                   f"name={iface}", "source=static", f"addr={dns}"]
+            if dns == "dhcp":
+                cmd = ["netsh", "interface", "ip", "set", "dns", f"name={iface}", "source=dhcp"]
+            subprocess.run(cmd, capture_output=True)
+
+        # Remove all NetStrip firewall rules
+        for rule_name in ("NetStrip_Killswitch", "NetStrip_Paranoid", "NetStrip_BlockInbound"):
+            subprocess.run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"],
+                           capture_output=True)
+        print("  Firewall rules cleaned.")
+
+        # Re-enable IPv6/IPv4 if they were disabled
+        for proto in ("6", "4"):
+            subprocess.run(
+                ["reg", "add",
+                 rf"HKLM\SYSTEM\CurrentControlSet\Services\Tcpip{proto}\Parameters",
+                 "/v", "DisabledComponents", "/t", "REG_DWORD", "/d", "0", "/f"],
+                capture_output=True
+            )
+        print("  Protocol bindings restored.")
+
+        # Clear killswitch flag
+        db.set_setting("killswitch_active", "false")
+        db.set_setting("pending_kernel_threat", "")
+        print("Done. Network restored.")
+    finally:
+        db.stop()
+    sys.exit(0)
+
 if "--parent-pid" in sys.argv:
     try:
         idx = sys.argv.index("--parent-pid")

@@ -54,7 +54,16 @@ class LogView(ctk.CTkFrame):
             self, placeholder_text="Filter logs...", **CTK_ENTRY_STYLE,
         )
         self._filter_entry.pack(fill="x", pady=(0, Spacing.SM))
-        self._filter_entry.bind("<KeyRelease>", lambda e: self._refresh_logs())
+        # Debounce search: cancel pending refresh on each keystroke, fire after 300ms
+        self._debounce_id = None
+        def _debounced_refresh(e=None):
+            if e and e.keysym in ("Return", "Escape"):
+                return
+            if hasattr(self, '_debounce_id') and self._debounce_id:
+                try: self.after_cancel(self._debounce_id)
+                except Exception: pass
+            self._debounce_id = self.after(300, self._refresh_logs)
+        self._filter_entry.bind("<KeyRelease>", _debounced_refresh)
 
         # Apply Treeview styling
         style = ttk.Style()
