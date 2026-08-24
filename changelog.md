@@ -1,3 +1,14 @@
+## [v3.8.4] - 2026-08-22
+### Notification Digest
+- **Blocked connections no longer spam toasts**: events are buffered for 60s and flushed as one summary notification (e.g. "🛡 47 blocked — 30 Tracker"). Zero toasts during quiet periods.
+
+### Per-App Bandwidth Persistence
+- Session byte totals now persist to a new `app_bandwidth` SQLite table during the hourly sweep. Sidebar ↑↓ labels survive restarts and accumulate over time instead of resetting to zero.
+- New `save_app_bandwidth()` / `get_app_bandwidth()` DB methods with upsert semantics (no duplicate rows per app).
+
+### RTL Foundation
+- `i18n.is_rtl()` helper detects Arabic/Hebrew/Farsi/Urdu for future layout mirroring.
+
 ## [v3.8.3] - 2026-08-22
 ### --restore-network CLI Flag
 - **New `--restore-network` flag**: restores DNS on every interface, removes all NetStrip firewall rules, re-enables IPv6/IPv4 protocol bindings, and clears killswitch state — all without starting the GUI. This fulfills the promise the Windows installer's uninstaller already made (referenced but never implemented).

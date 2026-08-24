@@ -118,6 +118,11 @@ class NetStripEngine:
         self._app_bytes_lock = threading.Lock()
 
         self.connection_monitor.on_new_connection = self._handle_new_connection
+
+        # Notification digest: batch blocked-connection events into one
+        # summary per 60s window instead of firing a toast per connection.
+        self._digest_buffer = {}
+        self._digest_lock = threading.Lock()
         self.connection_monitor.on_malware_detected = self._handle_malware_detected
         self.connection_monitor.on_status = self.broadcast_status
         self.dns_proxy.resolver.on_status = self.broadcast_status
@@ -408,6 +413,7 @@ class NetStripEngine:
                     'action': action.value,
                     'mode': self.classifier.mode.name
                 })
+                self._note_blocked_for_digest(cat.value)
             except Exception:
                 pass
             return False
@@ -429,6 +435,37 @@ class NetStripEngine:
     def get_app_bytes(self, process_name: str):
         with self._app_bytes_lock:
             return self._app_bytes.get(process_name, (0, 0))
+
+    def _note_blocked_for_digest(self, category: str):
+        """Buffer a blocked event for the notification digest."""
+        with self._digest_lock:
+            self._digest_buffer[category] = self._digest_buffer.get(category, 0) + 1
+
+    def _flush_notification_digest(self):
+        """Emit one summary toast per 60s window."""
+        with self._digest_lock:
+            if not self._digest_buffer:
+                return
+            snapshot = dict(self._digest_buffer)
+            self._digest_buffer.clear()
+        total = sum(snapshot.values())
+        top = max(snapshot.items(), key=lambda x: x[1])
+        cat_name = top[0].replace("_", " ").capitalize()
+        msg = f"\U0001f6e1 {total} blocked \u2014 {top[1]} {cat_name.lower()}"
+        try:
+            from plyer import notification
+            notification.notify(title="Cripple", message=msg, app_name="NetStrip", timeout=4)
+        except Exception:
+            pass
+        logger.debug(f"Digest toast: {msg}")
+
+    def _start_digest_timer(self):
+        def _flush_loop():
+            while not self._stop_event.is_set():
+                self._stop_event.wait(60)
+                if self.is_running and self._digest_buffer:
+                    self._flush_notification_digest()
+        threading.Thread(target=_flush_loop, daemon=True, name="NotifDigest").start()
 
     def start(self) -> bool:
         """Start all subsystems."""
@@ -603,6 +640,7 @@ class NetStripEngine:
         # connections that violate the freshly-applied user settings and
         # filters (blocklisted apps/domains live before boot are terminated).
         threading.Thread(target=self._startup_connection_sweep, daemon=True).start()
+        self._start_digest_timer()
         
         # Start the internal settings/schedule watchdog (Time Bombs expiry,
         # scheduled killswitch windows) — previously defined but never started.
@@ -1100,6 +1138,14 @@ class NetStripEngine:
                         self.db.maintenance_checkpoint()
                     except Exception as e:
                         logger.debug(f"WAL checkpoint failed: {e}")
+                    try:
+                        with self._app_bytes_lock:
+                            snapshot = dict(self._app_bytes)
+                        if snapshot:
+                            self.db.save_app_bandwidth(snapshot)
+                            logger.info("Per-app bandwidth persisted.")
+                    except Exception as e:
+                        logger.debug(f"App bw persist failed: {e}")
                     last_prune = time.time()
                     
                 # Scheduled Killswitch Check

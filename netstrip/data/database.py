@@ -116,7 +116,13 @@ class Database:
                         bytes_recv INTEGER DEFAULT 0
                     );
                     
-                    CREATE TABLE IF NOT EXISTS whitelisted_anomalies (
+                    CREATE TABLE IF NOT EXISTS app_bandwidth (
+            app_name TEXT PRIMARY KEY,
+            bytes_sent INTEGER DEFAULT 0,
+            bytes_recv INTEGER DEFAULT 0,
+            updated TEXT
+        );
+        CREATE TABLE IF NOT EXISTS whitelisted_anomalies (
                         name TEXT PRIMARY KEY,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
@@ -588,6 +594,27 @@ class Database:
                         bytes_sent = bytes_sent + ?,
                         bytes_recv = bytes_recv + ?
                 ''', (current_hour, bytes_sent, bytes_recv, bytes_sent, bytes_recv))
+
+    def save_app_bandwidth(self, app_bytes: dict):
+        import time as _t
+        now = _t.strftime('%Y-%m-%d %H:%M:%S')
+        with self.lock:
+            with self._get_connection() as conn:
+                rows = [(name, d[0], d[1], now, d[0], d[1], now)
+                        for name, d in app_bytes.items() if d[0] or d[1]]
+                conn.executemany(
+                    'INSERT INTO app_bandwidth (app_name, bytes_sent, bytes_recv, updated)'
+                    ' VALUES (?, ?, ?, ?) ON CONFLICT(app_name) DO UPDATE SET'
+                    ' bytes_sent = bytes_sent + ?, bytes_recv = bytes_recv + ?, updated = ?',
+                    rows)
+
+    def get_app_bandwidth(self) -> dict:
+        with self._read_lock:
+            with self._get_connection() as conn:
+                rows = conn.execute(
+                    'SELECT app_name, bytes_sent, bytes_recv FROM app_bandwidth'
+                ).fetchall()
+                return {r['app_name']: (r['bytes_sent'], r['bytes_recv']) for r in rows}
 
     def get_24h_bandwidth(self) -> tuple:
         """Get the sum of bytes sent and received over the last 24 hours. Returns (sent, recv)."""
