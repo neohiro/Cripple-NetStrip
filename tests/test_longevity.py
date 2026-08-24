@@ -204,3 +204,40 @@ def test_prune_old_logs_clamps_extreme_hours():
             db.prune_old_logs(hours=0)       # clamps to minimum 1
         finally:
             db.stop()
+
+
+def test_get_setting_cached_ttl_invalidation():
+    """Hot-path settings cache must reflect set_setting changes within TTL."""
+    import os
+    import tempfile
+
+    from netstrip.data.database import Database
+
+    with tempfile.TemporaryDirectory() as td:
+        db = Database(db_path=os.path.join(td, "t.db"))
+        try:
+            # Initial read caches the value
+            assert db.get_setting_cached("test_key", "default") == "default"
+            # set_setting must invalidate the hot cache immediately
+            db.set_setting("test_key", "new_value")
+            assert db.get_setting_cached("test_key") == "new_value"
+        finally:
+            db.stop()
+
+
+def test_bandwidth_persistence_roundtrip():
+    """Per-app bandwidth totals survive save + load."""
+    import os
+    import tempfile
+
+    from netstrip.data.database import Database
+
+    with tempfile.TemporaryDirectory() as td:
+        db = Database(db_path=os.path.join(td, "t.db"))
+        try:
+            db.save_app_bandwidth({"chrome.exe": (1024, 2048), "firefox.exe": (512, 256)})
+            result = db.get_app_bandwidth()
+            assert result["chrome.exe"] == (1024, 2048)
+            assert result["firefox.exe"] == (512, 256)
+        finally:
+            db.stop()
