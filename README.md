@@ -306,7 +306,7 @@ Cripple is engineered to align with two major cybersecurity standards:
 | Lazy preloading | Tabs pre-instantiated at 300ms intervals for zero-delay switching |
 | Debounced resize | Batched window resize events prevent layout thrashing |
 | Flicker-free dashboard | Pre-allocated widget pool with in-place `configure()` updates |
-| 15x scroll speed | Framework-level mouse wheel patching |
+| User-configurable scroll speed | Slow / Normal / Fast / Ultra presets applied live to all scrollers |
 | Connection-monitor cadence | 1 Hz desktop / 2 Hz headless psutil enumeration (was 5 Hz) — ~80% less monitoring CPU, zero blocking-latency cost |
 | Async app icons | First paint uses instant glyphs; real icons resolve off the UI thread |
 

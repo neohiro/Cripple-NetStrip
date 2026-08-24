@@ -442,7 +442,10 @@ class Database:
     def delete_setting(self, key: str):
         if not hasattr(self, '_settings_cache'):
             self._settings_cache = {}
-            
+        hot = getattr(self, '_hot_settings', None)
+        if hot:
+            hot.pop(key, None)
+
         with self.lock:
             if key in self._settings_cache:
                 del self._settings_cache[key]
