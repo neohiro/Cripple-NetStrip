@@ -73,6 +73,18 @@ jobs:
           key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
           restore-keys: buildozer-${{ runner.os }}-
 
+      # JCenter is dead (bintray shutdown) - p4a's bundled Gradle templates
+      # still reference it, and several pinned artifacts (e.g. Kotlin RCs)
+      # resolve only from Central/Google. Patch every template before build.
+      - name: Patch dead jcenter() out of p4a Gradle templates
+        run: |
+          P4A_DIR=$(python -c "import os, pythonforandroid; print(os.path.dirname(pythonforandroid.__file__))")
+          echo "p4a package at: $P4A_DIR"
+          grep -rl "jcenter()" "$P4A_DIR" --include='*.gradle' --include='*.tmpl' | while read -r f; do
+            sed -i 's/jcenter()/google() ; mavenCentral()/g' "$f"
+            echo "patched: $f"
+          done
+
       - name: Build debug APK (buildozer gate)
         run: |
           buildozer -v android debug > build_output.log 2>&1
