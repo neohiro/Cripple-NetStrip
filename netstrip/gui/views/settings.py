@@ -236,21 +236,28 @@ class SettingsView(ctk.CTkFrame):
 
                 def _go():
                     try:
-                        go = tkinter.messagebox.askyesno(
-                            "Update verified",
-                            f"v{setup_exe.name} verified.\n\n"
-                            "Install silently and restart NetStrip now?")
-                        if go:
-                            subprocess.Popen([
-                                str(setup_exe),
-                                "/SILENT", "/SUPPRESSMSGBOXES",
-                                "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS",
-                            ], close_fds=True)
-                            self.after(1500, lambda: (
-                                getattr(self.winfo_toplevel(), "on_closing", lambda: None)(),
-                                os._exit(0),
-                            ))
-                    finally:
+                        # User explicitly clicked "Update & Restart" — no extra confirmation.
+                        # Launch installer detached; Inno's /RESTARTAPPLICATIONS brings
+                        # the app back up after file replacement completes.
+                        creationflags = 0
+                        if hasattr(subprocess, "DETACHED_PROCESS"):
+                            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                        subprocess.Popen([
+                            str(setup_exe),
+                            "/SILENT", "/SUPPRESSMSGBOXES",
+                            "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS",
+                        ], close_fds=True, creationflags=creationflags)
+                        # Give the installer a moment to start, then exit gracefully.
+                        def _shutdown():
+                            top = self.winfo_toplevel()
+                            closing = getattr(top, "on_closing", None)
+                            if closing:
+                                closing()
+                            os._exit(0)
+                        self.after(1500, _shutdown)
+                    except Exception as e:
+                        tkinter.messagebox.showerror(
+                            "Update failed", f"Could not launch installer:\n{e}")
                         try: btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
                         except Exception: pass
                 self.after(0, _go)

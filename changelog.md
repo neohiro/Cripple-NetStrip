@@ -1,3 +1,14 @@
+## [v3.8.7] - 2026-08-22
+### Auto-Update Silent Apply (one-click, zero dialogs)
+- **Update & Restart button now truly one-click**: downloads → verifies SHA-256 → launches installer detached with `/SILENT /RESTARTAPPLICATIONS` → app exits gracefully so Inno replaces files cleanly → new version relaunches via the `[Run]` restart entry. No intermediate confirmation dialog.
+
+### Linux UDP Bandwidth Tracking
+- **NFQueue interceptor now processes UDP packets** for bandwidth accounting. UDP packets are tracked (bytes attributed to process) but always accepted — changing UDP blocking behavior requires device testing not yet performed.
+- Sidebar ↑↓ labels now show both TCP and UDP traffic on Linux.
+
+### macOS Packet Inspection Architecture
+- **New `docs/macos_packet_inspection.md`**: documents the NEFilterDataProvider architecture for per-packet inspection on macOS, including Swift helper app requirements, IPC protocol design, implementation phases, and why pyobjc alone is insufficient (requires signed System Extension).
+
 ## [v3.8.6] - 2026-08-22
 ### Per-App Bandwidth on All Platforms
 - **Linux NFQueue**: packet length now passed to the engine's bandwidth accumulator alongside the block/allow decision.

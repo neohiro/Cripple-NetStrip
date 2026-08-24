@@ -73,6 +73,17 @@ class LinuxNFQueueInterceptor(PacketInterceptor):
                 pkt.accept()
             else:
                 pkt.drop()
+        elif protocol == 17:  # UDP
+            # Track bandwidth but ALWAYS accept — changing UDP blocking behavior
+            # requires device testing we haven't done yet.
+            udp_header = payload[iph_length:iph_length + 8]
+            if len(udp_header) >= 4:
+                sport, dport = struct.unpack('!HH', udp_header[:4])
+                try:
+                    self.callback(dst_ip, dport, 'UDP', sport, src_ip, length=len(payload))
+                except Exception:
+                    pass
+            pkt.accept()
         else:
             pkt.accept()
 
