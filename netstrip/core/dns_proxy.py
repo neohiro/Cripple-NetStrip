@@ -530,6 +530,9 @@ class NetStripResolver(BaseResolver):
                     'mode': getattr(getattr(self.classifier, 'mode', None), 'name', 'GHOST')
                 })
                 self.db.update_daily_stats(action.value, category.value)
+                # Feed notification digest so DNS sinkhole blocks appear in summaries
+                if hasattr(self, 'engine') and self.engine and hasattr(self.engine, '_note_blocked_for_digest'):
+                    self.engine._note_blocked_for_digest(category.value)
                 
             # For SRV / discovery queries, return NXDOMAIN immediately so OS ceases probing
             reply = request.reply()

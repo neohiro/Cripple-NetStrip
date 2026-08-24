@@ -1,3 +1,10 @@
+## [v3.8.5] - 2026-08-22
+### DNS Sinkhole Digest Integration
+- **DNS sinkhole blocks now feed the notification digest**: previously only packet-interceptor blocks were counted, so sinkholed domains (the majority of blocks) never appeared in summary toasts. All block sources now converge into one unified digest.
+
+### Per-App Bandwidth Survives Restarts
+- Sidebar ↑↓ labels now load lifetime totals from the `app_bandwidth` table on startup, merging with live session tracking. Users see their true cumulative usage immediately instead of zeros.
+
 ## [v3.8.4] - 2026-08-22
 ### Notification Digest
 - **Blocked connections no longer spam toasts**: events are buffered for 60s and flushed as one summary notification (e.g. "🛡 47 blocked — 30 Tracker"). Zero toasts during quiet periods.

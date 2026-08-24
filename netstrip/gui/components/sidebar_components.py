@@ -480,6 +480,17 @@ class AppGroupFrame(ctk.CTkFrame):
         self.rows = {} # target -> ConnectionRow
         self.is_expanded = False
         
+        # Seed per-app bandwidth accumulator from persisted DB totals so
+        # lifetime ↑↓ labels appear on startup instead of resetting to zero.
+        try:
+            persisted = self.engine.db.get_app_bandwidth()
+            with self.engine._app_bytes_lock:
+                for app_name, (sent, recv) in persisted.items():
+                    if app_name not in self.engine._app_bytes:
+                        self.engine._app_bytes[app_name] = (sent, recv)
+        except Exception:
+            pass
+
         # Start collapsed by default
         self.btn_expand.configure(text="Expand ▼")
         
