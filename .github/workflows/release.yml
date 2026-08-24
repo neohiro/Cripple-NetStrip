@@ -16,11 +16,46 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
+  gate:
+    # Cheap guard for push-triggered runs: if this exact package version is
+    # already published as a release, the rebuild would produce byte-identical
+    # artifacts - skip the whole 4-OS matrix (macOS alone is a x10 minute
+    # multiplier). Manual dispatches and tag pushes always rebuild.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "package version: $VERSION"
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if gh release view "v$VERSION" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "v$VERSION already released - skipping redundant rebuild"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v$VERSION not yet published - building"
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.should_build == 'true'
     name: Build on ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
