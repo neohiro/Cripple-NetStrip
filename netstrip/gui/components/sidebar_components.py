@@ -501,6 +501,16 @@ class AppGroupFrame(ctk.CTkFrame):
 
         # Start collapsed by default
         self.btn_expand.configure(text="Expand ▼")
+
+        # ── Bandwidth history sampling ──────────────────────────────────
+        # Ring buffer of (sent_delta, recv_delta) per poll tick.
+        # Deltas computed from cumulative engine totals each tick.
+        from collections import deque
+        self._bw_history = deque(maxlen=30)
+        self._bw_prev_totals = (0, 0)
+
+        # ── Chart canvas (created lazily on first expand) ────────────────
+        self._bw_chart = None
         
         # Render the correct initial toggle state immediately (system block
         # red-light, Ghost implicit block, persisted allow/block) so the state
@@ -964,6 +974,15 @@ class AppGroupFrame(ctk.CTkFrame):
                 
         self.visible_count = len(visible_rows)
         self.update_bandwidth_label()
+        # Sample bandwidth deltas for the history chart
+        if hasattr(self, '_bw_history'):
+            self._sample_bandwidth()
+        # Refresh chart if expanded
+        if getattr(self, 'is_expanded_ui', False) and hasattr(self, '_bw_chart') and self._bw_chart:
+            try:
+                self._draw_bw_chart()
+            except Exception:
+                pass
         if getattr(self, 'is_expanded_ui', False) and hasattr(self, '_bw_detail'):
             try:
                 self._update_bw_bar()
@@ -1013,10 +1032,20 @@ class AppGroupFrame(ctk.CTkFrame):
                 )
             self.lbl_path.pack(side="left", padx=Spacing.MD)
             self.btn_timebomb.pack(side="right", padx=(0, Spacing.SM))
+            
+            # Show bandwidth history chart when expanded
+            self._sample_bandwidth()
+            chart = self._ensure_bw_chart()
+            if chart and not chart.winfo_ismapped():
+                chart.pack(fill="x", padx=(30, Spacing.SM), pady=(2, 0),
+                           before=self.rows_container)
+            self._draw_bw_chart()
         else:
             if hasattr(self, 'lbl_path') and getattr(self.lbl_path, 'winfo_exists', lambda: False)():
                 self.lbl_path.pack_forget()
             self.btn_timebomb.pack_forget()
+            if hasattr(self, '_bw_chart') and self._bw_chart:
+                self._bw_chart.pack_forget()
                 
         rows_list = list(self.rows.values())
         def _update_rows(index=0):
@@ -1074,6 +1103,76 @@ class AppGroupFrame(ctk.CTkFrame):
             self._bar_recv_widget.configure(width=max(1, int(total_px * (1 - pct))))
         except Exception:
             pass
+
+    # ── Bandwidth history chart ──────────────────────────────────────────
+
+    def _sample_bandwidth(self):
+        """Sample cumulative totals and store per-tick deltas into the ring buffer."""
+        try:
+            sent, recv = self.engine.get_app_bytes(self.process_name)
+            prev_s, prev_r = self._bw_prev_totals
+            delta_s = max(0, sent - prev_s)
+            delta_r = max(0, recv - prev_r)
+            self._bw_prev_totals = (sent, recv)
+            self._bw_history.append((delta_s, delta_r))
+        except Exception:
+            pass
+
+    def _ensure_bw_chart(self):
+        """Create the chart canvas lazily (only when expanded)."""
+        if self._bw_chart is not None and self._bw_chart.winfo_exists():
+            return self._bw_chart
+        import tkinter as tk
+        self._bw_chart = tk.Canvas(
+            self, bg="#0a0a12", height=36,
+            highlightthickness=0, bd=0,
+        )
+        return self._bw_chart
+
+    def _draw_bw_chart(self):
+        """Draw the bandwidth history sparkline on the canvas."""
+        import tkinter as tk
+        if not hasattr(self, '_bw_chart') or not self._bw_chart.winfo_exists():
+            return
+        cv = self._bw_chart
+        cv.delete("all")
+
+        width = cv.winfo_width()
+        height = cv.winfo_height()
+        if width < 10 or height < 10 or not self._bw_history:
+            return
+
+        samples = list(self._bw_history)
+        n = len(samples)
+        max_val = 1
+        for ds, dr in samples:
+            max_val = max(max_val, ds + dr)
+
+        bar_w = width / 30.0   # fixed 30-slot timeline
+        mid = height // 2
+
+        for i, (ds, dr) in enumerate(samples):
+            x = int(i * bar_w)
+            total = ds + dr
+            if total <= 0:
+                continue
+
+            # Upload bar: green, grows upward from center line
+            up_h = int((ds / max_val) * (mid - 2))
+            if up_h > 0:
+                color = "#22c55e"
+                cv.create_rectangle(x, mid - up_h, x + max(1, int(bar_w) - 1), mid,
+                                    fill=color, outline="", tags="chart")
+
+            # Download bar: blue, grows downward from center line
+            down_h = int((dr / max_val) * (mid - 2))
+            if down_h > 0:
+                color = "#3b82f6"
+                cv.create_rectangle(x, mid, x + max(1, int(bar_w) - 1), mid + down_h,
+                                    fill=color, outline="", tags="chart")
+
+        # Center baseline
+        cv.create_line(0, mid, width, mid, fill="#1a1a2e", width=1)
 
     def _copy_path(self):
         if not self.process_path:

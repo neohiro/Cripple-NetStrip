@@ -1,3 +1,10 @@
+## [v3.8.9] - 2026-08-22
+### Per-App Bandwidth History Chart
+- **Canvas-based sparkline** in each expanded sidebar row showing upload (green, above baseline) and download (blue, below baseline) as vertical bars over a rolling 30-sample window (~30 seconds at 1 Hz poll rate).
+- Data is sampled from the engine's cumulative per-app byte accumulator with per-tick delta computation — no additional syscalls or DB reads.
+- Chart auto-scales to the peak sample value and redraws on every sidebar poll when the row is expanded. Hidden entirely when collapsed.
+- Zero widget churn: uses raw `tkinter.Canvas` rectangle drawing instead of CTkFrame creation/destruction.
+
 ## [v3.8.8] - 2026-08-22
 ### Per-App Bandwidth Sparkline (Expanded Rows)
 - **Proportional ↑↓ bar chart** in each expanded sidebar row: green segment = sent, blue = received, sized by ratio. Updates live every sidebar poll tick. Only visible when the row is expanded — collapsed rows show the compact ↑↓ text label.
