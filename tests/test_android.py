@@ -85,7 +85,7 @@ def interceptor(monkeypatch):
         def isFullMode(self):
             return True
 
-    inst = AndroidVPNInterceptor(callback=lambda *a: True, engine=None)
+    inst = AndroidVPNInterceptor(callback=lambda *a, **kw: True, engine=None)
     inst.NetStripVpnService = types.SimpleNamespace(getInstance=lambda: _Instance())
     inst._fd = 42
 
@@ -143,7 +143,7 @@ def test_ipv4_dns_query_gets_synthesized_response(interceptor, monkeypatch):
 def test_full_mode_blocked_packet_is_dropped():
     dropped_target = "93.184.216.34"
 
-    inst = AndroidVPNInterceptor(callback=lambda s, sp, d, dp, proto: d != dropped_target, engine=None)
+    inst = AndroidVPNInterceptor(callback=lambda s, sp, d, dp, proto, **kw: d != dropped_target, engine=None)
     inst._fd = 42
     tun = FakeTun([])
     inst._tun = tun
@@ -166,7 +166,7 @@ def test_full_mode_blocked_packet_is_dropped():
 
 
 def test_dns_only_mode_passes_non_dns_traffic_through(monkeypatch):
-    inst = AndroidVPNInterceptor(callback=lambda *a: pytest.fail("callback must not run in DNS_ONLY"), engine=None)
+    inst = AndroidVPNInterceptor(callback=lambda *a, **kw: pytest.fail("callback must not run in DNS_ONLY"), engine=None)
     inst._fd = 42
     inst._is_full_mode = False
     tun = FakeTun([])
@@ -184,7 +184,7 @@ def test_callback_exception_fails_open(interceptor):
     def boom(*a):
         raise RuntimeError("classifier down")
 
-    inst.callback = boom
+    inst.callback = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError('classifier down'))
     pkt = build_ipv4_udp_packet("10.8.0.2", "1.1.1.1", 7000, 443, b"p" * 8)
     inst._process_ipv4(pkt)
     assert len(tun.written) == 1
@@ -193,7 +193,7 @@ def test_callback_exception_fails_open(interceptor):
 def test_tcp_packets_reach_the_classifier(interceptor):
     inst, tun = interceptor
     seen = []
-    inst.callback = lambda s, sp, d, dp, proto: (seen.append((d, dp, proto)) or True)
+    inst.callback = lambda s, sp, d, dp, proto, **kw: (seen.append((d, dp, proto)) or True)
 
     ihl = 20
     tcp = bytearray(build_ipv4_udp_packet("10.8.0.2", "1.2.3.4", 1234, 5678, b""))[:ihl]

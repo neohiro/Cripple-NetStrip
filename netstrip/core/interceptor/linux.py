@@ -68,7 +68,7 @@ class LinuxNFQueueInterceptor(PacketInterceptor):
             src_port = tcph[0]
             dst_port = tcph[1]
             
-            allowed = self.callback(dst_ip, dst_port, "TCP", src_port, src_ip)
+            allowed = self.callback(dst_ip, dst_port, "TCP", src_port, src_ip, length=len(payload))
             if allowed:
                 pkt.accept()
             else:

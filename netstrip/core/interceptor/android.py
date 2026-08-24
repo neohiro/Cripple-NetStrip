@@ -143,7 +143,7 @@ class AndroidVPNInterceptor(PacketInterceptor):
         # FULL mode: Apply NetStrip filtering via the callback
         # callback returns True if the connection should be ALLOWED
         try:
-            allowed = self.callback(src_ip, src_port, dst_ip, dst_port, proto_str)
+            allowed = self.callback(src_ip, src_port, dst_ip, dst_port, proto_str, length=len(packet))
         except Exception:
             allowed = True  # Fail-open: allow on error
 

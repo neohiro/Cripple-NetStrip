@@ -40,18 +40,18 @@ class TestVPNLifecycle:
     """Simulate VPN establishment and teardown without pyjnius."""
 
     def test_interceptor_starts_without_jni(self):
-        inst = AndroidVPNInterceptor(callback=lambda *a: True, engine=None)
+        inst = AndroidVPNInterceptor(callback=lambda *a, **kw: True, engine=None)
         assert inst.NetStripVpnService is None
         inst.start()  # must be a no-op
         inst.stop()
 
     def test_vpn_loop_exits_when_not_running(self):
-        inst = AndroidVPNInterceptor(callback=lambda *a: True, engine=None)
+        inst = AndroidVPNInterceptor(callback=lambda *a, **kw: True, engine=None)
         inst._running = False
         inst._vpn_loop()  # should return immediately without error
 
     def test_full_mode_toggle(self):
-        inst = AndroidVPNInterceptor(callback=lambda *a: True, engine=None)
+        inst = AndroidVPNInterceptor(callback=lambda *a, **kw: True, engine=None)
 
         class Inst:
             def getVpnFd(self): return 1
@@ -94,7 +94,7 @@ class TestPacketRoundTrip:
 
     def test_blocked_packet_silently_dropped(self, monkeypatch):
         inst = self._make_inst(monkeypatch)
-        inst.callback = lambda *a: False  # block everything
+        inst.callback = lambda *a, **kw: False  # block everything
         pkt = _build_ipv4_udp("10.8.0.2", "6.6.6.6", 5555, 443, b"data")
         orig_write = os.write
         writes = []

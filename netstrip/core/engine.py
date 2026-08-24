@@ -117,6 +117,16 @@ class NetStripEngine:
         self._app_bytes = {}
         self._app_bytes_lock = threading.Lock()
 
+        # Seed accumulator with persisted lifetime totals so sidebar ↑↓
+        # labels show real usage immediately on startup.
+        try:
+            persisted = self.db.get_app_bandwidth()
+            for name, (sent, recv) in persisted.items():
+                if sent or recv:
+                    self._app_bytes[name] = (sent, recv)
+        except Exception:
+            pass  # first run — table may not exist yet
+
         self.connection_monitor.on_new_connection = self._handle_new_connection
 
         # Notification digest: batch blocked-connection events into one

@@ -1,3 +1,10 @@
+## [v3.8.6] - 2026-08-22
+### Per-App Bandwidth on All Platforms
+- **Linux NFQueue**: packet length now passed to the engine's bandwidth accumulator alongside the block/allow decision.
+- **Android TUN**: same — per-packet length flows into the accumulator for per-app ↑↓ totals in the sidebar.
+- macOS PF remains policy-enforcement only (no user-space packet inspection) — documented limitation.
+- **Bandwidth seeding on startup**: the engine loads lifetime per-app byte totals from `app_bandwidth` table into the in-memory accumulator, so sidebar ↑↓ labels show true cumulative usage immediately.
+
 ## [v3.8.5] - 2026-08-22
 ### DNS Sinkhole Digest Integration
 - **DNS sinkhole blocks now feed the notification digest**: previously only packet-interceptor blocks were counted, so sinkholed domains (the majority of blocks) never appeared in summary toasts. All block sources now converge into one unified digest.
