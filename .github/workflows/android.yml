@@ -6,11 +6,16 @@ name: Android Gate
 #      layer) plus long-duration uptime guarantees. Runs on EVERY push/PR.
 #   2. apk-build-gate — real buildozer cross-compile producing a debug .apk,
 #      structurally verified before being published as an artifact.
+concurrency:
+  group: android-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
-    paths-ignore: ['*.md']
+    paths-ignore: ['**.md', '**.txt', 'docs/**', 'screenshots/**']
   pull_request:
+    paths-ignore: ['**.md', '**.txt', 'docs/**', 'screenshots/**']
   workflow_dispatch:
 
 permissions:
