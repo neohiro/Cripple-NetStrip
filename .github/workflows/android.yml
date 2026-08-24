@@ -13,10 +13,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: android-gate-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -77,17 +73,33 @@ jobs:
           key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
           restore-keys: buildozer-${{ runner.os }}-
 
-      # JCenter is dead (bintray shutdown) - p4a's bundled Gradle templates
-      # still reference it, and several pinned artifacts (e.g. Kotlin RCs)
-      # resolve only from Central/Google. Patch every template before build.
-      - name: Patch dead jcenter() out of p4a Gradle templates
+      # JCenter (bintray) shut down in 2022, but python-for-android's Gradle
+      # templates still declare it as a repository, so dependency resolution
+      # dies on the first artifact. Rather than chasing buildozer's freshly
+      # cloned p4a copy, install a Gradle init script that rewrites every
+      # jcenter repository URL to the Maven Central mirror for ALL projects,
+      # including buildscript classpath resolution.
+      - name: Redirect dead JCenter repos to Maven Central
         run: |
-          P4A_DIR=$(python -c "import os, pythonforandroid; print(os.path.dirname(pythonforandroid.__file__))")
-          echo "p4a package at: $P4A_DIR"
-          grep -rl "jcenter()" "$P4A_DIR" --include='*.gradle' --include='*.tmpl' | while read -r f; do
-            sed -i 's/jcenter()/google() ; mavenCentral()/g' "$f"
-            echo "patched: $f"
-          done
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/redirect-jcenter.init.gradle <<'EOF'
+          // Rewrites dead jcenter.bintray.com repositories to Maven Central.
+          allprojects {
+            buildscript {
+              repositories.all { repo ->
+                if (repo.url != null && repo.url.toString().contains('jcenter')) {
+                  repo.url = uri('https://repo1.maven.org/maven2/')
+                }
+              }
+            }
+            repositories.all { repo ->
+              if (repo.url != null && repo.url.toString().contains('jcenter')) {
+                repo.url = uri('https://repo1.maven.org/maven2/')
+              }
+            }
+          }
+          EOF
+          echo "init script installed at ~/.gradle/init.d/redirect-jcenter.init.gradle"
 
       - name: Build debug APK (buildozer gate)
         run: |
