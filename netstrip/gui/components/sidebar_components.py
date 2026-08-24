@@ -355,6 +355,10 @@ class AppGroupFrame(ctk.CTkFrame):
         self.engine = engine
         self.icon_manager = icon_manager
         self.rows = {} # target -> ConnectionRow
+        from collections import deque
+        self._bw_history = deque(maxlen=30)
+        self._bw_prev_totals = None  # set on first sample
+        self._bw_chart = None        # canvas, created lazily on expand
         
         self.grid_columnconfigure(0, weight=1)
         
@@ -517,6 +521,76 @@ class AppGroupFrame(ctk.CTkFrame):
         # is correct at program start and not only after the first UI poll.
         self.visible_count = 0
         self.refresh_global_state()
+
+    def _sample_bandwidth(self):
+        try:
+            sent, recv = self.engine.get_app_bytes(self.process_name)
+            prev = getattr(self, '_bw_prev_totals', None)
+            if prev is None:
+                self._bw_prev_totals = (sent, recv)
+                self._bw_history.append((0, 0))
+                return
+            ds = max(0, sent - prev[0])
+            dr = max(0, recv - prev[1])
+            self._bw_prev_totals = (sent, recv)
+            self._bw_history.append((ds, dr))
+        except Exception:
+            pass
+
+    def _ensure_bw_chart(self):
+        import tkinter as tk
+        if self._bw_chart is not None and self._bw_chart.winfo_exists():
+            return self._bw_chart
+        self._bw_chart = tk.Canvas(
+            self, bg="#0a0a12", height=40,
+            highlightthickness=0, bd=0,
+        )
+        return self._bw_chart
+
+    def _draw_bw_chart(self):
+        if not hasattr(self, '_bw_chart') or not self._bw_chart.winfo_exists():
+            return
+        cv = self._bw_chart
+        cv.delete("all")
+        w = cv.winfo_width()
+        h = cv.winfo_height()
+        samples = list(self._bw_history)
+        if w < 20 or h < 10 or len(samples) < 2:
+            return
+
+        max_val = max((ds + dr for ds, dr in samples), default=1)
+        step_w = w / 30.0
+        mid = h // 2
+        usable = max(4, mid - 3)
+
+        # Gridlines
+        for frac in (0.25, 0.5, 0.75):
+            gy = int(frac * h)
+            cv.create_line(0, gy, w, gy, fill="#111118", width=1)
+
+        pts_up = []
+        pts_down = []
+        for i in range(len(samples)):
+            x = int(i * step_w)
+            ds, dr = samples[i]
+            up_y = mid - int((ds / max_val) * usable)
+            down_y = mid + int((dr / max_val) * usable)
+            pts_up.extend([x, up_y])
+            pts_down.extend([x, down_y])
+
+        last_x = int((len(samples) - 1) * step_w) if len(samples) > 1 else 0
+        pts_up.extend([last_x, mid, 0, mid])
+        pts_down.extend([last_x, mid, 0, mid])
+
+        cv.create_polygon(pts_up, fill="#22c55e", outline="#4ade80",
+                          stipple="gray50", smooth=True, splinesteps=10)
+        cv.create_line(pts_up[:-4], fill="#4ade80", width=1,
+                       smooth=True, splinesteps=10)
+        cv.create_polygon(pts_down, fill="#3b82f6", outline="#60a5fa",
+                          stipple="gray50", smooth=True, splinesteps=10)
+        cv.create_line(pts_down[:-4], fill="#60a5fa", width=1,
+                       smooth=True, splinesteps=10)
+        cv.create_line(0, mid, w, mid, fill="#333344", width=1)
 
     def _toggle_expand(self, event=None):
         self.is_expanded = not self.is_expanded
@@ -802,6 +876,7 @@ class AppGroupFrame(ctk.CTkFrame):
 
     def update_bandwidth_label(self):
         """Pull session byte totals from the engine and format compactly."""
+        self._sample_bandwidth()
         try:
             sent, recv = self.engine.get_app_bytes(self.process_name)
         except Exception:
@@ -1104,76 +1179,6 @@ class AppGroupFrame(ctk.CTkFrame):
         except Exception:
             pass
 
-    # ── Bandwidth history chart ──────────────────────────────────────────
-
-    def _sample_bandwidth(self):
-        """Sample cumulative totals and store per-tick deltas into the ring buffer."""
-        try:
-            sent, recv = self.engine.get_app_bytes(self.process_name)
-            prev_s, prev_r = self._bw_prev_totals
-            delta_s = max(0, sent - prev_s)
-            delta_r = max(0, recv - prev_r)
-            self._bw_prev_totals = (sent, recv)
-            self._bw_history.append((delta_s, delta_r))
-        except Exception:
-            pass
-
-    def _ensure_bw_chart(self):
-        """Create the chart canvas lazily (only when expanded)."""
-        if self._bw_chart is not None and self._bw_chart.winfo_exists():
-            return self._bw_chart
-        import tkinter as tk
-        self._bw_chart = tk.Canvas(
-            self, bg="#0a0a12", height=36,
-            highlightthickness=0, bd=0,
-        )
-        return self._bw_chart
-
-    def _draw_bw_chart(self):
-        """Draw the bandwidth history sparkline on the canvas."""
-        import tkinter as tk
-        if not hasattr(self, '_bw_chart') or not self._bw_chart.winfo_exists():
-            return
-        cv = self._bw_chart
-        cv.delete("all")
-
-        width = cv.winfo_width()
-        height = cv.winfo_height()
-        if width < 10 or height < 10 or not self._bw_history:
-            return
-
-        samples = list(self._bw_history)
-        n = len(samples)
-        max_val = 1
-        for ds, dr in samples:
-            max_val = max(max_val, ds + dr)
-
-        bar_w = width / 30.0   # fixed 30-slot timeline
-        mid = height // 2
-
-        for i, (ds, dr) in enumerate(samples):
-            x = int(i * bar_w)
-            total = ds + dr
-            if total <= 0:
-                continue
-
-            # Upload bar: green, grows upward from center line
-            up_h = int((ds / max_val) * (mid - 2))
-            if up_h > 0:
-                color = "#22c55e"
-                cv.create_rectangle(x, mid - up_h, x + max(1, int(bar_w) - 1), mid,
-                                    fill=color, outline="", tags="chart")
-
-            # Download bar: blue, grows downward from center line
-            down_h = int((dr / max_val) * (mid - 2))
-            if down_h > 0:
-                color = "#3b82f6"
-                cv.create_rectangle(x, mid, x + max(1, int(bar_w) - 1), mid + down_h,
-                                    fill=color, outline="", tags="chart")
-
-        # Center baseline
-        cv.create_line(0, mid, width, mid, fill="#1a1a2e", width=1)
-
     def _copy_path(self):
         if not self.process_path:
             return
@@ -1183,4 +1188,3 @@ class AppGroupFrame(ctk.CTkFrame):
             original_text = self.process_path
             self.lbl_path.configure(text="Path copied!", text_color=Colors.SUCCESS)
             self.after(1500, lambda: self.lbl_path.configure(text=original_text, text_color=Colors.TEXT_TERTIARY) if hasattr(self, 'lbl_path') and self.lbl_path.winfo_exists() else None)
-
