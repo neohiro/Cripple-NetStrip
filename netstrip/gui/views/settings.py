@@ -370,28 +370,6 @@ class SettingsView(ctk.CTkFrame):
                     tkinter.messagebox.showerror("Network error", net_err)
                     btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
                 self.after(0, _err_net)
-            except Exception as e:
-                net_err = str(e)
-                self.after(0, lambda: (
-                    _hide_progress(),
-                    tkinter.messagebox.showerror("Network error", net_err),
-                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart")),
-                ))
-                err = str(e)
-
-                def _err():
-                    tkinter.messagebox.showerror("Update failed", err)
-                    try: btn.configure(state="normal", text=_t("⟳ Update & Restart"))
-                    except Exception: pass
-                self.after(0, _err)
-            except Exception as e:
-                net_err = str(e)
-
-                def _err_net():
-                    tkinter.messagebox.showerror("Network error", net_err)
-                    try: btn.configure(state="normal", text=_t("⟳ Update & Restart"))
-                    except Exception: pass
-                self.after(0, _err_net)
 
         threading.Thread(target=_work, daemon=True).start()
 
