@@ -232,87 +232,144 @@ class SettingsView(ctk.CTkFrame):
             self.btn_update_restart.pack_forget()
 
     def _update_and_restart(self):
-        """Verify → launch silent installer → app restarts automatically."""
+        """Verify → launch silent installer → app restarts automatically.
+
+        Progress phases:
+          0–90%   downloading (determinate, throttled to 1% increments)
+          90–100% hash verification (quick jump)
+          indeterminate oscillation during Inno install
+          brief "Restarting…" then app exits
+        """
         import threading
         import subprocess
         from pathlib import Path as _P
         import tkinter.messagebox
 
         btn = self.btn_update_restart
-        btn.configure(state="disabled", text=_t("status.downloading_verify"))
         bar = self.update_progress
         lbl = self.lbl_progress_status
 
-        def _show_progress():
+        state = {"installing": False, "anim_id": None}
+
+        def _show_progress(stage_text):
             bar.pack(fill="x", padx=Spacing.LG, pady=(0, 4))
             lbl.pack(anchor="w", padx=Spacing.LG)
-            btn.configure(text="Downloading…")
+            btn.configure(state="disabled", text=stage_text)
+
+        def _set_stage(text):
+            try:
+                btn.configure(text=text)
+                lbl.configure(text=text)
+            except Exception:
+                pass
 
         def _hide_progress():
+            # Stop any running animation
+            state["installing"] = False
+            if state["anim_id"]:
+                try: self.after_cancel(state["anim_id"])
+                except Exception: pass
             bar.pack_forget()
             lbl.pack_forget()
 
         def _set_progress(fraction):
-            # No update_idletasks() here — it can cause re-entrant event
-            # processing under rapid-fire updates. The mainloop handles redraw.
             try:
                 bar.set(min(1.0, max(0.0, fraction)))
             except Exception:
                 pass
 
-        # Show progress bar on UI thread immediately
-        self.after(0, _show_progress)
+        def _start_indeterminate():
+            """Oscillate the bar during the silent install phase."""
+            state["installing"] = True
+            step = [0]
+
+            def _tick():
+                if not state["installing"]:
+                    return
+                t = (step[0] % 24) / 24.0
+                val = 0.15 + 0.7 * abs(t - 0.5) * 2
+                _set_progress(val)
+                step[0] += 1
+                state["anim_id"] = self.after(80, _tick)
+            _tick()
+
+        def _stop_indeterminate():
+            state["installing"] = False
+            if state["anim_id"]:
+                try: self.after_cancel(state["anim_id"])
+                except Exception: pass
+
+        # Phase 0: show progress UI
+        self.after(0, lambda: _show_progress(_t("status.downloading_verify")))
 
         def _work():
             from netstrip.core.self_update import SelfUpdater, SelfUpdateError
             dest = _P.home() / "Downloads" / "NetStrip"
 
+            last_reported = [0.0]
+
             def on_progress(stage, done=0, total=0):
                 if stage == "download" and total > 0:
                     frac = done / total
-                    self.after(0, lambda f=frac: _set_progress(f * 0.9))  # 0-90% for download
+                    # Throttle: only schedule UI update if fraction moved >1%
+                    if frac - last_reported[0] >= 0.01 or frac >= 1.0:
+                        last_reported[0] = frac
+                        self.after(0, lambda f=frac: (
+                            _set_progress(f * 0.9),
+                            _set_stage(f"Downloading… {f*100:.0f}%"),
+                        ))
 
             try:
                 setup_exe = SelfUpdater().download_verified(dest, progress=on_progress)
 
-                # Verification phase: 90-100%
-                self.after(0, lambda: _set_progress(1.0))
+                # Phase: verification (90→100% quick jump)
+                self.after(0, lambda: (
+                    _set_progress(1.0),
+                    _set_stage(_t("status.checking")),
+                ))
+                import time as _time
+                _time.sleep(0.3)  # brief visual pause so user sees 100%
 
+                # Phase: launch installer detached + start indeterminate animation
                 def _go():
-                    try:
-                        _hide_progress()
-                        # Launch installer detached; Inno's /RESTARTAPPLICATIONS
-                        # brings the app back up after file replacement completes.
-                        creationflags = 0
-                        if hasattr(subprocess, "DETACHED_PROCESS"):
-                            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-                        subprocess.Popen([
-                            str(setup_exe),
-                            "/SILENT", "/SUPPRESSMSGBOXES",
-                            "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS",
-                        ], close_fds=True, creationflags=creationflags)
-                        # Give the installer a moment to start, then exit gracefully.
-                        def _shutdown():
-                            top = self.winfo_toplevel()
-                            closing = getattr(top, "on_closing", None)
-                            if closing:
-                                closing()
-                            os._exit(0)
-                        self.after(1500, _shutdown)
-                    except Exception as e:
-                        tkinter.messagebox.showerror(
-                            "Update failed", f"Could not launch installer:\n{e}")
-                        _hide_progress()
-                        try: btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
-                        except Exception: pass
+                    _set_stage("Installing…")
+                    _start_indeterminate()
+
+                    creationflags = 0
+                    if hasattr(subprocess, "DETACHED_PROCESS"):
+                        creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                    subprocess.Popen([
+                        str(setup_exe),
+                        "/SILENT", "/SUPPRESSMSGBOXES",
+                        "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS",
+                    ], close_fds=True, creationflags=creationflags)
+
+                    # Give the installer a moment to start, then exit gracefully.
+                    def _shutdown():
+                        top = self.winfo_toplevel()
+                        closing = getattr(top, "on_closing", None)
+                        if closing:
+                            closing()
+                        os._exit(0)
+                    self.after(1500, _shutdown)
                 self.after(0, _go)
+
             except SelfUpdateError as e:
                 err = str(e)
-                self.after(0, lambda: (
-                    _hide_progress(),
-                    tkinter.messagebox.showerror("Update failed", err),
-                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart")),
-                ))
+                def _err():
+                    _stop_indeterminate()
+                    _hide_progress()
+                    tkinter.messagebox.showerror("Update failed", err)
+                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
+                self.after(0, _err)
+            except Exception as e:
+                net_err = str(e)
+                def _err_net():
+                    _stop_indeterminate()
+                    _hide_progress()
+                    tkinter.messagebox.showerror("Network error", net_err)
+                    btn.configure(state="normal", text=_t("\u27f3 Update & Restart"))
+                self.after(0, _err_net)
             except Exception as e:
                 net_err = str(e)
                 self.after(0, lambda: (
