@@ -61,11 +61,17 @@ jobs:
           Write-Host "installed ProductVersion: $v"
           if (-not $v) { Write-Error 'empty ProductVersion'; exit 1 }
           if (-not (Test-Path (Join-Path $app 'unins000.exe'))) { Write-Error 'uninstaller missing'; exit 1 }
-          $key = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' |
+          # Inno Setup is built 32-bit, so the ARP key lands in WOW6432Node
+          $roots = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                   'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+          $key = Get-ChildItem $roots -ErrorAction SilentlyContinue |
             Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -like '*NetStrip*' } |
             Select-Object -First 1
-          if (-not $key) { Write-Error 'uninstall registry key missing'; exit 1 }
-          Write-Host "uninstall key: $($key.PSChildName)" 
+          if (-not $key) {
+            Get-ChildItem $roots -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  subkey: $($_.Name)" }
+            Write-Error 'uninstall registry key missing'; exit 1
+          }
+          Write-Host "uninstall key: $($key.Name)" 
           Write-Host "INSTALLED STATE OK (v$v)"
 
       - name: Silent uninstall
@@ -84,7 +90,7 @@ jobs:
             $gone = -not (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe")
           } while (-not $gone -and (Get-Date) -lt $deadline)
           if (Test-Path "$env:ProgramFiles\NetStrip\Cripple.exe") { Write-Error 'exe survived uninstall'; exit 1 }
-          $leftover = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' |
+          $leftover = Get-ChildItem $roots -ErrorAction SilentlyContinue |
             Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -like '*NetStrip*' }
           if ($leftover) { Write-Error 'uninstall registry key survived'; exit 1 }
           Write-Host 'CLEAN UNINSTALL OK'
