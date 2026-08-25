@@ -48,7 +48,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk libssl-dev libffi-dev python3-dev
+          sudo apt-get install -y python3-tk libssl-dev libffi-dev python3-dev xvfb
 
       - name: Install Python Dependencies
         run: |
@@ -87,7 +87,16 @@ jobs:
           python -c "from netstrip.core.updater import BlocklistUpdater; print('Updater module OK')"
           python -c "from netstrip.core.crash_reporter import send_crash_report; print('Crash Reporter module OK')"
 
+      - name: Run unit tests with coverage floor (Linux, under Xvfb)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash   # backslash continuations are invalid in Windows PowerShell
+        run: |
+          xvfb-run -a python -m pytest tests/ -v --timeout=30 --tb=short -q \
+            --cov=netstrip/core --cov=netstrip/data --cov-report=term \
+            --cov-fail-under=19
+
       - name: Run unit tests with coverage floor
+        if: matrix.os != 'ubuntu-latest'
         shell: bash   # backslash continuations are invalid in Windows PowerShell
         run: |
           python -m pytest tests/ -v --timeout=30 --tb=short -q \
