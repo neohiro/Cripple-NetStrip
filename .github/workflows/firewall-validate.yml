@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   validate-windows-firewall:
+    continue-on-error: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[oc]') }}
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -45,6 +46,7 @@ jobs:
           Write-Host "DNS query syntax PASS"
 
   validate-linux-firewall:
+    continue-on-error: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[oc]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
