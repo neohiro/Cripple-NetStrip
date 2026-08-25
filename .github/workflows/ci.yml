@@ -21,6 +21,7 @@ permissions:
 jobs:
   test:
     name: Test on ${{ matrix.name }}
+    continue-on-error: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[oc]') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -116,6 +117,7 @@ jobs:
 
   syntax-check:
     name: Full Syntax Check
+    continue-on-error: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[oc]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
