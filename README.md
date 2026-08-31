@@ -476,8 +476,7 @@ Copyright © 2026 FrenzyPenguin Media — All rights reserved. Free for personal
 ---
 
 <div align="center">
-  <a href="http://www.freevisitorcounters.com">Free Counter</a>
-  <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1631168/t/1"></script>
+  <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1631168/t/1" defer></script>
 </div>
 
 <p align="center">
