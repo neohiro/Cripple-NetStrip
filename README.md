@@ -476,7 +476,7 @@ Copyright © 2026 FrenzyPenguin Media — All rights reserved. Free for personal
 ---
 
 <div align="center">
-  <a href="https://www.freevisitorcounters.com/en/home/stats/id/1631168" rel="noopener noreferrer nofollow no-referrer"><img src="https://www.freevisitorcounters.com/en/counter/render/1631168/t/1" alt="Visitor counter" /></a>
+  <a href="https://www.freevisitorcounters.com/en/home/stats/id/1631168" rel="noopener noreferrer nofollow"><img src="https://www.freevisitorcounters.com/en/counter/render/1631168/t/1" alt="Visitor counter" /></a>
 </div>
 
 <p align="center">
