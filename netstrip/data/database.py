@@ -715,8 +715,6 @@ class Database:
             # Get updater sources
             sources = []
             try:
-                import os
-
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 sources_file = os.path.join(base_dir, "data", "updater_sources.json")
                 if os.path.exists(sources_file):
@@ -778,8 +776,6 @@ class Database:
             # Import updater sources if present
             if updater_sources:
                 try:
-                    import os
-
                     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     sources_file = os.path.join(base_dir, "data", "updater_sources.json")
 
@@ -846,7 +842,7 @@ class Database:
         reinitialize default rows, vacuum database, and reset all in-memory caches.
         """
         self.flush()
-        with self._read_lock:
+        with self.lock:
             with self._get_connection() as conn:
                 conn.executescript("""
                     DELETE FROM user_rules;
@@ -865,3 +861,6 @@ class Database:
                 self._settings_cache.clear()
             if hasattr(self, "_rules_cache"):
                 self._rules_cache.clear()
+            hot = getattr(self, "_hot_settings", None)
+            if hot:
+                hot.clear()

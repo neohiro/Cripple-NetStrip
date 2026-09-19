@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import logging
 import os
-import re
 import secrets
 import sqlite3
 import subprocess
@@ -104,13 +103,19 @@ def get_backup_dns(interface_name: str) -> str | None:
         c = conn.cursor()
         c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
         row = c.fetchone()
-        conn.close()
         if row and row[0] and row[0] != "dhcp":
             ip = row[0]
-            if re.match(r"^([0-9]{1,3}\.){3}[0-9]{1,3}$", ip):
+            try:
+                import ipaddress
+
+                ipaddress.ip_address(ip)
                 return ip
+            except ValueError:
+                return None
     except Exception as e:
         logging.error(f"Failed to read backup DNS from DB: {e}")
+    finally:
+        conn.close()
     return None
 
 
@@ -123,11 +128,12 @@ def get_db_setting(key: str, default: str = "false") -> str:
         c = conn.cursor()
         c.execute("SELECT value FROM settings WHERE key=?", (key,))
         row = c.fetchone()
-        conn.close()
         if row and row[0]:
             return row[0]
     except Exception:
         pass
+    finally:
+        conn.close()
     return default
 
 
@@ -140,9 +146,10 @@ def clear_db_setting(key: str) -> None:
         c = conn.cursor()
         c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
         conn.commit()
-        conn.close()
     except Exception:
         pass
+    finally:
+        conn.close()
 
 
 def restore_network():
@@ -155,6 +162,8 @@ def restore_network():
 
     try:
         if sys_plat == "Windows":
+            import winreg
+
             res = subprocess.run(
                 ["netsh", "interface", "show", "interface"],
                 capture_output=True,
@@ -215,8 +224,6 @@ def restore_network():
             # IPv6/IPv4 protocol bindings are restored below based on the database state.
             logging.info("Removing NetStrip firewall rules...")
             try:
-                import winreg
-
                 rule_names_to_delete = []
                 reg_path = r"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules"
                 try:
@@ -245,8 +252,6 @@ def restore_network():
 
             # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
             logging.info("Restoring Windows network adapter protocol bindings and discovery...")
-
-            import winreg
 
             subprocess.run(
                 [
@@ -304,8 +309,6 @@ def restore_network():
                 pass
 
             try:
-                import winreg
-
                 winreg.DeleteKey(
                     winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD"
                 )
@@ -313,8 +316,6 @@ def restore_network():
                 pass
 
             try:
-                import winreg
-
                 with winreg.CreateKeyEx(
                     winreg.HKEY_LOCAL_MACHINE,
                     r"SYSTEM\CurrentControlSet\Services\MsLldp",
@@ -482,86 +483,50 @@ def restore_network():
             clear_db_setting("killswitch_active")
 
             # Flush any IPv4 drops
-            while (
-                subprocess.run(
-                    [
-                        "iptables",
-                        "-C",
-                        "INPUT",
-                        "!",
-                        "-i",
-                        "lo",
-                        "-p",
-                        "all",
-                        "-m",
-                        "comment",
-                        "--comment",
-                        "NetStrip_IPv4_Block",
-                        "-j",
-                        "DROP",
-                    ],
-                    capture_output=True,
-                ).returncode
-                == 0
-            ):
-                subprocess.run(
-                    [
-                        "iptables",
-                        "-D",
-                        "INPUT",
-                        "!",
-                        "-i",
-                        "lo",
-                        "-p",
-                        "all",
-                        "-m",
-                        "comment",
-                        "--comment",
-                        "NetStrip_IPv4_Block",
-                        "-j",
-                        "DROP",
-                    ]
-                )
-            while (
-                subprocess.run(
-                    [
-                        "iptables",
-                        "-C",
-                        "OUTPUT",
-                        "!",
-                        "-o",
-                        "lo",
-                        "-p",
-                        "all",
-                        "-m",
-                        "comment",
-                        "--comment",
-                        "NetStrip_IPv4_Block",
-                        "-j",
-                        "DROP",
-                    ],
-                    capture_output=True,
-                ).returncode
-                == 0
-            ):
-                subprocess.run(
-                    [
-                        "iptables",
-                        "-D",
-                        "OUTPUT",
-                        "!",
-                        "-o",
-                        "lo",
-                        "-p",
-                        "all",
-                        "-m",
-                        "comment",
-                        "--comment",
-                        "NetStrip_IPv4_Block",
-                        "-j",
-                        "DROP",
-                    ]
-                )
+            for _direction in ("INPUT", "OUTPUT"):
+                lo_flag = "-i" if _direction == "INPUT" else "-o"
+                _removed = 0
+                while _removed < 100:
+                    check = subprocess.run(
+                        [
+                            "iptables",
+                            "-C",
+                            _direction,
+                            "!",
+                            "-o" if _direction == "INPUT" else "-i",
+                            "lo",
+                            "-p",
+                            "all",
+                            "-m",
+                            "comment",
+                            "--comment",
+                            "NetStrip_IPv4_Block",
+                            "-j",
+                            "DROP",
+                        ],
+                        capture_output=True,
+                    )
+                    if check.returncode != 0:
+                        break
+                    subprocess.run(
+                        [
+                            "iptables",
+                            "-D",
+                            _direction,
+                            "!",
+                            lo_flag,
+                            "lo",
+                            "-p",
+                            "all",
+                            "-m",
+                            "comment",
+                            "--comment",
+                            "NetStrip_IPv4_Block",
+                            "-j",
+                            "DROP",
+                        ]
+                    )
+                    _removed += 1
 
         logging.info("Emergency network restore completed successfully.")
     except Exception as e:
