@@ -3,15 +3,17 @@ DNS Proxy Server for NetStrip
 Intercepts local DNS queries, classifies them, and acts as a sinkhole for blocked domains.
 """
 
-from dnslib import DNSRecord, RR, A, QTYPE
-from dnslib.server import DNSServer, BaseResolver, DNSLogger
-import threading
 import logging
+import threading
 import time
+from collections.abc import Callable
+
+from dnslib import QTYPE, RR, A, DNSRecord
+from dnslib.server import BaseResolver, DNSLogger, DNSServer
+
 from netstrip.core.classifier import TrafficClassifier
 from netstrip.core.modes import ConnectionAction, ConnectionCategory
 from netstrip.data.database import Database
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -69,36 +71,40 @@ DNS_UPSTREAM_OPTIONS = {
 
 # Dynamically load the online providers list if available
 try:
-    import os, json
+    import json
+    import os
+
     # Load online DoH providers list dynamically from the data directory
     _current_dir = os.path.dirname(os.path.abspath(__file__))
-    _doh_file = os.path.join(_current_dir, '..', 'data', 'lists', 'doh_providers_online.json')
+    _doh_file = os.path.join(_current_dir, "..", "data", "lists", "doh_providers_online.json")
     if os.path.exists(_doh_file):
-        with open(_doh_file, 'r', encoding='utf-8') as _f:
+        with open(_doh_file, encoding="utf-8") as _f:
             _online_providers = json.load(_f)
-            
+
         for _p in _online_providers:
-            _ip = _p['ip']
-            _name = _p['hostname']
-            
+            _ip = _p["ip"]
+            _name = _p["hostname"]
+
             # Filter out DNSCrypt servers since we only support DoH, DoT and UDP natively
-            if 'dnscry' in _name.lower() or 'dnscrypt' in _name.lower():
+            if "dnscry" in _name.lower() or "dnscrypt" in _name.lower():
                 continue
-                
-            if _p['type'] == 'DoH':
-                DOH_PROVIDERS[_ip] = (_name, _p['path'])
+
+            if _p["type"] == "DoH":
+                DOH_PROVIDERS[_ip] = (_name, _p["path"])
             # We don't have DOT_PROVIDERS dict, we just use DoT implicitly if they aren't in DOH_PROVIDERS
             # but for the upstream options dropdown, we add them all!
             if _ip not in DNS_UPSTREAM_OPTIONS:
                 # Add domain base name for a cleaner UI (e.g. dns.google -> google)
-                _short_name = _name.split('.')[-2].title() if '.' in _name else _name.title()
+                _short_name = _name.split(".")[-2].title() if "." in _name else _name.title()
                 DNS_UPSTREAM_OPTIONS[_ip] = f"{_ip} ({_short_name})"
-                
+
 except Exception as e:
     logger.debug(f"Could not load online DoH providers: {e}")
 
+
 class _DNSConnectionPool:
     """Thread-safe connection pool for DNS over TLS (DoT) and DNS over HTTPS (DoH) keep-alive sockets."""
+
     def __init__(self, idle_timeout: float = 30.0, max_connections_per_host: int = 4):
         self.idle_timeout = idle_timeout
         self.max_connections_per_host = max_connections_per_host
@@ -115,6 +121,7 @@ class _DNSConnectionPool:
                     if now - last_used <= self.idle_timeout:
                         try:
                             import select
+
                             r, _, _ = select.select([tls_sock], [], [], 0)
                             if not r:
                                 tls_sock.settimeout(timeout)
@@ -127,9 +134,11 @@ class _DNSConnectionPool:
         try:
             import socket
             import ssl
+
             # Always-verified TLS context (fail closed) — no CERT_NONE downgrade
             try:
                 import certifi
+
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ctx = ssl.create_default_context()
@@ -175,9 +184,10 @@ class _DNSConnectionPool:
             if key in self._doh_pool:
                 while self._doh_pool[key]:
                     conn, last_used = self._doh_pool[key].pop()
-                    if now - last_used <= self.idle_timeout and getattr(conn, 'sock', None):
+                    if now - last_used <= self.idle_timeout and getattr(conn, "sock", None):
                         try:
                             import select
+
                             r, _, _ = select.select([conn.sock], [], [], 0)
                             if not r:
                                 conn.timeout = timeout
@@ -193,9 +203,11 @@ class _DNSConnectionPool:
         try:
             import http.client
             import ssl
+
             # Always-verified TLS context (fail closed) — no CERT_NONE downgrade
             try:
                 import certifi
+
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ctx = ssl.create_default_context()
@@ -273,7 +285,7 @@ class _DNSConnectionPool:
                 del self._doh_pool[key]
 
     def start_reaper(self, interval: float = 60.0):
-        if getattr(self, '_reaper_started', False):
+        if getattr(self, "_reaper_started", False):
             return
         self._reaper_started = True
         self._reaper_stop = threading.Event()
@@ -288,7 +300,7 @@ class _DNSConnectionPool:
         threading.Thread(target=_loop, daemon=True, name="DNSPoolReaper").start()
 
     def stop_reaper(self):
-        ev = getattr(self, '_reaper_stop', None)
+        ev = getattr(self, "_reaper_stop", None)
         if ev:
             ev.set()
 
@@ -316,22 +328,30 @@ class _DNSConnectionPool:
 
 
 class NetStripResolver(BaseResolver):
-    def __init__(self, classifier: TrafficClassifier, db: Database, default_upstream_port: int = 53, engine=None):
+    def __init__(
+        self,
+        classifier: TrafficClassifier,
+        db: Database,
+        default_upstream_port: int = 53,
+        engine=None,
+    ):
         self.classifier = classifier
         self.db = db
         self.engine = engine
         self.on_status: Callable = None
         self.upstream_port = default_upstream_port
         from collections import OrderedDict
+
         self._dns_cache = OrderedDict()  # (qname, qtype) -> (timestamp, proxy_response_bytes)
         self._max_cache_size = 5000
         self._cache_ttl = 300  # 5 minutes TTL
         self._proc_cache = OrderedDict()  # domain -> (timestamp, process_name)
         self._proc_cache_ttl = 60  # 60 seconds
         self._conn_pool = _DNSConnectionPool(idle_timeout=30.0, max_connections_per_host=4)
-        
+
     def _infer_process(self, domain: str, src_port: int = None) -> str:
-        from netstrip.core.process_utils import resolve_process_identity, normalize_process_name
+        from netstrip.core.process_utils import normalize_process_name, resolve_process_identity
+
         # Check fast in-memory process cache
         now = time.time()
         if domain in self._proc_cache:
@@ -340,21 +360,27 @@ class NetStripResolver(BaseResolver):
                 return p_name
 
         # 1. Direct Socket Mapping: If the app sends its own UDP packets
-        if src_port and self.engine and hasattr(self.engine, 'connection_monitor'):
+        if src_port and self.engine and hasattr(self.engine, "connection_monitor"):
             pid = self.engine.connection_monitor.port_to_pid.get(src_port)
             if pid:
                 try:
                     import psutil
+
                     proc = psutil.Process(pid)
                     p_name, _, _, _ = resolve_process_identity(proc)
-                    if p_name and p_name.lower() not in ('svchost', 'svchost.exe', 'dnscache', 'unknown'):
+                    if p_name and p_name.lower() not in (
+                        "svchost",
+                        "svchost.exe",
+                        "dnscache",
+                        "unknown",
+                    ):
                         if len(self._proc_cache) > 2000:
                             self._proc_cache.popitem(last=False)
                         self._proc_cache[domain] = (now, p_name)
                         return p_name
                 except Exception:
                     pass
-                    
+
         # 2. Database History Inference
         try:
             with self.db.lock:
@@ -366,15 +392,15 @@ class NetStripResolver(BaseResolver):
                         ORDER BY id DESC LIMIT 1
                     """
                     row = conn.execute(query1, (domain,)).fetchone()
-                    if row and row['process_name']:
-                        p_name = normalize_process_name(row['process_name'])
+                    if row and row["process_name"]:
+                        p_name = normalize_process_name(row["process_name"])
                         if len(self._proc_cache) > 2000:
                             self._proc_cache.popitem(last=False)
                         self._proc_cache[domain] = (now, p_name)
                         return p_name
-                        
+
                     # B. Fallback to Parent Domain correlation (e.g. ads.example.com -> example.com)
-                    parts = domain.split('.')
+                    parts = domain.split(".")
                     if len(parts) > 2:
                         parent_domain = f"%.{parts[-2]}.{parts[-1]}"
                         query2 = """
@@ -383,16 +409,16 @@ class NetStripResolver(BaseResolver):
                             ORDER BY id DESC LIMIT 1
                         """
                         row = conn.execute(query2, (parent_domain,)).fetchone()
-                        if row and row['process_name']:
-                            p_name = normalize_process_name(row['process_name'])
+                        if row and row["process_name"]:
+                            p_name = normalize_process_name(row["process_name"])
                             if len(self._proc_cache) > 2000:
                                 self._proc_cache.popitem(last=False)
                             self._proc_cache[domain] = (now, p_name)
                             return p_name
-                            
+
         except Exception as e:
             logger.debug(f"Process inference failed: {e}")
-            
+
         inferred = "Unknown (DNS)"
         if len(self._proc_cache) > 2000:
             self._proc_cache.popitem(last=False)
@@ -401,6 +427,7 @@ class NetStripResolver(BaseResolver):
 
     def _send_dot(self, request_packet, ip, timeout=2):
         import struct
+
         for attempt in range(2):
             tls_sock, raw_sock = self._conn_pool.get_dot_socket(ip, port=853, timeout=timeout)
             if not tls_sock:
@@ -408,24 +435,24 @@ class NetStripResolver(BaseResolver):
             try:
                 length = struct.pack("!H", len(request_packet))
                 tls_sock.sendall(length + request_packet)
-                
+
                 resp_len_bytes = tls_sock.recv(2)
                 if not resp_len_bytes or len(resp_len_bytes) < 2:
                     self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
                     continue
                 resp_len = struct.unpack("!H", resp_len_bytes)[0]
-                
+
                 resp_data = b""
                 while len(resp_data) < resp_len:
                     chunk = tls_sock.recv(resp_len - len(resp_data))
-                    if not chunk: break
+                    if not chunk:
+                        break
                     resp_data += chunk
-                    
+
                 if len(resp_data) == resp_len:
                     self._conn_pool.put_dot_socket(ip, tls_sock, raw_sock)
                     return resp_data
-                else:
-                    self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
+                self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
             except Exception as e:
                 self._conn_pool.discard_dot_socket(tls_sock, raw_sock)
                 if attempt == 1:
@@ -439,11 +466,11 @@ class NetStripResolver(BaseResolver):
                 return None
             try:
                 headers = {
-                    'Host': host,
-                    'Content-Type': 'application/dns-message',
-                    'Accept': 'application/dns-message',
-                    'Content-Length': str(len(request_packet)),
-                    'Connection': 'keep-alive'
+                    "Host": host,
+                    "Content-Type": "application/dns-message",
+                    "Accept": "application/dns-message",
+                    "Content-Length": str(len(request_packet)),
+                    "Connection": "keep-alive",
                 }
                 conn.request("POST", url_path, body=request_packet, headers=headers)
                 res = conn.getresponse()
@@ -451,8 +478,7 @@ class NetStripResolver(BaseResolver):
                     data = res.read()
                     self._conn_pool.put_doh_connection(ip, host, conn)
                     return data
-                else:
-                    self._conn_pool.discard_doh_connection(conn)
+                self._conn_pool.discard_doh_connection(conn)
             except Exception as e:
                 self._conn_pool.discard_doh_connection(conn)
                 if attempt == 1:
@@ -462,7 +488,7 @@ class NetStripResolver(BaseResolver):
     @staticmethod
     def _is_ghost_privacy_query(domain: str) -> bool:
         """Identify OS network topology / discovery queries that leak identity to ISP/WAN DNS."""
-        d_lower = domain.lower().strip('.')
+        d_lower = domain.lower().strip(".")
         # 1. WPAD proxy auto-discovery
         if d_lower == "wpad" or d_lower.startswith("wpad.") or ".wpad." in d_lower:
             return True
@@ -470,70 +496,95 @@ class NetStripResolver(BaseResolver):
         if d_lower == "isatap" or d_lower.startswith("isatap.") or ".isatap." in d_lower:
             return True
         # 3. Directory Services / LDAP / Kerberos SRV discovery queries (e.g. _ldap._tcp.dc._msdcs.dynamic.ziggo.nl)
-        if any(srv in d_lower for srv in ("_msdcs", "_ldap._tcp", "_kerberos._tcp", "_kpasswd._tcp", "_gc._tcp", "_sip._tls", "_ldap._tcp.dc")):
+        if any(
+            srv in d_lower
+            for srv in (
+                "_msdcs",
+                "_ldap._tcp",
+                "_kerberos._tcp",
+                "_kpasswd._tcp",
+                "_gc._tcp",
+                "_sip._tls",
+                "_ldap._tcp.dc",
+            )
+        ):
             return True
         # 4. NetBIOS / local broadcast leak queries
-        if d_lower.startswith("netbios.") or ".netbios." in d_lower or d_lower.endswith(".corp") or d_lower.endswith(".internal"):
+        if (
+            d_lower.startswith("netbios.")
+            or ".netbios." in d_lower
+            or d_lower.endswith(".corp")
+            or d_lower.endswith(".internal")
+        ):
             return True
         return False
 
     def resolve(self, request, handler):
-        from netstrip.core.modes import ProtectionLevel
         from dnslib import RCODE
-        
+
+        from netstrip.core.modes import ProtectionLevel
+
         qname = str(request.q.qname)
         # Strip trailing dot for processing
-        domain = qname.rstrip('.') if qname.endswith('.') else qname
+        domain = qname.rstrip(".") if qname.endswith(".") else qname
         qtype = QTYPE[request.q.qtype]
 
         # 1. Ghost Mode & System Connection Privacy Sinkhole Check:
         # Prevents Windows/OS leaks like WPAD, _ldap._tcp.dc._msdcs, ISATAP, NetBIOS from escaping to upstream WAN/ISP DNS.
-        is_ghost = hasattr(self.classifier, 'mode') and getattr(self.classifier.mode, 'level', None) in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT)
+        is_ghost = hasattr(self.classifier, "mode") and getattr(
+            self.classifier.mode, "level", None
+        ) in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT)
         block_sys = self.db.get_setting("block_system_connections", "false") == "true"
-        
+
         if (is_ghost or block_sys) and self._is_ghost_privacy_query(domain):
             category = ConnectionCategory.SYSTEM
             action = ConnectionAction.BLOCK
         else:
             # 1. Classify
             category = self.classifier.classify_domain(domain)
-            
+
             # 2. Get action from mode
             action = self.classifier.mode.get_action_for_category(category, self.db)
 
-        src_port = getattr(handler, 'client_address', (None, None))[1]
+        src_port = getattr(handler, "client_address", (None, None))[1]
         process_name = self._infer_process(domain, src_port)
 
         # 3. Handle Sinkhole & Throttle Logs
         if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
             now = time.time()
             throttle_key = f"{process_name}:{domain}"
-            last_blocked = getattr(self, '_last_blocked_cache', {}).get(throttle_key, 0)
-            
+            last_blocked = getattr(self, "_last_blocked_cache", {}).get(throttle_key, 0)
+
             # Initialize cache if missing
-            if not hasattr(self, '_last_blocked_cache'):
+            if not hasattr(self, "_last_blocked_cache"):
                 self._last_blocked_cache = {}
-                
+
             # Only log and broadcast if we haven't blocked this exact domain for this app in the last 10 seconds
             if now - last_blocked > 10:
                 self._last_blocked_cache[throttle_key] = now
                 if self.on_status:
                     self.on_status(f"DNS Autoblocked {category.value.capitalize()}: {domain}")
-                
-                src_port = getattr(handler, 'client_address', (None, None))[1]
-                self.db.log_connection({
-                    'process_name': process_name,
-                    'domain': domain,
-                    'protocol': 'DNS',
-                    'category': category.value,
-                    'action': action.value,
-                    'mode': getattr(getattr(self.classifier, 'mode', None), 'name', 'GHOST')
-                })
+
+                src_port = getattr(handler, "client_address", (None, None))[1]
+                self.db.log_connection(
+                    {
+                        "process_name": process_name,
+                        "domain": domain,
+                        "protocol": "DNS",
+                        "category": category.value,
+                        "action": action.value,
+                        "mode": getattr(getattr(self.classifier, "mode", None), "name", "GHOST"),
+                    }
+                )
                 self.db.update_daily_stats(action.value, category.value)
                 # Feed notification digest so DNS sinkhole blocks appear in summaries
-                if hasattr(self, 'engine') and self.engine and hasattr(self.engine, '_note_blocked_for_digest'):
+                if (
+                    hasattr(self, "engine")
+                    and self.engine
+                    and hasattr(self.engine, "_note_blocked_for_digest")
+                ):
                     self.engine._note_blocked_for_digest(category.value)
-                
+
             # For SRV / discovery queries, return NXDOMAIN immediately so OS ceases probing
             reply = request.reply()
             if "_msdcs" in domain or "_ldap" in domain or "_kerberos" in domain:
@@ -558,97 +609,111 @@ class NetStripResolver(BaseResolver):
                 del self._dns_cache[cache_key]
 
         # Cache Miss: Log Allowed connection and forward upstream
-        src_port = getattr(handler, 'client_address', (None, None))[1]
-        self.db.log_connection({
-            'process_name': process_name,
-            'domain': domain,
-            'protocol': 'DNS',
-            'category': category.value,
-            'action': action.value,
-            'mode': self.classifier.mode.name
-        })
+        src_port = getattr(handler, "client_address", (None, None))[1]
+        self.db.log_connection(
+            {
+                "process_name": process_name,
+                "domain": domain,
+                "protocol": "DNS",
+                "category": category.value,
+                "action": action.value,
+                "mode": self.classifier.mode.name,
+            }
+        )
         self.db.update_daily_stats(action.value, category.value)
-        
+
         # Fetch dynamic upstream from settings
         upstream_ip = self.db.get_setting("dns_upstream", "8.8.8.8")
         has_local_proxy = bool(self.db.get_setting("local_dns_tool"))
-        
+
         if upstream_ip == "127.127.127.127":
             # Never proxy to our own bind IP
-            upstream_ip = "8.8.8.8" 
+            upstream_ip = "8.8.8.8"
         elif upstream_ip in ("127.0.0.1", "localhost", "::1") and not has_local_proxy:
             # Prevent infinite recursive loop if we didn't detect a 3rd party tool (e.g. YogaDNS, DNSCrypt)
-            upstream_ip = "8.8.8.8" 
-            
+            upstream_ip = "8.8.8.8"
+
         try:
             proxy_response = None
             is_public_ip = not upstream_ip.startswith("127.") and upstream_ip != "::1"
-            
-            force_doh_setting = self.db.get_setting('force_doh', 'auto')
-            force_doh = force_doh_setting != 'false'
-            
+
+            force_doh_setting = self.db.get_setting("force_doh", "auto")
+            force_doh = force_doh_setting != "false"
+
             if force_doh and not has_local_proxy:
                 if upstream_ip in DOH_PROVIDERS:
                     host, url_path = DOH_PROVIDERS[upstream_ip]
-                    proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=1.5)
-                
+                    proxy_response = self._send_doh(
+                        request.pack(), upstream_ip, host, url_path, timeout=1.5
+                    )
+
                 if not proxy_response and is_public_ip:
                     proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
-                    
+
                 if not proxy_response:
-                    if force_doh_setting == 'true':
+                    if force_doh_setting == "true":
                         reply = request.reply()
                         reply.header.rcode = RCODE.SERVFAIL
                         return reply
-                    else:
-                        try:
-                            proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
-                        except Exception:
-                            proxy_response = None
+                    try:
+                        proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
+                    except Exception:
+                        proxy_response = None
             else:
                 # 1. Primary: Standard UDP port 53 (Fastest, 10-30ms response time, 1.5s timeout)
                 try:
                     proxy_response = request.send(upstream_ip, self.upstream_port, timeout=1.5)
                 except Exception:
                     proxy_response = None
-    
+
                 # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH) if standard UDP failed and public IP
                 if not proxy_response and is_public_ip:
                     proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
                     if not proxy_response and upstream_ip in DOH_PROVIDERS:
                         host, url_path = DOH_PROVIDERS[upstream_ip]
-                        proxy_response = self._send_doh(request.pack(), upstream_ip, host, url_path, timeout=1.5)
+                        proxy_response = self._send_doh(
+                            request.pack(), upstream_ip, host, url_path, timeout=1.5
+                        )
 
             if not proxy_response:
                 raise TimeoutError(f"No response from upstream DNS {upstream_ip}")
 
             record = DNSRecord.parse(proxy_response)
-            
+
             # Save to bounded LRU cache
             if len(self._dns_cache) >= self._max_cache_size:
                 self._dns_cache.popitem(last=False)
             self._dns_cache[cache_key] = (time.time(), proxy_response)
             self._dns_cache.move_to_end(cache_key)
-            
+
             # Extract A (1) and AAAA (28) records to populate persistent database cache
             # Exclude our own telemetry / IP checks from polluting the shared global DNS cache with AWS IPs
-            exclude_domains = ('api.ipify.org', 'ipinfo.io', 'ipapi.co', 'ipwho.is', 'icanhazip.com', 'ifconfig.me', 'raw.githubusercontent.com', 'api.github.com')
-            
+            exclude_domains = (
+                "api.ipify.org",
+                "ipinfo.io",
+                "ipapi.co",
+                "ipwho.is",
+                "icanhazip.com",
+                "ifconfig.me",
+                "raw.githubusercontent.com",
+                "api.github.com",
+            )
+
             for rr in record.rr:
-                if rr.rtype in (1, 28): 
+                if rr.rtype in (1, 28):
                     ip = str(rr.rdata)
                     if domain.lower() not in exclude_domains:
                         self.db.cache_domain_mapping(ip, domain)
-                    
+
             return record
         except Exception as e:
             logger.debug(f"DNS Upstream error for {domain} via {upstream_ip}: {e}")
-            force_doh_setting = self.db.get_setting('force_doh', 'auto')
-            if force_doh_setting == 'true' and not has_local_proxy:
+            force_doh_setting = self.db.get_setting("force_doh", "auto")
+            if force_doh_setting == "true" and not has_local_proxy:
                 reply = request.reply()
                 reply.header.rcode = RCODE.SERVFAIL
                 return reply
-                
+
             if upstream_ip != "1.1.1.1":
                 try:
                     proxy_response = request.send("1.1.1.1", 53, timeout=1.5)
@@ -660,7 +725,9 @@ class NetStripResolver(BaseResolver):
 
 
 class DNSProxyService:
-    def __init__(self, classifier: TrafficClassifier, db: Database, bind_ip="127.0.0.1", port=53, engine=None):
+    def __init__(
+        self, classifier: TrafficClassifier, db: Database, bind_ip="127.0.0.1", port=53, engine=None
+    ):
         self.resolver = NetStripResolver(classifier, db, engine=engine)
         self.bind_ip = bind_ip
         self.port = port
@@ -706,18 +773,47 @@ class DNSProxyService:
         class BoundedThreadingTCPServer(_BoundedMixIn, socketserver.ThreadingTCPServer):
             pass
 
-        self.udp_server = DNSServer(self.resolver, port=port, address=bind_ip, logger=self.dns_logger, server=BoundedThreadingUDPServer)
-        self.tcp_server = DNSServer(self.resolver, port=port, address=bind_ip, tcp=True, logger=self.dns_logger, server=BoundedThreadingTCPServer)
+        self.udp_server = DNSServer(
+            self.resolver,
+            port=port,
+            address=bind_ip,
+            logger=self.dns_logger,
+            server=BoundedThreadingUDPServer,
+        )
+        self.tcp_server = DNSServer(
+            self.resolver,
+            port=port,
+            address=bind_ip,
+            tcp=True,
+            logger=self.dns_logger,
+            server=BoundedThreadingTCPServer,
+        )
 
         # IPv6 Support
-        class ThreadingUDPServer6(BoundedThreadingUDPServer): address_family = __import__('socket').AF_INET6
-        class ThreadingTCPServer6(BoundedThreadingTCPServer): address_family = __import__('socket').AF_INET6
+        class ThreadingUDPServer6(BoundedThreadingUDPServer):
+            address_family = __import__("socket").AF_INET6
+
+        class ThreadingTCPServer6(BoundedThreadingTCPServer):
+            address_family = __import__("socket").AF_INET6
 
         self.udp_server_v6 = None
         self.tcp_server_v6 = None
         try:
-            self.udp_server_v6 = DNSServer(self.resolver, port=port, address="fd00::127", logger=self.dns_logger, server=ThreadingUDPServer6)
-            self.tcp_server_v6 = DNSServer(self.resolver, port=port, address="fd00::127", tcp=True, logger=self.dns_logger, server=ThreadingTCPServer6)
+            self.udp_server_v6 = DNSServer(
+                self.resolver,
+                port=port,
+                address="fd00::127",
+                logger=self.dns_logger,
+                server=ThreadingUDPServer6,
+            )
+            self.tcp_server_v6 = DNSServer(
+                self.resolver,
+                port=port,
+                address="fd00::127",
+                tcp=True,
+                logger=self.dns_logger,
+                server=ThreadingTCPServer6,
+            )
         except Exception as e:
             logger.warning(f"Could not bind IPv6 DNS Proxy: {e}")
 
@@ -734,7 +830,7 @@ class DNSProxyService:
             self.tcp_server_v6.start_thread()
         # Start the idle-socket reaper so pooled DoT/DoH connections for
         # abandoned hosts cannot leak file descriptors over long uptimes.
-        if hasattr(self.resolver, '_conn_pool'):
+        if hasattr(self.resolver, "_conn_pool"):
             self.resolver._conn_pool.start_reaper()
         logger.info(f"DNS Proxy started on {self.bind_ip}:{self.port} and [fd00::127]:{self.port}")
 
@@ -747,7 +843,7 @@ class DNSProxyService:
         if self.udp_server_v6:
             self.udp_server_v6.stop()
             self.tcp_server_v6.stop()
-        if hasattr(self.resolver, '_conn_pool'):
+        if hasattr(self.resolver, "_conn_pool"):
             self.resolver._conn_pool.stop_reaper()
             self.resolver._conn_pool.close_all()
         logger.info("DNS Proxy stopped")

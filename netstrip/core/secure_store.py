@@ -66,9 +66,13 @@ def _dpapi_unprotect(blob: bytes) -> bytes:
     class DATA_BLOB(ctypes.Structure):
         _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
 
-    payload = base64.b64decode(blob[len(_PREFIX_DPAPI):])
-    in_blob = DATA_BLOB(len(payload), ctypes.cast(
-        ctypes.create_string_buffer(payload, len(payload)), ctypes.POINTER(ctypes.c_char)))
+    payload = base64.b64decode(blob[len(_PREFIX_DPAPI) :])
+    in_blob = DATA_BLOB(
+        len(payload),
+        ctypes.cast(
+            ctypes.create_string_buffer(payload, len(payload)), ctypes.POINTER(ctypes.c_char)
+        ),
+    )
     out_blob = DATA_BLOB()
     ok = ctypes.windll.crypt32.CryptUnprotectData(
         ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
@@ -108,7 +112,7 @@ def _read_keyfile() -> bytes | None:
             logger.error(f"DPAPI unprotect failed (moved machine? deleted user key?): {e}")
             return None
     if raw.startswith(_PREFIX_RAW):
-        return base64.b64decode(raw[len(_PREFIX_RAW):])
+        return base64.b64decode(raw[len(_PREFIX_RAW) :])
     # Very old layout: bare base64 PSK — accept and let caller re-store securely
     return raw
 
@@ -116,8 +120,11 @@ def _read_keyfile() -> bytes | None:
 def store_psk(db, psk_str: str):
     """Persist the PSK into the protected keyfile; scrub any legacy DB copy."""
     psk_bytes = psk_str.encode("utf-8") if isinstance(psk_str, str) else psk_str
-    content = _dpapi_protect(psk_bytes) if os.name == "nt" else (
-        _PREFIX_RAW + base64.b64encode(psk_bytes))
+    content = (
+        _dpapi_protect(psk_bytes)
+        if os.name == "nt"
+        else (_PREFIX_RAW + base64.b64encode(psk_bytes))
+    )
     _write_keyfile(content)
     try:
         if db is not None and db.get_setting("lan_shield_psk", "") != DB_MARKER:

@@ -1,12 +1,12 @@
-import os
-import sys
-import re
 import logging
+import os
+import re
 import subprocess
+import sys
 import threading
-from typing import Optional
 
 logger = logging.getLogger(__name__)
+
 
 class MACRandomizer:
     def __init__(self, engine):
@@ -17,7 +17,7 @@ class MACRandomizer:
 
     @classmethod
     def is_supported(cls) -> bool:
-        return sys.platform in ('win32', 'linux', 'darwin')
+        return sys.platform in ("win32", "linux", "darwin")
 
     def generate_random_mac(self) -> str:
         """
@@ -27,6 +27,7 @@ class MACRandomizer:
         # CSPRNG required: predictable (Mersenne-Twister) MACs would defeat the
         # purpose of randomization — an observer could correlate/predict IDs.
         import secrets
+
         mac = [
             secrets.randbelow(0x10) << 4 | secrets.choice((0x02, 0x06, 0x0A, 0x0E)),
             secrets.randbelow(0x100),
@@ -35,12 +36,17 @@ class MACRandomizer:
             secrets.randbelow(0x100),
             secrets.randbelow(0x100),
         ]
-        return ':'.join(f'{x:02x}' for x in mac)
+        return ":".join(f"{x:02x}" for x in mac)
 
-    def get_active_interface(self) -> Optional[str]:
-        if sys.platform == 'win32':
+    def get_active_interface(self) -> str | None:
+        if sys.platform == "win32":
             try:
-                result = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, shell=False)
+                result = subprocess.run(
+                    ["netsh", "interface", "show", "interface"],
+                    capture_output=True,
+                    text=True,
+                    shell=False,
+                )
                 if result.returncode == 0:
                     for line in result.stdout.splitlines():
                         if "Connected" in line or "Verbunden" in line or "Conectado" in line:
@@ -49,11 +55,12 @@ class MACRandomizer:
                                 return " ".join(parts[3:])
             except Exception as e:
                 logger.error(f"Failed to get active interface on Windows: {e}")
-        elif sys.platform == 'linux':
+        elif sys.platform == "linux":
             try:
                 # No shell pipeline: parse the default-route device directly
-                result = subprocess.run(["ip", "route", "show", "default"],
-                                        capture_output=True, text=True, shell=False)
+                result = subprocess.run(
+                    ["ip", "route", "show", "default"], capture_output=True, text=True, shell=False
+                )
                 if result.returncode == 0:
                     for token in result.stdout.split():
                         if token == "dev":
@@ -63,10 +70,11 @@ class MACRandomizer:
                         return parts[parts.index("dev") + 1]
             except Exception as e:
                 logger.error(f"Failed to get active interface on Linux: {e}")
-        elif sys.platform == 'darwin':
+        elif sys.platform == "darwin":
             try:
-                result = subprocess.run(["route", "-n", "get", "default"],
-                                        capture_output=True, text=True, shell=False)
+                result = subprocess.run(
+                    ["route", "-n", "get", "default"], capture_output=True, text=True, shell=False
+                )
                 if result.returncode == 0:
                     for line in result.stdout.splitlines():
                         if line.strip().startswith("interface:"):
@@ -75,48 +83,54 @@ class MACRandomizer:
                 logger.error(f"Failed to get active interface on macOS: {e}")
         return None
 
-    def get_current_mac(self, interface_name: str) -> Optional[str]:
+    def get_current_mac(self, interface_name: str) -> str | None:
         if not interface_name:
             return None
-            
-        if sys.platform == 'win32':
+
+        if sys.platform == "win32":
             try:
-                result = subprocess.run(["getmac", "/v", "/fo", "csv"], capture_output=True, text=True, shell=False)
+                result = subprocess.run(
+                    ["getmac", "/v", "/fo", "csv"], capture_output=True, text=True, shell=False
+                )
                 if result.returncode == 0:
-                    import csv, io
+                    import csv
+                    import io
+
                     reader = csv.reader(io.StringIO(result.stdout))
                     for row in reader:
                         if len(row) >= 3 and row[0] == interface_name:
                             mac = row[2]
-                            if mac and mac.lower() != 'n/a':
-                                return mac.replace('-', ':').lower()
+                            if mac and mac.lower() != "n/a":
+                                return mac.replace("-", ":").lower()
             except Exception as e:
                 logger.error(f"Failed to get MAC on Windows: {e}")
-        elif sys.platform in ('linux', 'darwin'):
+        elif sys.platform in ("linux", "darwin"):
             try:
-                cmd = ['ifconfig', interface_name]
-                if sys.platform == 'linux':
-                    cmd = ['ip', 'link', 'show', interface_name]
+                cmd = ["ifconfig", interface_name]
+                if sys.platform == "linux":
+                    cmd = ["ip", "link", "show", interface_name]
                 result = subprocess.run(cmd, capture_output=True, text=True)
-                match = re.search(r'([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})', result.stdout)
+                match = re.search(r"([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})", result.stdout)
                 if match:
-                    return match.group(0).replace('-', ':').lower()
+                    return match.group(0).replace("-", ":").lower()
             except Exception as e:
                 logger.error(f"Failed to get MAC on *nix: {e}")
         return None
 
-    def _win_set_mac(self, interface_name: str, mac: Optional[str]) -> bool:
+    def _win_set_mac(self, interface_name: str, mac: str | None) -> bool:
         try:
             import winreg
-            
-            reg_path = r"SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}"
+
+            reg_path = (
+                r"SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}"
+            )
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
-            
+
             # Shell Sandboxing: argument lists (shell=False) so adapter names
             # can never be interpreted as shell metacharacters.
             creation_kwargs = {}
-            if os.name == 'nt':
-                creation_kwargs['creationflags'] = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            if os.name == "nt":
+                creation_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
             target_subkey = None
             for i in range(winreg.QueryInfoKey(key)[0]):
@@ -126,15 +140,25 @@ class MACRandomizer:
                     try:
                         net_cfg_id = winreg.QueryValueEx(subkey, "NetCfgInstanceId")[0]
                         result = subprocess.run(
-                            ["wmic", "nic", "where", f"NetConnectionID='{interface_name}'", "get", "GUID"],
-                            capture_output=True, text=True, shell=False, **creation_kwargs
+                            [
+                                "wmic",
+                                "nic",
+                                "where",
+                                f"NetConnectionID='{interface_name}'",
+                                "get",
+                                "GUID",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            shell=False,
+                            **creation_kwargs,
                         )
                         guid = ""
                         for line in result.stdout.splitlines():
                             if "{" in line and "}" in line:
                                 guid = line.strip()
                                 break
-                        
+
                         if guid == net_cfg_id:
                             target_subkey = subkey_name
                             winreg.CloseKey(subkey)
@@ -150,10 +174,12 @@ class MACRandomizer:
                 logger.error("Could not find adapter in registry")
                 return False
 
-            write_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{reg_path}\\{target_subkey}", 0, winreg.KEY_SET_VALUE)
-            
+            write_key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, f"{reg_path}\\{target_subkey}", 0, winreg.KEY_SET_VALUE
+            )
+
             if mac:
-                mac_clean = mac.replace(':', '').replace('-', '').upper()
+                mac_clean = mac.replace(":", "").replace("-", "").upper()
                 winreg.SetValueEx(write_key, "NetworkAddress", 0, winreg.REG_SZ, mac_clean)
             else:
                 try:
@@ -161,14 +187,32 @@ class MACRandomizer:
                 except FileNotFoundError:
                     pass
             winreg.CloseKey(write_key)
-            
+
             subprocess.run(
-                ["netsh", "interface", "set", "interface", f"name={interface_name}", "admin=disable"],
-                capture_output=True, shell=False, **creation_kwargs
+                [
+                    "netsh",
+                    "interface",
+                    "set",
+                    "interface",
+                    f"name={interface_name}",
+                    "admin=disable",
+                ],
+                capture_output=True,
+                shell=False,
+                **creation_kwargs,
             )
             subprocess.run(
-                ["netsh", "interface", "set", "interface", f"name={interface_name}", "admin=enable"],
-                capture_output=True, shell=False, **creation_kwargs
+                [
+                    "netsh",
+                    "interface",
+                    "set",
+                    "interface",
+                    f"name={interface_name}",
+                    "admin=enable",
+                ],
+                capture_output=True,
+                shell=False,
+                **creation_kwargs,
             )
             return True
         except Exception as e:
@@ -184,13 +228,15 @@ class MACRandomizer:
             if not interface_name:
                 logger.error("No interface provided")
                 return False
-                
+
             current = self.get_current_mac(interface_name)
             if current and not self.original_mac:
                 self.original_mac = current
-                if self.engine and hasattr(self.engine, 'db'):
+                if self.engine and hasattr(self.engine, "db"):
                     try:
-                        self.engine.db.set_setting(f"original_mac_{interface_name}", self.original_mac)
+                        self.engine.db.set_setting(
+                            f"original_mac_{interface_name}", self.original_mac
+                        )
                     except Exception as e:
                         logger.error(f"Failed to save original MAC to DB: {e}")
 
@@ -198,19 +244,21 @@ class MACRandomizer:
             logger.info(f"Randomizing MAC on {interface_name} to {new_mac}")
 
             success = False
-            if sys.platform == 'win32':
+            if sys.platform == "win32":
                 success = self._win_set_mac(interface_name, new_mac)
-            elif sys.platform == 'linux':
+            elif sys.platform == "linux":
                 try:
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'down'], check=True)
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'address', new_mac], check=True)
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'up'], check=True)
+                    subprocess.run(["ip", "link", "set", "dev", interface_name, "down"], check=True)
+                    subprocess.run(
+                        ["ip", "link", "set", "dev", interface_name, "address", new_mac], check=True
+                    )
+                    subprocess.run(["ip", "link", "set", "dev", interface_name, "up"], check=True)
                     success = True
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Linux MAC change failed: {e}")
-            elif sys.platform == 'darwin':
+            elif sys.platform == "darwin":
                 try:
-                    subprocess.run(['ifconfig', interface_name, 'ether', new_mac], check=True)
+                    subprocess.run(["ifconfig", interface_name, "ether", new_mac], check=True)
                     success = True
                 except subprocess.CalledProcessError as e:
                     logger.error(f"macOS MAC change failed: {e}")
@@ -225,7 +273,7 @@ class MACRandomizer:
                 return False
 
             orig_mac = self.original_mac
-            if not orig_mac and self.engine and hasattr(self.engine, 'db'):
+            if not orig_mac and self.engine and hasattr(self.engine, "db"):
                 try:
                     orig_mac = self.engine.db.get_setting(f"original_mac_{interface_name}")
                 except Exception:
@@ -233,26 +281,31 @@ class MACRandomizer:
 
             if not orig_mac:
                 logger.info("No original MAC saved to restore")
-                if sys.platform == 'win32':
+                if sys.platform == "win32":
                     return self._win_set_mac(interface_name, None)
                 return False
 
             logger.info(f"Restoring MAC on {interface_name} to {orig_mac}")
-            
+
             success = False
-            if sys.platform == 'win32':
-                success = self._win_set_mac(interface_name, None) # Remove custom MAC to use hardware MAC
-            elif sys.platform == 'linux':
+            if sys.platform == "win32":
+                success = self._win_set_mac(
+                    interface_name, None
+                )  # Remove custom MAC to use hardware MAC
+            elif sys.platform == "linux":
                 try:
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'down'], check=True)
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'address', orig_mac], check=True)
-                    subprocess.run(['ip', 'link', 'set', 'dev', interface_name, 'up'], check=True)
+                    subprocess.run(["ip", "link", "set", "dev", interface_name, "down"], check=True)
+                    subprocess.run(
+                        ["ip", "link", "set", "dev", interface_name, "address", orig_mac],
+                        check=True,
+                    )
+                    subprocess.run(["ip", "link", "set", "dev", interface_name, "up"], check=True)
                     success = True
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Linux MAC restore failed: {e}")
-            elif sys.platform == 'darwin':
+            elif sys.platform == "darwin":
                 try:
-                    subprocess.run(['ifconfig', interface_name, 'ether', orig_mac], check=True)
+                    subprocess.run(["ifconfig", interface_name, "ether", orig_mac], check=True)
                     success = True
                 except subprocess.CalledProcessError as e:
                     logger.error(f"macOS MAC restore failed: {e}")
@@ -288,7 +341,7 @@ class MACRandomizer:
     @staticmethod
     def harden_adapter_protocols(enable: bool = True):
         """Harden or restore network adapter protocol bindings.
-        
+
         Disables/re-enables vulnerable legacy protocols on all active adapters:
         - NetBIOS over TCP/IP
         - LLMNR (Link-Local Multicast Name Resolution)
@@ -298,30 +351,60 @@ class MACRandomizer:
         - QoS Packet Scheduler
         - mDNS (Multicast DNS)
         """
-        if sys.platform != 'win32':
+        if sys.platform != "win32":
             # Linux/macOS: disable avahi-daemon and NetBIOS via nmcli
-            if sys.platform == 'linux':
+            if sys.platform == "linux":
                 try:
                     if enable:
-                        subprocess.run(['systemctl', 'stop', 'avahi-daemon'], capture_output=True)
-                        subprocess.run(['systemctl', 'disable', 'avahi-daemon'], capture_output=True)
+                        subprocess.run(["systemctl", "stop", "avahi-daemon"], capture_output=True)
+                        subprocess.run(
+                            ["systemctl", "disable", "avahi-daemon"], capture_output=True
+                        )
                         # Disable LLMNR in systemd-resolved
-                        subprocess.run(['sed', '-i', 's/#LLMNR=yes/LLMNR=no/', '/etc/systemd/resolved.conf'], capture_output=True)
-                        subprocess.run(['systemctl', 'restart', 'systemd-resolved'], capture_output=True)
+                        subprocess.run(
+                            ["sed", "-i", "s/#LLMNR=yes/LLMNR=no/", "/etc/systemd/resolved.conf"],
+                            capture_output=True,
+                        )
+                        subprocess.run(
+                            ["systemctl", "restart", "systemd-resolved"], capture_output=True
+                        )
                     else:
-                        subprocess.run(['systemctl', 'enable', 'avahi-daemon'], capture_output=True)
-                        subprocess.run(['systemctl', 'start', 'avahi-daemon'], capture_output=True)
-                        subprocess.run(['sed', '-i', 's/LLMNR=no/#LLMNR=yes/', '/etc/systemd/resolved.conf'], capture_output=True)
-                        subprocess.run(['systemctl', 'restart', 'systemd-resolved'], capture_output=True)
+                        subprocess.run(["systemctl", "enable", "avahi-daemon"], capture_output=True)
+                        subprocess.run(["systemctl", "start", "avahi-daemon"], capture_output=True)
+                        subprocess.run(
+                            ["sed", "-i", "s/LLMNR=no/#LLMNR=yes/", "/etc/systemd/resolved.conf"],
+                            capture_output=True,
+                        )
+                        subprocess.run(
+                            ["systemctl", "restart", "systemd-resolved"], capture_output=True
+                        )
                     logger.info(f"Linux adapter hardening {'enabled' if enable else 'disabled'}")
                 except Exception as e:
                     logger.error(f"Linux adapter hardening failed: {e}")
-            elif sys.platform == 'darwin':
+            elif sys.platform == "darwin":
                 try:
                     if enable:
-                        subprocess.run(['sudo', 'launchctl', 'unload', '-w', '/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist'], capture_output=True)
+                        subprocess.run(
+                            [
+                                "sudo",
+                                "launchctl",
+                                "unload",
+                                "-w",
+                                "/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist",
+                            ],
+                            capture_output=True,
+                        )
                     else:
-                        subprocess.run(['sudo', 'launchctl', 'load', '-w', '/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist'], capture_output=True)
+                        subprocess.run(
+                            [
+                                "sudo",
+                                "launchctl",
+                                "load",
+                                "-w",
+                                "/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist",
+                            ],
+                            capture_output=True,
+                        )
                     logger.info(f"macOS adapter hardening {'enabled' if enable else 'disabled'}")
                 except Exception as e:
                     logger.error(f"macOS adapter hardening failed: {e}")
@@ -329,13 +412,14 @@ class MACRandomizer:
 
         # Windows: Use native Group Policy Registry and ctypes to disable/enable protocol bindings without triggering ML
         try:
-            import winreg
             import ctypes
-            
+            import winreg
+
             def _control_service(service_name: str, start: bool):
                 try:
                     scm = ctypes.windll.advapi32.OpenSCManagerW(None, None, 0xF003F)
-                    if not scm: return
+                    if not scm:
+                        return
                     svc = ctypes.windll.advapi32.OpenServiceW(scm, service_name, 0xF01FF)
                     if not svc:
                         ctypes.windll.advapi32.CloseServiceHandle(scm)
@@ -343,21 +427,33 @@ class MACRandomizer:
                     if start:
                         ctypes.windll.advapi32.StartServiceW(svc, 0, None)
                     else:
+
                         class SERVICE_STATUS(ctypes.Structure):
-                            _fields_ = [("dwServiceType", ctypes.c_ulong), ("dwCurrentState", ctypes.c_ulong),
-                                        ("dwControlsAccepted", ctypes.c_ulong), ("dwWin32ExitCode", ctypes.c_ulong),
-                                        ("dwServiceSpecificExitCode", ctypes.c_ulong), ("dwCheckPoint", ctypes.c_ulong),
-                                        ("dwWaitHint", ctypes.c_ulong)]
+                            _fields_ = [
+                                ("dwServiceType", ctypes.c_ulong),
+                                ("dwCurrentState", ctypes.c_ulong),
+                                ("dwControlsAccepted", ctypes.c_ulong),
+                                ("dwWin32ExitCode", ctypes.c_ulong),
+                                ("dwServiceSpecificExitCode", ctypes.c_ulong),
+                                ("dwCheckPoint", ctypes.c_ulong),
+                                ("dwWaitHint", ctypes.c_ulong),
+                            ]
+
                         status = SERVICE_STATUS()
                         ctypes.windll.advapi32.ControlService(svc, 1, ctypes.byref(status))
                     ctypes.windll.advapi32.CloseServiceHandle(svc)
                     ctypes.windll.advapi32.CloseServiceHandle(scm)
                 except Exception:
                     pass
-            
+
             if enable:
                 try:
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SOFTWARE\Policies\Microsoft\Windows\LLTD",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "EnableLLTDIO", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "EnableRspndr", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "AllowLLTDIOOnDomain", 0, winreg.REG_DWORD, 0)
@@ -366,13 +462,28 @@ class MACRandomizer:
                         winreg.SetValueEx(key, "AllowRspndrOnDomain", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
-                        
+
                     # Disable LLDP (ms_lldp) and QoS Packet Scheduler (ms_pacer) via driver registry start values
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\MsLldp",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\pacer",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\lanmanserver", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\lanmanserver",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 4)
                 except Exception:
                     pass
@@ -381,33 +492,58 @@ class MACRandomizer:
                 _control_service("lanmanserver", False)
             else:
                 try:
-                    winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
+                    winreg.DeleteKey(
+                        winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD"
+                    )
                 except Exception:
                     pass
                 try:
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\MsLldp",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\pacer",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
-                    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\lanmanserver", 0, winreg.KEY_WRITE) as key:
+                    with winreg.CreateKeyEx(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Services\lanmanserver",
+                        0,
+                        winreg.KEY_WRITE,
+                    ) as key:
                         winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 2)
                 except Exception:
                     pass
                 _control_service("MsLldp", True)
                 _control_service("pacer", True)
                 _control_service("lanmanserver", True)
-            
+
             # Disable NetBIOS over TCP/IP natively via registry interfaces
             import winreg
+
             reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
             try:
                 key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
                 for i in range(winreg.QueryInfoKey(key)[0]):
                     try:
                         subkey_name = winreg.EnumKey(key, i)
-                        subkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{reg_path}\\{subkey_name}", 0, winreg.KEY_SET_VALUE)
+                        subkey = winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            f"{reg_path}\\{subkey_name}",
+                            0,
+                            winreg.KEY_SET_VALUE,
+                        )
                         # 2 = Disable NetBIOS over TCP/IP, 0 = Default (enable)
-                        winreg.SetValueEx(subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 2 if enable else 0)
+                        winreg.SetValueEx(
+                            subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 2 if enable else 0
+                        )
                         winreg.CloseKey(subkey)
                     except OSError:
                         continue
@@ -419,11 +555,15 @@ class MACRandomizer:
             try:
                 llmnr_path = r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient"
                 try:
-                    llmnr_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, llmnr_path, 0, winreg.KEY_SET_VALUE)
+                    llmnr_key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE, llmnr_path, 0, winreg.KEY_SET_VALUE
+                    )
                 except FileNotFoundError:
                     llmnr_key = winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, llmnr_path)
                 # 0 = Disable LLMNR
-                winreg.SetValueEx(llmnr_key, "EnableMulticast", 0, winreg.REG_DWORD, 0 if enable else 1)
+                winreg.SetValueEx(
+                    llmnr_key, "EnableMulticast", 0, winreg.REG_DWORD, 0 if enable else 1
+                )
                 winreg.CloseKey(llmnr_key)
             except OSError as e:
                 logger.error(f"Failed to modify LLMNR registry: {e}")
@@ -432,7 +572,9 @@ class MACRandomizer:
             try:
                 mdns_path = r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters"
                 try:
-                    mdns_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, mdns_path, 0, winreg.KEY_SET_VALUE)
+                    mdns_key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE, mdns_path, 0, winreg.KEY_SET_VALUE
+                    )
                 except FileNotFoundError:
                     mdns_key = winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, mdns_path)
                 winreg.SetValueEx(mdns_key, "EnableMDNS", 0, winreg.REG_DWORD, 0 if enable else 1)
@@ -440,12 +582,14 @@ class MACRandomizer:
             except OSError as e:
                 logger.error(f"Failed to modify mDNS registry: {e}")
 
-            logger.info(f"Windows adapter hardening {'enabled' if enable else 'disabled'}: NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, File Sharing, QoS")
+            logger.info(
+                f"Windows adapter hardening {'enabled' if enable else 'disabled'}: NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, File Sharing, QoS"
+            )
             # Clear caches natively without subprocess telemetry
             try:
                 ctypes.windll.dnsapi.DnsFlushResolverCache()
             except Exception as e:
                 logger.debug(f"Native cache flush failed: {e}")
-                
+
         except Exception as e:
             logger.error(f"Windows adapter hardening failed: {e}")

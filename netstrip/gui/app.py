@@ -2,48 +2,52 @@
 Main GUI Application for NetStrip
 """
 
-import customtkinter as ctk
 import sys
+
+import customtkinter as ctk
+
 from netstrip.gui.hovertip import apply_global_tooltips
 
 # Apply global auto-tooltips monkey-patch
 apply_global_tooltips()
 
+
 # Monkey-patch CustomTkinter Scrollable Frame for centralized, ultra-smooth scrolling
 def fast_mouse_wheel_all(self, event):
     try:
         if self._check_if_valid_scroll(event.widget):
-            canvas = getattr(self, '_parent_canvas', None)
+            canvas = getattr(self, "_parent_canvas", None)
             if not canvas or not canvas.winfo_exists():
                 return
 
             from netstrip.gui.utils import get_scroll_step
+
             step_units = get_scroll_step()
 
             if sys.platform.startswith("win"):
-                if hasattr(event, 'delta') and event.delta:
+                if hasattr(event, "delta") and event.delta:
                     # Units per notch follow the user's Scroll Speed setting
                     step = -int((event.delta / 120) * step_units)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
-                    if getattr(self, '_shift_pressed', False):
+                    if getattr(self, "_shift_pressed", False):
                         if canvas.xview() != (0.0, 1.0):
                             canvas.xview("scroll", step, "units")
                     else:
                         if canvas.yview() != (0.0, 1.0):
                             canvas.yview("scroll", step, "units")
             elif sys.platform == "darwin":
-                if hasattr(event, 'delta') and event.delta:
+                if hasattr(event, "delta") and event.delta:
                     step = -int(event.delta * max(1, int(step_units / 2)))
-                    if getattr(self, '_shift_pressed', False):
+                    if getattr(self, "_shift_pressed", False):
                         if canvas.xview() != (0.0, 1.0):
                             canvas.xview("scroll", step, "units")
                     else:
                         if canvas.yview() != (0.0, 1.0):
                             canvas.yview("scroll", step, "units")
-            else: # Linux / X11
-                step = -step_units if getattr(event, 'num', None) == 4 else step_units
-                if getattr(self, '_shift_pressed', False):
+            else:  # Linux / X11
+                step = -step_units if getattr(event, "num", None) == 4 else step_units
+                if getattr(self, "_shift_pressed", False):
                     if canvas.xview() != (0.0, 1.0):
                         canvas.xview_scroll(step, "units")
                 else:
@@ -52,6 +56,7 @@ def fast_mouse_wheel_all(self, event):
     except Exception:
         pass
 
+
 def fast_check_if_valid_scroll(self, widget):
     try:
         if not self.winfo_exists() or not self.winfo_ismapped():
@@ -59,65 +64,77 @@ def fast_check_if_valid_scroll(self, widget):
         # Don't scroll if this scrollable frame is not visible (hidden tab)
         if not self.winfo_viewable():
             return False
-            
+
         # Strictly verify that this scrollable frame is inside the currently active tab
         # OR if it belongs to the persistent right sidebar (which is outside the tab hierarchy).
-        # This absolutely prevents invisible background tabs from processing scroll events 
+        # This absolutely prevents invisible background tabs from processing scroll events
         # and generating ghost artifacting on the canvas.
         app = self
         is_sidebar = False
-        while app and not hasattr(app, 'current_view'):
-            if hasattr(app, 'right_sidebar'): break
-            if app == app.master: break
+        while app and not hasattr(app, "current_view"):
+            if hasattr(app, "right_sidebar"):
+                break
+            if app == app.master:
+                break
             app = app.master
-            
+
         # Check if the widget is inside the right sidebar
         curr_sb = self
         while curr_sb:
-            if hasattr(app, 'right_sidebar') and curr_sb == app.right_sidebar:
+            if hasattr(app, "right_sidebar") and curr_sb == app.right_sidebar:
                 is_sidebar = True
                 break
-            if curr_sb == curr_sb.master: break
+            if curr_sb == curr_sb.master:
+                break
             curr_sb = curr_sb.master
-            
-        if not is_sidebar and app and hasattr(app, 'current_view') and app.current_view:
+
+        if not is_sidebar and app and hasattr(app, "current_view") and app.current_view:
             curr = self
             is_active_tab = False
             while curr:
                 if curr == app.current_view:
                     is_active_tab = True
                     break
-                if curr == curr.master: break
+                if curr == curr.master:
+                    break
                 curr = curr.master
             if not is_active_tab:
                 return False
-                
-        canvas = getattr(self, '_parent_canvas', None)
+
+        canvas = getattr(self, "_parent_canvas", None)
         if not canvas or not canvas.winfo_exists():
             return False
-            
+
         canvas_str = str(canvas)
         widget_str = str(widget)
-        if widget_str == canvas_str or widget_str.startswith(canvas_str + ".") or widget_str == str(self) or widget_str.startswith(str(self) + "."):
+        if (
+            widget_str == canvas_str
+            or widget_str.startswith(canvas_str + ".")
+            or widget_str == str(self)
+            or widget_str.startswith(str(self) + ".")
+        ):
             return True
-            
+
         curr = widget
         while curr is not None:
             if curr == canvas or curr == self:
                 return True
-            curr = getattr(curr, 'master', None)
+            curr = getattr(curr, "master", None)
     except Exception:
         pass
     return False
 
+
 ctk.CTkScrollableFrame._mouse_wheel_all = fast_mouse_wheel_all
 ctk.CTkScrollableFrame._check_if_valid_scroll = fast_check_if_valid_scroll
+
 
 # Warm-import heavy engine modules in a background thread so first tab
 # switches (Filter Manager / Settings) don't pay the import cost on the UI
 # thread.
 def _warm_import_heavy_modules():
     import importlib
+
     for _mod in (
         "netstrip.core.dns_proxy",
         "netstrip.data.blocklist_manager",
@@ -129,36 +146,47 @@ def _warm_import_heavy_modules():
         except Exception:
             pass
 
+
 import threading as _threading
+
 _threading.Thread(target=_warm_import_heavy_modules, daemon=True).start()
 
 import logging
-from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
+
 from netstrip.core.engine import NetStripEngine
+from netstrip.gui.theme import Colors, Fonts, Icons, Spacing
+
 
 def _resolve_view_class(view_target):
     if isinstance(view_target, str):
         if view_target == "DashboardView":
             from netstrip.gui.dashboard import DashboardView
+
             return DashboardView
-        elif view_target == "LogView":
+        if view_target == "LogView":
             from netstrip.gui.views.logs import LogView
+
             return LogView
-        elif view_target == "BlocklistView":
+        if view_target == "BlocklistView":
             from netstrip.gui.views.blocklists import BlocklistView
+
             return BlocklistView
-        elif view_target == "SettingsView":
+        if view_target == "SettingsView":
             from netstrip.gui.views.settings import SettingsView
+
             return SettingsView
-        elif view_target == "AppRulesView":
+        if view_target == "AppRulesView":
             from netstrip.gui.views.rules import AppRulesView
+
             return AppRulesView
     return view_target
 
 
 class DraggableSash(ctk.CTkFrame):
     def __init__(self, master, engine, right_frame, **kwargs):
-        super().__init__(master, width=6, cursor="sb_h_double_arrow", fg_color=Colors.BORDER_SUBTLE, **kwargs)
+        super().__init__(
+            master, width=6, cursor="sb_h_double_arrow", fg_color=Colors.BORDER_SUBTLE, **kwargs
+        )
         self.engine = engine
         self.right_frame = right_frame
         self.bind("<ButtonPress-1>", self._on_press)
@@ -167,27 +195,29 @@ class DraggableSash(ctk.CTkFrame):
         self.bind("<Enter>", lambda e: self.configure(fg_color=Colors.TEXT_SECONDARY))
         self.bind("<Leave>", lambda e: self.configure(fg_color=Colors.BORDER_SUBTLE))
         self._drag_timer = None
-        
+
     def _on_press(self, event):
         self._start_x = event.x_root
         self._initial_width = self.right_frame.winfo_width()
         self.configure(fg_color=Colors.ACCENT_PRIMARY)
-        if not hasattr(self, 'ghost_line'):
-            self.ghost_line = ctk.CTkFrame(self.master, width=4, fg_color=Colors.ACCENT_PRIMARY, corner_radius=0)
+        if not hasattr(self, "ghost_line"):
+            self.ghost_line = ctk.CTkFrame(
+                self.master, width=4, fg_color=Colors.ACCENT_PRIMARY, corner_radius=0
+            )
         self.ghost_line.place(x=self.winfo_x(), y=self.winfo_y(), height=self.winfo_height())
         self.ghost_line.lift()
-        
+
     def _on_drag(self, event):
         dx = event.x_root - self._start_x
         new_width = self._initial_width - dx
         if 250 < new_width < 1200:
             new_x = self.winfo_x() + dx
-            if hasattr(self, 'ghost_line'):
+            if hasattr(self, "ghost_line"):
                 self.ghost_line.place(x=new_x)
-            
+
     def _on_release(self, event):
         self.configure(fg_color=Colors.BORDER_SUBTLE)
-        if hasattr(self, 'ghost_line'):
+        if hasattr(self, "ghost_line"):
             self.ghost_line.place_forget()
         dx = event.x_root - self._start_x
         new_width = self._initial_width - dx
@@ -195,44 +225,48 @@ class DraggableSash(ctk.CTkFrame):
             self.master.grid_columnconfigure(3, weight=0, minsize=new_width)
             self.engine.db.set_setting("sidebar_width", str(new_width))
 
+
 logger = logging.getLogger(__name__)
+
 
 class NetStripApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.withdraw() # Hide immediately to prevent white window flash during init
+        self.withdraw()  # Hide immediately to prevent white window flash during init
 
         # Setup Window
         self.title("NetStrip - Intelligent Network Debloater")
-        from netstrip.gui.utils import get_screen_dimensions, center_window
+        from netstrip.gui.utils import center_window, get_screen_dimensions
+
         screen_w, screen_h = get_screen_dimensions(self)
         win_w = min(1500, max(960, int(screen_w * 0.88)))
         win_h = min(850, max(600, int(screen_h * 0.85)))
         center_window(self, win_w, win_h)
         self.configure(fg_color=Colors.BG_DARKEST)
-        
+
         # Fix Taskbar icon grouping on Windows globally for this process
         try:
             import ctypes
-            myappid = 'NetStrip.app.1.0'
+
+            myappid = "NetStrip.app.1.0"
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         except Exception:
             pass
 
         self.apply_icon()
-        
+
         # Prevent black rendering artifacts on window restore without lagging child widgets
         self.bind("<Map>", self._on_window_map)
         self.bind("<Unmap>", self._on_window_unmap)
         self.bind("<Configure>", self._on_window_resize)
         self._resize_timer = None
-        
+
     def _on_window_unmap(self, event):
         if str(event.widget) == str(self):
             # Pause animations and intensive redrawing when minimized
-            if hasattr(self, 'persistent_logo'):
+            if hasattr(self, "persistent_logo"):
                 self.persistent_logo.stop()
-            if hasattr(self, 'connections_list'):
+            if hasattr(self, "connections_list"):
                 self.connections_list._pause_updates = True
         self._map_timer = None
 
@@ -240,28 +274,32 @@ class NetStripApp(ctk.CTk):
         try:
             import os
             import sys
+
             from PIL import Image
-            
-            if getattr(sys, 'frozen', False):
+
+            if getattr(sys, "frozen", False):
                 base_path = sys._MEIPASS
             else:
-                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                
-            icon_path = os.path.join(base_path, 'assets', 'logo.ico')
+                base_path = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                )
+
+            icon_path = os.path.join(base_path, "assets", "logo.ico")
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
                 self._icon_image = Image.open(icon_path)
-                
+
                 import ctypes
-                myappid = 'NetStrip.app.1.0'
+
+                myappid = "NetStrip.app.1.0"
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-                
+
                 # Also set the small and large icons explicitly using ctypes for taskbar and alt-tab
                 hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
                 hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
                 if hicon:
-                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
-                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)  # ICON_SMALL
+                    ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)  # ICON_BIG
         except Exception:
             pass
 
@@ -269,12 +307,12 @@ class NetStripApp(ctk.CTk):
         # Debounce the un-minimize to prevent artifacting, but keep it fast
         if str(event.widget) == str(self):
             # Resume animations immediately
-            if hasattr(self, 'persistent_logo'):
+            if hasattr(self, "persistent_logo"):
                 self.persistent_logo.start()
-            if hasattr(self, 'connections_list'):
+            if hasattr(self, "connections_list"):
                 self.connections_list._pause_updates = False
-                
-            if hasattr(self, '_map_after_id') and self._map_after_id:
+
+            if hasattr(self, "_map_after_id") and self._map_after_id:
                 self.after_cancel(self._map_after_id)
             self._map_after_id = self.after(500, self._force_redraw)
 
@@ -282,12 +320,12 @@ class NetStripApp(ctk.CTk):
         # Only act on top-level window resize events, not child widget reconfigs
         if event.widget is not self:
             return
-            
-        if not getattr(self, '_is_resizing', False):
+
+        if not getattr(self, "_is_resizing", False):
             self._is_resizing = True
-            if hasattr(self, 'connections_list'):
+            if hasattr(self, "connections_list"):
                 self.connections_list._resize_paused = True
-                
+
         # Debounce: cancel any pending resize-end callback and reset
         if self._resize_timer is not None:
             self.after_cancel(self._resize_timer)
@@ -296,9 +334,9 @@ class NetStripApp(ctk.CTk):
     def _on_resize_end(self):
         self._resize_timer = None
         self._is_resizing = False
-        
+
         # Restore scroll frames
-        if hasattr(self, 'connections_list'):
+        if hasattr(self, "connections_list"):
             self.connections_list._resize_paused = False
 
     def build_ui(self, engine: NetStripEngine):
@@ -308,13 +346,16 @@ class NetStripApp(ctk.CTk):
         # Restore the user's Scroll Speed preference into the scroll engine
         try:
             from netstrip.gui.utils import apply_saved_scroll_speed
+
             apply_saved_scroll_speed(self.engine.db)
         except Exception:
             pass
 
         # Restore interface language (i18n) before any view is built
         try:
-            from netstrip.i18n import set_language as _set_lang, detect_language
+            from netstrip.i18n import detect_language
+            from netstrip.i18n import set_language as _set_lang
+
             lang = str(self.engine.db.get_setting("gui_language", "auto"))
             _set_lang(detect_language() if lang == "auto" else lang)
         except Exception:
@@ -326,15 +367,15 @@ class NetStripApp(ctk.CTk):
         self.engine.on_critical_network_event = self._show_critical_recovery_modal
         self.engine.geoip.add_callback(self._update_geoip_ui)
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
-        
-        if getattr(self.engine, 'is_headless', False):
+
+        if getattr(self.engine, "is_headless", False):
             # Headless Mode: Skip heavy UI widget construction and polling loops
             self.withdraw()
             self.engine.set_status_callback(self._show_status)
             return
 
         self._build_ui()
-        
+
         # Register status callback
         self.engine.set_status_callback(self._show_status)
 
@@ -343,76 +384,112 @@ class NetStripApp(ctk.CTk):
             try:
                 if msg == "rules_changed":
                     from netstrip.gui.views.blocklists import BlocklistView
+
                     blocklist_view = self._cached_views.get(BlocklistView)
-                    if blocklist_view and hasattr(blocklist_view, '_on_blocklist_data_reloaded_ui'):
+                    if blocklist_view and hasattr(blocklist_view, "_on_blocklist_data_reloaded_ui"):
                         blocklist_view._on_blocklist_data_reloaded_ui()
-                        
-                if hasattr(self, 'status_label') and msg != "rules_changed":
+
+                if hasattr(self, "status_label") and msg != "rules_changed":
                     self.status_label.configure(text=msg)
-                    if hasattr(self, '_status_timer'):
+                    if hasattr(self, "_status_timer"):
                         self.after_cancel(self._status_timer)
-                    self._status_timer = self.after(5000, lambda: self.status_label.configure(text=""))
-                
+                    self._status_timer = self.after(
+                        5000, lambda: self.status_label.configure(text="")
+                    )
+
                 # If app is hidden/minimized to tray or headless, send a system notification
-                if getattr(self, '_tray_icon', None):
-                    if not self.winfo_ismapped() or getattr(self.engine, 'is_headless', False):
+                if getattr(self, "_tray_icon", None):
+                    if not self.winfo_ismapped() or getattr(self.engine, "is_headless", False):
                         # Don't spam notifications for minor updates, only important ones
-                        if "blocked" in msg.lower() or "mode changed" in msg.lower() or "threat" in msg.lower() or "whitelist" in msg.lower() or "killswitch" in msg.lower() or "anomaly" in msg.lower():
+                        if (
+                            "blocked" in msg.lower()
+                            or "mode changed" in msg.lower()
+                            or "threat" in msg.lower()
+                            or "whitelist" in msg.lower()
+                            or "killswitch" in msg.lower()
+                            or "anomaly" in msg.lower()
+                        ):
                             self._tray_icon.notify(msg, "NetStrip Status")
             except Exception:
                 pass
+
         self.after(0, _update)
 
     def _build_ui(self):
         # 3-column layout, 3 rows: Top Bar | (Nav Sidebar | Main Content | Connections Sidebar) | Status Bar
-        self.grid_rowconfigure(0, weight=0) # Top Bar
-        self.grid_rowconfigure(1, weight=1) # Main
-        self.grid_rowconfigure(2, weight=0) # Status Bar
+        self.grid_rowconfigure(0, weight=0)  # Top Bar
+        self.grid_rowconfigure(1, weight=1)  # Main
+        self.grid_rowconfigure(2, weight=0)  # Status Bar
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
-        
+
         try:
             saved_width = int(self.engine.db.get_setting("sidebar_width", "500"))
         except Exception:
             saved_width = 500
-            
-        self.grid_columnconfigure(2, weight=0, minsize=6) # Sash
-        self.grid_columnconfigure(3, weight=0, minsize=saved_width) # Right sidebar
-        
+
+        self.grid_columnconfigure(2, weight=0, minsize=6)  # Sash
+        self.grid_columnconfigure(3, weight=0, minsize=saved_width)  # Right sidebar
+
         # Top Bar
         self.top_bar = ctk.CTkFrame(self, fg_color=Colors.BG_PANEL, corner_radius=0, height=45)
         self.top_bar.grid(row=0, column=0, columnspan=4, sticky="ew")
         self.top_bar.grid_propagate(False)
         self.top_bar.grid_columnconfigure(1, weight=1)
 
-        self.lbl_geoip = ctk.CTkLabel(self.top_bar, text="🌐 Loading GeoIP...", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY)
+        self.lbl_geoip = ctk.CTkLabel(
+            self.top_bar,
+            text="🌐 Loading GeoIP...",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_SECONDARY,
+        )
         self.lbl_geoip.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         self.top_bar.grid_rowconfigure(0, weight=1)
-        
+
         self.btn_sound_toggle = ctk.CTkButton(
-            self.top_bar, text="🔊", font=(Fonts.FAMILY_PRIMARY[0], 22), width=40, height=40,
-            fg_color="transparent", hover_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_PRIMARY,
-            command=self._toggle_sound
+            self.top_bar,
+            text="🔊",
+            font=(Fonts.FAMILY_PRIMARY[0], 22),
+            width=40,
+            height=40,
+            fg_color="transparent",
+            hover_color=Colors.BG_ELEVATED,
+            text_color=Colors.TEXT_PRIMARY,
+            command=self._toggle_sound,
         )
         self.btn_sound_toggle.grid(row=0, column=1, padx=10, sticky="e")
-        
+
         self.btn_killswitch = ctk.CTkButton(
-            self.top_bar, text="CRIPPLE: ON", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
-            fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS, text_color="white", corner_radius=4, height=28,
-            command=self._manual_killswitch_click
+            self.top_bar,
+            text="CRIPPLE: ON",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+            fg_color=Colors.SUCCESS_DIM,
+            hover_color=Colors.SUCCESS,
+            text_color="white",
+            corner_radius=4,
+            height=28,
+            command=self._manual_killswitch_click,
         )
         self.btn_killswitch.grid(row=0, column=2, padx=20, pady=8, sticky="e")
-        
+
         try:
             from netstrip.gui.hovertip import FadingHovertip
-            FadingHovertip(self.btn_killswitch, "Click to toggle Killswitch mode. When ON, all traffic is securely dropped by the OS packet filter.", hover_delay=400)
-            FadingHovertip(self.btn_sound_toggle, "Toggle notification and alert sounds.", hover_delay=400)
+
+            FadingHovertip(
+                self.btn_killswitch,
+                "Click to toggle Killswitch mode. When ON, all traffic is securely dropped by the OS packet filter.",
+                hover_delay=400,
+            )
+            FadingHovertip(
+                self.btn_sound_toggle, "Toggle notification and alert sounds.", hover_delay=400
+            )
         except Exception:
             pass
 
         # Sidebar
-        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0, fg_color=Colors.BG_PANEL,
-                                     border_width=0)
+        self.sidebar = ctk.CTkFrame(
+            self, width=240, corner_radius=0, fg_color=Colors.BG_PANEL, border_width=0
+        )
         self.sidebar.grid(row=1, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_rowconfigure(8, weight=1)
@@ -420,40 +497,62 @@ class NetStripApp(ctk.CTk):
 
         # Logo
         from netstrip.gui.animated_logo import AnimatedLogo
+
         logo_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         logo_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 8))
-        
+
         # Add the requested quote
-        ctk.CTkLabel(logo_frame, text="Blocking millions of domains.",
-                     font=(Fonts.FAMILY_PRIMARY[0], 9, "italic"),
-                     justify="center", text_color=Colors.TEXT_TERTIARY).pack(anchor="center", pady=(0, 10))
-        
-        self.persistent_logo = AnimatedLogo(logo_frame, width=180, height=120, bg_color=Colors.BG_PANEL)
+        ctk.CTkLabel(
+            logo_frame,
+            text="Blocking millions of domains.",
+            font=(Fonts.FAMILY_PRIMARY[0], 9, "italic"),
+            justify="center",
+            text_color=Colors.TEXT_TERTIARY,
+        ).pack(anchor="center", pady=(0, 10))
+
+        self.persistent_logo = AnimatedLogo(
+            logo_frame, width=180, height=120, bg_color=Colors.BG_PANEL
+        )
         self.persistent_logo.pack(anchor="center", pady=(0, 5))
-        
-        ctk.CTkLabel(logo_frame, text="CRIPPLE",
-                     font=("Segoe UI Black", 38, "bold"),
-                     text_color=Colors.TEXT_PRIMARY).pack(anchor="center")
-        ctk.CTkLabel(logo_frame, text="Network Debloater",
-                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
-                     text_color=Colors.TEXT_TERTIARY).pack(anchor="center")
-        
+
+        ctk.CTkLabel(
+            logo_frame,
+            text="CRIPPLE",
+            font=("Segoe UI Black", 38, "bold"),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(anchor="center")
+        ctk.CTkLabel(
+            logo_frame,
+            text="Network Debloater",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_TERTIARY,
+        ).pack(anchor="center")
+
         # Add copyright at the very bottom of the sidebar
         copyright_lbl = ctk.CTkLabel(
-            self.sidebar, text="© 2026 FrenzyPenguin Media", 
-            font=(Fonts.FAMILY_PRIMARY[0], 10), text_color=Colors.TEXT_TERTIARY
+            self.sidebar,
+            text="© 2026 FrenzyPenguin Media",
+            font=(Fonts.FAMILY_PRIMARY[0], 10),
+            text_color=Colors.TEXT_TERTIARY,
         )
         copyright_lbl.grid(row=8, column=0, pady=20, sticky="s")
-        ctk.CTkLabel(logo_frame, text="DNS filter & sinkhole",
-                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
-                     text_color=Colors.TEXT_TERTIARY).pack(anchor="center")
-        ctk.CTkLabel(logo_frame, text="Firewall add-on",
-                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
-                     text_color=Colors.TEXT_TERTIARY).pack(anchor="center")
+        ctk.CTkLabel(
+            logo_frame,
+            text="DNS filter & sinkhole",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
+            text_color=Colors.TEXT_TERTIARY,
+        ).pack(anchor="center")
+        ctk.CTkLabel(
+            logo_frame,
+            text="Firewall add-on",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS),
+            text_color=Colors.TEXT_TERTIARY,
+        ).pack(anchor="center")
 
         # Separator
         ctk.CTkFrame(self.sidebar, height=1, fg_color=Colors.BORDER_SUBTLE).grid(
-            row=1, column=0, sticky="ew", padx=16, pady=(8, 12))
+            row=1, column=0, sticky="ew", padx=16, pady=(8, 12)
+        )
 
         # Nav buttons
         self.nav_btns = []
@@ -465,38 +564,49 @@ class NetStripApp(ctk.CTk):
 
         # Expand button
         self.btn_expand = ctk.CTkButton(
-            self.sidebar, text="◀ Expand Connections", 
-            font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"), 
-            fg_color=Colors.BG_ELEVATED, 
+            self.sidebar,
+            text="◀ Expand Connections",
+            font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"),
+            fg_color=Colors.BG_ELEVATED,
             hover_color=Colors.BG_PANEL,
             text_color=Colors.TEXT_PRIMARY,
             corner_radius=8,
             height=32,
-            command=self._toggle_sidebar_expand
+            command=self._toggle_sidebar_expand,
         )
         self.btn_expand.grid(row=8, column=0, pady=20, padx=20, sticky="ew")
 
         # Version
         from netstrip import __version__
-        self.version_label = ctk.CTkLabel(self.sidebar, text=f"v{__version__}",
-                     font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
-                     text_color=Colors.ACCENT_CYAN,
-                     cursor="hand2")
+
+        self.version_label = ctk.CTkLabel(
+            self.sidebar,
+            text=f"v{__version__}",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, Fonts.WEIGHT_BOLD),
+            text_color=Colors.ACCENT_CYAN,
+            cursor="hand2",
+        )
         self.version_label.grid(row=9, column=0, pady=(0, 16))
-        
+
         def _nav_to_settings(e):
             self._select_nav_by_text("Settings")
-            
+
             def _scroll_to_top():
                 from netstrip.gui.views.settings import SettingsView
+
                 settings_view = self._cached_views.get(SettingsView)
-                if settings_view and hasattr(settings_view, 'scroll_frame') and hasattr(settings_view.scroll_frame, '_parent_canvas'):
+                if (
+                    settings_view
+                    and hasattr(settings_view, "scroll_frame")
+                    and hasattr(settings_view.scroll_frame, "_parent_canvas")
+                ):
                     try:
                         settings_view.scroll_frame._parent_canvas.yview_moveto(0)
-                    except Exception: pass
-                    
+                    except Exception:
+                        pass
+
             self.after(50, _scroll_to_top)
-            
+
         self.version_label.bind("<Button-1>", _nav_to_settings)
 
         # Start continuous desktop left pane glowing animation
@@ -504,7 +614,7 @@ class NetStripApp(ctk.CTk):
 
         # Register callback for engine events
         self.engine.gui_update_callback = self._on_engine_event
-        if getattr(self.engine, 'update_available', False):
+        if getattr(self.engine, "update_available", False):
             self._on_engine_event("UPDATE_AVAILABLE")
 
         # Main content (middle pane)
@@ -518,30 +628,38 @@ class NetStripApp(ctk.CTk):
         self.sash.grid(row=1, column=2, sticky="ns")
 
         # Right Sidebar (Persistent App Connections List)
-        self.right_sidebar = ctk.CTkFrame(self, corner_radius=0, fg_color=Colors.BG_PANEL, border_width=1, border_color=Colors.BORDER_SUBTLE)
+        self.right_sidebar = ctk.CTkFrame(
+            self,
+            corner_radius=0,
+            fg_color=Colors.BG_PANEL,
+            border_width=1,
+            border_color=Colors.BORDER_SUBTLE,
+        )
         self.right_sidebar.grid(row=1, column=3, sticky="nsew")
         self.sash.right_frame = self.right_sidebar
-        
+
         # Status Bar
         self.status_bar = ctk.CTkFrame(self, height=24, corner_radius=0, fg_color=Colors.BG_DARKEST)
         self.status_bar.grid(row=2, column=0, columnspan=4, sticky="ew")
         self.status_bar.grid_propagate(False)
         self.status_label = ctk.CTkLabel(
-            self.status_bar, text="",
+            self.status_bar,
+            text="",
             font=(Fonts.FAMILY_PRIMARY[0], 11),
-            text_color=Colors.TEXT_TERTIARY
+            text_color=Colors.TEXT_TERTIARY,
         )
         self.status_label.pack(side="left", padx=16)
-        
+
         self.right_sidebar.grid_rowconfigure(0, weight=1)
         self.right_sidebar.grid_columnconfigure(0, weight=1)
-        
+
         # Instantiate heavy components BEFORE the splash screen fades out
         self._deferred_init()
 
     def _deferred_init(self):
         # Instantiate the ConnectionsSidebar widget inside the right sidebar
         from netstrip.gui.connections_sidebar import ConnectionsSidebar
+
         self.connections_list = ConnectionsSidebar(self.right_sidebar, self.engine)
         self.connections_list.pack(fill="both", expand=True)
 
@@ -549,16 +667,15 @@ class NetStripApp(ctk.CTk):
         self._cached_views = {}
         self._select_nav(self.nav_btns[0])
 
-        
         # Silently pre-warm unshown tabs in idle background time for instant switching
         self.after(1000, self._prewarm_views)
 
     def _prewarm_views(self):
         """Silently instantiate un-cached views during idle time so tab switching is instantaneous."""
-        if getattr(self, '_destroyed', False):
+        if getattr(self, "_destroyed", False):
             return
         for btn in self.nav_btns:
-            v_raw = getattr(btn, '_view_class', None)
+            v_raw = getattr(btn, "_view_class", None)
             v_cls = _resolve_view_class(v_raw)
             if v_cls and v_cls not in self._cached_views:
                 try:
@@ -574,25 +691,30 @@ class NetStripApp(ctk.CTk):
 
     def _toggle_sidebar_expand(self):
         from netstrip.core.sound import sound_manager
+
         sound_manager.play_click()
-        if not hasattr(self, '_sidebar_expanded'):
+        if not hasattr(self, "_sidebar_expanded"):
             self._sidebar_expanded = False
-            
+
         self._sidebar_expanded = not self._sidebar_expanded
-        
+
         if self._sidebar_expanded:
             self.main_frame.grid_remove()
             self.sash.grid_remove()
             self.right_sidebar.grid(row=1, column=1, columnspan=3, sticky="nsew")
             self.connections_list.set_expanded(True)
-            self.btn_expand.configure(text="Collapse Sidebar ▶", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"))
+            self.btn_expand.configure(
+                text="Collapse Sidebar ▶", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold")
+            )
         else:
             self.main_frame.grid(row=1, column=1, sticky="nsew")
             self.sash.grid(row=1, column=2, sticky="ns")
             self.right_sidebar.grid(row=1, column=3, columnspan=1, sticky="nsew")
             self.connections_list.set_expanded(False)
-            self.btn_expand.configure(text="◀ Expand Sidebar", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"))
-            
+            self.btn_expand.configure(
+                text="◀ Expand Sidebar", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold")
+            )
+
         try:
             self.update_idletasks()
         except Exception:
@@ -602,9 +724,15 @@ class NetStripApp(ctk.CTk):
         # Localized display; English remains the stable lookup identity
         try:
             from netstrip.i18n import tr as _tr
-            text = _tr({"DashboardView": "Dashboard", "LogView": "Logs",
-                        "BlocklistView": "Filter Lists",
-                        "SettingsView": "Settings"}.get(view_class, text))
+
+            text = _tr(
+                {
+                    "DashboardView": "Dashboard",
+                    "LogView": "Logs",
+                    "BlocklistView": "Filter Lists",
+                    "SettingsView": "Settings",
+                }.get(view_class, text)
+            )
         except Exception:
             pass
         btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=40)
@@ -614,13 +742,14 @@ class NetStripApp(ctk.CTk):
         btn = ctk.CTkButton(
             btn_frame,
             text=f"  {icon}   {text}",
-            anchor="w", height=38,
+            anchor="w",
+            height=38,
             corner_radius=Spacing.RADIUS_SM,
             fg_color="transparent",
             text_color=Colors.TEXT_SECONDARY,
             hover_color=Colors.BG_ELEVATED,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD),
-            command=lambda t=text: self._select_nav_by_text(t)
+            command=lambda t=text: self._select_nav_by_text(t),
         )
         btn.grid(row=0, column=0, sticky="ew")
         btn._view_class = view_class
@@ -646,15 +775,16 @@ class NetStripApp(ctk.CTk):
 
     def _select_nav(self, selected_btn):
         from netstrip.core.sound import sound_manager
+
         sound_manager.play_click()
         for btn in self.nav_btns:
             btn.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         selected_btn.configure(fg_color=Colors.BG_ELEVATED, text_color=Colors.ACCENT_PRIMARY)
 
         view_class = _resolve_view_class(selected_btn._view_class)
-        is_dash = getattr(view_class, '__name__', '') == 'DashboardView'
+        is_dash = getattr(view_class, "__name__", "") == "DashboardView"
         target_pad = 0 if is_dash else 24
-        
+
         def _show_view(view):
             if self.current_view and self.current_view != view:
                 self.current_view.grid_remove()
@@ -665,37 +795,41 @@ class NetStripApp(ctk.CTk):
         if view_class in self._cached_views:
             _show_view(self._cached_views[view_class])
             return
-        
+
         # First-time load on-demand
-        if not hasattr(self, '_tab_loading_overlay'):
+        if not hasattr(self, "_tab_loading_overlay"):
             self._tab_loading_overlay = ctk.CTkFrame(self.main_frame, fg_color=Colors.BG_DARK)
-            ctk.CTkLabel(self._tab_loading_overlay, text="Loading...", font=(Fonts.FAMILY_PRIMARY[0], 20)).place(relx=0.5, rely=0.5, anchor="center")
-            
+            ctk.CTkLabel(
+                self._tab_loading_overlay, text="Loading...", font=(Fonts.FAMILY_PRIMARY[0], 20)
+            ).place(relx=0.5, rely=0.5, anchor="center")
+
         self._tab_loading_overlay.grid(row=0, column=0, sticky="nsew")
         if self.current_view:
             self.current_view.grid_remove()
-            
+
         self.update_idletasks()
-        
+
         def _build_and_show():
             try:
                 if view_class not in self._cached_views:
                     self._cached_views[view_class] = view_class(self.main_frame, self.engine)
-                if hasattr(self, '_tab_loading_overlay'):
+                if hasattr(self, "_tab_loading_overlay"):
                     self._tab_loading_overlay.grid_remove()
                 _show_view(self._cached_views[view_class])
             except Exception as e:
                 logger.error(f"Failed to load view {view_class}: {e}", exc_info=True)
-                if hasattr(self, '_tab_loading_overlay'):
+                if hasattr(self, "_tab_loading_overlay"):
                     self._tab_loading_overlay.grid_remove()
-            
+
         self.after(10, _build_and_show)
 
     def _show_smart_modal(self, conn_data):
         # Must run in main thread
         def _show():
             from netstrip.gui.smart_modal import SmartGhostModal
+
             SmartGhostModal(self, self.engine, conn_data)
+
         self.after(0, _show)
 
     def _update_geoip_ui(self, old_ip: str, geo_data: dict):
@@ -706,18 +840,21 @@ class NetStripApp(ctk.CTk):
                 copy_val = "Hidden for privacy"
             else:
                 text = f"{geo_data.get('flag', '🌐')} {geo_data.get('city', 'Unknown')}, {geo_data.get('country', 'Unknown')}  |  {geo_data.get('ip', 'Unknown')}"
-                copy_val = geo_data.get('ip', 'Unknown')
-                
+                copy_val = geo_data.get("ip", "Unknown")
+
             self.lbl_geoip.configure(text=text)
             try:
                 from netstrip.gui.utils import bind_copy_tooltip
+
                 bind_copy_tooltip(self.lbl_geoip, copy_val, "Copied!")
             except Exception:
                 pass
+
         self.after(0, update_ui)
 
     def _toggle_sound(self):
         from netstrip.core.sound import sound_manager
+
         sound_manager.set_muted(not sound_manager.muted)
         self.btn_sound_toggle.configure(text="🔇" if sound_manager.muted else "🔊")
         if not sound_manager.muted:
@@ -725,14 +862,20 @@ class NetStripApp(ctk.CTk):
 
     def _manual_killswitch_click(self):
         current_state = self.btn_killswitch.cget("text")
-        
+
         if current_state == "CRIPPLE: ON":
             # State 1 -> 2: Engage Killswitch
             try:
                 from netstrip.gui.killswitch_modal import ManualKillswitchModal
-                self.after(0, lambda: ManualKillswitchModal(self, self.engine, self._execute_manual_killswitch))
+
+                self.after(
+                    0,
+                    lambda: ManualKillswitchModal(
+                        self, self.engine, self._execute_manual_killswitch
+                    ),
+                )
             except Exception:
-                self._execute_manual_killswitch(True) # Fallback to engaging without warning
+                self._execute_manual_killswitch(True)  # Fallback to engaging without warning
         elif current_state == "KILLSWITCH ENGAGED":
             # State 2 -> 3: Cripple OFF (Bypass)
             try:
@@ -756,40 +899,66 @@ class NetStripApp(ctk.CTk):
         modal = ctk.CTkToplevel(self)
         modal.title("WARNING: BYPASS MODE")
         modal.attributes("-topmost", True)
-        from netstrip.gui.utils import center_window, apply_window_icon
+        from netstrip.gui.utils import apply_window_icon, center_window
+
         apply_window_icon(modal)
         center_window(modal, 450, 200, parent=self)
-        
-        lbl_title = ctk.CTkLabel(modal, text="🚨 WARNING: ENDPOINT UNPROTECTED", font=Fonts.h3(), text_color=Colors.WARNING)
+
+        lbl_title = ctk.CTkLabel(
+            modal,
+            text="🚨 WARNING: ENDPOINT UNPROTECTED",
+            font=Fonts.h3(),
+            text_color=Colors.WARNING,
+        )
         lbl_title.pack(pady=(20, 10))
-        
-        lbl_desc = ctk.CTkLabel(modal, text="Switching to OFF will clear all Cripple firewall rules and DNS.\nYour PC will be raw and unprotected.", font=Fonts.body())
+
+        lbl_desc = ctk.CTkLabel(
+            modal,
+            text="Switching to OFF will clear all Cripple firewall rules and DNS.\nYour PC will be raw and unprotected.",
+            font=Fonts.body(),
+        )
         lbl_desc.pack(pady=10)
-        
+
         btn_frame = ctk.CTkFrame(modal, fg_color="transparent")
         btn_frame.pack()
-        
-        ctk.CTkButton(btn_frame, text="Cancel", command=modal.destroy, fg_color=Colors.BG_INPUT, hover_color=Colors.BORDER_HOVER, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=5)
-        
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Cancel",
+            command=modal.destroy,
+            fg_color=Colors.BG_INPUT,
+            hover_color=Colors.BORDER_HOVER,
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left", padx=5)
+
         def confirm_bypass():
             self.engine.set_killswitch(False)
             self.engine.firewall.clear_all_rules()
             self.btn_killswitch.configure(text="CRIPPLE: OFF (BYPASS)", fg_color=Colors.WARNING)
             modal.destroy()
-            
-        ctk.CTkButton(btn_frame, text="Proceed to OFF", command=confirm_bypass, fg_color=Colors.WARNING, text_color="white").pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Proceed to OFF",
+            command=confirm_bypass,
+            fg_color=Colors.WARNING,
+            text_color="white",
+        ).pack(side="left", padx=5)
 
     def _show_critical_recovery_modal(self, message: str):
         try:
             from netstrip.gui.killswitch_modal import CriticalRecoveryModal
+
             self.after(0, lambda: CriticalRecoveryModal(self, self.engine, message))
         except Exception as e:
             logger.error(f"Failed to spawn recovery modal: {e}")
-        self.after(0, lambda: self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d"))
-
+        self.after(
+            0, lambda: self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d")
+        )
 
     def _perform_clean_exit(self):
         import pathlib
+
         clean_exit_path = pathlib.Path.home() / ".netstrip" / ".clean_exit"
         try:
             clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -810,10 +979,11 @@ class NetStripApp(ctk.CTk):
 
     def _show_tray_icon(self):
         try:
-            import pystray
             import threading
-    
-            if getattr(self, '_tray_icon', None) is not None:
+
+            import pystray
+
+            if getattr(self, "_tray_icon", None) is not None:
                 return
         except Exception:
             # Pystray requires a display server (X11/Wayland/Explorer).
@@ -824,10 +994,14 @@ class NetStripApp(ctk.CTk):
         def on_show(icon, item):
             icon.stop()
             self._tray_icon = None
+
             def _restore():
                 self.deiconify()
-                if getattr(self.engine, 'update_available', False) and not getattr(self, '_update_glow_active', False):
+                if getattr(self.engine, "update_available", False) and not getattr(
+                    self, "_update_glow_active", False
+                ):
                     self._start_version_glow_animation()
+
             self.after(0, _restore)
 
         def on_quit(icon, item):
@@ -836,21 +1010,25 @@ class NetStripApp(ctk.CTk):
             self.after(0, self._perform_clean_exit)
 
         def is_killswitch_active(item):
-            return getattr(self.engine, 'killswitch_active', False)
+            return getattr(self.engine, "killswitch_active", False)
 
         def toggle_killswitch(icon, item):
             current = is_killswitch_active(item)
             self.engine.set_killswitch(not current)
+
             def update_ui():
-                if hasattr(self, 'btn_killswitch'):
-                    if getattr(self.engine, 'killswitch_active', False):
+                if hasattr(self, "btn_killswitch"):
+                    if getattr(self.engine, "killswitch_active", False):
                         self.btn_killswitch.configure(text="KILLSWITCH ENGAGED", fg_color="#7f1d1d")
                     else:
-                        self.btn_killswitch.configure(text="CRIPPLE: ACTIVE", fg_color=Colors.SUCCESS_DIM)
+                        self.btn_killswitch.configure(
+                            text="CRIPPLE: ACTIVE", fg_color=Colors.SUCCESS_DIM
+                        )
+
             self.after(0, update_ui)
 
         def is_ghost_active(item):
-            mode = getattr(getattr(self.engine, 'classifier', None), 'mode', None)
+            mode = getattr(getattr(self.engine, "classifier", None), "mode", None)
             return mode and mode.name in ("GHOST", "PARANOID")
 
         def toggle_ghost(icon, item):
@@ -875,70 +1053,90 @@ class NetStripApp(ctk.CTk):
             threat = self.engine.db.get_setting("pending_kernel_threat")
             if threat:
                 try:
-                    name, msg = threat.split('|', 1)
+                    name, msg = threat.split("|", 1)
                 except ValueError:
                     name, msg = "unknown", threat
-                anomaly_data = {'name': name, 'message': msg, 'type': 'adapter'}
-                
+                anomaly_data = {"name": name, "message": msg, "type": "adapter"}
+
                 def _tray_decision(decision):
                     self.engine.db.set_setting("pending_kernel_threat", "")
-                    if decision == 'neutralize':
+                    if decision == "neutralize":
                         if self.engine.anomaly_scanner:
                             self.engine.anomaly_scanner._neutralize_adapter(name)
                             self.engine.anomaly_scanner._neutralize_pcap()
-                    elif decision == 'whitelist':
+                    elif decision == "whitelist":
                         self.engine.db.whitelist_anomaly(name)
-                    elif decision == 'disable_scanner':
+                    elif decision == "disable_scanner":
                         self.engine.db.set_setting("kernel_anomaly_scanner", "false")
                         if self.engine.anomaly_scanner:
                             self.engine.anomaly_scanner.stop()
-                
+
                 from netstrip.gui.views.anomaly_alert import CTkAnomalyAlert
-                self.after(0, lambda: CTkAnomalyAlert(self, self.engine, anomaly_data, _tray_decision))
+
+                self.after(
+                    0, lambda: CTkAnomalyAlert(self, self.engine, anomaly_data, _tray_decision)
+                )
 
         def get_menu_items():
-            items = [pystray.MenuItem('Show Cripple', on_show, default=True)]
-            
+            items = [pystray.MenuItem("Show Cripple", on_show, default=True)]
+
             # Dynamic Threat Button
             threat = self.engine.db.get_setting("pending_kernel_threat")
             if threat:
-                items.append(pystray.MenuItem('⚠️ Review Kernel Anomaly', review_anomaly))
-                
+                items.append(pystray.MenuItem("⚠️ Review Kernel Anomaly", review_anomaly))
+
             def is_smart_shield_active(item):
                 return self.engine.db.get_setting("smart_shield_enabled", "true") == "true"
+
             def toggle_smart_shield(icon, item):
                 current = is_smart_shield_active(item)
                 self.engine.db.set_setting("smart_shield_enabled", "false" if current else "true")
-                
+
             def is_system_blocked(item):
                 return self.engine.db.get_setting("block_system_connections", "false") == "true"
+
             def toggle_system_blocked(icon, item):
                 current = is_system_blocked(item)
-                self.engine.db.set_setting("block_system_connections", "false" if current else "true")
+                self.engine.db.set_setting(
+                    "block_system_connections", "false" if current else "true"
+                )
                 self.engine.event_bus.publish("MODE_CHANGED")
-                
+
             def is_streamer_privacy_active(item):
                 return self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
+
             def toggle_streamer_privacy(icon, item):
                 current = is_streamer_privacy_active(item)
                 self.engine.db.set_setting("privacy_stream_mode", "false" if current else "true")
                 self.engine.event_bus.publish("MODE_CHANGED")
-                
-            items.extend([
-                pystray.MenuItem('Master Killswitch', toggle_killswitch, checked=is_killswitch_active),
-                pystray.MenuItem('Ghost Mode', toggle_ghost, checked=is_ghost_active),
-                pystray.MenuItem('Streamer Privacy Mode', toggle_streamer_privacy, checked=is_streamer_privacy_active),
-                pystray.MenuItem('Smart Shield', toggle_smart_shield, checked=is_smart_shield_active),
-                pystray.MenuItem('Block System Connections', toggle_system_blocked, checked=is_system_blocked),
-                pystray.MenuItem('LAN Shield', toggle_lan_shield, checked=is_lan_shield_active),
-                pystray.MenuItem('Quit', on_quit)
-            ])
+
+            items.extend(
+                [
+                    pystray.MenuItem(
+                        "Master Killswitch", toggle_killswitch, checked=is_killswitch_active
+                    ),
+                    pystray.MenuItem("Ghost Mode", toggle_ghost, checked=is_ghost_active),
+                    pystray.MenuItem(
+                        "Streamer Privacy Mode",
+                        toggle_streamer_privacy,
+                        checked=is_streamer_privacy_active,
+                    ),
+                    pystray.MenuItem(
+                        "Smart Shield", toggle_smart_shield, checked=is_smart_shield_active
+                    ),
+                    pystray.MenuItem(
+                        "Block System Connections", toggle_system_blocked, checked=is_system_blocked
+                    ),
+                    pystray.MenuItem("LAN Shield", toggle_lan_shield, checked=is_lan_shield_active),
+                    pystray.MenuItem("Quit", on_quit),
+                ]
+            )
             return items
 
         menu = pystray.Menu(get_menu_items)
 
-        self._tray_icon = pystray.Icon("NetStrip", getattr(self, '_icon_image'), "Cripple", menu)
-        
+        self._tray_icon = pystray.Icon("NetStrip", self._icon_image, "Cripple", menu)
+
         # pystray blocks, so run it in a thread
         threading.Thread(target=self._tray_icon.run, daemon=True).start()
 
@@ -946,82 +1144,90 @@ class NetStripApp(ctk.CTk):
         def _handle_event():
             if event_name == "UPDATE_AVAILABLE":
                 # Start the glow animation now that an update is available
-                if not getattr(self, '_update_glow_active', False):
+                if not getattr(self, "_update_glow_active", False):
                     self._start_version_glow_animation()
                 # Update version label text to show latest version
-                if hasattr(self, 'version_label') and hasattr(self.engine, 'latest_version'):
+                if hasattr(self, "version_label") and hasattr(self.engine, "latest_version"):
                     from netstrip import __version__
-                    self.version_label.configure(text=f"v{__version__} → v{self.engine.latest_version}")
+
+                    self.version_label.configure(
+                        text=f"v{__version__} → v{self.engine.latest_version}"
+                    )
                 # Ensure update status refreshed if settings view is cached
                 from netstrip.gui.views.settings import SettingsView
+
                 settings_view = self._cached_views.get(SettingsView)
-                if settings_view and hasattr(settings_view, '_refresh_update_status'):
+                if settings_view and hasattr(settings_view, "_refresh_update_status"):
                     settings_view._refresh_update_status()
             elif event_name == "MODE_CHANGE" or event_name == "MODE_CHANGED":
-                if hasattr(self, 'connections_list'):
+                if hasattr(self, "connections_list"):
                     for group in self.connections_list.app_groups.values():
-                        if hasattr(group, 'refresh_global_state'):
+                        if hasattr(group, "refresh_global_state"):
                             group.refresh_global_state()
                     self.connections_list._refresh_loop()
-                
+
                 # Keep SettingsView toggles in sync with Dashboard changes
                 from netstrip.gui.views.settings import SettingsView
+
                 settings_view = self._cached_views.get(SettingsView)
-                if settings_view and hasattr(settings_view, 'refresh_toggles'):
+                if settings_view and hasattr(settings_view, "refresh_toggles"):
                     settings_view.refresh_toggles()
+
         self.after(0, _handle_event)
-                
+
     def _start_version_glow_animation(self):
         """Only start the glow animation if an update is actually available."""
-        self._update_glow_active = getattr(self.engine, 'update_available', False)
+        self._update_glow_active = getattr(self.engine, "update_available", False)
         if self._update_glow_active:
             self._animate_version_glow(step=0, increasing=True)
         else:
             # Static cyan color — app is up to date
             try:
-                if hasattr(self, 'version_label') and self.version_label.winfo_exists():
+                if hasattr(self, "version_label") and self.version_label.winfo_exists():
                     self.version_label.configure(text_color=Colors.ACCENT_CYAN)
             except Exception:
                 pass
 
     def _animate_version_glow(self, step=0, increasing=True):
-        if not hasattr(self, 'version_label') or not self.version_label.winfo_exists():
+        if not hasattr(self, "version_label") or not self.version_label.winfo_exists():
             return
-        
+
         # Stop animation if no update is available (user may have updated)
-        if not getattr(self.engine, 'update_available', False):
+        if not getattr(self.engine, "update_available", False):
             self._update_glow_active = False
             try:
                 self.version_label.configure(text_color=Colors.ACCENT_CYAN)
             except Exception:
                 pass
             return
-            
+
         try:
             # Update available: pulse yellow/gold (#6b7280 -> #facc15)
-            r1, g1, b1 = 0x6b, 0x72, 0x80
-            r2, g2, b2 = 0xfa, 0xcc, 0x15
-            
+            r1, g1, b1 = 0x6B, 0x72, 0x80
+            r2, g2, b2 = 0xFA, 0xCC, 0x15
+
             ratio = step / 25.0
             r = int(r1 + (r2 - r1) * ratio)
             g = int(g1 + (g2 - g1) * ratio)
             b = int(b1 + (b2 - b1) * ratio)
             color = f"#{r:02x}{g:02x}{b:02x}"
-            
+
             self.version_label.configure(text_color=color)
-            
+
             if increasing:
                 step += 1
-                if step >= 25: increasing = False
+                if step >= 25:
+                    increasing = False
             else:
                 step -= 1
-                if step <= 0: increasing = True
-            
+                if step <= 0:
+                    increasing = True
+
             # Pause animation if window is hidden (e.g. system tray)
             if not self.winfo_exists() or not self.winfo_viewable():
                 self._update_glow_active = False
                 return
-                
+
             self.after(100, lambda: self._animate_version_glow(step, increasing))
         except Exception:
             pass

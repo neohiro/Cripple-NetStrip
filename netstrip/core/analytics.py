@@ -24,11 +24,11 @@ What is NEVER collected:
 """
 
 import logging
+import platform
 import threading
 import time
-import platform
 import uuid
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from netstrip.core.engine import CrippleEngine
@@ -47,34 +47,36 @@ SETTING_KEY = "analytics_opt_in"
 class AnalyticsReporter:
     """
     Collects and periodically sends anonymous usage statistics.
-    
+
     This reporter is strictly opt-in. It will NOT send any data unless
     the user has explicitly enabled the 'analytics_opt_in' setting.
     The setting defaults to 'false' in all code paths.
     """
 
-    def __init__(self, engine: 'CrippleEngine'):
+    def __init__(self, engine: "CrippleEngine"):
         self.engine = engine
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._installation_id: Optional[str] = None
+        self._installation_id: str | None = None
 
     def start(self):
         """Start the background analytics thread. Only sends if opt-in is enabled."""
-        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="AnalyticsReporter")
+        self._thread = threading.Thread(
+            target=self._run_loop, daemon=True, name="AnalyticsReporter"
+        )
         self._thread.start()
-        
+
         # Auto-whitelist telemetry delivery domains if analytics is already enabled
         if self.is_enabled():
             self._ensure_telemetry_domains_whitelisted()
-        
+
         logger.info("Analytics reporter initialized (will only send if user has opted in)")
 
     def _ensure_telemetry_domains_whitelisted(self):
         """Whitelist the telemetry delivery endpoints so reports can pass the firewall."""
         try:
             bl = self.engine.classifier.blocklist
-            for d in ('api.github.com',):
+            for d in ("api.github.com",):
                 bl.add_user_whitelist(d)
             self.engine.classifier._domain_cache.clear()
         except Exception:
@@ -132,7 +134,11 @@ class AnalyticsReporter:
         }
 
         try:
-            payload["mode"] = self.engine.classifier.mode.name if hasattr(self.engine, 'classifier') else "unknown"
+            payload["mode"] = (
+                self.engine.classifier.mode.name
+                if hasattr(self.engine, "classifier")
+                else "unknown"
+            )
         except Exception:
             payload["mode"] = "unknown"
 
@@ -151,11 +157,21 @@ class AnalyticsReporter:
             payload["rule_count"] = 0
 
         try:
-            payload["blocklist_domains"] = self.engine.blocklist.total_count if hasattr(self.engine, 'blocklist') else 0
-            if hasattr(self.engine, 'updater') and hasattr(self.engine.updater, 'last_update_stats'):
-                payload["blocklist_download_success_rate"] = self.engine.updater.last_update_stats.get("success", 0)
-                payload["blocklist_download_failures"] = self.engine.updater.last_update_stats.get("failed", 0)
-                payload["blocklist_total_lists"] = self.engine.updater.last_update_stats.get("total", 0)
+            payload["blocklist_domains"] = (
+                self.engine.blocklist.total_count if hasattr(self.engine, "blocklist") else 0
+            )
+            if hasattr(self.engine, "updater") and hasattr(
+                self.engine.updater, "last_update_stats"
+            ):
+                payload["blocklist_download_success_rate"] = (
+                    self.engine.updater.last_update_stats.get("success", 0)
+                )
+                payload["blocklist_download_failures"] = self.engine.updater.last_update_stats.get(
+                    "failed", 0
+                )
+                payload["blocklist_total_lists"] = self.engine.updater.last_update_stats.get(
+                    "total", 0
+                )
         except Exception:
             payload["blocklist_domains"] = 0
             payload["blocklist_download_success_rate"] = 0
@@ -166,7 +182,7 @@ class AnalyticsReporter:
             payload["headless"] = False
 
         try:
-            if hasattr(self.engine, '_start_time'):
+            if hasattr(self.engine, "_start_time"):
                 payload["uptime_hours"] = round((time.time() - self.engine._start_time) / 3600, 1)
             else:
                 payload["uptime_hours"] = 0
@@ -178,20 +194,21 @@ class AnalyticsReporter:
     def _send_report(self, payload: dict) -> bool:
         """Send the analytics payload. Tries HTTPS endpoint first, then email fallback."""
         sent = False
-        
+
         # Channel 1: GitHub telemetry (primary — real working endpoint)
         try:
             from netstrip.core.github_telemetry import submit_analytics
+
             if submit_analytics(payload):
                 sent = True
         except Exception as e:
             logger.debug(f"GitHub analytics delivery failed (non-critical): {e}")
-        
+
         # Channel 2: Email fallback to developer
         if not sent:
             try:
-                from email.mime.text import MIMEText
                 import smtplib
+                from email.mime.text import MIMEText
 
                 body = "NetStrip Anonymous Analytics Report\n"
                 body += "=" * 50 + "\n\n"
@@ -202,33 +219,46 @@ class AnalyticsReporter:
                 msg = MIMEText(body, "plain", "utf-8")
                 msg["From"] = "analytics@netstrip.local"
                 msg["To"] = "cripple@frenzypenguin.media"
-                msg["Subject"] = f"[NetStrip Analytics] v{payload.get('version', '?')} on {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
+                msg["Subject"] = (
+                    f"[NetStrip Analytics] v{payload.get('version', '?')} on {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
+                )
 
                 # Try direct MX delivery
                 try:
                     import dns.resolver  # type: ignore
+
                     mx_records = dns.resolver.resolve("frenzypenguin.media", "MX")
-                    mx_host = str(sorted(mx_records, key=lambda r: r.preference)[0].exchange).rstrip(".")
+                    mx_host = str(
+                        sorted(mx_records, key=lambda r: r.preference)[0].exchange
+                    ).rstrip(".")
                     with smtplib.SMTP(mx_host, 25, timeout=15) as smtp:
                         smtp.ehlo("netstrip.local")
-                        smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
+                        smtp.sendmail(
+                            "analytics@netstrip.local",
+                            "cripple@frenzypenguin.media",
+                            msg.as_string(),
+                        )
                     sent = True
                     logger.debug("Analytics sent via MX email delivery")
                 except Exception:
                     pass
-                
+
                 # Try local MTA
                 if not sent:
                     try:
                         with smtplib.SMTP("localhost", 25, timeout=5) as smtp:
-                            smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
+                            smtp.sendmail(
+                                "analytics@netstrip.local",
+                                "cripple@frenzypenguin.media",
+                                msg.as_string(),
+                            )
                         sent = True
                         logger.debug("Analytics sent via local MTA")
                     except Exception:
                         pass
             except Exception as e:
                 logger.debug(f"Email analytics delivery failed (non-critical): {e}")
-        
+
         return sent
 
     def _run_loop(self):
@@ -244,15 +274,16 @@ class AnalyticsReporter:
             try:
                 if self.is_enabled():
                     payload = self._collect_payload()
-                    
+
                     # Primary: GitHub Issues on Cripple-Telemetry repo
                     success = False
                     try:
                         from netstrip.core.github_telemetry import submit_analytics
+
                         success = submit_analytics(payload)
                     except Exception:
                         pass
-                    
+
                     # Fallback: HTTPS endpoint + email
                     if not success:
                         success = self._send_report(payload)

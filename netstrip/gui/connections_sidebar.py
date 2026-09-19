@@ -3,63 +3,81 @@ Persistent Connections Sidebar for Cripple GUI.
 Displays a live list of connections grouped by app name, target, classification color, and allow/block toggle.
 """
 
-import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing
-from netstrip.core.engine import NetStripEngine
-from netstrip.gui.icon_manager import IconManager
 import os
 import threading
 
+import customtkinter as ctk
 
+from netstrip.core.engine import NetStripEngine
 from netstrip.gui.components.sidebar_components import AppGroupFrame
-from netstrip.gui.utils import safe_loop, enable_smooth_scrolling
+from netstrip.gui.icon_manager import IconManager
 from netstrip.gui.popups import check_killswitch_override
+from netstrip.gui.theme import Colors, Fonts, Spacing
+from netstrip.gui.utils import enable_smooth_scrolling, safe_loop
+
 
 class ConnectionsSidebar(ctk.CTkFrame):
     def __init__(self, master, engine: NetStripEngine, **kwargs):
         super().__init__(master, fg_color=Colors.BG_PANEL, corner_radius=0, **kwargs)
         self.engine = engine
         self._destroyed = False
-        
+
         home_dir = os.path.expanduser("~")
         config_dir = os.path.join(home_dir, ".NetStrip")
         self.icon_manager = IconManager(config_dir)
-        
+
         # Grid layout for sidebar
-        self.grid_rowconfigure(3, weight=1) # List area
-        self.grid_rowconfigure(4, weight=0) # LAN toggle row
+        self.grid_rowconfigure(3, weight=1)  # List area
+        self.grid_rowconfigure(4, weight=0)  # LAN toggle row
         self.grid_columnconfigure(0, weight=1)
-        
+
         # Legend (Now at the very top, row 0)
         legend_frame = ctk.CTkFrame(self, fg_color="transparent")
         legend_frame.grid(row=0, column=0, sticky="ew", padx=Spacing.LG, pady=(Spacing.MD, 0))
-        ctk.CTkLabel(legend_frame, text="Legend: ", font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"), text_color=Colors.TEXT_SECONDARY).pack(side="left")
-        
+        ctk.CTkLabel(
+            legend_frame,
+            text="Legend: ",
+            font=(Fonts.FAMILY_PRIMARY[0], 10, "bold"),
+            text_color=Colors.TEXT_SECONDARY,
+        ).pack(side="left")
+
         categories = [
-            ('Ad', Colors.CAT_AD), ('Tracker', Colors.CAT_TRACKER), ('Telemetry', Colors.CAT_TELEMETRY), ('Malware', Colors.CAT_MALWARE),
-            ('Essential', Colors.CAT_ESSENTIAL), ('Allowed', Colors.CAT_USER_ALLOWED), ('Unknown', Colors.CAT_UNKNOWN), ('LAN', Colors.CAT_LAN)
+            ("Ad", Colors.CAT_AD),
+            ("Tracker", Colors.CAT_TRACKER),
+            ("Telemetry", Colors.CAT_TELEMETRY),
+            ("Malware", Colors.CAT_MALWARE),
+            ("Essential", Colors.CAT_ESSENTIAL),
+            ("Allowed", Colors.CAT_USER_ALLOWED),
+            ("Unknown", Colors.CAT_UNKNOWN),
+            ("LAN", Colors.CAT_LAN),
         ]
-        
+
         legend_grid = ctk.CTkFrame(legend_frame, fg_color="transparent")
         legend_grid.pack(side="left")
-        
+
         for i, (name, color) in enumerate(categories):
             row = i // 4
             col = i % 4
             cell = ctk.CTkFrame(legend_grid, fg_color="transparent")
             cell.grid(row=row, column=col, padx=(4, 8), pady=1, sticky="w")
-            ctk.CTkLabel(cell, text="●", text_color=color, font=(Fonts.FAMILY_PRIMARY[0], 10)).pack(side="left", padx=(0, 2))
-            ctk.CTkLabel(cell, text=name, text_color=Colors.TEXT_TERTIARY, font=(Fonts.FAMILY_PRIMARY[0], 10)).pack(side="left")
+            ctk.CTkLabel(cell, text="●", text_color=color, font=(Fonts.FAMILY_PRIMARY[0], 10)).pack(
+                side="left", padx=(0, 2)
+            )
+            ctk.CTkLabel(
+                cell, text=name, text_color=Colors.TEXT_TERTIARY, font=(Fonts.FAMILY_PRIMARY[0], 10)
+            ).pack(side="left")
 
         # Header (Now row 1)
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=1, column=0, sticky="ew", padx=Spacing.LG, pady=(Spacing.MD, Spacing.SM))
-        
+        header_frame.grid(
+            row=1, column=0, sticky="ew", padx=Spacing.LG, pady=(Spacing.MD, Spacing.SM)
+        )
+
         ctk.CTkLabel(
-            header_frame, 
-            text="App Connections", 
+            header_frame,
+            text="App Connections",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD),
-            text_color=Colors.TEXT_PRIMARY
+            text_color=Colors.TEXT_PRIMARY,
         ).pack(side="left")
 
         self.hide_inactive = False
@@ -67,71 +85,103 @@ class ConnectionsSidebar(ctk.CTkFrame):
         # Sort & Filter Bar (Now row 2)
         sf_frame = ctk.CTkFrame(self, fg_color="transparent")
         sf_frame.grid(row=2, column=0, sticky="ew", padx=Spacing.LG, pady=(0, Spacing.SM))
-        
+
         self.sort_var = ctk.StringVar(value="Sort by: Recent")
         self.opt_sort = ctk.CTkOptionMenu(
-            sf_frame, values=["Sort by: Recent", "Sort by: Active", "Sort by: Name (A-Z)"], 
-            variable=self.sort_var, width=130, height=26,
+            sf_frame,
+            values=["Sort by: Recent", "Sort by: Active", "Sort by: Name (A-Z)"],
+            variable=self.sort_var,
+            width=130,
+            height=26,
             font=(Fonts.FAMILY_PRIMARY[0], 11),
-            fg_color=Colors.BG_ELEVATED, button_color=Colors.BG_ELEVATED, button_hover_color=Colors.BORDER_DEFAULT, dropdown_fg_color=Colors.BG_ELEVATED,
-            command=self._on_sort_filter_change
+            fg_color=Colors.BG_ELEVATED,
+            button_color=Colors.BG_ELEVATED,
+            button_hover_color=Colors.BORDER_DEFAULT,
+            dropdown_fg_color=Colors.BG_ELEVATED,
+            command=self._on_sort_filter_change,
         )
         self.opt_sort.pack(side="left")
-        
+
         self.filter_var = ctk.StringVar(value="Filter: All")
         self.opt_filter = ctk.CTkOptionMenu(
-            sf_frame, values=["Filter: All", "Filter: Allowed", "Filter: Blocked", "Filter: System", "Filter: DNS/Local"], 
-            variable=self.filter_var, width=130, height=26,
+            sf_frame,
+            values=[
+                "Filter: All",
+                "Filter: Allowed",
+                "Filter: Blocked",
+                "Filter: System",
+                "Filter: DNS/Local",
+            ],
+            variable=self.filter_var,
+            width=130,
+            height=26,
             font=(Fonts.FAMILY_PRIMARY[0], 11),
-            fg_color=Colors.BG_ELEVATED, button_color=Colors.BG_ELEVATED, button_hover_color=Colors.BORDER_DEFAULT, dropdown_fg_color=Colors.BG_ELEVATED,
-            command=self._on_sort_filter_change
+            fg_color=Colors.BG_ELEVATED,
+            button_color=Colors.BG_ELEVATED,
+            button_hover_color=Colors.BORDER_DEFAULT,
+            dropdown_fg_color=Colors.BG_ELEVATED,
+            command=self._on_sort_filter_change,
         )
         self.opt_filter.pack(side="left", padx=Spacing.SM)
-        
+
         self.btn_reset = ctk.CTkButton(
-            sf_frame, text="Reset", width=50, height=26,
-            fg_color=Colors.BG_ELEVATED, hover_color=Colors.BORDER_DEFAULT,
+            sf_frame,
+            text="Reset",
+            width=50,
+            height=26,
+            fg_color=Colors.BG_ELEVATED,
+            hover_color=Colors.BORDER_DEFAULT,
             command=self._reset_filters,
-            font=(Fonts.FAMILY_PRIMARY[0], 11), text_color=Colors.TEXT_TERTIARY
+            font=(Fonts.FAMILY_PRIMARY[0], 11),
+            text_color=Colors.TEXT_TERTIARY,
         )
         self.btn_reset.pack(side="left", padx=Spacing.SM)
-        
+
         self._all_expanded = False
         self.btn_expand_all = ctk.CTkButton(
-            sf_frame, text="Expand All", width=80, height=26,
-            fg_color=Colors.BG_INPUT, hover_color=Colors.ACCENT_PRIMARY,
+            sf_frame,
+            text="Expand All",
+            width=80,
+            height=26,
+            fg_color=Colors.BG_INPUT,
+            hover_color=Colors.ACCENT_PRIMARY,
             command=self._toggle_expand_all,
-            font=(Fonts.FAMILY_PRIMARY[0], 11, "bold"), text_color=Colors.TEXT_PRIMARY
+            font=(Fonts.FAMILY_PRIMARY[0], 11, "bold"),
+            text_color=Colors.TEXT_PRIMARY,
         )
         self.btn_expand_all.pack(side="right")
-        
+
         # List Area
-        self.scroll_frame = ctk.CTkScrollableFrame(
-            self, 
-            fg_color=Colors.BG_DARK,
-            corner_radius=0
-        )
+        self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK, corner_radius=0)
         self.scroll_frame.grid(row=3, column=0, sticky="nsew", padx=Spacing.SM)
         self.scroll_frame.grid_columnconfigure(0, weight=1)
-        
-        self.app_groups = {} # process_name -> AppGroupFrame
+
+        self.app_groups = {}  # process_name -> AppGroupFrame
         self.last_update_id = 0
-        
+
         # LAN Shield Toggle at bottom
         self.lan_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.lan_frame.grid(row=4, column=0, sticky="ew", padx=Spacing.LG, pady=Spacing.MD)
-        
-        ctk.CTkLabel(self.lan_frame, text="LAN Shield", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
-        
+
+        ctk.CTkLabel(
+            self.lan_frame,
+            text="LAN Shield",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
         lan_setting = str(self.engine.db.get_setting("lan_shield_enabled", "true")).lower()
         is_lan_on = lan_setting not in ("false", "0", "off")
         self.lan_toggle_var = ctk.StringVar(value="on" if is_lan_on else "off")
         self.lan_toggle = ctk.CTkSwitch(
-            self.lan_frame, text="", width=36,
+            self.lan_frame,
+            text="",
+            width=36,
             variable=self.lan_toggle_var,
-            onvalue="on", offvalue="off",
+            onvalue="on",
+            offvalue="off",
             progress_color=Colors.CAT_LAN,
-            command=self._on_lan_toggle
+            command=self._on_lan_toggle,
         )
         if is_lan_on:
             self.lan_toggle.select()
@@ -148,7 +198,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
         def proceed():
             val = self.lan_toggle_var.get() == "on"
             self.engine.db.set_setting("lan_shield_enabled", "true" if val else "false")
-            
+
             if val:
                 self.engine.lan_shield.enable()
             else:
@@ -156,11 +206,12 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
         # We only care if they are trying to toggle it OFF
         is_on = self.lan_toggle_var.get() == "on"
-        if not is_on: # They toggled it to OFF
+        if not is_on:  # They toggled it to OFF
+
             def on_cancel():
                 # Revert visual
                 self.lan_toggle_var.set("on")
-            
+
             check_killswitch_override(self.engine, self, proceed, cancel_callback=on_cancel)
         else:
             proceed()
@@ -179,43 +230,44 @@ class ConnectionsSidebar(ctk.CTkFrame):
     def _on_sort_filter_change(self, choice=None):
         self._last_visible_order = None  # force re-evaluation after sort/filter change
         self._refresh_loop()
-        
+
     def _get_poll_interval(self):
         """Adaptive polling: fast when GUI visible for live traffic feel, slow when headless."""
-        if getattr(self.engine, 'is_headless', False):
+        if getattr(self.engine, "is_headless", False):
             return 2000
         return 1000  # 1Hz visual refresh to balance live feel and UI performance
 
     @safe_loop(delay_ms=1000)
     def _refresh_loop(self):
-        if getattr(self, '_destroyed', False):
+        if getattr(self, "_destroyed", False):
             return
         poll_ms = self._get_poll_interval()
         top = self.winfo_toplevel()
         is_tray = top and str(top.state()) == "withdrawn"
         is_hidden_tab = not self.winfo_ismapped() and top and str(top.state()) == "normal"
-        
+
         if is_tray or is_hidden_tab:
             # Not visible yet or fully hidden - reschedule at slow rate so the loop doesn't die permanently
             if not self._destroyed:
                 self.after(500, self._refresh_loop)
             return
         # Skip heavy refresh during active window resize to prevent artifacts
-        if getattr(self, '_resize_paused', False):
+        if getattr(self, "_resize_paused", False):
             if not self._destroyed:
                 self.after(poll_ms, self._refresh_loop)
             return
-        if getattr(self, '_is_fetching', False):
+        if getattr(self, "_is_fetching", False):
             if not self._destroyed:
                 self.after(poll_ms, self._refresh_loop)
             return
-            
+
         self._is_fetching = True
         # Persistent worker: a single long-lived fetcher consumes queued jobs,
         # instead of spawning (and tearing down) a fresh thread every second —
         # thousands of thread churns avoided over months-long sessions.
         import queue
-        if not hasattr(self, '_fetch_queue'):
+
+        if not hasattr(self, "_fetch_queue"):
             self._fetch_queue = queue.Queue(maxsize=2)
             self._worker_stop = threading.Event()
             self._fetch_worker = threading.Thread(
@@ -230,7 +282,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
                 def process_ui_batch(index=0, current_counts=None):
                     try:
-                        if getattr(self, '_destroyed', False) or not self.winfo_exists():
+                        if getattr(self, "_destroyed", False) or not self.winfo_exists():
                             self._is_fetching = False
                             return
 
@@ -238,16 +290,20 @@ class ConnectionsSidebar(ctk.CTkFrame):
                             current_counts = {}
 
                         batch_size = 25
-                        batch_conns = conns[index:index + batch_size]
+                        batch_conns = conns[index : index + batch_size]
 
                         if batch_conns:
                             if index == 0:
                                 self.engine._cached_recent = conns
-                            is_final_batch = (index + batch_size >= len(conns))
-                            self._process_connections(batch_conns, sys_val, current_counts, is_final_batch=is_final_batch)
+                            is_final_batch = index + batch_size >= len(conns)
+                            self._process_connections(
+                                batch_conns, sys_val, current_counts, is_final_batch=is_final_batch
+                            )
 
                         if not is_final_batch:
-                            self.after(20, lambda: process_ui_batch(index + batch_size, current_counts))
+                            self.after(
+                                20, lambda: process_ui_batch(index + batch_size, current_counts)
+                            )
                         else:
                             self._is_fetching = False
                     except Exception:
@@ -257,7 +313,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
             except Exception:
                 self._is_fetching = False
                 # Reschedule even on fetch failure so the loop survives
-                if not getattr(self, '_destroyed', False):
+                if not getattr(self, "_destroyed", False):
                     self.after(1000, self._refresh_loop)
 
         try:
@@ -277,104 +333,120 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 job()
             except Exception as e:
                 import logging
+
                 logging.getLogger(__name__).debug(f"sidebar worker job failed: {e}")
 
     def _process_connections(self, conns, sys_val, app_conn_counts=None, is_final_batch=True):
         try:
             if app_conn_counts is None:
                 app_conn_counts = {}
-            
+
             if len(conns) > 0:
                 from netstrip.core.process_utils import normalize_process_name
+
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
                 for i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
-                    raw_p_name = conn_dict.get('process_name') or 'Unknown'
-                    pid_val = conn_dict.get('pid')
-                    
-                    if raw_p_name == 'Unknown (DNS)' or conn_dict.get('rport') in (53, 853):
-                        p_name = 'DNS'
+                    raw_p_name = conn_dict.get("process_name") or "Unknown"
+                    pid_val = conn_dict.get("pid")
+
+                    if raw_p_name == "Unknown (DNS)" or conn_dict.get("rport") in (53, 853):
+                        p_name = "DNS"
                     else:
                         p_name = normalize_process_name(raw_p_name, pid=pid_val)
-                            
+
                     if app_conn_counts.get(p_name, 0) >= 50:
                         continue
-                        
+
                     app_conn_counts[p_name] = app_conn_counts.get(p_name, 0) + 1
-                    
-                    p_path = conn_dict.get('process_path', '')
-                    
-                    if p_name == 'DNS':
-                        conn_dict['category'] = 'dns'
-                        
+
+                    p_path = conn_dict.get("process_path", "")
+
+                    if p_name == "DNS":
+                        conn_dict["category"] = "dns"
+
                     # Live re-evaluate category and action based on current mode and blocklist rules
-                    domain_ip = conn_dict.get('domain') or conn_dict.get('ip')
+                    domain_ip = conn_dict.get("domain") or conn_dict.get("ip")
                     if domain_ip:
-                        from netstrip.core.modes import ConnectionCategory, ConnectionAction
-                        
-                        original_cat = conn_dict.get('category', 'unknown')
+                        from netstrip.core.modes import ConnectionAction, ConnectionCategory
+
+                        original_cat = conn_dict.get("category", "unknown")
                         try:
                             cat = ConnectionCategory(original_cat)
                         except ValueError:
                             cat = ConnectionCategory.UNKNOWN
-                            
+
                         # Always run the domain through the live classifier to sync categories
                         # (e.g. if a user changed mode or updated lists in the background)
                         live_cat = self.engine.classifier.classify_domain(domain_ip, p_name)
                         if live_cat == ConnectionCategory.UNKNOWN:
-                            live_cat, _ = self.engine.classifier.classify_ip(conn_dict.get('ip'), 0, p_name)
+                            live_cat, _ = self.engine.classifier.classify_ip(
+                                conn_dict.get("ip"), 0, p_name
+                            )
                         if live_cat != ConnectionCategory.UNKNOWN:
                             cat = live_cat
-                        
+
                         # Apply EXPLICIT user rule overrides only.
                         # We check the whitelist/blacklist sets directly instead of calling
                         # is_blocked() again, which would re-run the full classification cascade
                         # and overwrite built-in categories (e.g. ESSENTIAL → USER_ALLOWED).
-                        domain_lower = domain_ip.lower().rstrip('.')
+                        domain_lower = domain_ip.lower().rstrip(".")
                         bl = self.engine.classifier.blocklist
                         if domain_lower in bl.whitelist or (p_name and p_name in bl.app_whitelist):
                             cat = ConnectionCategory.USER_ALLOWED
-                        elif domain_lower in bl.blacklist or (p_name and p_name in bl.app_blacklist):
+                        elif domain_lower in bl.blacklist or (
+                            p_name and p_name in bl.app_blacklist
+                        ):
                             cat = ConnectionCategory.USER_BLOCKED
-                        
-                        action = self.engine.classifier.mode.get_action_for_category(cat, self.engine.db)
-                        
-                        if getattr(self.engine, 'killswitch_active', False):
+
+                        action = self.engine.classifier.mode.get_action_for_category(
+                            cat, self.engine.db
+                        )
+
+                        if getattr(self.engine, "killswitch_active", False):
                             action = ConnectionAction.BLOCK
-                        
-                        conn_dict['action'] = action.value
-                        conn_dict['category'] = cat.value if cat != ConnectionCategory.UNKNOWN else p_name
-                        
+
+                        conn_dict["action"] = action.value
+                        conn_dict["category"] = (
+                            cat.value if cat != ConnectionCategory.UNKNOWN else p_name
+                        )
+
                         # Apply identity tag
                         identity = self.engine.blocklist.get_identity(domain_ip)
                         if identity:
-                            conn_dict['identity'] = identity
-                    
+                            conn_dict["identity"] = identity
+
                     if p_name not in self.app_groups:
                         # Create new group
-                        group = AppGroupFrame(self.scroll_frame, p_name, p_path, self.engine, self.icon_manager)
+                        group = AppGroupFrame(
+                            self.scroll_frame, p_name, p_path, self.engine, self.icon_manager
+                        )
                         self.app_groups[p_name] = group
-                        group.set_expanded(getattr(self, 'is_expanded', False))
+                        group.set_expanded(getattr(self, "is_expanded", False))
                         if self._all_expanded and not group.is_expanded:
                             group._toggle_expand()
-                        
+
                     # Add connection to group
                     self.app_groups[p_name].add_connection(conn_dict, self.hide_inactive)
-                    
-            if not conns and not hasattr(self, 'lbl_empty'):
-                self.lbl_empty = ctk.CTkLabel(self.scroll_frame, text="No app connections tracked yet.\n\nLoading connections...", text_color=Colors.TEXT_TERTIARY)
+
+            if not conns and not hasattr(self, "lbl_empty"):
+                self.lbl_empty = ctk.CTkLabel(
+                    self.scroll_frame,
+                    text="No app connections tracked yet.\n\nLoading connections...",
+                    text_color=Colors.TEXT_TERTIARY,
+                )
                 self.lbl_empty.place(relx=0.5, rely=0.5, anchor="center")
-            elif conns and hasattr(self, 'lbl_empty'):
+            elif conns and hasattr(self, "lbl_empty"):
                 self.lbl_empty.destroy()
-                delattr(self, 'lbl_empty')
+                delattr(self, "lbl_empty")
 
             if not is_final_batch:
                 return
-                    
+
             # Sorting logic
             sort_val = self.sort_var.get()
             groups = list(self.app_groups.values())
-            
+
             if sort_val == "Sort by: Name (A-Z)":
                 groups.sort(key=lambda g: g.process_name.lower())
             elif sort_val == "Sort by: Active":
@@ -385,19 +457,20 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 # 2. Bucket the time into 5-second chunks (prevents micro-jittering/flickering)
                 # 3. Secondary sort by app name for perfect stability within the bucket
                 def get_sort_key(g):
-                    if not g.rows: return (0, g.process_name)
-                    latest = max(getattr(r, 'last_updated', 0) for r in g.rows.values())
+                    if not g.rows:
+                        return (0, g.process_name)
+                    latest = max(getattr(r, "last_updated", 0) for r in g.rows.values())
                     bucket = round(latest / 5.0) * 5
                     return (bucket, g.process_name.lower())
-                    
+
                 groups.sort(key=get_sort_key, reverse=True)
-                
+
             current_filter = self.filter_var.get()
-            
+
             # Prune completely empty app groups (where all rows have expired/pruned)
             for p_name, group in list(self.app_groups.items()):
                 if not group.rows:
-                    if getattr(group, '_is_packed', False):
+                    if getattr(group, "_is_packed", False):
                         group.grid_forget()
                     group.destroy()
                     self.app_groups.pop(p_name, None)
@@ -406,19 +479,19 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
             # Update internal visibility first without packing/unpacking
             for group in groups:
-                if hasattr(group, 'refresh_global_state'):
+                if hasattr(group, "refresh_global_state"):
                     group.refresh_global_state()
                 group.apply_filter(self.hide_inactive, current_filter)
 
             # Now repack only if the visible order does not match the desired sorted order
             visible_groups = [g for g in groups if g.visible_count > 0]
-            
+
             # Pin low-signal internal/system pseudo-groups to the very end of
             # the list (below all real applications): kernel-owned sockets and
             # Service Host groupings first, with DNS always dead last.
             def _tail_rank(group):
                 name = group.process_name.lower()
-                if name == 'dns':
+                if name == "dns":
                     return 2
                 if name in ("system idle process", "system (kernel/driver)", "system"):
                     return 1
@@ -429,40 +502,44 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 key=_tail_rank,
             )
             visible_groups = [g for g in visible_groups if _tail_rank(g) == 0] + tail_groups
-            
+
             # Anti-flicker: skip grid repack if order is unchanged
             new_order = [g.process_name for g in visible_groups]
-            if new_order == getattr(self, '_last_visible_order', None):
+            if new_order == getattr(self, "_last_visible_order", None):
                 for group in groups:
-                    if hasattr(group, 'refresh_global_state'):
+                    if hasattr(group, "refresh_global_state"):
                         group.refresh_global_state()
                 return
             self._last_visible_order = new_order
-            
-            
+
             # Intelligent grid packing to eliminate flicker and stuttering
-            current_packed = [c for c in self.scroll_frame.winfo_children() if isinstance(c, AppGroupFrame) and getattr(c, '_is_packed', True)]
+            current_packed = [
+                c
+                for c in self.scroll_frame.winfo_children()
+                if isinstance(c, AppGroupFrame) and getattr(c, "_is_packed", True)
+            ]
             for group in current_packed:
                 if group not in visible_groups:
                     group.grid_forget()
                     group._is_packed = False
-            
+
             # Seamlessly repack only those whose row index actually changed
             for idx, group in enumerate(visible_groups):
-                info = group.grid_info() if getattr(group, '_is_packed', False) else {}
-                if not getattr(group, '_is_packed', False) or info.get('row') != idx:
+                info = group.grid_info() if getattr(group, "_is_packed", False) else {}
+                if not getattr(group, "_is_packed", False) or info.get("row") != idx:
                     group.grid(row=idx, column=0, sticky="ew", padx=Spacing.XS, pady=Spacing.SM)
                     group._is_packed = True
-                        
+
             # Export active apps for dashboard to avoid redundant classification
             active_apps = set()
             for group in visible_groups:
-                if any(row.conn_data.get('action') == 'allow' for row in group.rows.values()):
+                if any(row.conn_data.get("action") == "allow" for row in group.rows.values()):
                     active_apps.add(group.process_name)
             self.engine._cached_active_apps = active_apps
-                        
+
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Error updating sidebar: {e}", exc_info=True)
 
         # Update LAN toggle state cleanly
@@ -474,9 +551,9 @@ class ConnectionsSidebar(ctk.CTkFrame):
         elif not lan_enabled and self.lan_toggle_var.get() != "off":
             self.lan_toggle_var.set("off")
             self.lan_toggle.deselect()
-            
+
         if not self._destroyed:
-            if hasattr(self, '_refresh_after_id'):
+            if hasattr(self, "_refresh_after_id"):
                 self.after_cancel(self._refresh_after_id)
             self._refresh_after_id = self.after(self._get_poll_interval(), self._refresh_loop)
 
@@ -488,55 +565,65 @@ class ConnectionsSidebar(ctk.CTkFrame):
         self.hide_inactive = False
         self._last_visible_order = None  # force re-evaluation
         self._on_sort_filter_change()
-        
+
     def _toggle_expand_all(self):
-        if getattr(self, '_is_expanding_all', False):
-            return # Prevent double clicks
-            
+        if getattr(self, "_is_expanding_all", False):
+            return  # Prevent double clicks
+
         self._all_expanded = not self._all_expanded
         btn_text = "Collapse All" if self._all_expanded else "Expand All"
         self.btn_expand_all.configure(text=btn_text)
-        
+
         # Instantly snap scroll view to top when collapsing all to avoid empty void from batch shrinking
         if not self._all_expanded:
-            try: self.scroll_frame._parent_canvas.yview_moveto(0)
-            except Exception: pass
-        
+            try:
+                self.scroll_frame._parent_canvas.yview_moveto(0)
+            except Exception:
+                pass
+
         groups_to_update = list(self.app_groups.values())
         self._is_expanding_all = True
-        
+
         def _update_next(index=0):
             if not self.winfo_exists() or index >= len(groups_to_update):
                 self._is_expanding_all = False
                 return
-                
+
             # Process up to 10 groups per UI cycle to balance speed vs freezing
             batch_size = 10
             for i in range(index, min(index + batch_size, len(groups_to_update))):
                 group = groups_to_update[i]
-                if getattr(group, '_is_packed', False):
+                if getattr(group, "_is_packed", False):
                     if group.is_expanded != self._all_expanded:
                         group._toggle_expand()
                 else:
                     # Keep state synced for hidden groups but don't force UI redraws
                     group.is_expanded = self._all_expanded
                     if group.is_expanded:
-                        group.btn_expand.configure(text="Collapse ▲", fg_color=Colors.BG_DARK, text_color=Colors.TEXT_SECONDARY)
+                        group.btn_expand.configure(
+                            text="Collapse ▲",
+                            fg_color=Colors.BG_DARK,
+                            text_color=Colors.TEXT_SECONDARY,
+                        )
                     else:
-                        group.btn_expand.configure(text="Expand ▼", fg_color=Colors.BG_INPUT, text_color=Colors.TEXT_PRIMARY)
-                    
+                        group.btn_expand.configure(
+                            text="Expand ▼",
+                            fg_color=Colors.BG_INPUT,
+                            text_color=Colors.TEXT_PRIMARY,
+                        )
+
             # Yield to UI loop
             try:
                 self.after(2, lambda: _update_next(index + batch_size))
             except Exception:
                 pass
-            
+
         _update_next()
 
     def set_expanded(self, expanded: bool):
         self.is_expanded = expanded
         groups_to_update = list(self.app_groups.values())
-        
+
         def _update_next(index=0):
             if not self.winfo_exists() or index >= len(groups_to_update):
                 return
@@ -549,7 +636,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self.after(1, lambda: _update_next(index + batch_size))
             except Exception:
                 pass
-                
+
         _update_next()
 
     def destroy(self):

@@ -21,8 +21,8 @@ import logging
 import os
 import sys
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class SelfUpdateError(Exception):
 # Pure helpers (unit-tested)
 
 
-def parse_sha256sums(text: str) -> Dict[str, str]:
+def parse_sha256sums(text: str) -> dict[str, str]:
     """Parse `sha256sum` output into {lowercased_filename: lowercase_hex}.
 
     Tolerates: leading '# ' comments, CRLF, extra whitespace, BSD-style
@@ -56,7 +56,7 @@ def parse_sha256sums(text: str) -> Dict[str, str]:
         digest = digest.lower()
         if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             continue
-        if name.startswith("*"):       # BSD binary-mode marker
+        if name.startswith("*"):  # BSD binary-mode marker
             name = name[1:]
         name = name.lstrip("*").strip()
         if "\\" in name and "/" not in name:
@@ -113,9 +113,9 @@ def pick_assets(assets, platform: str = None):
             continue
         if want_l == "windows":
             if name.startswith("netstrip-setup-") and name.endswith(".exe"):
-                update_asset = a          # preferred installer
+                update_asset = a  # preferred installer
             elif update_asset is None and name.endswith(".zip") and "windows" in name:
-                update_asset = a          # legacy portable fallback
+                update_asset = a  # legacy portable fallback
         elif name.endswith(".zip") and want_l in name:
             update_asset = a
     return update_asset, sums_asset
@@ -123,18 +123,22 @@ def pick_assets(assets, platform: str = None):
 
 def _tls_context():
     import ssl
+
     try:
         import certifi
+
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()  # fail closed: still verified TLS
 
 
-def http_download(url: str, dest: Path, progress: Optional[Callable[[int, int], None]] = None):
+def http_download(url: str, dest: Path, progress: Callable[[int, int], None] | None = None):
     """Stream url→dest over verified TLS. Returns dest."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     ctx = _tls_context()
-    with urllib.request.urlopen(req, timeout=30, context=ctx if url.startswith("https") else None) as resp:
+    with urllib.request.urlopen(
+        req, timeout=30, context=ctx if url.startswith("https") else None
+    ) as resp:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         with open(dest, "wb") as f:
@@ -167,8 +171,12 @@ class SelfUpdater:
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
-    def download_verified(self, dest_dir: Path, tag_hint: str = "",
-                          progress: Optional[Callable[[str, int, int], None]] = None) -> Path:
+    def download_verified(
+        self,
+        dest_dir: Path,
+        tag_hint: str = "",
+        progress: Callable[[str, int, int], None] | None = None,
+    ) -> Path:
         """
         Download this platform's update zip and its SHA256SUMS manifest,
         then verify. Returns the verified zip path.
@@ -206,8 +214,9 @@ class SelfUpdater:
             raise SelfUpdateError(f"{zip_a['name']} absent from SHA256SUMS.txt")
 
         prog("download", 0, int(zip_a.get("size") or 0))
-        http_download(zip_a["browser_download_url"], zip_path,
-                      progress=lambda d, t: prog("download", d, t))
+        http_download(
+            zip_a["browser_download_url"], zip_path, progress=lambda d, t: prog("download", d, t)
+        )
 
         if not verify_file_hash(zip_path, expected):
             try:
@@ -222,8 +231,10 @@ class SelfUpdater:
         self._verify_optional_signature(zip_path)
 
         # Clean up manifest (already consumed)
-        try: sums_path.unlink(missing_ok=True)
-        except Exception: pass
+        try:
+            sums_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
         logger.info(f"Self-update verified: {zip_path}")
         prog("done")
@@ -237,6 +248,7 @@ class SelfUpdater:
             return
         try:
             from cryptography.hazmat.primitives.asymmetric import ed25519
+
             pub = ed25519.Ed25519PublicKey.from_public_bytes(base64.b64decode(pub_b64))
             pub.verify(sig_path.read_bytes(), path.read_bytes())
             logger.info("update signature OK (ed25519)")
@@ -250,14 +262,20 @@ def launch_update(verified_file: Path):
     Other OS: opens the folder containing the native build."""
     try:
         if verified_file.suffix.lower() == ".exe":
-            os.startfile(str(verified_file))  # noqa: S606 - hash-verified installer
+            os.startfile(str(verified_file))
             return
         target = verified_file.parent
         if sys.platform == "darwin":
             import subprocess
-            subprocess.Popen(["open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            subprocess.Popen(
+                ["open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
         else:
             import subprocess
-            subprocess.Popen(["xdg-open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            subprocess.Popen(
+                ["xdg-open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
     except Exception as e:
         logger.debug(f"could not hand off {verified_file}: {e}")

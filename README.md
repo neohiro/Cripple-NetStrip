@@ -476,7 +476,8 @@ Copyright © 2026 FrenzyPenguin Media — All rights reserved. Free for personal
 ---
 
 <div align="center">
-  <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1631168/t/1" defer></script>
+  <a href="https://visitorbadge.io/status?path=github.com%2Fneohiro%2FCripple-NetStrip" rel="noopener noreferrer nofollow">
+    <img src="https://api.visitorbadge.io/api/visitors?path=github.com%2Fneohiro%2FCripple-NetStrip&label=Visitors&countColor=%23263759" alt="Visitors" /></a>
 </div>
 
 <p align="center">
