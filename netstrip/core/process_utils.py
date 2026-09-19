@@ -14,6 +14,7 @@ except ImportError:
 
 _PID_CACHE = {}
 _PID_CACHE_LOCK = threading.Lock()
+_PID_CACHE_MAX_SIZE = 2000
 
 # Intermediate console windows / shell wrappers
 CONSOLE_WRAPPERS = {
@@ -563,8 +564,8 @@ def resolve_process_identity(proc) -> tuple[str, str, any, str]:
     if proc_pid is not None:
         with _PID_CACHE_LOCK:
             cached = _PID_CACHE.get(proc_pid)
-            if cached and (now - cached[4]) < 30.0:
-                return cached[0], cached[1], cached[2], cached[3]
+            if cached and (now - cached[3]) < 30.0:
+                return cached[0], cached[1], None, cached[2]
 
     original_exe = "Unknown"
     try:
@@ -644,9 +645,12 @@ def resolve_process_identity(proc) -> tuple[str, str, any, str]:
 
     if proc_pid is not None:
         with _PID_CACHE_LOCK:
-            # Clean old entries if cache grows beyond 2000
-            if len(_PID_CACHE) > 2000:
-                _PID_CACHE.clear()
-            _PID_CACHE[proc_pid] = (canonical_name, process_path, root_proc, original_exe, now)
+            # LRU eviction if cache grows beyond max size
+            if len(_PID_CACHE) >= _PID_CACHE_MAX_SIZE:
+                # Remove oldest entry (first inserted)
+                oldest_key = next(iter(_PID_CACHE))
+                del _PID_CACHE[oldest_key]
+            # Store only serializable data, not psutil.Process object
+            _PID_CACHE[proc_pid] = (canonical_name, process_path, original_exe, now)
 
-    return canonical_name, process_path, root_proc, original_exe
+    return canonical_name, process_path, None, original_exe

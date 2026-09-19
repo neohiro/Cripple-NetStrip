@@ -12,6 +12,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Any
 
+# Maximum size of the async write queue before dropping events
+MAX_WRITE_QUEUE_SIZE = 10000
+
 
 class Database:
     def __init__(self, db_path: str = None):
@@ -160,7 +163,7 @@ class Database:
 
                 # Ensure default settings are initialized
                 conn.execute(
-                    "INSERT OR IGNORE INTO settings (key, value) VALUES ('lan_shield_enabled', '\"true\"')"
+                    "INSERT OR IGNORE INTO settings (key, value) VALUES ('lan_shield_enabled', 'true')"
                 )
 
                 # Pre-load settings cache
@@ -273,14 +276,14 @@ class Database:
                     )
                     time.sleep(sleep_time)
                     # Re-queue batch if write queue isn't overflowed (max 10,000)
-                    if self.write_queue.qsize() < 10000:
+                    if self.write_queue.qsize() < MAX_WRITE_QUEUE_SIZE:
                         for item in batch:
                             self.write_queue.put(item)
 
     def log_connection(self, data: dict[str, Any]):
         """Log a connection event via async queue with queue bound protection"""
         if hasattr(self, "write_queue"):
-            if self.write_queue.qsize() > 15000:
+            if self.write_queue.qsize() > MAX_WRITE_QUEUE_SIZE:
                 # Drop oldest items to avoid memory explosion if disk is locked
                 try:
                     for _ in range(100):
@@ -656,9 +659,7 @@ class Database:
                 )
 
     def save_app_bandwidth(self, app_bytes: dict):
-        import time as _t
-
-        now = _t.strftime("%Y-%m-%d %H:%M:%S")
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
         rows = [
             (name, d[0], d[1], now, d[0], d[1], now)
             for name, d in app_bytes.items()
@@ -864,7 +865,3 @@ class Database:
                 self._settings_cache.clear()
             if hasattr(self, "_rules_cache"):
                 self._rules_cache.clear()
-            if hasattr(self, "_user_rules_cache"):
-                self._user_rules_cache = None
-            if hasattr(self, "_domain_rule_lookup"):
-                self._domain_rule_lookup.clear()

@@ -1,6 +1,11 @@
 import contextlib
 import hashlib
+import hmac
 import logging
+import os
+import re
+import secrets
+import sqlite3
 import subprocess
 import sys
 import time
@@ -9,11 +14,8 @@ from pathlib import Path
 # Setup basic logging for the watchdog
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - Watchdog - %(message)s")
 
-import hmac
-import secrets
-
-# Generate ephemeral in-memory 512-bit secret key per watchdog session (Post-Quantum Keyed Hashing)
-HMAC_SECRET_KEY = secrets.token_bytes(64)
+# HMAC secret key generated per-session in main()
+HMAC_SECRET_KEY: bytes | None = None
 
 
 def get_critical_files():
@@ -85,61 +87,71 @@ def get_clean_exit_path():
     return Path.home() / ".netstrip" / ".clean_exit"
 
 
+def _get_db_connection():
+    """Get a connection to the NetStrip database."""
+    db_path = Path.home() / ".netstrip" / "netstrip.db"
+    if db_path.exists():
+        return sqlite3.connect(db_path)
+    return None
+
+
+def get_backup_dns(interface_name: str) -> str | None:
+    """Get backup DNS for an interface from the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return None
+    try:
+        c = conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0] and row[0] != "dhcp":
+            ip = row[0]
+            if re.match(r"^([0-9]{1,3}\.){3}[0-9]{1,3}$", ip):
+                return ip
+    except Exception as e:
+        logging.error(f"Failed to read backup DNS from DB: {e}")
+    return None
+
+
+def get_db_setting(key: str, default: str = "false") -> str:
+    """Get a setting from the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return default
+    try:
+        c = conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key=?", (key,))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return default
+
+
+def clear_db_setting(key: str) -> None:
+    """Clear a setting in the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return
+    try:
+        c = conn.cursor()
+        c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 def restore_network():
     """Fail-Open: Restore the OS DNS settings and firewall rules to default if NetStrip crashes."""
     logging.info("NetStrip crash detected! Initiating emergency DNS and network restore...")
 
     import platform
-    import re
-    import sqlite3
 
     sys_plat = platform.system()
-
-    def get_backup_dns(interface_name):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute(
-                    "SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",)
-                )
-                row = c.fetchone()
-                conn.close()
-                if row and row[0] and row[0] != "dhcp":
-                    ip = row[0]
-                    if re.match(r"^([0-9]{1,3}\.){3}[0-9]{1,3}$", ip):
-                        return ip
-            except Exception as e:
-                logging.error(f"Failed to read backup DNS from DB: {e}")
-        return None
-
-    def get_db_setting(key, default="false"):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute("SELECT value FROM settings WHERE key=?", (key,))
-                row = c.fetchone()
-                conn.close()
-                if row and row[0]:
-                    return row[0]
-            except Exception:
-                pass
-        return default
-
-    def clear_db_setting(key):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
 
     try:
         if sys_plat == "Windows":
@@ -234,7 +246,6 @@ def restore_network():
             # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
             logging.info("Restoring Windows network adapter protocol bindings and discovery...")
 
-            import os
             import winreg
 
             subprocess.run(
@@ -578,6 +589,8 @@ def restore_network():
 
 
 def main():
+    global HMAC_SECRET_KEY
+    HMAC_SECRET_KEY = secrets.token_bytes(64)
     baseline_hashes = snapshot_integrity()
 
     import psutil
@@ -654,7 +667,8 @@ def main():
                 break
 
             # If the exit code is 0 (or specifically 100 which some apps use for manual exit), it was gracefully closed by the user.
-            if exit_code in (0,):
+            # On Unix, negative exit codes indicate termination by signal; treat as crash.
+            if exit_code is not None and exit_code >= 0 and exit_code in (0, 100):
                 logging.info(
                     "Graceful shutdown detected via exit code. Watchdog terminating cleanly."
                 )
