@@ -227,19 +227,20 @@ def restore_network():
                 rule_names_to_delete = []
                 reg_path = r"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules"
                 try:
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
-                    num_values = winreg.QueryInfoKey(key)[1]
-                    for i in range(num_values):
-                        try:
-                            name, value, _ = winreg.EnumValue(key, i)
-                            if isinstance(value, str):
-                                parts = value.split("|")
-                                for p in parts:
-                                    if p.startswith("Name=") and "NetStrip" in p:
-                                        rule_names_to_delete.append(p.split("=", 1)[1])
-                        except OSError:
-                            pass
-                    winreg.CloseKey(key)
+                    with winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ
+                    ) as key:
+                        num_values = winreg.QueryInfoKey(key)[1]
+                        for i in range(num_values):
+                            try:
+                                name, value, _ = winreg.EnumValue(key, i)
+                                if isinstance(value, str):
+                                    parts = value.split("|")
+                                    for p in parts:
+                                        if p.startswith("Name=") and "NetStrip" in p:
+                                            rule_names_to_delete.append(p.split("=", 1)[1])
+                            except OSError:
+                                pass
                 except Exception:
                     pass
                 for rule_name in set(rule_names_to_delete):
@@ -290,21 +291,26 @@ def restore_network():
 
             try:
                 reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
-                for i in range(winreg.QueryInfoKey(key)[0]):
-                    try:
-                        subkey_name = winreg.EnumKey(key, i)
-                        subkey = winreg.OpenKey(
-                            winreg.HKEY_LOCAL_MACHINE,
-                            f"{reg_path}\\{subkey_name}",
-                            0,
-                            winreg.KEY_SET_VALUE,
-                        )
-                        winreg.SetValueEx(subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 0)
-                        winreg.CloseKey(subkey)
-                    except OSError:
-                        continue
-                winreg.CloseKey(key)
+                with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ
+                ) as key:
+                    for i in range(winreg.QueryInfoKey(key)[0]):
+                        try:
+                            subkey_name = winreg.EnumKey(key, i)
+                            subkey = winreg.OpenKey(
+                                winreg.HKEY_LOCAL_MACHINE,
+                                f"{reg_path}\\{subkey_name}",
+                                0,
+                                winreg.KEY_SET_VALUE,
+                            )
+                            try:
+                                winreg.SetValueEx(
+                                    subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 0
+                                )
+                            finally:
+                                winreg.CloseKey(subkey)
+                        except OSError:
+                            continue
             except Exception:
                 pass
 

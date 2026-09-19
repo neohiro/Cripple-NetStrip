@@ -67,6 +67,7 @@ def _get_system_info() -> dict:
 def _get_engine_state() -> dict:
     """Attempt to capture engine state from the database (read-only, no PII)."""
     state = {}
+    conn = None
     try:
         import sqlite3
 
@@ -137,10 +138,11 @@ def _get_engine_state() -> dict:
                     state["uptime_seconds"] = int(time.time() - float(row[0]))
                 except (ValueError, TypeError):
                     pass
-
-            conn.close()
     except Exception as e:
         state["db_error"] = str(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
     return state
 
@@ -185,12 +187,14 @@ def _get_crash_token() -> str:
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path), timeout=2)
-            c = conn.cursor()
-            c.execute("SELECT value FROM settings WHERE key='telemetry_github_token'")
-            row = c.fetchone()
-            conn.close()
-            if row and row[0]:
-                return str(row[0]).strip()
+            try:
+                c = conn.cursor()
+                c.execute("SELECT value FROM settings WHERE key='telemetry_github_token'")
+                row = c.fetchone()
+                if row and row[0]:
+                    return str(row[0]).strip()
+            finally:
+                conn.close()
     except Exception:
         pass
 
@@ -313,12 +317,14 @@ def _is_analytics_opted_in() -> bool:
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path), timeout=2)
-            c = conn.cursor()
-            c.execute("SELECT value FROM settings WHERE key='analytics_opt_in'")
-            row = c.fetchone()
-            conn.close()
-            if row and str(row[0]).lower() == "true":
-                return True
+            try:
+                c = conn.cursor()
+                c.execute("SELECT value FROM settings WHERE key='analytics_opt_in'")
+                row = c.fetchone()
+                if row and str(row[0]).lower() == "true":
+                    return True
+            finally:
+                conn.close()
     except Exception:
         pass
     return False
