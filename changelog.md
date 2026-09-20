@@ -1,3 +1,12 @@
+## [v3.9.0] - 2026-09-19
+### Major Correctness, Security & Robustness Hardening
+- **Watchdog & crash recovery**: Fixed resource leaks in crash_reporter (DB connections closed via try/finally) and watchdog (winreg handles wrapped in context managers). Added per-session HMAC-SHA512 integrity checks with tampering detection that kills the parent process.
+- **Database hardening**: Fixed `lan_shield_enabled` default value (was double-quoted string), `factory_reset()` now holds lock, removed stale cache refs, added `MAX_WRITE_QUEUE_SIZE=10000` to bound memory.
+- **Process utilities**: LRU eviction cache (max 2000 entries) for process metadata; no `psutil.Process` objects cached to prevent handle leaks.
+- **Packaging overhaul**: Dynamic CTK_PATH in Cripple.spec (no hardcoded paths), full-directory installer.iss with recursive copy, python314.dll bundled in `_internal/`.
+- **GUI fixes**: Removed unused `pct_sent` variable (F841), duplicate "chrome" key (F601), added `PLATFORM_SUPPORT: ClassVar` type annotation.
+- **Code quality**: 80 tests pass, ruff clean (0 F/E codes), 284 style-only warnings (SIM105/E402/PIE810/RUF013).
+
 ## [v3.8.9] - 2026-08-22
 ### Per-App Bandwidth History Chart
 - **Canvas-based sparkline** in each expanded sidebar row showing upload (green, above baseline) and download (blue, below baseline) as vertical bars over a rolling 30-sample window (~30 seconds at 1 Hz poll rate).
