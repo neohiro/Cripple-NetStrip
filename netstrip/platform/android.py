@@ -1,9 +1,9 @@
 import logging
-from typing import List, Optional
 
 from netstrip.platform.base import PlatformBase
 
 logger = logging.getLogger(__name__)
+
 
 class AndroidPlatform(PlatformBase):
     """
@@ -17,11 +17,12 @@ class AndroidPlatform(PlatformBase):
         self.vpn_fd = -1
         try:
             from jnius import autoclass
-            self.PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            self.VpnService = autoclass('android.net.VpnService')
-            self.Context = autoclass('android.content.Context')
+
+            self.PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            self.VpnService = autoclass("android.net.VpnService")
+            self.Context = autoclass("android.content.Context")
             # VpnService.Builder is a nested class
-            self.Builder = autoclass('android.net.VpnService$Builder')
+            self.Builder = autoclass("android.net.VpnService$Builder")
         except ImportError:
             logger.warning("pyjnius not available - Android native calls will fail.")
             self.VpnService = None
@@ -40,11 +41,14 @@ class AndroidPlatform(PlatformBase):
         On Android, DNS is set when the VpnService is established using builder.addDnsServer().
         We simulate it returning True.
         """
-        if not self.VpnService: return False
+        if not self.VpnService:
+            return False
         try:
             # Note: DNS on Android is applied via VpnService builder.addDnsServer()
             # when the tunnel is established; a running VPN instance is required.
-            logger.info(f"Android VpnService builder will intercept DNS queries and route to {dns_server}")
+            logger.info(
+                f"Android VpnService builder will intercept DNS queries and route to {dns_server}"
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to set Android DNS: {e}")
@@ -54,12 +58,12 @@ class AndroidPlatform(PlatformBase):
         # Bringing down the VpnService naturally restores DNS
         return True
 
-    def get_original_dns(self, interface: str) -> Optional[str]:
+    def get_original_dns(self, interface: str) -> str | None:
         # Android handles the fallback upstream DNS automatically when VPN is off
         return "8.8.8.8"
 
     def get_current_ssid(self) -> str:
-        if not getattr(self, 'Context', None):
+        if not getattr(self, "Context", None):
             return ""
         try:
             wifi_manager = self.PythonActivity.mActivity.getSystemService(self.Context.WIFI_SERVICE)
@@ -73,13 +77,22 @@ class AndroidPlatform(PlatformBase):
             logger.debug(f"Failed to get Android SSID: {e}")
         return ""
 
-    def get_active_interfaces(self) -> List[str]:
+    def get_active_interfaces(self) -> list[str]:
         return ["wlan0", "rmnet0"]
 
-    def get_default_gateway(self) -> Optional[str]:
+    def get_default_gateway(self) -> str | None:
         return "192.168.1.1"
 
-    def add_firewall_rule(self, rule_name: str, direction: str, action: str, remote_ip: Optional[str], remote_port: Optional[int], protocol: Optional[str], program: Optional[str]) -> bool:
+    def add_firewall_rule(
+        self,
+        rule_name: str,
+        direction: str,
+        action: str,
+        remote_ip: str | None,
+        remote_port: int | None,
+        protocol: str | None,
+        program: str | None,
+    ) -> bool:
         # We handle dropping packets directly in our VpnService TUN read loop.
         logger.debug(f"Android virtual rule registered: {rule_name} -> {action}")
         return True
@@ -111,7 +124,6 @@ class AndroidPlatform(PlatformBase):
 
     def kill_all_tcp_connections(self):
         """Forcefully terminate all active TCP connections on Android. Handled natively by VpnService."""
-        pass
 
     def enable_killswitch(self) -> bool:
         logger.warning("Android VpnService native killswitch engaged.")
@@ -121,22 +133,22 @@ class AndroidPlatform(PlatformBase):
     def disable_killswitch(self) -> bool:
         logger.info("Android VpnService native killswitch disengaged.")
         return True
-        
+
     def disable_ipv6(self) -> bool:
         return True
-        
+
     def enable_ipv6(self) -> bool:
         return True
-        
+
     def is_ipv6_enabled(self) -> bool:
         return True
-        
+
     def disable_ipv4(self) -> bool:
         return True
-        
+
     def enable_ipv4(self) -> bool:
         return True
-        
+
     def is_ipv4_enabled(self) -> bool:
         return True
 

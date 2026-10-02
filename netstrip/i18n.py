@@ -41,8 +41,8 @@ def detect_language() -> str:
     if sys.platform.startswith("win"):
         try:
             import winreg
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                r"Control Panel\International") as k:
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\International") as k:
                 name = winreg.QueryValueEx(k, "LocaleName")[0]
                 return name[:2].lower()
         except Exception:
@@ -54,16 +54,34 @@ def detect_language() -> str:
 
 import sys  # noqa: E402
 
-
 # Native display names (shown in the Settings picker)
 LANGUAGE_NAMES = {
-    "en": "English", "es": "Español", "de": "Deutsch", "fr": "Français",
-    "it": "Italiano", "pt": "Português", "nl": "Nederlands", "pl": "Polski",
-    "tr": "Türkçe", "ru": "Русский", "uk": "Українська", "ja": "日本語",
-    "ko": "한국어", "zh-cn": "简体中文", "zh-tw": "繁體中文", "hi": "हिन्दी",
-    "id": "Bahasa Indonesia", "vi": "Tiếng Việt", "ar": "العربية",
-    "sv": "Svenska", "da": "Dansk", "fi": "Suomi", "cs": "Čeština",
-    "el": "Ελληνικά", "hu": "Magyar", "ro": "Română",
+    "en": "English",
+    "es": "Español",
+    "de": "Deutsch",
+    "fr": "Français",
+    "it": "Italiano",
+    "pt": "Português",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "tr": "Türkçe",
+    "ru": "Русский",
+    "uk": "Українська",
+    "ja": "日本語",
+    "ko": "한국어",
+    "zh-cn": "简体中文",
+    "zh-tw": "繁體中文",
+    "hi": "हिन्दी",
+    "id": "Bahasa Indonesia",
+    "vi": "Tiếng Việt",
+    "ar": "العربية",
+    "sv": "Svenska",
+    "da": "Dansk",
+    "fi": "Suomi",
+    "cs": "Čeština",
+    "el": "Ελληνικά",
+    "hu": "Magyar",
+    "ro": "Română",
 }
 
 

@@ -5,9 +5,11 @@ GUI Utilities for NetStrip
 import functools
 import logging
 import traceback
+
 from netstrip.gui.theme import Colors
 
 logger = logging.getLogger(__name__)
+
 
 def safe_loop(delay_ms=None):
     """
@@ -15,35 +17,45 @@ def safe_loop(delay_ms=None):
     Catches any unhandled exceptions to prevent the loop from silently crashing and dying forever.
     If delay_ms is provided, it attempts to reschedule the loop even on failure.
     """
+
     def decorator(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
-            if hasattr(self, '_destroyed') and self._destroyed:
-                return
-                
+            if hasattr(self, "_destroyed") and self._destroyed:
+                return None
+
             try:
                 return func(self, *args, **kwargs)
             except Exception as e:
                 logger.error(f"Error in UI loop '{func.__name__}': {e}")
                 logger.debug(traceback.format_exc())
-                
+
                 # Try to reschedule if we have a delay and we aren't destroyed
-                if delay_ms and hasattr(self, 'after') and not getattr(self, '_destroyed', False):
+                if delay_ms and hasattr(self, "after") and not getattr(self, "_destroyed", False):
                     try:
                         self.after(delay_ms, getattr(self, func.__name__))
                     except Exception as reschedule_err:
-                        logger.error(f"Failed to reschedule UI loop '{func.__name__}': {reschedule_err}")
+                        logger.error(
+                            f"Failed to reschedule UI loop '{func.__name__}': {reschedule_err}"
+                        )
+
         return wrapper
+
     return decorator
 
+
 def is_ip(text: str) -> bool:
-    if not text: return False
+    if not text:
+        return False
     text = str(text)
     # Basic IPv4
-    if re.match(r'^(?:\d{1,3}\.){3}\d{1,3}$', text): return True
+    if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", text):
+        return True
     # Basic IPv6
-    if re.match(r'^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$', text): return True
+    if re.match(r"^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$", text):
+        return True
     return False
+
 
 class ClipboardTooltipManager:
     _instance = None
@@ -61,22 +73,27 @@ class ClipboardTooltipManager:
 
     def show(self, widget, message, x, y):
         import customtkinter as ctk
+
         if self.tip is None or not self.tip.winfo_exists():
             self.tip = ctk.CTkToplevel()
             self.tip.overrideredirect(True)
             self.tip.attributes("-topmost", True)
-            self.tip.configure(fg_color=Colors.SUCCESS_DIM if hasattr(Colors, 'SUCCESS_DIM') else "#166534")
-            
+            self.tip.configure(
+                fg_color=Colors.SUCCESS_DIM if hasattr(Colors, "SUCCESS_DIM") else "#166534"
+            )
+
             self.lbl = ctk.CTkLabel(
-                self.tip, text=message,
+                self.tip,
+                text=message,
                 text_color="white",
                 font=("Inter", 11, "bold"),
-                padx=8, pady=4
+                padx=8,
+                pady=4,
             )
             self.lbl.pack()
         else:
             self.lbl.configure(text=message)
-            
+
         self.tip.geometry(f"+{x}+{y}")
         self.tip.deiconify()
 
@@ -84,36 +101,40 @@ class ClipboardTooltipManager:
             self.tip.after_cancel(self.hide_id)
         self.hide_id = self.tip.after(1500, self.tip.withdraw)
 
+
 def bind_copy_tooltip(widget, text_to_copy, message=None):
     """Binds a click event to copy text and show a floating tooltip."""
     if message is None:
         message = "IP copied!" if is_ip(text_to_copy) else "Link copied!"
-        
+
     widget.configure(cursor="hand2")
-    
+
     def on_click(event):
         widget.clipboard_clear()
         widget.clipboard_append(str(text_to_copy))
-        
+
         x = event.x_root + 10
         y = event.y_root + 10
         ClipboardTooltipManager.get_instance().show(widget, message, x, y)
-        
+
     widget.bind("<Button-1>", on_click)
 
+
 import re
+
 
 def mask_ip_string(text: str) -> str:
     """Masks IPv4 and IPv6 addresses in a string for Privacy Stream Mode."""
     if not text:
         return text
-        
+
     text = str(text)
     # Mask IPv4
-    text = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', '<HIDDEN_IP>', text)
+    text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<HIDDEN_IP>", text)
     # Mask common IPv6 patterns
-    text = re.sub(r'\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b', '<HIDDEN_IP>', text)
+    text = re.sub(r"\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b", "<HIDDEN_IP>", text)
     return text
+
 
 _SCROLL_SPEED_PRESETS = {
     "slow": 0.5,
@@ -151,6 +172,7 @@ def get_scroll_step(platform: str = None) -> int:
     """Centralized mousewheel scroll speed (units per notch), honoring the
     user's Scroll Speed setting. Matches the app.py CTkScrollableFrame patch."""
     import sys
+
     platform = platform or sys.platform
     if platform.startswith("win"):
         base = 22
@@ -160,25 +182,26 @@ def get_scroll_step(platform: str = None) -> int:
         base = 10
     return max(1, int(round(base * _scroll_multiplier)))
 
+
 def apply_treeview_scroll_patch(tree_widget):
     """Applies ultra-fast custom scroll binding to a ttk.Treeview widget."""
     import sys
-    
+
     step_units = get_scroll_step()
-    
+
     def _on_mousewheel(event):
         try:
             if not tree_widget.winfo_exists():
-                return
+                return None
             if sys.platform.startswith("win"):
-                if hasattr(event, 'delta') and event.delta:
+                if hasattr(event, "delta") and event.delta:
                     step = -int((event.delta / 120) * step_units)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
                     tree_widget.yview_scroll(step, "units")
                     return "break"
             elif sys.platform == "darwin":
-                if hasattr(event, 'delta') and event.delta:
+                if hasattr(event, "delta") and event.delta:
                     step = -int(event.delta * step_units / 2)
                     if step == 0:
                         step = -1 if event.delta > 0 else 1
@@ -193,7 +216,7 @@ def apply_treeview_scroll_patch(tree_widget):
             return "break"
         except Exception:
             pass
-            
+
     def _on_linux_scroll_down(event):
         try:
             tree_widget.yview_scroll(step_units, "units")
@@ -212,19 +235,36 @@ def get_screen_bounds(window=None):
     Returns (width, height, left, top).
     """
     import sys
+
     if sys.platform.startswith("win"):
         import ctypes
         from ctypes import wintypes
+
         try:
             if window is not None and window.winfo_exists():
                 try:
                     hwnd = window.winfo_id()
                     if hwnd:
-                        monitor = ctypes.windll.user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+                        monitor = ctypes.windll.user32.MonitorFromWindow(
+                            hwnd, 2
+                        )  # MONITOR_DEFAULTTONEAREST
+
                         class RECT(ctypes.Structure):
-                            _fields_ = [('left', wintypes.LONG), ('top', wintypes.LONG), ('right', wintypes.LONG), ('bottom', wintypes.LONG)]
+                            _fields_ = [
+                                ("left", wintypes.LONG),
+                                ("top", wintypes.LONG),
+                                ("right", wintypes.LONG),
+                                ("bottom", wintypes.LONG),
+                            ]
+
                         class MONITORINFO(ctypes.Structure):
-                            _fields_ = [('cbSize', wintypes.DWORD), ('rcMonitor', RECT), ('rcWork', RECT), ('dwFlags', wintypes.DWORD)]
+                            _fields_ = [
+                                ("cbSize", wintypes.DWORD),
+                                ("rcMonitor", RECT),
+                                ("rcWork", RECT),
+                                ("dwFlags", wintypes.DWORD),
+                            ]
+
                         mi = MONITORINFO()
                         mi.cbSize = ctypes.sizeof(MONITORINFO)
                         if ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(mi)):
@@ -245,8 +285,9 @@ def get_screen_bounds(window=None):
     if window is not None:
         try:
             import customtkinter as ctk
+
             scale = 1.0
-            if hasattr(ctk, 'ScalingTracker'):
+            if hasattr(ctk, "ScalingTracker"):
                 scale = ctk.ScalingTracker.get_window_scaling(window)
             w = int(round(window.winfo_screenwidth() * scale))
             h = int(round(window.winfo_screenheight() * scale))
@@ -281,7 +322,8 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
     scale = 1.0
     try:
         import customtkinter as ctk
-        if hasattr(ctk, 'ScalingTracker'):
+
+        if hasattr(ctk, "ScalingTracker"):
             scale = ctk.ScalingTracker.get_window_scaling(window)
     except Exception:
         scale = 1.0
@@ -316,7 +358,7 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
 
     max_actual_w = max(300, int(screen_w * max_w_ratio))
     max_actual_h = max(200, int(screen_h * max_h_ratio))
-    
+
     if actual_w > max_actual_w:
         actual_w = max_actual_w
         width = int(round(actual_w / scale))
@@ -350,28 +392,30 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
 
 _cached_logo_images = {}
 
+
 def get_app_logo_image(size=(24, 24)):
     """
     Returns a CTkImage of the Cripple NetStrip logo at the specified size.
     """
     import os
     import sys
-    from PIL import Image
+
     import customtkinter as ctk
-    
+    from PIL import Image
+
     if size in _cached_logo_images:
         return _cached_logo_images[size]
-        
+
     try:
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            
-        logo_path = os.path.join(base_path, 'assets', 'cripple_logo.png')
+
+        logo_path = os.path.join(base_path, "assets", "cripple_logo.png")
         if not os.path.exists(logo_path):
-            logo_path = os.path.join(base_path, 'assets', 'logo.ico')
-            
+            logo_path = os.path.join(base_path, "assets", "logo.ico")
+
         if os.path.exists(logo_path):
             pil_img = Image.open(logo_path)
             ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=size)
@@ -390,41 +434,41 @@ def apply_window_icon(window):
     try:
         import os
         import sys
-        
-        if getattr(sys, 'frozen', False):
+
+        if getattr(sys, "frozen", False):
             base_path = sys._MEIPASS
         else:
             base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            
-        icon_path = os.path.join(base_path, 'assets', 'logo.ico')
+
+        icon_path = os.path.join(base_path, "assets", "logo.ico")
         if os.path.exists(icon_path):
             try:
                 window.iconbitmap(icon_path)
             except Exception:
                 pass
-            
+
             if sys.platform.startswith("win"):
+
                 def _set_win_icon():
                     try:
                         import ctypes
+
                         hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
                         if not hwnd:
                             hwnd = window.winfo_id()
                         hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
                         if hicon and hwnd:
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon) # ICON_SMALL
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon) # ICON_BIG
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)  # ICON_SMALL
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)  # ICON_BIG
                     except Exception:
                         pass
-                
+
                 # Execute immediately and also schedule after 10ms in case window wasn't fully mapped
                 _set_win_icon()
-                if hasattr(window, 'after'):
+                if hasattr(window, "after"):
                     try:
                         window.after(10, _set_win_icon)
                     except Exception:
                         pass
     except Exception as e:
         logger.debug(f"Failed to apply window icon: {e}")
-
-

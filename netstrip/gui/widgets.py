@@ -4,55 +4,60 @@ Reusable components built on top of customtkinter.
 """
 
 import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing, CTK_FRAME_STYLE
+
+from netstrip.gui.theme import CTK_FRAME_STYLE, Colors, Fonts, Spacing
+
 
 class StatCard(ctk.CTkFrame):
-    def __init__(self, master, title, value="-", icon="", color=Colors.ACCENT_PRIMARY, subtitle="", **kwargs):
+    def __init__(
+        self, master, title, value="-", icon="", color=Colors.ACCENT_PRIMARY, subtitle="", **kwargs
+    ):
         super().__init__(master, **{**CTK_FRAME_STYLE, **kwargs})
         self.color = color
-        
+
         # Left-aligned container to prevent horizontal shifting/glitching on value update
         self.inner = ctk.CTkFrame(self, fg_color="transparent")
         self.inner.pack(fill="both", expand=True, padx=Spacing.LG, pady=Spacing.LG)
-        
+
         # Grid layout for inner
-        self.inner.grid_columnconfigure(0, weight=0, minsize=50) # Fixed icon width
-        self.inner.grid_columnconfigure(1, weight=1) # Flexible text area
-        
+        self.inner.grid_columnconfigure(0, weight=0, minsize=50)  # Fixed icon width
+        self.inner.grid_columnconfigure(1, weight=1)  # Flexible text area
+
         # Icon (Futuristic accent)
         self.icon_label = ctk.CTkLabel(
-            self.inner, text=icon, 
+            self.inner,
+            text=icon,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL + 6),
             text_color=self.color,
-            anchor="center"
+            anchor="center",
         )
         rowspan = 3 if subtitle else 2
         self.icon_label.grid(row=0, column=0, rowspan=rowspan, sticky="nsw")
-        
+
         # Value (Larger, more minimal)
         self.value_label = ctk.CTkLabel(
-            self.inner, text=value,
+            self.inner,
+            text=value,
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XL, Fonts.WEIGHT_BOLD),
-            text_color=Colors.TEXT_PRIMARY
+            text_color=Colors.TEXT_PRIMARY,
         )
         self.value_label.grid(row=0, column=1, sticky="sw", pady=(0, 2))
-        
+
         # Title
         self.title_label = ctk.CTkLabel(
-            self.inner, text=title.upper(),
+            self.inner,
+            text=title.upper(),
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_XS, "bold"),
-            text_color=Colors.TEXT_TERTIARY
+            text_color=Colors.TEXT_TERTIARY,
         )
         self.title_label.grid(row=1, column=1, sticky="nw")
-        
+
         if subtitle:
             self.subtitle_label = ctk.CTkLabel(
-                self.inner, text=subtitle,
-                font=(Fonts.FAMILY_PRIMARY[0], 10),
-                text_color=self.color
+                self.inner, text=subtitle, font=(Fonts.FAMILY_PRIMARY[0], 10), text_color=self.color
             )
             self.subtitle_label.grid(row=2, column=1, sticky="w", pady=(4, 0))
-            
+
         self._resize_timer = None
         self.bind("<Configure>", self._on_resize)
 
@@ -65,40 +70,51 @@ class StatCard(ctk.CTkFrame):
         # Scale between 0.8x and 1.2x based on 250px baseline to prevent giant text
         scale = max(0.8, min(1.2, width / 250.0))
         self._current_scale = scale
-        
+
         # Re-apply value to calculate correct font size with new scale
         self.set_value(self.value_label.cget("text"))
-        
+
         # Scale icon
         icon_size = int((Fonts.SIZE_XL + 4) * scale)
         self.icon_label.configure(font=(Fonts.FAMILY_PRIMARY[0], icon_size))
-        
+
         # Scale title
         title_size = int(Fonts.SIZE_SM * scale)
         self.title_label.configure(font=(Fonts.FAMILY_PRIMARY[0], title_size, Fonts.WEIGHT_BOLD))
-        
-        if hasattr(self, 'subtitle_label'):
+
+        if hasattr(self, "subtitle_label"):
             sub_size = int(9 * scale)
             self.subtitle_label.configure(font=(Fonts.FAMILY_PRIMARY[0], sub_size))
 
     def set_value(self, value: str):
         val_str = str(value)
         old_val = self.value_label.cget("text")
-        
-        scale = getattr(self, '_current_scale', 1.0)
+
+        scale = getattr(self, "_current_scale", 1.0)
         scaled_size = int(Fonts.SIZE_BASE * scale)
-        self.value_label.configure(text=val_str, font=(Fonts.FAMILY_PRIMARY[0], scaled_size, Fonts.WEIGHT_BOLD))
-        
+        self.value_label.configure(
+            text=val_str, font=(Fonts.FAMILY_PRIMARY[0], scaled_size, Fonts.WEIGHT_BOLD)
+        )
+
         # Trigger a subtle sparkline/pulse when value updates and differs
-        if str(old_val) != val_str and str(old_val).replace(',', '').isdigit() and val_str.replace(',', '').isdigit():
-            if not getattr(self, '_is_pulsing', False):
+        if (
+            str(old_val) != val_str
+            and str(old_val).replace(",", "").isdigit()
+            and val_str.replace(",", "").isdigit()
+        ):
+            if not getattr(self, "_is_pulsing", False):
                 self._is_pulsing = True
                 orig_color = Colors.BG_PANEL
                 # Green pulse for Allows, Red pulse for Blocks
-                steps = ["#1a2e21", "#14251a", "#0f1c14", orig_color] if self.color == Colors.SUCCESS else ["#3d141b", "#2c0e13", "#1b090c", orig_color]
-                
+                steps = (
+                    ["#1a2e21", "#14251a", "#0f1c14", orig_color]
+                    if self.color == Colors.SUCCESS
+                    else ["#3d141b", "#2c0e13", "#1b090c", orig_color]
+                )
+
                 def _fade(idx=0):
-                    if not self.winfo_exists(): return
+                    if not self.winfo_exists():
+                        return
                     if idx < len(steps):
                         self.configure(fg_color=steps[idx])
                         self.inner.configure(fg_color=steps[idx])
@@ -107,10 +123,11 @@ class StatCard(ctk.CTkFrame):
                         self.configure(fg_color=orig_color)
                         self.inner.configure(fg_color="transparent")
                         self._is_pulsing = False
+
                 _fade(0)
 
     def set_subtitle(self, subtitle: str):
-        if hasattr(self, 'subtitle_label'):
+        if hasattr(self, "subtitle_label"):
             self.subtitle_label.configure(text=subtitle)
 
 
@@ -119,61 +136,72 @@ class ModeSelector(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.on_change = on_change
         self.current_value = "Normal"
-        
+
         # Use standard buttons instead of CTkSegmentedButton to bypass a massive 3.6s initialization bug in CustomTkinter
-        self.grid_columnconfigure((0,1,2), weight=1)
-        
+        self.grid_columnconfigure((0, 1, 2), weight=1)
+
         self.buttons = {}
         for i, val in enumerate(["Ghost", "Normal", "Loose"]):
             btn = ctk.CTkButton(
-                self, text=val,
+                self,
+                text=val,
                 command=lambda v=val: self._handle_change(v),
                 font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD),
                 fg_color=Colors.BG_PANEL,
                 hover_color=Colors.BG_ELEVATED,
                 text_color=Colors.TEXT_SECONDARY,
                 corner_radius=4,
-                height=28
+                height=28,
             )
             btn.grid(row=0, column=i, padx=2, sticky="ew")
             self.buttons[val] = btn
-            
+
         self.set("Normal")
 
     def _handle_change(self, value):
         self.set(value)
         if self.on_change:
             self.on_change(value)
-            
+
     def get(self):
         return self.current_value
-        
+
     def set(self, value):
         if value == "Paranoid":
             value = "Ghost"
         self.current_value = value
         for val, btn in self.buttons.items():
             if val == value:
-                btn.configure(fg_color=Colors.ACCENT_PRIMARY, hover_color=Colors.ACCENT_LIGHT, text_color="white")
+                btn.configure(
+                    fg_color=Colors.ACCENT_PRIMARY,
+                    hover_color=Colors.ACCENT_LIGHT,
+                    text_color="white",
+                )
             else:
-                btn.configure(fg_color=Colors.BG_PANEL, hover_color=Colors.BG_ELEVATED, text_color=Colors.TEXT_SECONDARY)
-        
+                btn.configure(
+                    fg_color=Colors.BG_PANEL,
+                    hover_color=Colors.BG_ELEVATED,
+                    text_color=Colors.TEXT_SECONDARY,
+                )
+
 
 class ShieldIndicator(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
-        
+
         self.icon = ctk.CTkLabel(
-            self, text="🛡", 
+            self,
+            text="🛡",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_4XL),
-            text_color=Colors.SUCCESS
+            text_color=Colors.SUCCESS,
         )
         self.icon.pack(pady=Spacing.MD)
-        
+
         self.status = ctk.CTkLabel(
-            self, text="Protection Active",
+            self,
+            text="Protection Active",
             font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_LG, Fonts.WEIGHT_BOLD),
-            text_color=Colors.SUCCESS
+            text_color=Colors.SUCCESS,
         )
         self.status.pack()
 
@@ -188,7 +216,7 @@ class ShieldIndicator(ctk.CTkFrame):
             else:
                 color = Colors.MODE_NORMAL
                 status = "Balanced Protection"
-                
+
             self.icon.configure(text_color=color)
             self.status.configure(text=status, text_color=color)
         else:

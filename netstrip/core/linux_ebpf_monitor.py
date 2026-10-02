@@ -5,11 +5,11 @@ This provides a high-assurance verification stream that cannot be bypassed by st
 """
 
 import logging
-import threading
 import socket
 import struct
 import subprocess
-from typing import Callable
+import threading
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,7 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx) {
 }
 """
 
+
 class EBPFMonitor:
     def __init__(self, callback: Callable):
         self.callback = callback
@@ -66,12 +67,25 @@ class EBPFMonitor:
         except ImportError:
             # Auto-install attempt if on Linux
             import platform
+
             if platform.system() == "Linux":
                 logger.info("BCC library missing. Attempting automated installation via apt-get...")
                 try:
                     subprocess.run(["apt-get", "update"], check=True, capture_output=True)
-                    subprocess.run(["apt-get", "install", "-y", "python3-bpfcc", "bpfcc-tools", "linux-headers-generic"], check=True, capture_output=True)
+                    subprocess.run(
+                        [
+                            "apt-get",
+                            "install",
+                            "-y",
+                            "python3-bpfcc",
+                            "bpfcc-tools",
+                            "linux-headers-generic",
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
                     from bcc import BPF
+
                     logger.info("BCC successfully installed and imported.")
                 except Exception as e:
                     logger.debug(f"Automated BCC installation failed: {e}. eBPF Monitor disabled.")
@@ -100,7 +114,7 @@ class EBPFMonitor:
         self.is_running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
-        
+
         # BCC cleans up automatically on object destruction, but we can be explicit
         if self.b:
             self.b.cleanup()
@@ -120,16 +134,16 @@ class EBPFMonitor:
         try:
             event = self.b["ipv4_events"].event(data)
             ip = socket.inet_ntoa(struct.pack("<I", event.daddr))
-            process_name = event.comm.decode('utf-8', 'replace')
-            
+            process_name = event.comm.decode("utf-8", "replace")
+
             event_data = {
-                'pid': event.pid,
-                'ip': ip,
-                'port': event.dport,
-                'process_name': process_name,
-                'protocol': 'TCP'
+                "pid": event.pid,
+                "ip": ip,
+                "port": event.dport,
+                "process_name": process_name,
+                "protocol": "TCP",
             }
-            
+
             # Pass directly to connection monitor callback
             self.callback(event_data)
         except Exception as e:

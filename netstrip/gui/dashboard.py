@@ -1,111 +1,194 @@
 from netstrip.gui.popups import check_killswitch_override
+
 """
 Dashboard View for Cripple GUI
 """
 
 import customtkinter as ctk
-from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_FRAME_STYLE
-from netstrip.gui.widgets import StatCard, ModeSelector, ShieldIndicator
+
+from netstrip.gui.theme import CTK_FRAME_STYLE, Colors, Fonts, Icons, Spacing
 from netstrip.gui.utils import safe_loop
+from netstrip.gui.widgets import ModeSelector, ShieldIndicator, StatCard
 from netstrip.i18n import t as _t
+
 
 class DashboardView(ctk.CTkFrame):
     def __init__(self, master, engine, **kwargs):
         super().__init__(master, fg_color=Colors.BG_DARK, corner_radius=0, **kwargs)
         self.engine = engine
-        
+
         # Plain frame layout (no scrollbar): every element fits the visible
         # pane and the Recent Blocks frame stretches to exactly fill the
         # remaining height at any window size.
         self.inner = ctk.CTkFrame(self, fg_color="transparent")
         self.inner.pack(fill="both", expand=True, padx=24, pady=(16, 12))
-        
+
         # Grid layout - enforce uniform column widths so dynamic text doesn't shift the UI
         self.inner.grid_columnconfigure((0, 1), weight=1, uniform="stat_cols")
         self.inner.grid_rowconfigure(3, weight=1)
-        
+
         # 1. Header & Shield
         self.header_frame = ctk.CTkFrame(self.inner, fg_color=Colors.BG_DARK)
         self.header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, Spacing.LG))
-        
+
         self.shield = ShieldIndicator(self.header_frame)
         self.shield.pack(side="left", padx=Spacing.MD)
-        
+
         # Mode selector on the right
         self.mode_frame = ctk.CTkFrame(self.header_frame, fg_color=Colors.BG_DARK)
         self.mode_frame.pack(side="right", padx=Spacing.MD, pady=Spacing.MD)
-        
+
         # System Toggle above Smart Shield
         self.system_frame = ctk.CTkFrame(self.mode_frame, fg_color=Colors.BG_DARK)
         self.system_frame.pack(fill="x", pady=(0, Spacing.XS))
-        
-        ctk.CTkLabel(self.system_frame, text=_t('dashboard.block_system'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
-        
+
+        ctk.CTkLabel(
+            self.system_frame,
+            text=_t("dashboard.block_system"),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
         self.system_toggle = ctk.CTkSwitch(
-            self.system_frame, text="", width=36,
+            self.system_frame,
+            text="",
+            width=36,
             progress_color=Colors.DANGER,
-            command=self._on_system_toggle
+            command=self._on_system_toggle,
         )
         self.system_toggle.pack(side="right")
 
         # Smart Shield Toggle above Mode Selector
         self.smart_frame = ctk.CTkFrame(self.mode_frame, fg_color=Colors.BG_DARK)
         self.smart_frame.pack(fill="x", pady=(0, Spacing.MD))
-        
-        ctk.CTkLabel(self.smart_frame, text=_t('dashboard.smart_shield'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY).pack(side="left")
-        
+
+        ctk.CTkLabel(
+            self.smart_frame,
+            text=_t("dashboard.smart_shield"),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+
         self.smart_toggle = ctk.CTkSwitch(
-            self.smart_frame, text="", width=36,
+            self.smart_frame,
+            text="",
+            width=36,
             progress_color=Colors.ACCENT_PRIMARY,
-            command=self._on_smart_toggle
+            command=self._on_smart_toggle,
         )
         self.smart_toggle.pack(side="right")
-        
-        ctk.CTkLabel(self.mode_frame, text="Protection Level", font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY).pack(anchor="w", pady=(0, Spacing.XS))
+
+        ctk.CTkLabel(
+            self.mode_frame,
+            text="Protection Level",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+            text_color=Colors.TEXT_SECONDARY,
+        ).pack(anchor="w", pady=(0, Spacing.XS))
         self.mode_selector = ModeSelector(self.mode_frame, on_change=self._on_mode_change)
         self.mode_selector.pack(fill="x")
-        
+
         # 2. Stats Rows (2x2 Grid)
-        self.stat_traffic = StatCard(self.inner, title=_t('stat.allowed_blocked'), icon=Icons.BLOCKED, color=Colors.DANGER, subtitle=_t('sub.last24h'))
-        self.stat_traffic.grid(row=1, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
-        
-        self.stat_queries = StatCard(self.inner, title=_t('stat.total_queries'), icon=Icons.CONNECTIONS, color=Colors.INFO, subtitle="Last 24h")
-        self.stat_queries.grid(row=1, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
-        
-        self.stat_active = StatCard(self.inner, title=_t('stat.active'), icon="⚡", color=Colors.ACCENT_PRIMARY, subtitle=_t('sub.currently'))
-        self.stat_active.grid(row=2, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
-        
-        self.stat_bandwidth = StatCard(self.inner, title=_t('stat.down_up'), icon="🖧", color=Colors.SUCCESS, subtitle=_t('sub.vert'))
-        self.stat_bandwidth.grid(row=2, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
-        
+        self.stat_traffic = StatCard(
+            self.inner,
+            title=_t("stat.allowed_blocked"),
+            icon=Icons.BLOCKED,
+            color=Colors.DANGER,
+            subtitle=_t("sub.last24h"),
+        )
+        self.stat_traffic.grid(
+            row=1, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM)
+        )
+
+        self.stat_queries = StatCard(
+            self.inner,
+            title=_t("stat.total_queries"),
+            icon=Icons.CONNECTIONS,
+            color=Colors.INFO,
+            subtitle="Last 24h",
+        )
+        self.stat_queries.grid(
+            row=1, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM)
+        )
+
+        self.stat_active = StatCard(
+            self.inner,
+            title=_t("stat.active"),
+            icon="⚡",
+            color=Colors.ACCENT_PRIMARY,
+            subtitle=_t("sub.currently"),
+        )
+        self.stat_active.grid(
+            row=2, column=0, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM)
+        )
+
+        self.stat_bandwidth = StatCard(
+            self.inner,
+            title=_t("stat.down_up"),
+            icon="🖧",
+            color=Colors.SUCCESS,
+            subtitle=_t("sub.vert"),
+        )
+        self.stat_bandwidth.grid(
+            row=2, column=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM)
+        )
+
         # Add Fading Hovertips
         try:
             from netstrip.gui.hovertip import FadingHovertip
-            FadingHovertip(self.stat_traffic, "Shows the ratio of allowed vs blocked connections over the rolling 24-hour window.", hover_delay=400)
-            FadingHovertip(self.stat_queries, "Total number of outbound packets intercepted and evaluated by Cripple in the last 24 hours.", hover_delay=400)
-            FadingHovertip(self.stat_active, "The number of distinct applications that have made a connection recently.", hover_delay=400)
-            FadingHovertip(self.system_toggle, "Toggle whether to block native Windows/OS background connections.", hover_delay=400)
-            FadingHovertip(self.smart_toggle, "When enabled, Ghost mode dynamically alerts you to background malware domains.", hover_delay=400)
+
+            FadingHovertip(
+                self.stat_traffic,
+                "Shows the ratio of allowed vs blocked connections over the rolling 24-hour window.",
+                hover_delay=400,
+            )
+            FadingHovertip(
+                self.stat_queries,
+                "Total number of outbound packets intercepted and evaluated by Cripple in the last 24 hours.",
+                hover_delay=400,
+            )
+            FadingHovertip(
+                self.stat_active,
+                "The number of distinct applications that have made a connection recently.",
+                hover_delay=400,
+            )
+            FadingHovertip(
+                self.system_toggle,
+                "Toggle whether to block native Windows/OS background connections.",
+                hover_delay=400,
+            )
+            FadingHovertip(
+                self.smart_toggle,
+                "When enabled, Ghost mode dynamically alerts you to background malware domains.",
+                hover_delay=400,
+            )
         except Exception as e:
             print("Failed to attach hovertips:", e)
-        
+
         # 3. Recent Activity List
         self.activity_frame = ctk.CTkFrame(self.inner, **CTK_FRAME_STYLE)
         self.activity_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0))
-        
+
         self.activity_frame.grid_columnconfigure(0, weight=1)
         self.activity_frame.grid_rowconfigure(1, weight=1)
-        
-        header = ctk.CTkLabel(self.activity_frame, text=_t('dashboard.recent_blocks'), font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD), text_color=Colors.TEXT_PRIMARY)
+
+        header = ctk.CTkLabel(
+            self.activity_frame,
+            text=_t("dashboard.recent_blocks"),
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_MD, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        )
         header.grid(row=0, column=0, sticky="w", padx=Spacing.MD, pady=Spacing.MD)
-        
+
         self.activity_list = ctk.CTkFrame(self.activity_frame, fg_color=Colors.BG_DARK)
-        self.activity_list.grid(row=1, column=0, sticky="nsew", padx=Spacing.XS, pady=(0, Spacing.XS))
-        
+        self.activity_list.grid(
+            row=1, column=0, sticky="nsew", padx=Spacing.XS, pady=(0, Spacing.XS)
+        )
+
         # Initialize UI state deferred to prevent startup freeze
-        if hasattr(self, '_update_stats_id'): self.after_cancel(self._update_stats_id)
+        if hasattr(self, "_update_stats_id"):
+            self.after_cancel(self._update_stats_id)
         self._update_stats_id = self.after(50, self._update_stats)
-        
+
         # Bind resize event for responsive layout
         self.bind("<Configure>", self._on_resize)
         self._is_mobile_layout = None
@@ -118,18 +201,28 @@ class DashboardView(ctk.CTkFrame):
         if self._is_mobile_layout == is_mobile:
             return
         self._is_mobile_layout = is_mobile
-        
+
         if is_mobile:
             # Stack cards vertically
             self.inner.grid_columnconfigure((0, 1), weight=1, uniform="")
-            self.stat_traffic.grid(row=1, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
-            self.stat_queries.grid(row=2, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
-            self.stat_active.grid(row=3, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
-            self.stat_bandwidth.grid(row=4, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM))
-            self.activity_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0))
+            self.stat_traffic.grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM)
+            )
+            self.stat_queries.grid(
+                row=2, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM)
+            )
+            self.stat_active.grid(
+                row=3, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM)
+            )
+            self.stat_bandwidth.grid(
+                row=4, column=0, columnspan=2, sticky="ew", padx=0, pady=(0, Spacing.SM)
+            )
+            self.activity_frame.grid(
+                row=5, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0)
+            )
             self.inner.grid_rowconfigure(3, weight=0)
             self.inner.grid_rowconfigure(5, weight=1)
-            
+
             # Stack header items if very narrow
             if event.width < 400:
                 self.shield.pack(side="top", pady=(0, Spacing.MD))
@@ -137,14 +230,44 @@ class DashboardView(ctk.CTkFrame):
         else:
             # 2x2 Grid
             self.inner.grid_columnconfigure((0, 1), weight=1, uniform="stat_cols")
-            self.stat_traffic.grid(row=1, column=0, columnspan=1, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
-            self.stat_queries.grid(row=1, column=1, columnspan=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
-            self.stat_active.grid(row=2, column=0, columnspan=1, sticky="ew", padx=(0, Spacing.SM), pady=(0, Spacing.SM))
-            self.stat_bandwidth.grid(row=2, column=1, columnspan=1, sticky="ew", padx=(Spacing.SM, 0), pady=(0, Spacing.SM))
-            self.activity_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0))
+            self.stat_traffic.grid(
+                row=1,
+                column=0,
+                columnspan=1,
+                sticky="ew",
+                padx=(0, Spacing.SM),
+                pady=(0, Spacing.SM),
+            )
+            self.stat_queries.grid(
+                row=1,
+                column=1,
+                columnspan=1,
+                sticky="ew",
+                padx=(Spacing.SM, 0),
+                pady=(0, Spacing.SM),
+            )
+            self.stat_active.grid(
+                row=2,
+                column=0,
+                columnspan=1,
+                sticky="ew",
+                padx=(0, Spacing.SM),
+                pady=(0, Spacing.SM),
+            )
+            self.stat_bandwidth.grid(
+                row=2,
+                column=1,
+                columnspan=1,
+                sticky="ew",
+                padx=(Spacing.SM, 0),
+                pady=(0, Spacing.SM),
+            )
+            self.activity_frame.grid(
+                row=3, column=0, columnspan=2, sticky="nsew", pady=(Spacing.LG, 0)
+            )
             self.inner.grid_rowconfigure(5, weight=0)
             self.inner.grid_rowconfigure(3, weight=1)
-            
+
             # Restore header layout
             self.shield.pack(side="left", padx=Spacing.MD, pady=0)
             self.mode_frame.pack(side="right", padx=Spacing.MD, pady=Spacing.MD, fill="none")
@@ -154,12 +277,12 @@ class DashboardView(ctk.CTkFrame):
             val = "true" if self.smart_toggle.get() else "false"
             self.engine.db.set_setting("smart_paranoid_mode", val)
 
-
         is_on = self.smart_toggle.get()
-        if not is_on: # They toggled it to OFF
+        if not is_on:  # They toggled it to OFF
+
             def on_cancel():
                 self.smart_toggle.select()
-            
+
             check_killswitch_override(self.engine, self, proceed, cancel_callback=on_cancel)
         else:
             proceed()
@@ -168,21 +291,25 @@ class DashboardView(ctk.CTkFrame):
         def proceed():
             val = "true" if self.system_toggle.get() else "false"
             self.engine.db.set_setting("block_system_connections", val)
-            if hasattr(self.engine, 'gui_update_callback') and self.engine.gui_update_callback:
-                try: self.engine.gui_update_callback("MODE_CHANGED")
-                except Exception: pass
+            if hasattr(self.engine, "gui_update_callback") and self.engine.gui_update_callback:
+                try:
+                    self.engine.gui_update_callback("MODE_CHANGED")
+                except Exception:
+                    pass
 
         is_on = self.system_toggle.get()
-        if not is_on: # They toggled it to OFF
+        if not is_on:  # They toggled it to OFF
+
             def on_cancel():
                 self.system_toggle.select()
-            
+
             check_killswitch_override(self.engine, self, proceed, cancel_callback=on_cancel)
         else:
             proceed()
 
     def _on_mode_change(self, mode_name: str):
         from netstrip.core.modes import ProtectionLevel
+
         mode_upper = mode_name.upper()
         if mode_upper in ("GHOST", "PARANOID"):
             level = ProtectionLevel.GHOST
@@ -200,28 +327,29 @@ class DashboardView(ctk.CTkFrame):
             try:
                 if event_name == "MODE_CHANGED":
                     mode_name = self.engine.classifier.mode.name
-                    if hasattr(self, 'shield') and self.shield.winfo_exists():
+                    if hasattr(self, "shield") and self.shield.winfo_exists():
                         self.shield.set_state(self.engine.is_running, mode_name)
             except Exception:
                 pass
+
         self.after(0, _handle)
 
     @safe_loop(delay_ms=1000)
     def _update_stats(self):
-        if getattr(self, '_destroyed', False):
+        if getattr(self, "_destroyed", False):
             return
-            
+
         if not self.winfo_ismapped():
             self._update_stats_id = self.after(1000, self._update_stats)
             return
 
         self._update_stats_id = self.after(1000, self._update_stats)
 
-        if getattr(self, '_is_fetching_stats', False):
+        if getattr(self, "_is_fetching_stats", False):
             return
 
         self._is_fetching_stats = True
-        
+
         # All I/O (DB queries + psutil counters) happens on this background
         # thread; the UI thread only applies pre-computed strings.
         def fetch():
@@ -238,11 +366,13 @@ class DashboardView(ctk.CTkFrame):
                 # Bandwidth snapshot (off the UI thread — psutil syscall)
                 bandwidth_payload = None
                 try:
-                    import psutil
                     import time as _time
+
+                    import psutil
+
                     current_io = psutil.net_io_counters()
                     current_time = _time.time()
-                    last_io = getattr(self, '_last_io', None)
+                    last_io = getattr(self, "_last_io", None)
                     if not last_io:
                         self._last_io = current_io
                         self._last_io_time = current_time
@@ -254,17 +384,22 @@ class DashboardView(ctk.CTkFrame):
                             down_speed = max(0, current_io.bytes_recv - last_io.bytes_recv) / dt
 
                             def format_speed(bps):
-                                if bps < 1024: return f"{bps:.0f} B/s"
-                                elif bps < 1024 * 1024: return f"{bps/1024:.1f} KB/s"
-                                else: return f"{bps/(1024*1024):.1f} MB/s"
+                                if bps < 1024:
+                                    return f"{bps:.0f} B/s"
+                                if bps < 1024 * 1024:
+                                    return f"{bps / 1024:.1f} KB/s"
+                                return f"{bps / (1024 * 1024):.1f} MB/s"
 
                             def format_volume(bytes_val):
-                                if bytes_val < 1024: return f"{bytes_val} B"
-                                elif bytes_val < 1024**2: return f"{bytes_val/1024:.1f} KB"
-                                elif bytes_val < 1024**3: return f"{bytes_val/(1024**2):.1f} MB"
-                                else: return f"{bytes_val/(1024**3):.2f} GB"
+                                if bytes_val < 1024:
+                                    return f"{bytes_val} B"
+                                if bytes_val < 1024**2:
+                                    return f"{bytes_val / 1024:.1f} KB"
+                                if bytes_val < 1024**3:
+                                    return f"{bytes_val / (1024**2):.1f} MB"
+                                return f"{bytes_val / (1024**3):.2f} GB"
 
-                            db_sent, db_recv = getattr(self, '_cached_bandwidth', (0, 0))
+                            db_sent, db_recv = getattr(self, "_cached_bandwidth", (0, 0))
                             if db_sent > 0 or db_recv > 0:
                                 total_vol = db_sent + db_recv
                                 label_suffix = "Last 24h"
@@ -284,26 +419,35 @@ class DashboardView(ctk.CTkFrame):
                     try:
                         unique_allowed = self.engine.db.get_unique_allowed_24h()
                     except AttributeError:
-                        unique_allowed = today_stats.get('total_allowed', 0)
+                        unique_allowed = today_stats.get("total_allowed", 0)
                     stats_snapshot = (
                         f"{unique_allowed:,}  |  {today_stats['total_blocked']:,}",
                         f"{today_stats['total_queries']:,}",
                     )
-                    self.after(0, lambda: self._apply_stats(stats_snapshot, recent_conns, bandwidth_payload))
+                    self.after(
+                        0,
+                        lambda: self._apply_stats(stats_snapshot, recent_conns, bandwidth_payload),
+                    )
                 else:
-                    self.after(0, lambda: self._apply_stats(("0  |  0", "0"), recent_conns, bandwidth_payload))
+                    self.after(
+                        0,
+                        lambda: self._apply_stats(
+                            ("0  |  0", "0"), recent_conns, bandwidth_payload
+                        ),
+                    )
             except Exception:
                 self._is_fetching_stats = False
 
         import threading
+
         threading.Thread(target=fetch, daemon=True).start()
 
         # Cheap cached value only — no syscalls on the UI thread
         try:
-            if getattr(self.engine, 'killswitch_active', False):
+            if getattr(self.engine, "killswitch_active", False):
                 self.stat_active.set_value("0")
             else:
-                active_apps = getattr(self.engine, '_cached_active_apps', set())
+                active_apps = getattr(self.engine, "_cached_active_apps", set())
                 self.stat_active.set_value(str(len(active_apps)))
         except Exception:
             pass
@@ -311,7 +455,7 @@ class DashboardView(ctk.CTkFrame):
     def _apply_stats(self, stats_snapshot, recent_conns, bandwidth_payload):
         """Apply pre-computed stat strings on the UI thread."""
         try:
-            if not getattr(self, '_destroyed', False) and self.winfo_exists():
+            if not getattr(self, "_destroyed", False) and self.winfo_exists():
                 traffic_txt, queries_txt = stats_snapshot
                 self.stat_traffic.set_value(traffic_txt)
                 self.stat_queries.set_value(queries_txt)
@@ -326,63 +470,79 @@ class DashboardView(ctk.CTkFrame):
             pass
         finally:
             self._is_fetching_stats = False
-            
+
     def _update_recent_blocks(self, recent):
         if not recent:
             return
-            
+
         # Flicker-Free Static Pool Activity List
-        if not hasattr(self, '_activity_pool'):
+        if not hasattr(self, "_activity_pool"):
             self._activity_pool = []
-            
-        blocked_only = [r for r in recent if r['action'] in ('block', 'sinkhole')][:15]
-        
+
+        blocked_only = [r for r in recent if r["action"] in ("block", "sinkhole")][:15]
+
         if not blocked_only and not self._activity_pool:
-            if not hasattr(self, 'lbl_no_blocks'):
-                self.lbl_no_blocks = ctk.CTkLabel(self.activity_list, text="No recent blocks", text_color=Colors.TEXT_TERTIARY, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM))
+            if not hasattr(self, "lbl_no_blocks"):
+                self.lbl_no_blocks = ctk.CTkLabel(
+                    self.activity_list,
+                    text="No recent blocks",
+                    text_color=Colors.TEXT_TERTIARY,
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+                )
                 self.lbl_no_blocks.pack(pady=Spacing.LG)
         else:
-            if hasattr(self, 'lbl_no_blocks'):
+            if hasattr(self, "lbl_no_blocks"):
                 self.lbl_no_blocks.destroy()
-                delattr(self, 'lbl_no_blocks')
-            
+                delattr(self, "lbl_no_blocks")
+
             from netstrip.gui.theme import get_category_color
-            
+
             privacy_on = self.engine.db.get_setting("privacy_stream_mode", "false") == "true"
-            
+
             # Ensure pool has enough rows (max 15)
             while len(self._activity_pool) < len(blocked_only):
-                row = ctk.CTkFrame(self.activity_list, fg_color=Colors.BG_DARK, corner_radius=0, border_width=0)
+                row = ctk.CTkFrame(
+                    self.activity_list, fg_color=Colors.BG_DARK, corner_radius=0, border_width=0
+                )
                 lbl_dot = ctk.CTkLabel(row, text="●", font=(Fonts.FAMILY_PRIMARY[0], 12))
                 lbl_dot.pack(side="left", padx=(0, Spacing.SM))
-                lbl_proc = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"), text_color=Colors.TEXT_PRIMARY)
+                lbl_proc = ctk.CTkLabel(
+                    row,
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, "bold"),
+                    text_color=Colors.TEXT_PRIMARY,
+                )
                 lbl_proc.pack(side="left")
-                lbl_domain = ctk.CTkLabel(row, font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM), text_color=Colors.TEXT_SECONDARY)
+                lbl_domain = ctk.CTkLabel(
+                    row,
+                    font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM),
+                    text_color=Colors.TEXT_SECONDARY,
+                )
                 lbl_domain.pack(side="right")
                 self._activity_pool.append((row, lbl_dot, lbl_proc, lbl_domain))
                 row.pack(fill="x", pady=2, side="top")
-                
+
             # Update visible rows
             for i, r in enumerate(blocked_only):
                 row, lbl_dot, lbl_proc, lbl_domain = self._activity_pool[i]
                 if not row.winfo_ismapped():
                     row.pack(fill="x", pady=2, side="top")
-                    
-                cat = r['category'] or 'unknown'
+
+                cat = r["category"] or "unknown"
                 c_color = get_category_color(cat)
                 if lbl_dot.cget("text_color") != c_color:
                     lbl_dot.configure(text_color=c_color)
-                    
-                p_name = r['process_name'] or "Unknown"
+
+                p_name = r["process_name"] or "Unknown"
                 if lbl_proc.cget("text") != p_name:
                     lbl_proc.configure(text=p_name)
-                    
-                d_text = r['domain'] or r['ip'] or ""
-                
+
+                d_text = r["domain"] or r["ip"] or ""
+
                 if privacy_on:
                     from netstrip.gui.utils import mask_ip_string
+
                     d_text = mask_ip_string(d_text)
-                
+
                 if lbl_domain.cget("text") != d_text:
                     lbl_domain.configure(text=d_text)
             # Hide unused rows
@@ -390,25 +550,25 @@ class DashboardView(ctk.CTkFrame):
                 row = self._activity_pool[i][0]
                 if row.winfo_ismapped():
                     row.pack_forget()
-                    
+
         # Update shield and toggles
         try:
             current_mode = self.engine.db.get_setting("protection_mode", "NORMAL")
             self.mode_selector.set(current_mode.capitalize())
             self.shield.set_state(self.engine.is_running, current_mode.capitalize())
-            
+
             smart_val = self.engine.db.get_setting("smart_paranoid_mode", "true")
             smart_enabled = str(smart_val).lower() == "true"
             if self.smart_toggle.get() != smart_enabled:
                 self.smart_toggle.select() if smart_enabled else self.smart_toggle.deselect()
-                
+
             system_val = self.engine.db.get_setting("block_system_connections", "false")
             system_enabled = str(system_val).lower() == "true"
             if self.system_toggle.get() != system_enabled:
                 self.system_toggle.select() if system_enabled else self.system_toggle.deselect()
         except Exception as e:
             print("Dashboard loop exception 2:", e)
-        
+
         # Removed untracked self.after call here, as it's handled at the top of the function
 
     def destroy(self):

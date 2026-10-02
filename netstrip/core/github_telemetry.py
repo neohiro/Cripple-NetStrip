@@ -19,9 +19,8 @@ Each report becomes a GitHub Issue with the appropriate label:
 import json
 import logging
 import os
-import urllib.request
 import ssl
-from typing import Optional
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ TELEMETRY_REPO = "neohiro/Cripple-Telemetry"
 ISSUES_ENDPOINT = f"{GITHUB_API_BASE}/repos/{TELEMETRY_REPO}/issues"
 
 
-def _get_token() -> Optional[str]:
+def _get_token() -> str | None:
     """
     Retrieve the GitHub PAT for telemetry submission.
     Checks environment variable first, then token file, then database.
@@ -43,6 +42,7 @@ def _get_token() -> Optional[str]:
     # 2. Token file (~/.netstrip/telemetry_token)
     try:
         from pathlib import Path
+
         token_file = Path.home() / ".netstrip" / "telemetry_token"
         if token_file.exists():
             token = token_file.read_text(encoding="utf-8").strip()
@@ -53,8 +53,10 @@ def _get_token() -> Optional[str]:
 
     # 3. Database setting
     try:
-        from netstrip.data.database import Database
         from pathlib import Path
+
+        from netstrip.data.database import Database
+
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             db = Database(str(db_path))
@@ -73,7 +75,6 @@ def _get_token() -> Optional[str]:
     return None
 
 
-
 def submit_issue(title: str, body: str, label: str) -> bool:
     """
     Create a GitHub Issue on the Cripple-Telemetry repo.
@@ -88,30 +89,32 @@ def submit_issue(title: str, body: str, label: str) -> bool:
     """
     import platform
     import sys
-    
+
     token = _get_token()
     if not token:
         logger.debug("No telemetry token configured, skipping GitHub delivery")
         return False
-        
+
     os_name = "windows"
-    if hasattr(sys, 'getandroidapilevel') or os.environ.get('NETSTRIP_ANDROID') == '1':
+    if hasattr(sys, "getandroidapilevel") or os.environ.get("NETSTRIP_ANDROID") == "1":
         os_name = "android"
     else:
         os_name = platform.system().lower()
-        
+
     os_label = f"os-{os_name}"
     os_title_prefix = f"[{os_name.capitalize()}] "
-    
+
     if not title.startswith(os_title_prefix):
         title = f"{os_title_prefix}{title}"
 
     try:
-        payload = json.dumps({
-            "title": title,
-            "body": body,
-            "labels": [label, os_label],
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "title": title,
+                "body": body,
+                "labels": [label, os_label],
+            }
+        ).encode("utf-8")
 
         req = urllib.request.Request(
             ISSUES_ENDPOINT,
@@ -131,9 +134,8 @@ def submit_issue(title: str, body: str, label: str) -> bool:
             if resp.status == 201:
                 logger.debug(f"Telemetry issue created on GitHub ({label}, {os_label})")
                 return True
-            else:
-                logger.debug(f"GitHub API returned status {resp.status}")
-                return False
+            logger.debug(f"GitHub API returned status {resp.status}")
+            return False
 
     except Exception as e:
         logger.debug(f"GitHub telemetry delivery failed: {e}")

@@ -3,23 +3,24 @@ NetStrip Protection Modes — Defines the three filtering modes
 and their associated rules and behaviors.
 """
 
-from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import List
+from enum import Enum, auto
 
 
 class ProtectionLevel(Enum):
     """The core protection modes."""
+
     GHOST = auto()
-    PARANOID = auto()   # Alias for GHOST (CLI/API compatibility)
-    STRICT = auto()     # Alias for GHOST (CLI compatibility)
+    PARANOID = auto()  # Alias for GHOST (CLI/API compatibility)
+    STRICT = auto()  # Alias for GHOST (CLI compatibility)
     NORMAL = auto()
-    STANDARD = auto()   # Alias for NORMAL (CLI compatibility)
+    STANDARD = auto()  # Alias for NORMAL (CLI compatibility)
     LOOSE = auto()
 
 
 class ConnectionCategory(Enum):
     """Classification categories for network connections."""
+
     AD = "ad"
     TRACKER = "tracker"
     TELEMETRY = "telemetry"
@@ -38,14 +39,16 @@ class ConnectionCategory(Enum):
 
 class ConnectionAction(Enum):
     """What to do with a connection."""
+
     ALLOW = "allow"
     BLOCK = "block"
-    ASK = "ask"           # Prompt the user
-    SINKHOLE = "sinkhole" # DNS sinkhole (return 0.0.0.0)
+    ASK = "ask"  # Prompt the user
+    SINKHOLE = "sinkhole"  # DNS sinkhole (return 0.0.0.0)
 
 
 class ConnectionProtocol(Enum):
     """Network protocol type."""
+
     TCP = "tcp"
     UDP = "udp"
     DNS = "dns"
@@ -54,6 +57,7 @@ class ConnectionProtocol(Enum):
 @dataclass
 class ModeConfig:
     """Configuration for a protection mode."""
+
     level: ProtectionLevel
     name: str
     description: str
@@ -78,10 +82,12 @@ class ModeConfig:
     lan_allow_dns: bool = True
 
     # Categories that are always blocked regardless of mode
-    always_blocked: List[ConnectionCategory] = field(default_factory=lambda: [
-        ConnectionCategory.MALWARE,
-        ConnectionCategory.TRACKER,
-    ])
+    always_blocked: list[ConnectionCategory] = field(
+        default_factory=lambda: [
+            ConnectionCategory.MALWARE,
+            ConnectionCategory.TRACKER,
+        ]
+    )
 
     def get_action_for_category(self, category: ConnectionCategory, db=None) -> ConnectionAction:
         """
@@ -97,7 +103,12 @@ class ModeConfig:
              block_system_connections user setting
         """
         # 1. Never-block channels (explicit user allow beats every preset)
-        if category in (ConnectionCategory.USER_ALLOWED, ConnectionCategory.DNS, ConnectionCategory.ESSENTIAL, ConnectionCategory.IDENTITY):
+        if category in (
+            ConnectionCategory.USER_ALLOWED,
+            ConnectionCategory.DNS,
+            ConnectionCategory.ESSENTIAL,
+            ConnectionCategory.IDENTITY,
+        ):
             return ConnectionAction.ALLOW
 
         # 2. Explicit user block beats every preset allow
@@ -116,7 +127,7 @@ class ModeConfig:
         # 5. Standard family (Normal / Loose share one security bucket):
         #    system connection gating first, then per-category mode config.
         if category == ConnectionCategory.SYSTEM:
-            if hasattr(db, 'get_setting'):
+            if hasattr(db, "get_setting"):
                 sys_val = db.get_setting("block_system_connections", "false")
             elif isinstance(db, dict):
                 sys_val = db.get("block_system_connections", "false")
@@ -142,10 +153,9 @@ class ModeConfig:
 
         if should_block:
             return ConnectionAction.BLOCK
-        elif category == ConnectionCategory.UNKNOWN and self.ask_on_unknown:
+        if category == ConnectionCategory.UNKNOWN and self.ask_on_unknown:
             return ConnectionAction.ASK
-        else:
-            return ConnectionAction.ALLOW
+        return ConnectionAction.ALLOW
 
 
 # ──────────────────────────────────────────────
@@ -156,21 +166,21 @@ GHOST_MODE = ModeConfig(
     level=ProtectionLevel.GHOST,
     name="Ghost",
     description="Maximum privacy & stealth protection. Blocks ALL connections not "
-                "explicitly whitelisted. WPAD/Active Directory discovery leaks and OS "
-                "telemetry blocked. OS updates paused. Full LAN isolation.",
+    "explicitly whitelisted. WPAD/Active Directory discovery leaks and OS "
+    "telemetry blocked. OS updates paused. Full LAN isolation.",
     icon="👻",
     color="#ef4444",
     block_ads=True,
     block_trackers=True,
     block_telemetry=True,
     block_malware=True,
-    block_unknown=True,     # Block unknown by default
+    block_unknown=True,  # Block unknown by default
     block_lan=True,
-    block_updates=True,     # Even app/OS updates blocked
-    block_security=True,    # Block OS security background noise
-    ask_on_unknown=True,    # But prompt user for unknowns
+    block_updates=True,  # Even app/OS updates blocked
+    block_security=True,  # Block OS security background noise
+    ask_on_unknown=True,  # But prompt user for unknowns
     lan_full_isolation=True,
-    lan_allow_gateway=True, # Still need internet
+    lan_allow_gateway=True,  # Still need internet
     lan_allow_dhcp=True,
     lan_allow_dns=True,
 )
@@ -182,19 +192,19 @@ NORMAL_MODE = ModeConfig(
     level=ProtectionLevel.NORMAL,
     name="Normal",
     description="Balanced protection. Blocks known ads, trackers, and "
-                "telemetry. Allows essential connections. Prompts for "
-                "unrecognized connections. LAN isolated except essentials.",
+    "telemetry. Allows essential connections. Prompts for "
+    "unrecognized connections. LAN isolated except essentials.",
     icon="🔰",
     color="#eab308",
     block_ads=True,
     block_trackers=True,
     block_telemetry=True,
     block_malware=True,
-    block_unknown=False,    # Allow unknown by default
+    block_unknown=False,  # Allow unknown by default
     block_lan=True,
-    block_updates=False,    # Allow app/OS updates
-    block_security=False,   # Allow OS security telemetry
-    ask_on_unknown=False,   # Allow unknowns quietly so UI colors them green
+    block_updates=False,  # Allow app/OS updates
+    block_security=False,  # Allow OS security telemetry
+    ask_on_unknown=False,  # Allow unknowns quietly so UI colors them green
     lan_full_isolation=False,
     lan_allow_gateway=True,
     lan_allow_dhcp=True,
@@ -205,8 +215,8 @@ LOOSE_MODE = ModeConfig(
     level=ProtectionLevel.LOOSE,
     name="Loose",
     description="Minimal protection. Only blocks confirmed ad/tracker "
-                "domains and malware. Allows most connections without "
-                "prompting. LAN partially open. For maximum compatibility.",
+    "domains and malware. Allows most connections without "
+    "prompting. LAN partially open. For maximum compatibility.",
     icon="🔓",
     color="#22c55e",
     block_ads=True,
@@ -214,10 +224,10 @@ LOOSE_MODE = ModeConfig(
     block_telemetry=False,  # Allow telemetry
     block_malware=True,
     block_unknown=False,
-    block_lan=False,        # LAN open
+    block_lan=False,  # LAN open
     block_updates=False,
     block_security=False,
-    ask_on_unknown=False,   # No prompts
+    ask_on_unknown=False,  # No prompts
     lan_full_isolation=False,
     lan_allow_gateway=True,
     lan_allow_dhcp=True,
@@ -228,9 +238,9 @@ LOOSE_MODE = ModeConfig(
 MODES = {
     ProtectionLevel.GHOST: GHOST_MODE,
     ProtectionLevel.PARANOID: GHOST_MODE,
-    ProtectionLevel.STRICT: GHOST_MODE,    # STRICT is an alias for GHOST/PARANOID
+    ProtectionLevel.STRICT: GHOST_MODE,  # STRICT is an alias for GHOST/PARANOID
     ProtectionLevel.NORMAL: NORMAL_MODE,
-    ProtectionLevel.STANDARD: NORMAL_MODE,    # STANDARD is an alias for NORMAL
+    ProtectionLevel.STANDARD: NORMAL_MODE,  # STANDARD is an alias for NORMAL
     ProtectionLevel.LOOSE: LOOSE_MODE,
 }
 
@@ -241,8 +251,8 @@ def get_mode(level: ProtectionLevel) -> ModeConfig:
         level_str = level.upper()
         if level_str in ("GHOST", "PARANOID", "STRICT"):
             return GHOST_MODE
-        elif level_str in ("NORMAL", "STANDARD"):
+        if level_str in ("NORMAL", "STANDARD"):
             return NORMAL_MODE
-        elif level_str == "LOOSE":
+        if level_str == "LOOSE":
             return LOOSE_MODE
     return MODES.get(level, NORMAL_MODE)

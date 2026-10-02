@@ -30,8 +30,7 @@ PrivilegesRequired=admin
 WizardStyle=modern
 
 [Files]
-Source: "{#ExeSource}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\assets\logo.ico"; DestDir: "{app}"
+Source: "..\dist\Cripple\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\NetStrip"; Filename: "{app}\Cripple.exe"

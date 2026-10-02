@@ -1,18 +1,21 @@
+import contextlib
+import hashlib
+import hmac
+import logging
+import os
+import secrets
+import sqlite3
+import subprocess
 import sys
 import time
-import subprocess
-import logging
-import hashlib
 from pathlib import Path
 
 # Setup basic logging for the watchdog
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - Watchdog - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - Watchdog - %(message)s")
 
-import hmac
-import secrets
+# HMAC secret key generated per-session in main()
+HMAC_SECRET_KEY: bytes | None = None
 
-# Generate ephemeral in-memory 512-bit secret key per watchdog session (Post-Quantum Keyed Hashing)
-HMAC_SECRET_KEY = secrets.token_bytes(64)
 
 def get_critical_files():
     base_dir = Path(__file__).parent.parent
@@ -25,13 +28,14 @@ def get_critical_files():
             files.append(path)
     return files
 
+
 def snapshot_integrity():
     """Hash all critical files on startup using keyed HMAC-SHA512 baseline to prevent hash forgery."""
     baseline = {}
     for filepath in get_critical_files():
         if filepath.exists():
             try:
-                with open(filepath, 'rb') as f:
+                with open(filepath, "rb") as f:
                     content = f.read()
                 h = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha512).hexdigest()
                 baseline[str(filepath)] = h
@@ -39,32 +43,36 @@ def snapshot_integrity():
                 logging.error(f"Failed to hash {filepath}: {e}")
     return baseline
 
+
 def verify_integrity(baseline):
     """Verify keyed HMAC-SHA512 baseline of all core modules and engine files."""
     tampered = []
     for filepath in get_critical_files():
         if filepath.exists():
             try:
-                with open(filepath, 'rb') as f:
+                with open(filepath, "rb") as f:
                     content = f.read()
                 current_hmac = hmac.new(HMAC_SECRET_KEY, content, hashlib.sha512).hexdigest()
-                if str(filepath) in baseline and not hmac.compare_digest(current_hmac, baseline[str(filepath)]):
+                if str(filepath) in baseline and not hmac.compare_digest(
+                    current_hmac, baseline[str(filepath)]
+                ):
                     tampered.append(filepath.name)
             except Exception:
                 pass
         else:
             tampered.append(f"{filepath.name} (DELETED)")
-            
+
     if tampered:
         logging.error(f"Integrity check failed. Tampered/Modified files: {', '.join(tampered)}")
         try:
             import tkinter as tk
             from tkinter import messagebox
+
             root = tk.Tk()
             root.withdraw()
             messagebox.showerror(
                 "Critical Security Alert - Tampering Detected",
-                f"NetStrip (Cripple) Watchdog detected unauthorized tampering or deletion of core security components:\n\n{', '.join(tampered)}\n\nExecution terminated to prevent malicious hijacking."
+                f"NetStrip (Cripple) Watchdog detected unauthorized tampering or deletion of core security components:\n\n{', '.join(tampered)}\n\nExecution terminated to prevent malicious hijacking.",
             )
             root.update()
             time.sleep(2)
@@ -73,65 +81,95 @@ def verify_integrity(baseline):
         return False
     return True
 
+
 def get_clean_exit_path():
     return Path.home() / ".netstrip" / ".clean_exit"
+
+
+def _get_db_connection():
+    """Get a connection to the NetStrip database."""
+    db_path = Path.home() / ".netstrip" / "netstrip.db"
+    if db_path.exists():
+        return sqlite3.connect(db_path)
+    return None
+
+
+def get_backup_dns(interface_name: str) -> str | None:
+    """Get backup DNS for an interface from the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return None
+    try:
+        c = conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
+        row = c.fetchone()
+        if row and row[0] and row[0] != "dhcp":
+            ip = row[0]
+            try:
+                import ipaddress
+
+                ipaddress.ip_address(ip)
+                return ip
+            except ValueError:
+                return None
+    except Exception as e:
+        logging.error(f"Failed to read backup DNS from DB: {e}")
+    finally:
+        conn.close()
+    return None
+
+
+def get_db_setting(key: str, default: str = "false") -> str:
+    """Get a setting from the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return default
+    try:
+        c = conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key=?", (key,))
+        row = c.fetchone()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    finally:
+        conn.close()
+    return default
+
+
+def clear_db_setting(key: str) -> None:
+    """Clear a setting in the database."""
+    conn = _get_db_connection()
+    if conn is None:
+        return
+    try:
+        c = conn.cursor()
+        c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
 
 def restore_network():
     """Fail-Open: Restore the OS DNS settings and firewall rules to default if NetStrip crashes."""
     logging.info("NetStrip crash detected! Initiating emergency DNS and network restore...")
-    
+
     import platform
-    import sqlite3
-    import re
+
     sys_plat = platform.system()
-    
-    def get_backup_dns(interface_name):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute("SELECT value FROM settings WHERE key=?", (f"backup_dns_{interface_name}",))
-                row = c.fetchone()
-                conn.close()
-                if row and row[0] and row[0] != "dhcp":
-                    ip = row[0]
-                    if re.match(r'^([0-9]{1,3}\.){3}[0-9]{1,3}$', ip):
-                        return ip
-            except Exception as e:
-                logging.error(f"Failed to read backup DNS from DB: {e}")
-        return None
 
-    def get_db_setting(key, default="false"):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute("SELECT value FROM settings WHERE key=?", (key,))
-                row = c.fetchone()
-                conn.close()
-                if row and row[0]:
-                    return row[0]
-            except Exception:
-                pass
-        return default
-
-    def clear_db_setting(key):
-        db_path = Path.home() / ".netstrip" / "netstrip.db"
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                c = conn.cursor()
-                c.execute("UPDATE settings SET value=? WHERE key=?", ("false", key))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
-    
     try:
         if sys_plat == "Windows":
-            res = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            import winreg
+
+            res = subprocess.run(
+                ["netsh", "interface", "show", "interface"],
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
             interfaces = []
             for line in res.stdout.splitlines():
                 if "Connected" in line:
@@ -140,132 +178,253 @@ def restore_network():
                         interfaces.append(" ".join(parts[3:]))
             if not interfaces:
                 interfaces = ["Wi-Fi", "Ethernet"]
-                
+
             for interface in interfaces:
                 backup_dns = get_backup_dns(interface)
                 if backup_dns:
                     logging.info(f"Restoring STATIC DNS for interface: {interface} -> {backup_dns}")
-                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "static", backup_dns], creationflags=subprocess.CREATE_NO_WINDOW)
+                    subprocess.run(
+                        [
+                            "netsh",
+                            "interface",
+                            "ipv4",
+                            "set",
+                            "dns",
+                            f"name={interface}",
+                            "static",
+                            backup_dns,
+                        ],
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
                 else:
                     logging.info(f"Restoring DHCP DNS for interface: {interface}")
-                    subprocess.run(["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
-                
-                subprocess.run(["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "dhcp"], creationflags=subprocess.CREATE_NO_WINDOW)
-                subprocess.run(["netsh", "interface", "ipv6", "set", "interface", f"interface={interface}", "routerdiscovery=enabled"], creationflags=subprocess.CREATE_NO_WINDOW)
-                
+                    subprocess.run(
+                        ["netsh", "interface", "ipv4", "set", "dns", f"name={interface}", "dhcp"],
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
+
+                subprocess.run(
+                    ["netsh", "interface", "ipv6", "set", "dns", f"name={interface}", "dhcp"],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                subprocess.run(
+                    [
+                        "netsh",
+                        "interface",
+                        "ipv6",
+                        "set",
+                        "interface",
+                        f"interface={interface}",
+                        "routerdiscovery=enabled",
+                    ],
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+
             # Fail-open: Fast batch command to wipe all NetStrip firewall rules.
             # IPv6/IPv4 protocol bindings are restored below based on the database state.
             logging.info("Removing NetStrip firewall rules...")
             try:
-                import winreg
                 rule_names_to_delete = []
                 reg_path = r"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules"
                 try:
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
-                    num_values = winreg.QueryInfoKey(key)[1]
-                    for i in range(num_values):
-                        try:
-                            name, value, _ = winreg.EnumValue(key, i)
-                            if isinstance(value, str):
-                                parts = value.split('|')
-                                for p in parts:
-                                    if p.startswith('Name=') and "NetStrip" in p:
-                                        rule_names_to_delete.append(p.split('=', 1)[1])
-                        except OSError:
-                            pass
-                    winreg.CloseKey(key)
+                    with winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ
+                    ) as key:
+                        num_values = winreg.QueryInfoKey(key)[1]
+                        for i in range(num_values):
+                            try:
+                                name, value, _ = winreg.EnumValue(key, i)
+                                if isinstance(value, str):
+                                    parts = value.split("|")
+                                    for p in parts:
+                                        if p.startswith("Name=") and "NetStrip" in p:
+                                            rule_names_to_delete.append(p.split("=", 1)[1])
+                            except OSError:
+                                pass
                 except Exception:
                     pass
                 for rule_name in set(rule_names_to_delete):
-                    subprocess.run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"], creationflags=subprocess.CREATE_NO_WINDOW)
+                    subprocess.run(
+                        ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"],
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
             except Exception:
                 pass
-            
+
             # Re-enable standard protocol bindings, WPAD, LLMNR, and NetBIOS on Windows
             logging.info("Restoring Windows network adapter protocol bindings and discovery...")
-            
-            import winreg, os
-            
-            subprocess.run(["wmic", "nicconfig", "where", "TcpipNetbiosOptions!=0", "call", "SetTcpipNetbios", "0"], creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"], creationflags=subprocess.CREATE_NO_WINDOW)
-            
+
+            subprocess.run(
+                [
+                    "wmic",
+                    "nicconfig",
+                    "where",
+                    "TcpipNetbiosOptions!=0",
+                    "call",
+                    "SetTcpipNetbios",
+                    "0",
+                ],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            subprocess.run(
+                ["wmic", "service", "where", "name='lanmanserver'", "call", "startservice"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+
             try:
-                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp", 0, winreg.KEY_WRITE) as key:
+                with winreg.CreateKeyEx(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp",
+                    0,
+                    winreg.KEY_WRITE,
+                ) as key:
                     winreg.SetValueEx(key, "DisableWpad", 0, winreg.REG_DWORD, 0)
-                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", 0, winreg.KEY_WRITE) as key:
+                with winreg.CreateKeyEx(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient",
+                    0,
+                    winreg.KEY_WRITE,
+                ) as key:
                     winreg.DeleteValue(key, "EnableMulticast")
             except Exception:
                 pass
-                
+
             try:
                 reg_path = r"SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces"
-                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ)
-                for i in range(winreg.QueryInfoKey(key)[0]):
-                    try:
-                        subkey_name = winreg.EnumKey(key, i)
-                        subkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{reg_path}\\{subkey_name}", 0, winreg.KEY_SET_VALUE)
-                        winreg.SetValueEx(subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 0)
-                        winreg.CloseKey(subkey)
-                    except OSError:
-                        continue
-                winreg.CloseKey(key)
+                with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_READ
+                ) as key:
+                    for i in range(winreg.QueryInfoKey(key)[0]):
+                        try:
+                            subkey_name = winreg.EnumKey(key, i)
+                            subkey = winreg.OpenKey(
+                                winreg.HKEY_LOCAL_MACHINE,
+                                f"{reg_path}\\{subkey_name}",
+                                0,
+                                winreg.KEY_SET_VALUE,
+                            )
+                            try:
+                                winreg.SetValueEx(
+                                    subkey, "NetbiosOptions", 0, winreg.REG_DWORD, 0
+                                )
+                            finally:
+                                winreg.CloseKey(subkey)
+                        except OSError:
+                            continue
             except Exception:
                 pass
-                
+
             try:
-                import winreg
-                winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD")
+                winreg.DeleteKey(
+                    winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD"
+                )
             except Exception:
                 pass
-                
+
             try:
-                import winreg
-                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\MsLldp", 0, winreg.KEY_WRITE) as key:
+                with winreg.CreateKeyEx(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SYSTEM\CurrentControlSet\Services\MsLldp",
+                    0,
+                    winreg.KEY_WRITE,
+                ) as key:
                     winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 3)
-                with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\pacer", 0, winreg.KEY_WRITE) as key:
+                with winreg.CreateKeyEx(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SYSTEM\CurrentControlSet\Services\pacer",
+                    0,
+                    winreg.KEY_WRITE,
+                ) as key:
                     winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, 1)
             except Exception:
                 pass
-                
+
             subprocess.run(["sc", "start", "MsLldp"], creationflags=subprocess.CREATE_NO_WINDOW)
             subprocess.run(["sc", "start", "pacer"], creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(["netsh", "interface", "isatap", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(["netsh", "interface", "teredo", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
-            subprocess.run(["netsh", "interface", "ipv6", "6to4", "set", "state", "default"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.run(
+                ["netsh", "interface", "isatap", "set", "state", "default"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            subprocess.run(
+                ["netsh", "interface", "teredo", "set", "state", "default"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            subprocess.run(
+                ["netsh", "interface", "ipv6", "6to4", "set", "state", "default"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
 
-            if get_db_setting("disable_ipv6_globally") == "true" or get_db_setting("disable_ipv4_globally") == "true":
+            if (
+                get_db_setting("disable_ipv6_globally") == "true"
+                or get_db_setting("disable_ipv4_globally") == "true"
+            ):
                 try:
-                    res = subprocess.run(["netsh", "interface", "show", "interface"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    res = subprocess.run(
+                        ["netsh", "interface", "show", "interface"],
+                        capture_output=True,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
                     ifaces = []
                     for line in res.stdout.splitlines():
                         if "Connected" in line or "Verbunden" in line or "Conectado" in line:
                             parts = line.split()
                             if len(parts) >= 4:
                                 ifaces.append(" ".join(parts[3:]))
-                                
+
                     if get_db_setting("disable_ipv6_globally") == "true":
-                        logging.info("Re-enabling global IPv6 (was disabled by engine before crash)...")
+                        logging.info(
+                            "Re-enabling global IPv6 (was disabled by engine before crash)..."
+                        )
                         for iface in ifaces:
-                            subprocess.run(["netsh", "interface", "ipv6", "set", "interface", iface, "admin=enable"], creationflags=subprocess.CREATE_NO_WINDOW)
+                            subprocess.run(
+                                [
+                                    "netsh",
+                                    "interface",
+                                    "ipv6",
+                                    "set",
+                                    "interface",
+                                    iface,
+                                    "admin=enable",
+                                ],
+                                creationflags=subprocess.CREATE_NO_WINDOW,
+                            )
                         clear_db_setting("disable_ipv6_globally")
-                        
+
                     if get_db_setting("disable_ipv4_globally") == "true":
-                        logging.info("Re-enabling global IPv4 (was disabled by engine before crash)...")
+                        logging.info(
+                            "Re-enabling global IPv4 (was disabled by engine before crash)..."
+                        )
                         for iface in ifaces:
-                            subprocess.run(["netsh", "interface", "ipv4", "set", "interface", iface, "admin=enable"], creationflags=subprocess.CREATE_NO_WINDOW)
+                            subprocess.run(
+                                [
+                                    "netsh",
+                                    "interface",
+                                    "ipv4",
+                                    "set",
+                                    "interface",
+                                    iface,
+                                    "admin=enable",
+                                ],
+                                creationflags=subprocess.CREATE_NO_WINDOW,
+                            )
                         clear_db_setting("disable_ipv4_globally")
                 except Exception as e:
                     logging.error(f"Failed to re-enable interfaces: {e}")
-            
+
             # Reset killswitch state in DB so the app starts fresh
             clear_db_setting("killswitch_active")
-                
-        elif sys_plat == "Darwin": # macOS
-            res = subprocess.run(["networksetup", "-listallnetworkservices"], capture_output=True, text=True)
-            interfaces = [line.strip() for line in res.stdout.splitlines() if line.strip() and "*" not in line]
+
+        elif sys_plat == "Darwin":  # macOS
+            res = subprocess.run(
+                ["networksetup", "-listallnetworkservices"], capture_output=True, text=True
+            )
+            interfaces = [
+                line.strip() for line in res.stdout.splitlines() if line.strip() and "*" not in line
+            ]
             if not interfaces:
                 interfaces = ["Wi-Fi", "Ethernet"]
-            
+
             for interface in interfaces:
                 backup_dns = get_backup_dns(interface)
                 if backup_dns:
@@ -274,53 +433,119 @@ def restore_network():
                 else:
                     logging.info(f"Restoring DHCP DNS for interface: {interface}")
                     subprocess.run(["networksetup", "-setdnsservers", interface, "Empty"])
-                    
+
                 if get_db_setting("disable_ipv6_globally") == "true":
                     subprocess.run(["networksetup", "-setv6automatic", interface])
-                
+
             subprocess.run(["sysctl", "-w", "net.inet6.ip6.accept_rtadv=1"])
             subprocess.run(["sysctl", "-w", "net.inet.icmp.drop_redirect=0"])
             subprocess.run(["sysctl", "-w", "net.inet.ip.redirect=1"])
-            subprocess.run(["defaults", "write", "/Library/Preferences/com.apple.mDNSResponder.plist", "NoMulticastAdvertisements", "-bool", "NO"])
-            
+            subprocess.run(
+                [
+                    "defaults",
+                    "write",
+                    "/Library/Preferences/com.apple.mDNSResponder.plist",
+                    "NoMulticastAdvertisements",
+                    "-bool",
+                    "NO",
+                ]
+            )
+
             clear_db_setting("disable_ipv6_globally")
             clear_db_setting("killswitch_active")
-            
+
         elif sys_plat == "Linux":
             logging.info("Restoring DNS for Linux (iptables)")
             for proto in ["udp", "tcp"]:
-                subprocess.run(["iptables", "-t", "nat", "-D", "OUTPUT", "-p", proto, "--dport", "53", "-j", "REDIRECT", "--to-ports", "53"])
-            
+                subprocess.run(
+                    [
+                        "iptables",
+                        "-t",
+                        "nat",
+                        "-D",
+                        "OUTPUT",
+                        "-p",
+                        proto,
+                        "--dport",
+                        "53",
+                        "-j",
+                        "REDIRECT",
+                        "--to-ports",
+                        "53",
+                    ]
+                )
+
             if get_db_setting("disable_ipv6_globally") == "true":
                 subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0"])
                 subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.disable_ipv6=0"])
-            
+
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
             subprocess.run(["sysctl", "-w", "net.ipv6.conf.default.accept_ra=1"])
             subprocess.run(["sysctl", "-w", "net.ipv4.conf.all.accept_redirects=1"])
             subprocess.run(["sysctl", "-w", "net.ipv4.conf.default.accept_redirects=1"])
             subprocess.run(["sysctl", "-w", "net.ipv4.conf.all.drop_unicast_in_l2_multicast=0"])
-            
+
             clear_db_setting("disable_ipv6_globally")
             clear_db_setting("killswitch_active")
-            
+
             # Flush any IPv4 drops
-            while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
-            while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
-            
+            for _direction in ("INPUT", "OUTPUT"):
+                lo_flag = "-i" if _direction == "INPUT" else "-o"
+                _removed = 0
+                while _removed < 100:
+                    check = subprocess.run(
+                        [
+                            "iptables",
+                            "-C",
+                            _direction,
+                            "!",
+                            "-o" if _direction == "INPUT" else "-i",
+                            "lo",
+                            "-p",
+                            "all",
+                            "-m",
+                            "comment",
+                            "--comment",
+                            "NetStrip_IPv4_Block",
+                            "-j",
+                            "DROP",
+                        ],
+                        capture_output=True,
+                    )
+                    if check.returncode != 0:
+                        break
+                    subprocess.run(
+                        [
+                            "iptables",
+                            "-D",
+                            _direction,
+                            "!",
+                            lo_flag,
+                            "lo",
+                            "-p",
+                            "all",
+                            "-m",
+                            "comment",
+                            "--comment",
+                            "NetStrip_IPv4_Block",
+                            "-j",
+                            "DROP",
+                        ]
+                    )
+                    _removed += 1
+
         logging.info("Emergency network restore completed successfully.")
     except Exception as e:
         logging.error(f"Failed to restore network: {e}")
 
     # Briefly wait for OS network interface sockets and routes to settle
     time.sleep(0.3)
-    
+
     # Send crash report to developer (consent-aware) AFTER internet connectivity is restored
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent))
         from netstrip.core.crash_reporter import send_crash_report
+
         send_crash_report(
             context="watchdog_crash_recovery",
             extra_info={
@@ -333,40 +558,43 @@ def restore_network():
     except Exception as e:
         logging.error(f"Failed to send watchdog crash report: {e}")
 
+
 def main():
+    global HMAC_SECRET_KEY
+    HMAC_SECRET_KEY = secrets.token_bytes(64)
     baseline_hashes = snapshot_integrity()
-    
+
     import psutil
-    
+
     if len(sys.argv) < 2:
         logging.error("Parent PID required.")
         sys.exit(1)
-        
+
     try:
         parent_pid = int(sys.argv[1])
     except ValueError:
         logging.error("Invalid PID.")
         sys.exit(1)
-        
+
     launch_cmd = sys.argv[2:] if len(sys.argv) > 2 else None
     restarts_remaining = 3
-        
+
     logging.info(f"Watchdog started, monitoring PID {parent_pid}")
-    
+
     # Clear any old clean exit flags
     clean_exit_file = get_clean_exit_path()
     if clean_exit_file.exists():
         try:
             clean_exit_file.unlink()
         except Exception as e:
-            logging.warning(f'Could not remove stale clean-exit flag: {e}')
-    
+            logging.warning(f"Could not remove stale clean-exit flag: {e}")
+
     # Check if process exists immediately
     if not psutil.pid_exists(parent_pid):
         logging.warning("Parent process already dead on startup.")
         if not launch_cmd:
             sys.exit(0)
-            
+
     try:
         if psutil.pid_exists(parent_pid):
             parent_process = psutil.Process(parent_pid)
@@ -374,7 +602,7 @@ def main():
             parent_process = None
     except psutil.NoSuchProcess:
         parent_process = None
-        
+
     # Monitor loop
     loop_ticks = 0
     while True:
@@ -385,42 +613,54 @@ def main():
                 loop_ticks += 1
                 if loop_ticks % 5 == 0:
                     if not verify_integrity(baseline_hashes):
-                        logging.critical("Live tampering detected during process execution! Terminating process...")
-                        try: parent_process.kill()
+                        logging.critical(
+                            "Live tampering detected during process execution! Terminating process..."
+                        )
+                        try:
+                            parent_process.kill()
                         except Exception as e:
-                            logging.critical(f'Failed to kill tampered parent process: {e}')
+                            logging.critical(f"Failed to kill tampered parent process: {e}")
                         restore_network()
                         break
 
                 exit_code = parent_process.wait(timeout=2.0)
-            
+
             # If we get here, process died!
             logging.info(f"Parent process terminated with exit code: {exit_code}")
-            
+
             # Check for the explicit clean_exit flag set by the user closing the app
             if clean_exit_file.exists():
-                logging.info("User requested clean exit flag detected. Watchdog terminating cleanly.")
-                try: clean_exit_file.unlink()
-                except Exception: pass
+                logging.info(
+                    "User requested clean exit flag detected. Watchdog terminating cleanly."
+                )
+                with contextlib.suppress(Exception):
+                    clean_exit_file.unlink()
                 break
-            
+
             # If the exit code is 0 (or specifically 100 which some apps use for manual exit), it was gracefully closed by the user.
-            if exit_code in (0,):
-                logging.info("Graceful shutdown detected via exit code. Watchdog terminating cleanly.")
+            # On Unix, negative exit codes indicate termination by signal; treat as crash.
+            if exit_code is not None and exit_code >= 0 and exit_code in (0, 100):
+                logging.info(
+                    "Graceful shutdown detected via exit code. Watchdog terminating cleanly."
+                )
                 break
-            
+
             if launch_cmd and restarts_remaining > 0:
                 # Before restarting, check integrity again
                 if not verify_integrity(baseline_hashes):
                     logging.error("Tampering detected. Aborting restart.")
                     restore_network()
                     break
-                
-                logging.info(f"Attempting to restart NetStrip... ({restarts_remaining} attempts left)")
+
+                logging.info(
+                    f"Attempting to restart NetStrip... ({restarts_remaining} attempts left)"
+                )
                 restarts_remaining -= 1
                 try:
                     # Relaunch NetStrip
-                    new_proc = subprocess.Popen(launch_cmd, creationflags=subprocess.CREATE_NO_WINDOW)
+                    new_proc = subprocess.Popen(
+                        launch_cmd, creationflags=subprocess.CREATE_NO_WINDOW
+                    )
                     parent_pid = new_proc.pid
                     parent_process = psutil.Process(parent_pid)
                     logging.info(f"Successfully restarted with new PID {parent_pid}")
@@ -428,11 +668,11 @@ def main():
                     continue
                 except Exception as e:
                     logging.error(f"Failed to restart: {e}")
-            
+
             # If we couldn't restart or ran out of attempts, restore network
             restore_network()
             break
-            
+
         except psutil.TimeoutExpired:
             # Still alive, continue waiting
             continue
@@ -441,11 +681,12 @@ def main():
             # Failsafe
             if not psutil.pid_exists(parent_pid):
                 if launch_cmd and restarts_remaining > 0:
-                    parent_process = None # Force restart block next loop
+                    parent_process = None  # Force restart block next loop
                     continue
                 restore_network()
                 break
             time.sleep(2.0)
+
 
 if __name__ == "__main__":
     main()
