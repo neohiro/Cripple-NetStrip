@@ -15,6 +15,13 @@ on:
         required: true
         type: string
 
+# A second dispatch while one is running would force-push a different version
+# to the same automation branch and silently win, leaving the PR title and the
+# tree disagreeing. Serialise them.
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
