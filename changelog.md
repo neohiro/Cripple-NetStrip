@@ -505,7 +505,7 @@
   - Added dedicated Windows 10/11 application manifest (`app.manifest`) with modern OS compatibility GUIDs and DPI awareness, removing hardcoded `requireAdministrator` at the PE manifest layer in favor of smooth runtime elevation.
   - Implemented automated Authenticode code signing with FrenzyPenguin Media publisher certificate and bundled one-click `Install_Certificate.bat` installer in release packages.
 - **Native Win32 Multi-Monitor & DPI-Aware Window Centering**:
-  - Implemented Win32 `MonitorFromWindow` / `MonitorFromPoint` and `GetMonitorInfoW` in [`netstrip/gui/utils.py`](file:///C:/Users/skele/.gemini/antigravity/scratch/Cripple-NetStrip/netstrip/gui/utils.py) to accurately calculate monitor work areas across multi-monitor setups with mixed DPI scalings.
+  - Implemented Win32 `MonitorFromWindow` / `MonitorFromPoint` and `GetMonitorInfoW` in [`netstrip/gui/utils.py`](netstrip/gui/utils.py) to accurately calculate monitor work areas across multi-monitor setups with mixed DPI scalings.
   - Corrected CustomTkinter geometry coordinate scaling offsets so splash screens and dialogs are centered with zero pixel drift on any monitor.
 - **Snappy Splash Screen Transition & CPU Animation Teardown**:
   - Added clean `stop_animation()` teardown on `AnimatedLogo` and `SplashScreen` to immediately halt CPU-intensive canvas redraws when boot finishes.
@@ -520,7 +520,7 @@
 ## [v3.3.5] - DPI-Aware Splash Screen Precision Centering & Multi-Monitor Geometry Alignment
 
 - **DPI-Aware Splash Screen & Modal Centering Precision**:
-  - Implemented automatic CustomTkinter `window_scaling` calculation in `center_window` and `get_screen_dimensions` ([`netstrip/gui/utils.py`](file:///C:/Users/skele/.gemini/antigravity/scratch/Cripple-NetStrip/netstrip/gui/utils.py)).
+  - Implemented automatic CustomTkinter `window_scaling` calculation in `center_window` and `get_screen_dimensions` ([`netstrip/gui/utils.py`](netstrip/gui/utils.py)).
   - Corrected screen dimension sampling to use Tk virtual coordinate space instead of unscaled physical display metrics, ensuring pixel-perfect centering (0px horizontal/vertical offset) across 100%, 125%, 150%, 175%, and 200% Windows display scaling settings.
   - Reordered `SplashScreen` initialization to pack child widgets prior to centering and icon attachment.
 
