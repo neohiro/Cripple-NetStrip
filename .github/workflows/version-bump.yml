@@ -3,6 +3,10 @@ name: Version Bump
 # Single-source versioning: bump the version in one place and this workflow
 # propagates it to every embedded location (package, setup, buildozer,
 # PyInstaller metadata) and verifies consistency in one commit.
+#
+# main is protected, so the bump cannot be pushed directly. This opens a pull
+# request instead, and `verify` runs against the bumped ref so the consistency
+# check still gates the change before it lands.
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +17,18 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
+
+env:
+  BRANCH: automation/version-bump
 
 jobs:
   bump:
     runs-on: ubuntu-latest
+    outputs:
+      bumped: ${{ steps.push.outputs.bumped }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -31,26 +40,56 @@ jobs:
       - name: Bump version everywhere
         run: python scripts/bump_version.py "${{ inputs.version }}"
 
-      - name: Commit propagated versions
+      - name: Commit and open pull request
+        id: push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add netstrip/__init__.py setup.py buildozer.spec version_info.txt
+
           if git diff --cached --quiet; then
-            echo "No version changes to commit"
-          else
-            git commit -m "Bump version to v${{ inputs.version }} [skip ci]"
-            git push
+            echo "No version changes to commit; nothing to do."
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          git commit -m "Bump version to v${VERSION} [skip ci]"
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+
+          number=$(gh pr list --head "$BRANCH" --state open --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            echo "Updated existing PR #${number}"
+            gh pr comment "$number" --body "Bumped to v${VERSION} by run ${GITHUB_RUN_ID}."
+          else
+            gh pr create \
+              --head "$BRANCH" \
+              --base main \
+              --title "chore: bump version to v${VERSION}" \
+              --body "Propagated \`${VERSION}\` to every embedded location by \`.github/workflows/version-bump.yml\`. The \`verify\` job checks consistency against this ref."
+          fi
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
 
   verify:
     runs-on: ubuntu-latest
     needs: bump
+    if: needs.bump.outputs.bumped == 'true'
     steps:
-      - name: Checkout (post-bump)
-        uses: actions/checkout@v4
+      # Check out the bumped ref, not main: the change is not on main until the
+      # PR merges, so verifying main here would check the old version.
+      - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ env.BRANCH }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Verify version consistency
         run: python scripts/bump_version.py --check
