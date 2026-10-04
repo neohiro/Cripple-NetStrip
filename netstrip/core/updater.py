@@ -11,6 +11,7 @@ import re
 import threading
 import time
 import urllib.request
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def is_newer_version(remote: str, current: str) -> bool:
 
 
 class BlocklistUpdater:
-    def __init__(self, lists_dir: str | None = None, on_update_callback: callable | None = None):
+    def __init__(self, lists_dir: str | None = None, on_update_callback: Callable | None = None):
         self._update_lock = threading.Lock()
         if lists_dir is None:
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
@@ -87,8 +88,8 @@ class BlocklistUpdater:
     def check_and_update(
         self,
         force: bool = False,
-        on_complete: callable | None = None,
-        on_progress: callable | None = None,
+        on_complete: Callable | None = None,
+        on_progress: Callable | None = None,
     ):
         """Run the update in a background thread (TOCTOU-safe)."""
         with self._update_lock:
@@ -102,8 +103,8 @@ class BlocklistUpdater:
     def _perform_update(
         self,
         force: bool = False,
-        on_complete: callable | None = None,
-        on_progress: callable | None = None,
+        on_complete: Callable | None = None,
+        on_progress: Callable | None = None,
     ):
         self.is_updating = True
         _completed = False

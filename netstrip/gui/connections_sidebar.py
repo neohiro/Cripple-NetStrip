@@ -14,7 +14,7 @@ from netstrip.gui.components.sidebar_components import AppGroupFrame
 from netstrip.gui.icon_manager import IconManager
 from netstrip.gui.popups import check_killswitch_override
 from netstrip.gui.theme import Colors, Fonts, Spacing
-from netstrip.gui.utils import enable_smooth_scrolling, safe_loop
+from netstrip.gui.utils import safe_loop
 
 
 class ConnectionsSidebar(ctk.CTkFrame):
@@ -189,9 +189,6 @@ class ConnectionsSidebar(ctk.CTkFrame):
         else:
             self.lan_toggle.deselect()
         self.lan_toggle.pack(side="right")
-
-        # Smooth mousewheel scroll handling
-        enable_smooth_scrolling(self.scroll_frame)
 
         self._refresh_loop()
 
