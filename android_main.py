@@ -17,11 +17,11 @@ import threading
 os.environ['NETSTRIP_ANDROID'] = '1'
 
 from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.togglebutton import ToggleButton
 from kivy.clock import Clock
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.togglebutton import ToggleButton
 
 try:
     from jnius import autoclass
@@ -43,7 +43,8 @@ class NetStripAndroidUI(BoxLayout):
         # Title
         self.title_label = Label(
             text="[b]Cripple — NetStrip[/b]",
-            markup=True, font_size='24sp',
+            markup=True,
+            font_size='24sp',
             size_hint=(1, 0.12)
         )
         self.add_widget(self.title_label)
@@ -51,7 +52,8 @@ class NetStripAndroidUI(BoxLayout):
         # Status
         self.status_label = Label(
             text="Select VPN mode and tap Start",
-            font_size='16sp', size_hint=(1, 0.15)
+            font_size='16sp',
+            size_hint=(1, 0.15)
         )
         self.add_widget(self.status_label)
 
@@ -59,13 +61,16 @@ class NetStripAndroidUI(BoxLayout):
         mode_row = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, 0.1))
 
         self.btn_full = ToggleButton(
-            text="Native VPN", group="vpn_mode", state="down",
+            text="Native VPN",
+            group="vpn_mode",
+            state="down",
             font_size='14sp'
         )
         self.btn_full.bind(on_press=lambda i: self._set_mode("FULL"))
 
         self.btn_companion = ToggleButton(
-            text="Companion Mode", group="vpn_mode",
+            text="Companion Mode",
+            group="vpn_mode",
             font_size='14sp'
         )
         self.btn_companion.bind(on_press=lambda i: self._set_mode("DNS_ONLY"))
@@ -77,7 +82,8 @@ class NetStripAndroidUI(BoxLayout):
         # Mode description
         self.mode_desc = Label(
             text="Routes ALL traffic through NetStrip.\nNo other VPN app needed.",
-            font_size='12sp', size_hint=(1, 0.12),
+            font_size='12sp',
+            size_hint=(1, 0.12),
             halign='center'
         )
         self.mode_desc.bind(size=self.mode_desc.setter('text_size'))
@@ -85,7 +91,8 @@ class NetStripAndroidUI(BoxLayout):
 
         # Start button
         self.btn_start = Button(
-            text="Start NetStrip Shield", size_hint=(1, 0.13),
+            text="Start NetStrip Shield",
+            size_hint=(1, 0.13),
             font_size='18sp'
         )
         self.btn_start.bind(on_press=self.request_vpn)
@@ -93,30 +100,40 @@ class NetStripAndroidUI(BoxLayout):
 
         # Trust WiFi button (hidden until engine starts)
         self.trust_btn = Button(
-            text="Trust Current WiFi", size_hint=(1, 0.1),
-            font_size='14sp', opacity=0, disabled=True
+            text="Trust Current WiFi",
+            size_hint=(1, 0.1),
+            font_size='14sp',
+            opacity=0,
+            disabled=True
         )
         self.trust_btn.bind(on_press=self.toggle_trust_wifi)
         self.add_widget(self.trust_btn)
 
         # Info label
         self.info_label = Label(
-            text="Native VPN: NetStrip is your device's VPN — filters everything.\n"
-                 "Companion: Use with another VPN app pointing DNS to 127.0.0.1:5353.",
-            font_size='11sp', size_hint=(1, 0.15),
-            halign='center', color=(0.6, 0.6, 0.6, 1)
+            text=(
+                "Native VPN: NetStrip is your device's VPN — filters everything.\n"
+                "Companion: Use with another VPN app pointing DNS to 127.0.0.1:5353."
+            ),
+            font_size='11sp',
+            size_hint=(1, 0.15),
+            halign='center',
+            color=(0.6, 0.6, 0.6, 1)
         )
         self.info_label.bind(size=self.info_label.setter('text_size'))
         self.add_widget(self.info_label)
 
-    def _set_mode(self, mode):
+    def _set_mode(self, mode: str) -> None:
         self._vpn_mode = mode
         if mode == "FULL":
             self.mode_desc.text = "Routes ALL traffic through NetStrip.\nNo other VPN app needed."
         else:
-            self.mode_desc.text = "DNS filtering only — use alongside another VPN app\npointing DNS to 127.0.0.1:5353."
+            self.mode_desc.text = (
+                "DNS filtering only — use alongside another VPN app\n"
+                "pointing DNS to 127.0.0.1:5353."
+            )
 
-    def request_vpn(self, instance):
+    def request_vpn(self, instance) -> None:
         if VpnService:
             self.status_label.text = "Requesting VPN Permission..."
             intent = VpnService.prepare(PythonActivity.mActivity)
@@ -128,10 +145,10 @@ class NetStripAndroidUI(BoxLayout):
         else:
             self.status_label.text = "Error: jnius / VpnService not found!"
 
-    def check_and_start(self, dt):
+    def check_and_start(self, dt) -> None:
         self.start_engine()
 
-    def start_engine(self):
+    def start_engine(self) -> None:
         mode_label = "Native VPN" if self._vpn_mode == "FULL" else "Companion (DNS Only)"
         self.status_label.text = f"NetStrip Engine Running — {mode_label}"
         self.btn_start.disabled = True
@@ -141,7 +158,10 @@ class NetStripAndroidUI(BoxLayout):
         # Start Java VpnService with the selected mode
         try:
             context = PythonActivity.mActivity
-            service_intent = Intent(context, autoclass('org.cripple.netstrip.NetStripVpnService'))
+            service_intent = Intent(
+                context,
+                autoclass('org.cripple.netstrip.NetStripVpnService')
+            )
             if self._vpn_mode == "FULL":
                 service_intent.setAction("START_FULL")
             else:
@@ -161,23 +181,23 @@ class NetStripAndroidUI(BoxLayout):
 
         Clock.schedule_interval(self.update_trust_btn, 5.0)
 
-    def _run_main(self):
+    def _run_main(self) -> None:
         import main
         self._engine = main.main()
 
-    def update_trust_btn(self, dt):
+    def update_trust_btn(self, dt) -> None:
         if not self._engine:
             return
         if getattr(self, '_is_updating_trust', False):
             return
         self._is_updating_trust = True
 
-        def _fetch_bg():
+        def _fetch_bg() -> None:
             try:
                 ssid = self._engine.platform.get_current_ssid()
                 trusted = self._engine.db.get_trusted_wifis() if ssid else []
 
-                def _update_ui(dt):
+                def _update_ui(dt_inner) -> None:
                     try:
                         if not ssid:
                             self.trust_btn.text = "No WiFi connected"
@@ -198,7 +218,7 @@ class NetStripAndroidUI(BoxLayout):
 
         threading.Thread(target=_fetch_bg, daemon=True).start()
 
-    def toggle_trust_wifi(self, instance):
+    def toggle_trust_wifi(self, instance) -> None:
         if not self._engine:
             return
         ssid = self._engine.platform.get_current_ssid()

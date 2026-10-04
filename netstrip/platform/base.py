@@ -70,7 +70,7 @@ class PlatformBase(ABC):
     def remove_all_app_block_rules(self) -> bool:
         """Remove all app-specific firewall block rules created by NetStrip."""
 
-    def block_ip(self, ip: str, rule_name: str = None) -> bool:
+    def block_ip(self, ip: str, rule_name: str | None = None) -> bool:
         """Convenience method to block an IP both in and out."""
         if not rule_name:
             rule_name = f"NetStrip_Block_{ip}"
@@ -78,7 +78,7 @@ class PlatformBase(ABC):
         success_out = self.add_firewall_rule(f"{rule_name}_OUT", "out", "block", remote_ip=ip)
         return success_in and success_out
 
-    def unblock_ip(self, ip: str, rule_name: str = None) -> bool:
+    def unblock_ip(self, ip: str, rule_name: str | None = None) -> bool:
         """Convenience method to unblock an IP."""
         if not rule_name:
             rule_name = f"NetStrip_Block_{ip}"

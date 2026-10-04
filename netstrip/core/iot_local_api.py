@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import socket
 import threading
@@ -88,7 +89,8 @@ class IoTLocalAPI:
         except ValueError:
             self.port = 8080
 
-        # Security Binding Audit: Default to local loopback (127.0.0.1) unless external bind is explicitly enabled
+        # Security Binding Audit: Default to local loopback (127.0.0.1)
+        # unless external bind is explicitly enabled
         bind_all = self.engine.db.get_setting("iot_local_sensor_bind_all", "false") == "true"
         bind_host = "0.0.0.0" if bind_all else "127.0.0.1"
 
@@ -138,7 +140,8 @@ class IoTLocalAPI:
 
             self.zeroconf.register_service(info)
             logger.info(
-                f"Registered mDNS service _http._tcp.local. for NetStrip Sensor on {local_ip}:{self.port}"
+                "Registered mDNS service _http._tcp.local. for NetStrip "
+                f"Sensor on {local_ip}:{self.port}"
             )
 
         except ImportError:
@@ -151,9 +154,7 @@ class IoTLocalAPI:
             logger.info("Stopping IoT Local API...")
             self._is_running = False
             if self.zeroconf:
-                try:
+                with contextlib.suppress(Exception):
                     self.zeroconf.close()
-                except Exception:
-                    pass
             # Flask's built in server cannot be easily stopped from a thread
             # Since it's a daemon thread, it will die with the process.

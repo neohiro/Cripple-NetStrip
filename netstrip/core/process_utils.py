@@ -1,8 +1,10 @@
 """
 Process utility functions for NetStrip.
-Provides canonical process name normalization and deep parent tree resolution (handling child processes and console host windows).
+Provides canonical process name normalization and deep parent
+tree resolution (handling child processes and console host windows).
 """
 
+import contextlib
 import os
 import threading
 import time
@@ -550,8 +552,9 @@ def normalize_process_name(
 def resolve_process_identity(proc) -> tuple[str, str, any, str]:
     """
     Ascend the process tree to find the root parent application.
-    Bypasses intermediate console windows, shell wrappers (cmd, powershell, conhost),
-    and runtime wrappers to correctly attribute connections to the parent application (e.g. AntiGravity).
+    Bypasses intermediate console windows, shell wrappers
+    (cmd, powershell, conhost), and runtime wrappers to correctly
+    attribute connections to the parent application (e.g. AntiGravity).
 
     Returns:
         (canonical_process_name, process_path, root_proc, original_exe_name)
@@ -568,10 +571,8 @@ def resolve_process_identity(proc) -> tuple[str, str, any, str]:
                 return cached[0], cached[1], None, cached[2]
 
     original_exe = "Unknown"
-    try:
+    with contextlib.suppress(Exception):
         original_exe = proc.name()
-    except Exception:
-        pass
 
     current_proc = proc
     root_proc = proc

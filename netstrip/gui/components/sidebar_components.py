@@ -1,3 +1,5 @@
+import contextlib
+
 import customtkinter as ctk
 
 from netstrip.core.classifier import ConnectionCategory
@@ -290,10 +292,8 @@ class ConnectionRow(ctk.CTkFrame):
                 except Exception:
                     pass
 
-            try:
+            with contextlib.suppress(Exception):
                 self.after(100, fade)
-            except Exception:
-                pass
 
     def _on_action(self, new_action: str):
         def proceed():
@@ -770,10 +770,8 @@ class AppGroupFrame(ctk.CTkFrame):
                 except Exception:
                     pass
 
-            try:
+            with contextlib.suppress(Exception):
                 self.after(0, _apply)
-            except Exception:
-                pass
 
         # Memory-cached icon? Apply instantly. Otherwise paint the fallback
         # glyph NOW and resolve the real icon off the UI thread (first call
@@ -838,10 +836,8 @@ class AppGroupFrame(ctk.CTkFrame):
                 except Exception:
                     pass
 
-            try:
+            with contextlib.suppress(Exception):
                 self.after(100, fade)
-            except Exception:
-                pass
 
     def _flash_traffic_light(self, action="allow"):
         if not hasattr(self, "traffic_dot") or not self.traffic_dot.winfo_exists():
@@ -884,10 +880,8 @@ class AppGroupFrame(ctk.CTkFrame):
             self._trigger_pulse(action)
             self._flash_traffic_light(action)
             if target in self.rows:
-                try:
+                with contextlib.suppress(Exception):
                     self.rows[target]._trigger_pulse(action)
-                except Exception:
-                    pass
 
         # The system block visual override is handled in refresh_global_state during the UI loop
 
@@ -939,15 +933,11 @@ class AppGroupFrame(ctk.CTkFrame):
 
             def _apply_row_visuals():
                 for row in rows_snapshot:
-                    try:
+                    with contextlib.suppress(Exception):
                         row.apply_bulk_state(db_action)
-                    except Exception:
-                        pass
 
-            try:
+            with contextlib.suppress(Exception):
                 self.after(0, _apply_row_visuals)
-            except Exception:
-                pass
 
             # Heavy I/O (OS firewall netsh calls, SQLite writes, rule re-sync)
             # runs on a background thread so the UI never blocks.
@@ -1236,15 +1226,11 @@ class AppGroupFrame(ctk.CTkFrame):
             self._sample_bandwidth()
         # Refresh chart if expanded
         if getattr(self, "is_expanded_ui", False) and hasattr(self, "_bw_chart") and self._bw_chart:
-            try:
+            with contextlib.suppress(Exception):
                 self._draw_bw_chart()
-            except Exception:
-                pass
         if getattr(self, "is_expanded_ui", False) and hasattr(self, "_bw_detail"):
-            try:
+            with contextlib.suppress(Exception):
                 self._update_bw_bar()
-            except Exception:
-                pass
 
     def set_expanded(self, expanded: bool):
         self.is_expanded_ui = expanded
@@ -1330,10 +1316,8 @@ class AppGroupFrame(ctk.CTkFrame):
             for i in range(index, min(index + batch_size, len(rows_list))):
                 if hasattr(rows_list[i], "set_expanded"):
                     rows_list[i].set_expanded(expanded)
-            try:
+            with contextlib.suppress(Exception):
                 self.after(2, lambda: _update_rows(index + batch_size))
-            except Exception:
-                pass
 
         _update_rows()
 

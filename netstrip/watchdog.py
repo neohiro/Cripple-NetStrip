@@ -233,7 +233,7 @@ def restore_network():
                         num_values = winreg.QueryInfoKey(key)[1]
                         for i in range(num_values):
                             try:
-                                name, value, _ = winreg.EnumValue(key, i)
+                                _name, value, _ = winreg.EnumValue(key, i)
                                 if isinstance(value, str):
                                     parts = value.split("|")
                                     for p in parts:
@@ -314,12 +314,10 @@ def restore_network():
             except Exception:
                 pass
 
-            try:
+            with contextlib.suppress(Exception):
                 winreg.DeleteKey(
                     winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD"
                 )
-            except Exception:
-                pass
 
             try:
                 with winreg.CreateKeyEx(
@@ -596,10 +594,7 @@ def main():
             sys.exit(0)
 
     try:
-        if psutil.pid_exists(parent_pid):
-            parent_process = psutil.Process(parent_pid)
-        else:
-            parent_process = None
+        parent_process = psutil.Process(parent_pid) if psutil.pid_exists(parent_pid) else None
     except psutil.NoSuchProcess:
         parent_process = None
 
@@ -611,17 +606,16 @@ def main():
             if parent_process and parent_process.is_running():
                 # Perform periodic live HMAC integrity check every ~10 seconds
                 loop_ticks += 1
-                if loop_ticks % 5 == 0:
-                    if not verify_integrity(baseline_hashes):
-                        logging.critical(
-                            "Live tampering detected during process execution! Terminating process..."
-                        )
-                        try:
-                            parent_process.kill()
-                        except Exception as e:
-                            logging.critical(f"Failed to kill tampered parent process: {e}")
-                        restore_network()
-                        break
+                if loop_ticks % 5 == 0 and not verify_integrity(baseline_hashes):
+                    logging.critical(
+                        "Live tampering detected during process execution! Terminating process..."
+                    )
+                    try:
+                        parent_process.kill()
+                    except Exception as e:
+                        logging.critical(f"Failed to kill tampered parent process: {e}")
+                    restore_network()
+                    break
 
                 exit_code = parent_process.wait(timeout=2.0)
 

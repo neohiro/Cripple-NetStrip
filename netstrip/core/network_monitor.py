@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkMonitor:
-    def __init__(self, callback: Callable = None, engine=None):
+    def __init__(self, callback: Callable | None = None, engine=None):
         self.callback = callback
         self.engine = engine
         self.platform = get_platform()
@@ -103,7 +103,11 @@ class NetworkMonitor:
                 self.callback(
                     {
                         "type": "arp_spoof",
-                        "message": f"Default Gateway MAC address changed unexpectedly from {self.current_state['gateway_mac']} to {gw_mac}. Potential ARP Spoofing/MITM attack detected.",
+                        "message": (
+                            "Default Gateway MAC address changed unexpectedly "
+                            f"from {self.current_state['gateway_mac']} to {gw_mac}. "
+                            "Potential ARP Spoofing/MITM attack detected."
+                        ),
                         "old_mac": self.current_state["gateway_mac"],
                         "new_mac": gw_mac,
                     }
@@ -123,7 +127,10 @@ class NetworkMonitor:
                 self.callback(
                     {
                         "type": "network_change",
-                        "message": f"Network changed. Default Gateway IP changed from {self.current_state['gateway_ip']} to {gw_ip}.",
+                        "message": (
+                            "Network changed. Default Gateway IP changed "
+                            f"from {self.current_state['gateway_ip']} to {gw_ip}."
+                        ),
                         "old_ip": self.current_state["gateway_ip"],
                         "new_ip": gw_ip,
                     }

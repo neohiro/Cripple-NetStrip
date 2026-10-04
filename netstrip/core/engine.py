@@ -3,6 +3,7 @@ Core Engine for NetStrip
 The central orchestrator that initializes and manages all subsystems.
 """
 
+import contextlib
 import logging
 import os
 import sys
@@ -201,10 +202,8 @@ class NetStripEngine:
                         pass
 
             # Headless or rootless fallback
-            try:
+            with contextlib.suppress(Exception):
                 self.on_status_update(msg)
-            except Exception:
-                pass
 
     def trigger_threat_escalation(self, threat_data: dict):
         """Escalate to Paranoid Mode + Killswitch and broadcast anomaly."""
@@ -253,7 +252,8 @@ class NetStripEngine:
     def _handle_anomaly(self, anomaly_data: dict):
         logger.warning(f"Kernel Anomaly Detected: {anomaly_data['message']}")
 
-        # 1. Instantly trigger CRITICAL threat escalation (Paranoid Mode + Killswitch) (if Smart Shield is ON)
+        # 1. Instantly trigger CRITICAL threat escalation (Paranoid Mode +
+        # Killswitch) (if Smart Shield is ON)
         self.trigger_threat_escalation(
             {
                 "process_name": "Kernel Bypass Scanner",
@@ -298,7 +298,8 @@ class NetStripEngine:
 
             # Get the root window from the App
             # We need to find the main root to attach the toplevel
-            # The engine has access to the app or root via callbacks, but easiest is to just use tk._default_root
+            # The engine has access to the app or root via callbacks,
+            # but easiest is to just use tk._default_root
             root = tk._default_root
             if root:
                 root.after(0, lambda: CTkAnomalyAlert(root, self, anomaly_data, _handle_decision))
@@ -327,9 +328,8 @@ class NetStripEngine:
         if is_inbound and dst_port in (22, 2222) and self.ssh_safeguard_enabled:
             return True
 
-        if self.killswitch_active:
-            if dst_ip not in ("127.0.0.1", "127.127.127.127", "::1"):
-                return False
+        if self.killswitch_active and dst_ip not in ("127.0.0.1", "127.127.127.127", "::1"):
+            return False
 
         # Bypass loopback
         if dst_ip.startswith("127.") or dst_ip == "::1":
@@ -381,7 +381,7 @@ class NetStripEngine:
             # against our standard IP blocklists using the remote src_ip
             cat, action = self.classifier.classify_ip(remote_ip, dst_port, "Inbound Connection")
             if action == ConnectionAction.BLOCK or action == ConnectionAction.SINKHOLE:
-                try:
+                with contextlib.suppress(Exception):
                     self.db.log_connection(
                         {
                             "process_name": "Inbound Connection",
@@ -392,8 +392,6 @@ class NetStripEngine:
                             "mode": self.classifier.mode.name,
                         }
                     )
-                except Exception:
-                    pass
                 return False
             return True
         # ----------------------------------------------------
@@ -437,7 +435,8 @@ class NetStripEngine:
             and dst_port in (53, 853)
             and not (dst_ip.startswith("127.") or dst_ip == "::1")
         ):
-            # Check if this is a detected local DNS proxy tool (e.g. dnscrypt-proxy, AdGuard Home, CoreDNS)
+            # Check if this is a detected local DNS proxy tool
+            # (e.g. dnscrypt-proxy, AdGuard Home, CoreDNS)
             local_tool = self.db.get_setting_cached("local_dns_tool", "")
             is_local_proxy = bool(
                 local_tool
@@ -448,7 +447,7 @@ class NetStripEngine:
             )
 
             if not is_local_proxy:
-                try:
+                with contextlib.suppress(Exception):
                     self.db.log_connection(
                         {
                             "process_name": process_name,
@@ -459,17 +458,13 @@ class NetStripEngine:
                             "mode": self.classifier.mode.name,
                         }
                     )
-                except Exception:
-                    pass
                 return False
         # ----------------------------------------------------
 
         # ── Per-app bandwidth accounting ────────────────────────────────
         if length:
-            try:
+            with contextlib.suppress(Exception):
                 self._note_app_bytes(process_name, not is_inbound, length)
-            except Exception:
-                pass
 
         cat, action = self.classifier.classify_ip(dst_ip, dst_port, process_name)
 
@@ -601,7 +596,8 @@ class NetStripEngine:
             self.progress_callback("Starting core interception subsystems...", 0.5)
 
         # We no longer block engine startup waiting for blocklists to load.
-        # The blocklists will load in the background, and the classifier will use cached/live data until then.
+        # The blocklists will load in the background, and the classifier
+        # will use cached/live data until then.
         # Start subsystems
         self.dns_proxy.start()
 
@@ -749,8 +745,8 @@ class NetStripEngine:
             )
             if os.path.exists(watchdog_path):
                 is_frozen = getattr(sys, "frozen", False)
-                launch_cmd = [sys.executable] + sys.argv if not is_frozen else sys.argv
-                cmd = [sys.executable, watchdog_path, str(os.getpid())] + launch_cmd
+                launch_cmd = [sys.executable, *sys.argv] if not is_frozen else sys.argv
+                cmd = [sys.executable, watchdog_path, str(os.getpid()), *launch_cmd]
                 try:
                     kwargs = (
                         {"creationflags": _subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
@@ -830,7 +826,7 @@ class NetStripEngine:
                         pass
 
             try:
-                cat, action = self.classifier.classify_ip(ip, conn.raddr.port or 0, process_name)
+                _cat, action = self.classifier.classify_ip(ip, conn.raddr.port or 0, process_name)
             except Exception:
                 continue
             if action in (ConnectionAction.BLOCK, ConnectionAction.SINKHOLE):
@@ -851,12 +847,11 @@ class NetStripEngine:
                 logger.debug(f"Failed to drop connection to {ip}: {e}")
 
         logger.info(
-            f"Startup connection sweep terminated {killed}/{len(blocked_ips)} blocklisted live connections."
+            "Startup connection sweep terminated "
+            f"{killed}/{len(blocked_ips)} blocklisted live connections."
         )
-        try:
+        with contextlib.suppress(Exception):
             self.broadcast_status(f"🧹 Startup sweep dropped {killed} blocklisted connection(s)")
-        except Exception:
-            pass
 
     def _update_checker_loop(self):
         import json
@@ -900,7 +895,8 @@ class NetStripEngine:
 
         while self.is_running:
             try:
-                # _perform_update will trigger on_update_callback only if files were actually updated
+                # _perform_update will trigger on_update_callback only
+                # if files were actually updated
                 self.updater._perform_update()
             except Exception as e:
                 logger.error(f"Blocklist update check failed: {e}")
@@ -911,7 +907,8 @@ class NetStripEngine:
                 time.sleep(1)
 
     def _detect_local_dns(self):
-        """Scans loopback interfaces for active third-party UDP/TCP 53 listeners. Returns (ip, tool_name)"""
+        """Scans loopback interfaces for active third-party UDP/TCP
+        53 listeners. Returns (ip, tool_name)"""
         try:
             import psutil
 
@@ -937,11 +934,13 @@ class NetStripEngine:
                                             "pythonw.exe",
                                             "python3.exe",
                                         ):
-                                            continue  # Ignore python entirely just in case (e.g. child workers)
+                                            continue  # Ignore python entirely just in case
+                                            # (e.g. child workers)
                                 except Exception:
                                     pass
                                 logger.info(
-                                    f"Detected active third-party DNS proxy ({process_name}) at {ip}:53"
+                                    "Detected active third-party DNS proxy "
+                                    f"({process_name}) at {ip}:53"
                                 )
                                 return ip, process_name
         except Exception as e:
@@ -955,10 +954,8 @@ class NetStripEngine:
 
         logger.info("Stopping NetStrip Engine...")
         # Flush any buffered notification digest events so they aren't lost
-        try:
+        with contextlib.suppress(Exception):
             self._flush_notification_digest()
-        except Exception:
-            pass
 
         self.is_running = False
         self._stop_event.set()
@@ -1235,7 +1232,8 @@ class NetStripEngine:
             self.set_mode(ProtectionLevel.PARANOID)
         else:
             logger.warning(
-                f"Network Event Detected: {message}. Smart Shield is disabled, ignoring auto-escalation."
+                "Network Event Detected: "
+                f"{message}. Smart Shield is disabled, ignoring auto-escalation."
             )
 
         # Send OS desktop notification
@@ -1273,7 +1271,8 @@ class NetStripEngine:
                     cleaned_count = self.db.cleanup_expired_rules()
                     if cleaned_count > 0:
                         logger.info(
-                            f"Time Bomb triggered: Reverted {cleaned_count} expired app permissions."
+                            "Time Bomb triggered: Reverted "
+                            f"{cleaned_count} expired app permissions."
                         )
                         self.broadcast_status(
                             f"💥 Time Bomb triggered: Reverted {cleaned_count} expired permissions"
@@ -1355,7 +1354,8 @@ class NetStripEngine:
             self._stop_event.wait(60.0)  # Poll every minute
 
     def _fast_route_monitor_loop(self):
-        """Monitors for routing changes (like connecting to a new Wi-Fi) and rapidly re-applies DNS hijacking."""
+        """Monitors for routing changes (like connecting to a new Wi-Fi)
+        and rapidly re-applies DNS hijacking."""
         import time
 
         last_interfaces = self.platform.get_active_interfaces()
@@ -1403,7 +1403,8 @@ class NetStripEngine:
                     # Ignore loopback/disconnected shifts
                     if not current_local_ip.startswith("127."):
                         logger.warning(
-                            f"Kernel Route Shift! Default interface IP changed from {self._last_wan_local_ip} to {current_local_ip}"
+                            "Kernel Route Shift! Default interface IP changed "
+                            f"from {self._last_wan_local_ip} to {current_local_ip}"
                         )
                         # Immediately trigger flux response (Killswitch)
                         self._evaluate_network_event(

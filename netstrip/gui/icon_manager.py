@@ -82,20 +82,19 @@ class AppIdentifier:
 
         # Linux System
         if (
-            path.startswith("/usr/bin/")
-            or path.startswith("/sbin/")
-            or path.startswith("/usr/sbin/")
+            path.startswith(("/usr/bin/", "/sbin/", "/usr/sbin/"))
         ):
             return "linux"
 
         # macOS System
-        if path.startswith("/system/library/") or path.startswith("/usr/libexec/"):
+        if path.startswith(("/system/library/", "/usr/libexec/")):
             return "macos"
 
         return "user_app"
 
 
 import concurrent.futures
+import contextlib
 
 
 class IconManager:
@@ -212,10 +211,8 @@ class IconManager:
                 self._trim_caches()
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     os.remove(cached_exe_icon)
-                except Exception:
-                    pass
 
         # 3. Check disk cache for App Fallback
         path_base = (
@@ -271,10 +268,8 @@ class IconManager:
                     self._trim_caches()
                     return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
                 except Exception:
-                    try:
+                    with contextlib.suppress(Exception):
                         os.remove(app_icon_path)
-                    except Exception:
-                        pass
         # 4. Check disk cache for OS Fallback
         os_type = AppIdentifier.identify(process_path)
         cached_os_icon_path = os.path.join(self.cache_dir, f"{os_type}.png")
@@ -287,10 +282,8 @@ class IconManager:
                 self._trim_caches()
                 return ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     os.remove(cached_os_icon_path)
-                except Exception:
-                    pass
 
         # If not cached anywhere and we don't have a callback, bail out
         if not callback:

@@ -7,7 +7,6 @@ periodic latency spikes, and asserts it now stays bounded / smooth.
 
 import time
 
-
 from netstrip.core.dns_proxy import DNS_MAX_POOL_HOSTS, _DNSConnectionPool
 
 

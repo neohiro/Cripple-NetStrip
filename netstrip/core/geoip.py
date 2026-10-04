@@ -3,6 +3,7 @@ GeoIP Module for NetStrip
 Fetches and caches the public IP and geolocation data.
 """
 
+import contextlib
 import json
 import logging
 import threading
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeoIPService:
-    def __init__(self, callback: Callable = None, engine=None):
+    def __init__(self, callback: Callable | None = None, engine=None):
         self.callbacks = [callback] if callback else []
         self.engine = engine
         self.current_data: dict = {
@@ -54,26 +55,23 @@ class GeoIPService:
             self.callbacks.append(cb)
             # Notify newly registered callback immediately if data is already fetched
             if self.current_data.get("ip") != "Loading...":
-                try:
+                with contextlib.suppress(Exception):
                     cb(self.current_data.get("ip"), self.current_data)
-                except Exception:
-                    pass
 
     def fetch_now(self) -> bool:
         """Fetch immediately and return True if successful."""
         # Privacy Hardening: Abort public IP checks entirely in Ghost or Streamer Privacy mode
         is_privacy = False
-        if self.engine:
-            if (
-                getattr(self.engine, "db", None)
-                and str(self.engine.db.get_setting("privacy_stream_mode", "false")).lower()
-                == "true"
-            ) or (
-                getattr(self.engine, "classifier", None)
-                and getattr(self.engine.classifier, "mode", None)
-                and self.engine.classifier.mode.name == "GHOST"
-            ):
-                is_privacy = True
+        if self.engine and ((
+            getattr(self.engine, "db", None)
+            and str(self.engine.db.get_setting("privacy_stream_mode", "false")).lower()
+            == "true"
+        ) or (
+            getattr(self.engine, "classifier", None)
+            and getattr(self.engine.classifier, "mode", None)
+            and self.engine.classifier.mode.name == "GHOST"
+        )):
+            is_privacy = True
 
         if is_privacy:
             self.current_data = {
@@ -84,10 +82,8 @@ class GeoIPService:
                 "flag": "🌐",
             }
             for cb in self.callbacks:
-                try:
+                with contextlib.suppress(Exception):
                     cb("PRIVACY MODE", self.current_data)
-                except Exception:
-                    pass
             return True
 
         old_ip = self.current_data.get("ip")
@@ -154,10 +150,8 @@ class GeoIPService:
                     "flag": self.get_flag_emoji(cc),
                 }
                 for cb in self.callbacks:
-                    try:
+                    with contextlib.suppress(Exception):
                         cb(old_ip, self.current_data)
-                    except Exception:
-                        pass
                 return True
 
         # Fallback to ipify for IP-only
@@ -165,10 +159,8 @@ class GeoIPService:
         if d5 and d5.get("ip"):
             self.current_data["ip"] = d5.get("ip")
             for cb in self.callbacks:
-                try:
+                with contextlib.suppress(Exception):
                     cb(old_ip, self.current_data)
-                except Exception:
-                    pass
             return True
 
         return False
@@ -178,7 +170,8 @@ class GeoIPService:
         self.fetch_now()
 
         while self.is_running:
-            # Poll every 30 seconds (Event-driven changes are handled instantly by WindowsMicroMonitor)
+            # Poll every 30 seconds (Event-driven changes are handled
+            # instantly by WindowsMicroMonitor)
             self._stop_event.wait(30)
             if self.is_running:
                 self.fetch_now()

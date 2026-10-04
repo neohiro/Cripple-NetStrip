@@ -101,30 +101,29 @@ class StatCard(ctk.CTkFrame):
             str(old_val) != val_str
             and str(old_val).replace(",", "").isdigit()
             and val_str.replace(",", "").isdigit()
-        ):
-            if not getattr(self, "_is_pulsing", False):
-                self._is_pulsing = True
-                orig_color = Colors.BG_PANEL
-                # Green pulse for Allows, Red pulse for Blocks
-                steps = (
-                    ["#1a2e21", "#14251a", "#0f1c14", orig_color]
-                    if self.color == Colors.SUCCESS
-                    else ["#3d141b", "#2c0e13", "#1b090c", orig_color]
-                )
+        ) and not getattr(self, "_is_pulsing", False):
+            self._is_pulsing = True
+            orig_color = Colors.BG_PANEL
+            # Green pulse for Allows, Red pulse for Blocks
+            steps = (
+                ["#1a2e21", "#14251a", "#0f1c14", orig_color]
+                if self.color == Colors.SUCCESS
+                else ["#3d141b", "#2c0e13", "#1b090c", orig_color]
+            )
 
-                def _fade(idx=0):
-                    if not self.winfo_exists():
-                        return
-                    if idx < len(steps):
-                        self.configure(fg_color=steps[idx])
-                        self.inner.configure(fg_color=steps[idx])
-                        self.after(80, lambda: _fade(idx + 1))
-                    else:
-                        self.configure(fg_color=orig_color)
-                        self.inner.configure(fg_color="transparent")
-                        self._is_pulsing = False
+            def _fade(idx=0):
+                if not self.winfo_exists():
+                    return
+                if idx < len(steps):
+                    self.configure(fg_color=steps[idx])
+                    self.inner.configure(fg_color=steps[idx])
+                    self.after(80, lambda: _fade(idx + 1))
+                else:
+                    self.configure(fg_color=orig_color)
+                    self.inner.configure(fg_color="transparent")
+                    self._is_pulsing = False
 
-                _fade(0)
+            _fade(0)
 
     def set_subtitle(self, subtitle: str):
         if hasattr(self, "subtitle_label"):

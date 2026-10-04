@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import re
@@ -182,10 +183,8 @@ class MACRandomizer:
                 mac_clean = mac.replace(":", "").replace("-", "").upper()
                 winreg.SetValueEx(write_key, "NetworkAddress", 0, winreg.REG_SZ, mac_clean)
             else:
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     winreg.DeleteValue(write_key, "NetworkAddress")
-                except FileNotFoundError:
-                    pass
             winreg.CloseKey(write_key)
 
             subprocess.run(
@@ -274,10 +273,8 @@ class MACRandomizer:
 
             orig_mac = self.original_mac
             if not orig_mac and self.engine and hasattr(self.engine, "db"):
-                try:
+                with contextlib.suppress(Exception):
                     orig_mac = self.engine.db.get_setting(f"original_mac_{interface_name}")
-                except Exception:
-                    pass
 
             if not orig_mac:
                 logger.info("No original MAC saved to restore")
@@ -410,7 +407,8 @@ class MACRandomizer:
                     logger.error(f"macOS adapter hardening failed: {e}")
             return
 
-        # Windows: Use native Group Policy Registry and ctypes to disable/enable protocol bindings without triggering ML
+        # Windows: Use native Group Policy Registry and ctypes to
+        # disable/enable protocol bindings without triggering ML
         try:
             import ctypes
             import winreg
@@ -463,7 +461,8 @@ class MACRandomizer:
                         winreg.SetValueEx(key, "AllowRspndrOnPublicNet", 0, winreg.REG_DWORD, 0)
                         winreg.SetValueEx(key, "ProhibitRspndrOnPrivateNet", 0, winreg.REG_DWORD, 1)
 
-                    # Disable LLDP (ms_lldp) and QoS Packet Scheduler (ms_pacer) via driver registry start values
+                    # Disable LLDP (ms_lldp) and QoS Packet Scheduler
+                    # (ms_pacer) via driver registry start values
                     with winreg.CreateKeyEx(
                         winreg.HKEY_LOCAL_MACHINE,
                         r"SYSTEM\CurrentControlSet\Services\MsLldp",
@@ -491,12 +490,10 @@ class MACRandomizer:
                 _control_service("pacer", False)
                 _control_service("lanmanserver", False)
             else:
-                try:
+                with contextlib.suppress(Exception):
                     winreg.DeleteKey(
                         winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\LLTD"
                     )
-                except Exception:
-                    pass
                 try:
                     with winreg.CreateKeyEx(
                         winreg.HKEY_LOCAL_MACHINE,
@@ -583,7 +580,10 @@ class MACRandomizer:
                 logger.error(f"Failed to modify mDNS registry: {e}")
 
             logger.info(
-                f"Windows adapter hardening {'enabled' if enable else 'disabled'}: NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, File Sharing, QoS"
+                "Windows adapter hardening "
+                f"{'enabled' if enable else 'disabled'}: "
+                "NetBIOS, LLMNR, LLDP, mDNS, Client for MS Networks, "
+                "File Sharing, QoS"
             )
             # Clear caches natively without subprocess telemetry
             try:

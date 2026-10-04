@@ -3,6 +3,7 @@ DNS Proxy Server for NetStrip
 Intercepts local DNS queries, classifies them, and acts as a sinkhole for blocked domains.
 """
 
+import contextlib
 import logging
 import threading
 import time
@@ -91,8 +92,9 @@ try:
 
             if _p["type"] == "DoH":
                 DOH_PROVIDERS[_ip] = (_name, _p["path"])
-            # We don't have DOT_PROVIDERS dict, we just use DoT implicitly if they aren't in DOH_PROVIDERS
-            # but for the upstream options dropdown, we add them all!
+            # We don't have DOT_PROVIDERS dict, we just use DoT implicitly
+            # if they aren't in DOH_PROVIDERS, but for the upstream options
+            # dropdown, we add them all!
             if _ip not in DNS_UPSTREAM_OPTIONS:
                 # Add domain base name for a cleaner UI (e.g. dns.google -> google)
                 _short_name = _name.split(".")[-2].title() if "." in _name else _name.title()
@@ -103,7 +105,8 @@ except Exception as e:
 
 
 class _DNSConnectionPool:
-    """Thread-safe connection pool for DNS over TLS (DoT) and DNS over HTTPS (DoH) keep-alive sockets."""
+    """Thread-safe connection pool for DNS over TLS (DoT) and DNS
+    over HTTPS (DoH) keep-alive sockets."""
 
     def __init__(self, idle_timeout: float = 30.0, max_connections_per_host: int = 4):
         self.idle_timeout = idle_timeout
@@ -194,10 +197,8 @@ class _DNSConnectionPool:
                                 return conn
                         except Exception:
                             pass
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.close()
-                    except Exception:
-                        pass
 
         # Create new HTTPS connection
         try:
@@ -212,8 +213,7 @@ class _DNSConnectionPool:
             except ImportError:
                 ctx = ssl.create_default_context()
 
-            conn = http.client.HTTPSConnection(ip, 443, context=ctx, timeout=timeout)
-            return conn
+            return http.client.HTTPSConnection(ip, 443, context=ctx, timeout=timeout)
         except Exception:
             return None
 
@@ -228,10 +228,8 @@ class _DNSConnectionPool:
             if len(self._doh_pool[key]) < self.max_connections_per_host:
                 self._doh_pool[key].append((conn, now))
                 return
-        try:
+        with contextlib.suppress(Exception):
             conn.close()
-        except Exception:
-            pass
 
     # ── Long-run hygiene (months/years uptime) ──────────────────────────
     # Idle pooled sockets were previously only reaped when the SAME host was
@@ -241,7 +239,8 @@ class _DNSConnectionPool:
     MAX_POOL_HOSTS = DNS_MAX_POOL_HOSTS
 
     def _sweep_once(self):
-        """Close stale idle sockets and prune over-cap host entries. Safe to call directly in tests."""
+        """Close stale idle sockets and prune over-cap host entries.
+        Safe to call directly in tests."""
         now = time.time()
         with self._lock:
             for ip in list(self._dot_pool.keys()):
@@ -261,10 +260,8 @@ class _DNSConnectionPool:
                     if now - ts <= self.idle_timeout:
                         keep.append((conn, ts))
                     else:
-                        try:
+                        with contextlib.suppress(Exception):
                             conn.close()
-                        except Exception:
-                            pass
                 if keep:
                     self._doh_pool[key] = keep
                 else:
@@ -278,10 +275,8 @@ class _DNSConnectionPool:
             while len(self._doh_pool) > self.MAX_POOL_HOSTS:
                 key, entries = next(iter(self._doh_pool.items()))
                 for conn, _ts in entries:
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.close()
-                    except Exception:
-                        pass
                 del self._doh_pool[key]
 
     def start_reaper(self, interval: float = 60.0):
@@ -306,24 +301,20 @@ class _DNSConnectionPool:
 
     def discard_doh_connection(self, conn):
         if conn:
-            try:
+            with contextlib.suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
 
     def close_all(self):
         with self._lock:
-            for ip, list_socks in self._dot_pool.items():
+            for _ip, list_socks in self._dot_pool.items():
                 for tls_sock, raw_sock, _ in list_socks:
                     self._close_sock(tls_sock, raw_sock)
             self._dot_pool.clear()
 
-            for key, list_conns in self._doh_pool.items():
+            for _key, list_conns in self._doh_pool.items():
                 for conn, _ in list_conns:
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.close()
-                    except Exception:
-                        pass
             self._doh_pool.clear()
 
 
@@ -349,7 +340,7 @@ class NetStripResolver(BaseResolver):
         self._proc_cache_ttl = 60  # 60 seconds
         self._conn_pool = _DNSConnectionPool(idle_timeout=30.0, max_connections_per_host=4)
 
-    def _infer_process(self, domain: str, src_port: int = None) -> str:
+    def _infer_process(self, domain: str, src_port: int | None = None) -> str:
         from netstrip.core.process_utils import normalize_process_name, resolve_process_identity
 
         # Check fast in-memory process cache
@@ -383,33 +374,34 @@ class NetStripResolver(BaseResolver):
 
         # 2. Database History Inference
         try:
-            with self.db.lock:
-                with self.db._get_connection() as conn:
-                    # A. Has this exact domain been requested by ANY process recently?
-                    query1 = """
-                        SELECT process_name FROM connection_log 
-                        WHERE domain = ? AND process_name NOT IN ('Unknown (DNS)', 'Cripple (Internal)', 'Cripple')
-                        ORDER BY id DESC LIMIT 1
-                    """
-                    row = conn.execute(query1, (domain,)).fetchone()
-                    if row and row["process_name"]:
-                        p_name = normalize_process_name(row["process_name"])
-                        if len(self._proc_cache) > 2000:
-                            self._proc_cache.popitem(last=False)
-                        self._proc_cache[domain] = (now, p_name)
-                        return p_name
+            with self.db.lock, self.db._get_connection() as conn:
+                # A. Has this exact domain been requested by ANY process recently?
+                query1 = (
+                    "SELECT process_name FROM connection_log "
+                    "WHERE domain = ? AND process_name NOT IN "
+                    "('Unknown (DNS)', 'Cripple (Internal)', 'Cripple') "
+                    "ORDER BY id DESC LIMIT 1"
+                )
+                row = conn.execute(query1, (domain,)).fetchone()
+                if row and row["process_name"]:
+                    p_name = normalize_process_name(row["process_name"])
+                    if len(self._proc_cache) > 2000:
+                        self._proc_cache.popitem(last=False)
+                    self._proc_cache[domain] = (now, p_name)
+                    return p_name
 
-                    # B. Fallback to Parent Domain correlation (e.g. ads.example.com -> example.com)
-                    parts = domain.split(".")
-                    if len(parts) > 2:
-                        parent_domain = f"%.{parts[-2]}.{parts[-1]}"
-                        query2 = """
-                            SELECT process_name FROM connection_log 
-                            WHERE domain LIKE ? AND process_name NOT IN ('Unknown (DNS)', 'Cripple (Internal)', 'Cripple')
-                            ORDER BY id DESC LIMIT 1
-                        """
-                        row = conn.execute(query2, (parent_domain,)).fetchone()
-                        if row and row["process_name"]:
+                # B. Fallback to Parent Domain correlation (e.g. ads.example.com -> example.com)
+                parts = domain.split(".")
+                if len(parts) > 2:
+                    parent_domain = f"%.{parts[-2]}.{parts[-1]}"
+                    query2 = (
+                        "SELECT process_name FROM connection_log "
+                        "WHERE domain LIKE ? AND process_name NOT IN "
+                        "('Unknown (DNS)', 'Cripple (Internal)', 'Cripple') "
+                        "ORDER BY id DESC LIMIT 1"
+                    )
+                    row = conn.execute(query2, (parent_domain,)).fetchone()
+                    if row and row["process_name"]:
                             p_name = normalize_process_name(row["process_name"])
                             if len(self._proc_cache) > 2000:
                                 self._proc_cache.popitem(last=False)
@@ -495,7 +487,8 @@ class NetStripResolver(BaseResolver):
         # 2. ISATAP tunnel auto-discovery
         if d_lower == "isatap" or d_lower.startswith("isatap.") or ".isatap." in d_lower:
             return True
-        # 3. Directory Services / LDAP / Kerberos SRV discovery queries (e.g. _ldap._tcp.dc._msdcs.dynamic.ziggo.nl)
+        # 3. Directory Services / LDAP / Kerberos SRV discovery
+        # queries (e.g. _ldap._tcp.dc._msdcs.dynamic.ziggo.nl)
         if any(
             srv in d_lower
             for srv in (
@@ -510,14 +503,11 @@ class NetStripResolver(BaseResolver):
         ):
             return True
         # 4. NetBIOS / local broadcast leak queries
-        if (
+        return bool(
             d_lower.startswith("netbios.")
             or ".netbios." in d_lower
-            or d_lower.endswith(".corp")
-            or d_lower.endswith(".internal")
-        ):
-            return True
-        return False
+            or d_lower.endswith((".corp", ".internal"))
+        )
 
     def resolve(self, request, handler):
         from dnslib import RCODE
@@ -530,7 +520,8 @@ class NetStripResolver(BaseResolver):
         qtype = QTYPE[request.q.qtype]
 
         # 1. Ghost Mode & System Connection Privacy Sinkhole Check:
-        # Prevents Windows/OS leaks like WPAD, _ldap._tcp.dc._msdcs, ISATAP, NetBIOS from escaping to upstream WAN/ISP DNS.
+        # Prevents Windows/OS leaks like WPAD, _ldap._tcp.dc._msdcs,
+        # ISATAP, NetBIOS from escaping to upstream WAN/ISP DNS.
         is_ghost = hasattr(self.classifier, "mode") and getattr(
             self.classifier.mode, "level", None
         ) in (ProtectionLevel.GHOST, ProtectionLevel.PARANOID, ProtectionLevel.STRICT)
@@ -559,7 +550,8 @@ class NetStripResolver(BaseResolver):
             if not hasattr(self, "_last_blocked_cache"):
                 self._last_blocked_cache = {}
 
-            # Only log and broadcast if we haven't blocked this exact domain for this app in the last 10 seconds
+            # Only log and broadcast if we haven't blocked this exact
+            # domain for this app in the last 10 seconds
             if now - last_blocked > 10:
                 self._last_blocked_cache[throttle_key] = now
                 if self.on_status:
@@ -630,7 +622,8 @@ class NetStripResolver(BaseResolver):
             # Never proxy to our own bind IP
             upstream_ip = "8.8.8.8"
         elif upstream_ip in ("127.0.0.1", "localhost", "::1") and not has_local_proxy:
-            # Prevent infinite recursive loop if we didn't detect a 3rd party tool (e.g. YogaDNS, DNSCrypt)
+            # Prevent infinite recursive loop if we didn't detect a 3rd party
+            # tool (e.g. YogaDNS, DNSCrypt)
             upstream_ip = "8.8.8.8"
 
         try:
@@ -666,7 +659,8 @@ class NetStripResolver(BaseResolver):
                 except Exception:
                     proxy_response = None
 
-                # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH) if standard UDP failed and public IP
+                # 2. Secondary: Try DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH)
+                # if standard UDP failed and public IP
                 if not proxy_response and is_public_ip:
                     proxy_response = self._send_dot(request.pack(), upstream_ip, timeout=1.5)
                     if not proxy_response and upstream_ip in DOH_PROVIDERS:
@@ -686,8 +680,10 @@ class NetStripResolver(BaseResolver):
             self._dns_cache[cache_key] = (time.time(), proxy_response)
             self._dns_cache.move_to_end(cache_key)
 
-            # Extract A (1) and AAAA (28) records to populate persistent database cache
-            # Exclude our own telemetry / IP checks from polluting the shared global DNS cache with AWS IPs
+            # Extract A (1) and AAAA (28) records to populate persistent
+            # database cache
+            # Exclude our own telemetry / IP checks from polluting the
+            # shared global DNS cache with AWS IPs
             exclude_domains = (
                 "api.ipify.org",
                 "ipinfo.io",
@@ -717,8 +713,7 @@ class NetStripResolver(BaseResolver):
             if upstream_ip != "1.1.1.1":
                 try:
                     proxy_response = request.send("1.1.1.1", 53, timeout=1.5)
-                    record = DNSRecord.parse(proxy_response)
-                    return record
+                    return DNSRecord.parse(proxy_response)
                 except Exception as e_fallback:
                     logger.debug(f"DNS Fallback error for {domain}: {e_fallback}")
             return request.reply()
@@ -750,10 +745,8 @@ class DNSProxyService:
             def process_request(self, request, client_address):
                 if not self._handler_sem.acquire(blocking=False):
                     # Shed load — drop this datagram/connection
-                    try:
+                    with contextlib.suppress(Exception):
                         self.shutdown_request(request)
-                    except Exception:
-                        pass
                     return
                 try:
                     super().process_request(request, client_address)

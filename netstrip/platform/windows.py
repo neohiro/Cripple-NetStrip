@@ -76,7 +76,7 @@ class WindowsPlatform(PlatformBase):
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 text=True,
             )
-            stdout, stderr = p.communicate(input=command_str + "\n")
+            _stdout, _stderr = p.communicate(input=command_str + "\n")
             return p.returncode == 0
         except Exception as e:
             logger.error(f"netsh stdin execution failed: {e}")
@@ -95,7 +95,7 @@ class WindowsPlatform(PlatformBase):
                 creationflags=subprocess.CREATE_NO_WINDOW,
                 text=True,
             )
-            stdout, stderr = p.communicate(input=command_str + "\n")
+            stdout, _stderr = p.communicate(input=command_str + "\n")
             return stdout
         except Exception:
             return ""
@@ -308,7 +308,7 @@ class WindowsPlatform(PlatformBase):
             num_values = winreg.QueryInfoKey(key)[1]
             for i in range(num_values):
                 try:
-                    name, value, _ = winreg.EnumValue(key, i)
+                    _name, value, _ = winreg.EnumValue(key, i)
                     if isinstance(value, str):
                         parts = value.split("|")
                         for p in parts:
@@ -334,7 +334,7 @@ class WindowsPlatform(PlatformBase):
             num_values = winreg.QueryInfoKey(key)[1]
             for i in range(num_values):
                 try:
-                    name, value, _ = winreg.EnumValue(key, i)
+                    _name, value, _ = winreg.EnumValue(key, i)
                     if isinstance(value, str):
                         parts = value.split("|")
                         for p in parts:

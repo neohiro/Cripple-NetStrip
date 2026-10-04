@@ -1,3 +1,4 @@
+import contextlib
 import math
 
 import customtkinter as ctk
@@ -84,10 +85,8 @@ class AnimatedLogo(ctk.CTkCanvas):
         """Stop animation loop and cancel pending timer."""
         self._running = False
         if self._anim_id:
-            try:
+            with contextlib.suppress(Exception):
                 self.after_cancel(self._anim_id)
-            except Exception:
-                pass
             self._anim_id = None
 
     def _animate(self):

@@ -442,7 +442,7 @@ def aes_256_cbc_encrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     out = bytearray()
     prev = iv
     for i in range(0, len(padded), 16):
-        blk = bytes(a ^ b for a, b in zip(padded[i : i + 16], prev))
+        blk = bytes(a ^ b for a, b in zip(padded[i : i + 16], prev, strict=False))
         enc = _cipher_256(blk, w)
         out.extend(enc)
         prev = enc
@@ -459,7 +459,7 @@ def aes_256_cbc_decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     for i in range(0, len(data), 16):
         blk = data[i : i + 16]
         dec = _inv_cipher_256(blk, w)
-        out.extend(bytes(a ^ b for a, b in zip(dec, prev)))
+        out.extend(bytes(a ^ b for a, b in zip(dec, prev, strict=False)))
         prev = blk
     if not out:
         raise ValueError("Decrypted output is empty")
@@ -601,7 +601,7 @@ class QuantumFernet:
         mac = hmac.new(self._signing_key, basic_parts, hashlib.sha512).digest()[:32]
         return base64.urlsafe_b64encode(basic_parts + mac)
 
-    def decrypt(self, token, ttl: int = None) -> bytes:
+    def decrypt(self, token, ttl: int | None = None) -> bytes:
         """Verifies HMAC signature, validates timestamp, and decrypts ciphertext."""
         if isinstance(token, str):
             token = token.strip().encode("utf-8")

@@ -78,7 +78,7 @@ class AnomalyScanner:
 
         try:
             stats = psutil.net_if_stats()
-            return set(iface for iface, stat in stats.items() if stat.isup)
+            return {iface for iface, stat in stats.items() if stat.isup}
         except Exception:
             return set()
 
@@ -149,7 +149,10 @@ class AnomalyScanner:
                             anomalies.append(
                                 {
                                     "name": "af_packet",
-                                    "message": f"Raw AF_PACKET sockets detected ({len(lines) - 1} open). Dropping via eBPF.",
+                                    "message": (
+                                        "Raw AF_PACKET sockets detected "
+                                        f"({len(lines) - 1} open). Dropping via eBPF."
+                                    ),
                                 }
                             )
             except Exception:
@@ -192,8 +195,10 @@ class AnomalyScanner:
                                 msg = f"New network adapter detected: {adp}"
                                 if is_vpn:
                                     msg = f"Rogue VPN / Virtual Adapter detected: {adp}."
-                                    # We don't neutralize it yet. We let the callback handle it so GUI can pop up first
-                                    # The engine's _handle_anomaly will now do the heavy lifting
+                                    # We don't neutralize it yet. We let the callback
+                                    # handle it so GUI can pop up first
+                                    # The engine's _handle_anomaly will now do
+                                    # the heavy lifting
 
                                 if self.callback:
                                     self.callback(

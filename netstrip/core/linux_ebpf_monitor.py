@@ -1,7 +1,8 @@
 """
 Linux eBPF Kernel Monitor for NetStrip
-Hooks into the Linux kernel using BCC to trace TCP connections at Ring 0.
-This provides a high-assurance verification stream that cannot be bypassed by standard user-space rootkit hooks.
+Hooks into the Linux kernel using BCC to trace TCP connections
+at Ring 0. This provides a high-assurance verification stream that
+cannot be bypassed by standard user-space rootkit hooks.
 """
 
 import logging
@@ -31,7 +32,7 @@ struct ipv4_data_t {
 // Hooking tcp_v4_connect return to catch successful or pending outbound connections
 int kretprobe__tcp_v4_connect(struct pt_regs *ctx) {
     int ret = PT_REGS_RC(ctx);
-    
+
     // We can filter by return code. 0 is success, -EINPROGRESS is normal for async.
     // For monitoring, we just want to know the attempt occurred.
 
@@ -43,7 +44,7 @@ int kretprobe__tcp_v4_connect(struct pt_regs *ctx) {
 
     data.daddr = sk->__sk_common.skc_daddr;
     data.dport = sk->__sk_common.skc_dport;
-    
+
     // dport is network byte order
     data.dport = ntohs(data.dport);
 

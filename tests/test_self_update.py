@@ -10,7 +10,6 @@ import hashlib
 import json
 
 import pytest
-
 from netstrip.core.self_update import (
     SelfUpdateError,
     SelfUpdater,
@@ -73,7 +72,7 @@ def fake_transport(monkeypatch, *, zip_bytes=ZIP_BYTES, sums_text=None):
     release = build_release()
     payloads = {
         API_URL: json.dumps(release).encode(),
-        f"https://example/SHA256SUMS.txt":
+        "https://example/SHA256SUMS.txt":
             (sums_text if sums_text is not None else make_manifest()).encode(),
         f"https://example/{SETUP_NAME}": zip_bytes,
         f"https://example/{LEGACY_ZIP_NAME.capitalize()}": zip_bytes,

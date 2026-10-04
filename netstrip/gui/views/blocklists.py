@@ -3,6 +3,8 @@ Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
+import contextlib
+
 import customtkinter as ctk
 
 from netstrip.gui.theme import (
@@ -140,10 +142,8 @@ class BlocklistView(ctk.CTkFrame):
     def _on_blocklist_data_reloaded(self):
         if getattr(self, "_destroyed", False):
             return
-        try:
+        with contextlib.suppress(Exception):
             self.after(0, self._on_blocklist_data_reloaded_ui)
-        except Exception:
-            pass
 
     def _on_blocklist_data_reloaded_ui(self):
         if getattr(self, "_destroyed", False):
@@ -390,10 +390,8 @@ class BlocklistView(ctk.CTkFrame):
                             ):
                                 self._do_search()
 
-                        try:
+                        with contextlib.suppress(Exception):
                             self.after(0, on_success)
-                        except Exception:
-                            pass
 
                 except Exception as e:
                     if hasattr(self.engine, "broadcast_status"):
@@ -466,7 +464,7 @@ class BlocklistView(ctk.CTkFrame):
         # The index reflects the true deduplicated coverage the engine uses.
         cat_sets = getattr(self.engine.blocklist, "category_domains", {})
         indexed = None
-        for c_enum in cat_sets.keys():
+        for c_enum in cat_sets:
             c_val_i = getattr(c_enum, "value", str(c_enum)).lower()
             if c_val_i.startswith("connectioncategory."):
                 c_val_i = c_val_i.split(".")[-1].lower()
@@ -523,7 +521,7 @@ class BlocklistView(ctk.CTkFrame):
             self.engine.on_status(msg)
 
         try:
-            for cat_enum, (card, inner, lbl_count) in getattr(
+            for cat_enum, (_card, _inner, lbl_count) in getattr(
                 self, "_category_ui_elements", {}
             ).items():
                 cnt = self._get_category_count(cat_enum)

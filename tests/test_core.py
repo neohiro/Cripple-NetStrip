@@ -1,7 +1,8 @@
 
 def test_version():
-    from netstrip import __version__
     import re
+
+    from netstrip import __version__
     assert re.match(r'^\d+\.\d+\.\d+$', __version__) is not None
 
 def test_engine_import():

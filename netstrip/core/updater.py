@@ -3,6 +3,7 @@ Auto-Updater for NetStrip
 Downloads updates for offline blocklists on the first internet connection after boot.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -57,7 +58,7 @@ def parse_version_tuple(v: str) -> tuple:
     while len(numbers) < 3:
         numbers.append(0)
 
-    return tuple(numbers) + (pre_release_weight, pre_tag)
+    return (*tuple(numbers), pre_release_weight, pre_tag)
 
 
 def is_newer_version(remote: str, current: str) -> bool:
@@ -69,7 +70,7 @@ def is_newer_version(remote: str, current: str) -> bool:
 
 
 class BlocklistUpdater:
-    def __init__(self, lists_dir: str = None, on_update_callback: callable = None):
+    def __init__(self, lists_dir: str | None = None, on_update_callback: callable | None = None):
         self._update_lock = threading.Lock()
         if lists_dir is None:
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
@@ -84,7 +85,10 @@ class BlocklistUpdater:
         self.last_update_stats = {"success": 0, "failed": 0, "total": 0}
 
     def check_and_update(
-        self, force: bool = False, on_complete: callable = None, on_progress: callable = None
+        self,
+        force: bool = False,
+        on_complete: callable | None = None,
+        on_progress: callable | None = None,
     ):
         """Run the update in a background thread (TOCTOU-safe)."""
         with self._update_lock:
@@ -96,7 +100,10 @@ class BlocklistUpdater:
         ).start()
 
     def _perform_update(
-        self, force: bool = False, on_complete: callable = None, on_progress: callable = None
+        self,
+        force: bool = False,
+        on_complete: callable | None = None,
+        on_progress: callable | None = None,
     ):
         self.is_updating = True
         _completed = False
@@ -148,23 +155,23 @@ class BlocklistUpdater:
 
                     # Report progress
                     if on_progress:
-                        try:
+                        with contextlib.suppress(Exception):
                             on_progress(idx, total_enabled, name)
-                        except Exception:
-                            pass
 
                     # Get the update interval for this source (default 24h)
                     update_interval_hours = float(source.get("update_interval_hours", 24))
                     update_interval_seconds = update_interval_hours * 3600
 
                     if not force:
-                        # Check file age (skip if updated within the required interval)
+                        # Check file age (skip if updated within the
+                        # required interval)
                         if os.path.exists(target_file):
                             file_age_seconds = time.time() - os.path.getmtime(target_file)
                             if file_age_seconds < update_interval_seconds:
                                 continue
 
-                        # Throttle recent attempts — but always retry sources that have never been downloaded
+                        # Throttle recent attempts — but always retry sources that
+                        # have never been downloaded
                         if os.path.exists(target_file):
                             throttle_seconds = min(3600, update_interval_seconds / 2.0)
                             last_attempt = state_data.get(name, {}).get("last_attempt", 0)
@@ -180,7 +187,11 @@ class BlocklistUpdater:
                             import requests
 
                             headers = {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                "User-Agent": (
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                    "Chrome/120.0.0.0 Safari/537.36"
+                                )
                             }
                             response = requests.get(url, headers=headers, stream=True, timeout=30)
                             response.raise_for_status()
@@ -191,10 +202,8 @@ class BlocklistUpdater:
                                         out_file.write(chunk)
 
                             if os.path.exists(target_file):
-                                try:
+                                with contextlib.suppress(Exception):
                                     os.remove(target_file)
-                                except Exception:
-                                    pass
                             os.replace(temp_file, target_file)
 
                             logger.info(f"Successfully updated '{name}' (attempt {attempt})")
@@ -211,10 +220,8 @@ class BlocklistUpdater:
                         except Exception as e:
                             last_error = e
                             if os.path.exists(temp_file):
-                                try:
+                                with contextlib.suppress(Exception):
                                     os.remove(temp_file)
-                                except Exception:
-                                    pass
                             if attempt < max_attempts:
                                 logger.warning(
                                     f"Attempt {attempt} failed for '{name}': {e} — retrying..."
@@ -223,7 +230,8 @@ class BlocklistUpdater:
 
                     if last_error:
                         logger.error(
-                            f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}"
+                            "Failed to update blocklist "
+                            f"'{name}' after {max_attempts} attempts: {last_error}"
                         )
                         self.last_update_stats["failed"] += 1
                         failures = state_data.get(name, {}).get("consecutive_failures", 0) + 1
@@ -234,7 +242,8 @@ class BlocklistUpdater:
 
                         if failures >= 10 and name.startswith("Custom:"):
                             logger.warning(
-                                f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures."
+                                "Auto-disabling dead custom blocklist "
+                                f"'{name}' after {failures} consecutive failures."
                             )
                             source["enabled"] = False
                             sources_modified = True
@@ -266,10 +275,8 @@ class BlocklistUpdater:
 
                 if on_complete:
                     _completed = True
-                    try:
+                    with contextlib.suppress(Exception):
                         on_complete(updated_count)
-                    except Exception:
-                        pass
 
                 return any_updated
             except Exception as e:
@@ -280,10 +287,8 @@ class BlocklistUpdater:
             # Guarantee on_complete fires even on catastrophic errors so the
             # GUI Update button never gets stuck in "Updating..." state.
             if not _completed and on_complete:
-                try:
+                with contextlib.suppress(Exception):
                     on_complete(0)
-                except Exception:
-                    pass
 
     def _decode_stamp(self, stamp_str):
         import base64
@@ -318,7 +323,7 @@ class BlocklistUpdater:
         if "[" in ip_clean or ":" in ip_clean:
             return None  # Skip IPv6 for simplicity in UI
 
-        pk, idx = read_pascal(data, idx)
+        _pk, idx = read_pascal(data, idx)
         provider_name, idx = read_pascal(data, idx)
         if not provider_name:
             return None

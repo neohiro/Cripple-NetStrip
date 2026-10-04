@@ -12,6 +12,8 @@ import customtkinter as ctk
 from netstrip.i18n import t as _t
 
 logger = logging.getLogger(__name__)
+import contextlib
+
 from netstrip.gui.theme import (
     CTK_ENTRY_STYLE,
     CTK_FRAME_STYLE,
@@ -87,7 +89,7 @@ class DNSSelectorModal(ctk.CTkToplevel):
         query = self.search_entry.get().lower()
         filtered = [
             k
-            for k in self.dns_options_map.keys()
+            for k in self.dns_options_map
             if query in k.lower() or query in self.dns_options_map[k].lower()
         ]
         self._populate_list(filtered)
@@ -159,10 +161,8 @@ class SettingsView(ctk.CTkFrame):
                 import logging
 
                 logging.getLogger(__name__).error(f"Deferred settings card build failed: {e}")
-            try:
+            with contextlib.suppress(Exception):
                 self.after(20, lambda: _build_next_card(index + 1))
-            except Exception:
-                pass
 
         self.after(10, _build_next_card)
 
@@ -314,18 +314,14 @@ class SettingsView(ctk.CTkFrame):
             # Stop any running animation
             state["installing"] = False
             if state["anim_id"]:
-                try:
+                with contextlib.suppress(Exception):
                     self.after_cancel(state["anim_id"])
-                except Exception:
-                    pass
             bar.pack_forget()
             lbl.pack_forget()
 
         def _set_progress(fraction):
-            try:
+            with contextlib.suppress(Exception):
                 bar.set(min(1.0, max(0.0, fraction)))
-            except Exception:
-                pass
 
         def _start_indeterminate():
             """Oscillate the bar during the silent install phase."""
@@ -346,10 +342,8 @@ class SettingsView(ctk.CTkFrame):
         def _stop_indeterminate():
             state["installing"] = False
             if state["anim_id"]:
-                try:
+                with contextlib.suppress(Exception):
                     self.after_cancel(state["anim_id"])
-                except Exception:
-                    pass
 
         # Phase 0: show progress UI
         self.after(0, lambda: _show_progress(_t("status.downloading_verify")))
@@ -479,10 +473,8 @@ class SettingsView(ctk.CTkFrame):
                         else:
                             os.startfile(path.parent)  # open Explorer at the file
                     finally:
-                        try:
+                        with contextlib.suppress(Exception):
                             btn.configure(state="normal", text=_t("btn.download_verify"))
-                        except Exception:
-                            pass
 
                 self.after(0, _ok)
             except SelfUpdateError as e:
@@ -492,10 +484,8 @@ class SettingsView(ctk.CTkFrame):
                     try:
                         tkinter.messagebox.showerror("Update verification failed", msg)
                     finally:
-                        try:
+                        with contextlib.suppress(Exception):
                             btn.configure(state="normal", text=_t("btn.download_verify"))
-                        except Exception:
-                            pass
 
                 self.after(0, _err)
             except Exception as e:
@@ -505,10 +495,8 @@ class SettingsView(ctk.CTkFrame):
                     try:
                         tkinter.messagebox.showerror("Update failed", f"Network error:\n{net_err}")
                     finally:
-                        try:
+                        with contextlib.suppress(Exception):
                             btn.configure(state="normal", text=_t("btn.download_verify"))
-                        except Exception:
-                            pass
 
                 self.after(0, _err2)
 
@@ -533,10 +521,8 @@ class SettingsView(ctk.CTkFrame):
 
             # Trigger blocklist auto-updater cycle
             if hasattr(self.engine, "updater") and self.engine.updater:
-                try:
+                with contextlib.suppress(Exception):
                     self.engine.updater.check_and_update(force=True)
-                except Exception:
-                    pass
 
             # Check GitHub API for application release updates
             try:
@@ -554,10 +540,8 @@ class SettingsView(ctk.CTkFrame):
                             hasattr(self.engine, "gui_update_callback")
                             and self.engine.gui_update_callback
                         ):
-                            try:
+                            with contextlib.suppress(Exception):
                                 self.engine.gui_update_callback("UPDATE_AVAILABLE")
-                            except Exception:
-                                pass
                     else:
                         self.engine.update_available = False
             except Exception:
@@ -1006,10 +990,8 @@ class SettingsView(ctk.CTkFrame):
                 import threading
 
                 def reload_task():
-                    try:
+                    with contextlib.suppress(Exception):
                         self.engine.blocklist.load_all()
-                    except Exception:
-                        pass
 
                 threading.Thread(target=reload_task, daemon=True).start()
 
@@ -1029,14 +1011,13 @@ class SettingsView(ctk.CTkFrame):
                     if hasattr(self.engine, "ebpf_manager") and self.engine.ebpf_manager:
                         self.engine.ebpf_manager.stop()
 
-            if setting_key == "layer2_arp_lockdown":
-                if value == "false":
-                    if hasattr(self.engine, "network_monitor") and hasattr(
-                        self.engine.network_monitor, "current_state"
-                    ):
-                        gw_ip = self.engine.network_monitor.current_state.get("gateway_ip")
-                        if gw_ip:
-                            self.engine.platform.unlock_arp(gw_ip)
+            if setting_key == "layer2_arp_lockdown" and value == "false":
+                if hasattr(self.engine, "network_monitor") and hasattr(
+                    self.engine.network_monitor, "current_state"
+                ):
+                    gw_ip = self.engine.network_monitor.current_state.get("gateway_ip")
+                    if gw_ip:
+                        self.engine.platform.unlock_arp(gw_ip)
 
             if setting_key == "disable_ipv6_globally":
                 from netstrip.platform.base import get_platform
@@ -1099,10 +1080,8 @@ class SettingsView(ctk.CTkFrame):
                     if hasattr(self.engine.classifier, "_ip_cache"):
                         self.engine.classifier._ip_cache.clear()
                 if hasattr(self.engine, "gui_update_callback") and self.engine.gui_update_callback:
-                    try:
+                    with contextlib.suppress(Exception):
                         self.engine.gui_update_callback("MODE_CHANGED")
-                    except Exception:
-                        pass
 
             if setting_key == "mac_randomization":
                 import threading
@@ -1732,7 +1711,7 @@ class SettingsView(ctk.CTkFrame):
             self.dns_options_map[f"Local Proxy ({local_tool})"] = local_ip
 
         # Find the key for the current value
-        current_option = list(self.dns_options_map.keys())[0]
+        current_option = next(iter(self.dns_options_map.keys()))
         for k, v in self.dns_options_map.items():
             if v == dns_val:
                 current_option = k
@@ -2074,10 +2053,8 @@ class SettingsView(ctk.CTkFrame):
             if os.path.exists(lists_dir):
                 for fname in os.listdir(lists_dir):
                     if fname.startswith("Custom_") or fname == "updater_state.json":
-                        try:
+                        with contextlib.suppress(Exception):
                             os.remove(os.path.join(lists_dir, fname))
-                        except Exception:
-                            pass
         except Exception as e:
             logger.error(f"Failed to clean custom blocklists: {e}")
 
@@ -2088,10 +2065,8 @@ class SettingsView(ctk.CTkFrame):
             logger.error(f"Engine stop during factory wipe: {e}")
 
         # 4. Stop DB background writer
-        try:
+        with contextlib.suppress(Exception):
             self.engine.db.stop()
-        except Exception:
-            pass
 
         # 5. Clean IPC socket if exposed in main
         try:

@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import socket
 import struct
@@ -99,10 +100,8 @@ class LinuxNFQueueInterceptor(PacketInterceptor):
             udp_header = payload[iph_length : iph_length + 8]
             if len(udp_header) >= 4:
                 sport, dport = struct.unpack("!HH", udp_header[:4])
-                try:
+                with contextlib.suppress(Exception):
                     self.callback(dst_ip, dport, "UDP", sport, src_ip, length=len(payload))
-                except Exception:
-                    pass
             pkt.accept()
         else:
             pkt.accept()

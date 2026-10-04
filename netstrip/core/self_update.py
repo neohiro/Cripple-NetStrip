@@ -15,6 +15,7 @@ enabling out-of-band signing later without another format change.
 """
 
 import base64
+import contextlib
 import hashlib
 import json
 import logging
@@ -85,7 +86,7 @@ def verify_file_hash(path: Path, expected_hex: str) -> bool:
     return ok
 
 
-def platform_token(platform: str = None) -> str:
+def platform_token(platform: str | None = None) -> str:
     platform = platform or sys.platform
     if platform.startswith("win"):
         return "Windows"
@@ -94,7 +95,7 @@ def platform_token(platform: str = None) -> str:
     return "Linux"
 
 
-def pick_assets(assets, platform: str = None):
+def pick_assets(assets, platform: str | None = None):
     """Return (update_asset, sums_asset) from a release-assets JSON list.
 
     Windows ships exactly ONE artifact: the Inno installer
@@ -149,10 +150,8 @@ def http_download(url: str, dest: Path, progress: Callable[[int, int], None] | N
                 f.write(block)
                 done += len(block)
                 if progress and total:
-                    try:
+                    with contextlib.suppress(Exception):
                         progress(done, total)
-                    except Exception:
-                        pass
     return dest
 
 
@@ -190,10 +189,8 @@ class SelfUpdater:
 
         def prog(stage, done=0, total=0):
             if progress:
-                try:
+                with contextlib.suppress(Exception):
                     progress(stage, done, total)
-                except Exception:
-                    pass
 
         release = self.latest_release()
         zip_a, sums_a = pick_assets(release.get("assets"))
@@ -219,10 +216,8 @@ class SelfUpdater:
         )
 
         if not verify_file_hash(zip_path, expected):
-            try:
+            with contextlib.suppress(Exception):
                 zip_path.unlink(missing_ok=True)
-            except Exception:
-                pass
             raise SelfUpdateError(
                 "SHA-256 mismatch — the downloaded update does not match the "
                 "published manifest and was deleted."
@@ -231,10 +226,8 @@ class SelfUpdater:
         self._verify_optional_signature(zip_path)
 
         # Clean up manifest (already consumed)
-        try:
+        with contextlib.suppress(Exception):
             sums_path.unlink(missing_ok=True)
-        except Exception:
-            pass
 
         logger.info(f"Self-update verified: {zip_path}")
         prog("done")

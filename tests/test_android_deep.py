@@ -96,7 +96,6 @@ class TestPacketRoundTrip:
         inst = self._make_inst(monkeypatch)
         inst.callback = lambda *a, **kw: False  # block everything
         pkt = _build_ipv4_udp("10.8.0.2", "6.6.6.6", 5555, 443, b"data")
-        orig_write = os.write
         writes = []
         monkeypatch.setattr(os, "write", lambda fd, data: writes.append(data))
 
@@ -106,7 +105,7 @@ class TestPacketRoundTrip:
     def test_fragmented_ipv4_minimum_length(self, monkeypatch):
         """Packets shorter than IP+UDP headers must be silently ignored."""
         inst = self._make_inst(monkeypatch)
-        for n in range(0, 28):
+        for n in range(28):
             pkt = b"\x45" * n
             try:
                 inst._process_ipv4(pkt)

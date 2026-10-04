@@ -1,3 +1,5 @@
+import contextlib
+
 import customtkinter as ctk
 
 from netstrip.gui.animated_logo import AnimatedLogo
@@ -58,16 +60,12 @@ class SplashScreen(ctk.CTkToplevel):
     def stop_animation(self):
         """Stops all background timers and canvas animations."""
         if hasattr(self, "_cycle_id") and self._cycle_id:
-            try:
+            with contextlib.suppress(Exception):
                 self.after_cancel(self._cycle_id)
-            except Exception:
-                pass
             self._cycle_id = None
         if hasattr(self, "logo") and self.logo:
-            try:
+            with contextlib.suppress(Exception):
                 self.logo.stop_animation()
-            except Exception:
-                pass
 
     def update_status(self, text, progress_val):
         """Update the loading text and smoothly animate the progress bar."""
@@ -163,17 +161,13 @@ class SplashScreen(ctk.CTkToplevel):
         eased = (1.0 - math.cos(progress * math.pi)) / 2.0
         alpha = max(0.0, 1.0 - eased)
 
-        try:
+        with contextlib.suppress(Exception):
             self.attributes("-alpha", alpha)
-        except Exception:
-            pass
 
         if step < total_steps:
             self.after(15, lambda: self.fade_out(callback, step + 1, total_steps))
         else:
-            try:
+            with contextlib.suppress(Exception):
                 self.withdraw()
-            except Exception:
-                pass
             if callback:
                 callback()

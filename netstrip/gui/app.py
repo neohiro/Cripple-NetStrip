@@ -2,6 +2,7 @@
 Main GUI Application for NetStrip
 """
 
+import contextlib
 import sys
 
 import customtkinter as ctk
@@ -108,16 +109,13 @@ def fast_check_if_valid_scroll(self, widget):
         canvas_str = str(canvas)
         widget_str = str(widget)
         if (
-            widget_str == canvas_str
-            or widget_str.startswith(canvas_str + ".")
-            or widget_str == str(self)
-            or widget_str.startswith(str(self) + ".")
+            widget_str == canvas_str or widget_str.startswith((canvas_str + ".", str(self) + ".")) or widget_str == str(self)
         ):
             return True
 
         curr = widget
         while curr is not None:
-            if curr == canvas or curr == self:
+            if curr in (canvas, self):
                 return True
             curr = getattr(curr, "master", None)
     except Exception:
@@ -141,10 +139,8 @@ def _warm_import_heavy_modules():
         "netstrip.gui.views.settings",
         "netstrip.gui.views.blocklists",
     ):
-        try:
+        with contextlib.suppress(Exception):
             importlib.import_module(_mod)
-        except Exception:
-            pass
 
 
 import threading as _threading
@@ -600,10 +596,8 @@ class NetStripApp(ctk.CTk):
                     and hasattr(settings_view, "scroll_frame")
                     and hasattr(settings_view.scroll_frame, "_parent_canvas")
                 ):
-                    try:
+                    with contextlib.suppress(Exception):
                         settings_view.scroll_frame._parent_canvas.yview_moveto(0)
-                    except Exception:
-                        pass
 
             self.after(50, _scroll_to_top)
 
@@ -715,10 +709,8 @@ class NetStripApp(ctk.CTk):
                 text="◀ Expand Sidebar", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold")
             )
 
-        try:
+        with contextlib.suppress(Exception):
             self.update_idletasks()
-        except Exception:
-            pass
 
     def _add_nav_btn(self, row, text, icon, view_class):
         # Localized display; English remains the stable lookup identity
@@ -1195,10 +1187,8 @@ class NetStripApp(ctk.CTk):
         # Stop animation if no update is available (user may have updated)
         if not getattr(self.engine, "update_available", False):
             self._update_glow_active = False
-            try:
+            with contextlib.suppress(Exception):
                 self.version_label.configure(text_color=Colors.ACCENT_CYAN)
-            except Exception:
-                pass
             return
 
         try:

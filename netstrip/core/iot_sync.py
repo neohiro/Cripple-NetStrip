@@ -154,7 +154,7 @@ class IoTTelemetrySync:
             # Note: discovering chromecasts is slow, so we cache it in a real implementation.
             # This is a stub for casting a local status text to the default media receiver.
             if not hasattr(self, "_chromecasts"):
-                services, browser = pychromecast.discovery.discover_chromecasts()
+                _services, browser = pychromecast.discovery.discover_chromecasts()
                 pychromecast.discovery.stop_discovery(browser)
                 self._chromecasts, self._browser = pychromecast.get_listed_chromecasts(
                     friendly_names=["Nest Hub", "Google Home", "Living Room TV"]

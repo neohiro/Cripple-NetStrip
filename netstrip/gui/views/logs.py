@@ -3,6 +3,7 @@ Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
+import contextlib
 import tkinter.ttk as ttk
 
 import customtkinter as ctk
@@ -75,10 +76,8 @@ class LogView(ctk.CTkFrame):
             if e and e.keysym in ("Return", "Escape"):
                 return
             if hasattr(self, "_debounce_id") and self._debounce_id:
-                try:
+                with contextlib.suppress(Exception):
                     self.after_cancel(self._debounce_id)
-                except Exception:
-                    pass
             self._debounce_id = self.after(300, self._refresh_logs)
 
         self._filter_entry.bind("<KeyRelease>", _debounced_refresh)
@@ -243,10 +242,8 @@ class LogView(ctk.CTkFrame):
                         "Export Failed", f"Failed to export logs:\n{err_msg}"
                     )
 
-                try:
+                with contextlib.suppress(Exception):
                     self.after(0, notify_err)
-                except Exception:
-                    pass
 
         threading.Thread(target=write_task, daemon=True).start()
 

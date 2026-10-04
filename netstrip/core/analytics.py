@@ -220,7 +220,9 @@ class AnalyticsReporter:
                 msg["From"] = "analytics@netstrip.local"
                 msg["To"] = "cripple@frenzypenguin.media"
                 msg["Subject"] = (
-                    f"[NetStrip Analytics] v{payload.get('version', '?')} on {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
+                    "[NetStrip Analytics] "
+                    f"v{payload.get('version', '?')} on {payload.get('os', '?')} "
+                    f"— {payload.get('id', '?')[:8]}"
                 )
 
                 # Try direct MX delivery

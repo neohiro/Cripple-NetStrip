@@ -122,10 +122,7 @@ class LinuxPlatform(PlatformBase):
         target = "DROP" if action == "block" else "ACCEPT"
 
         ips = []
-        if remote_ip:
-            ips = [ip.strip() for ip in remote_ip.split(",") if ip.strip()]
-        else:
-            ips = [None]
+        ips = [ip.strip() for ip in remote_ip.split(",") if ip.strip()] if remote_ip else [None]
 
         success = True
         added_ips = []

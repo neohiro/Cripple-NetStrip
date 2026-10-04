@@ -125,7 +125,7 @@ def test_rules_view(root, engine):
 # ── Modal lifecycles ────────────────────────────────────────────────────────
 
 def test_killswitch_modal_lifecycle(root, engine):
-    from netstrip.gui.killswitch_modal import ManualKillswitchModal, CriticalRecoveryModal
+    from netstrip.gui.killswitch_modal import CriticalRecoveryModal, ManualKillswitchModal
     fired = {}
     m1 = ManualKillswitchModal(root, engine, lambda ok: fired.setdefault("cancel", ok))
     root.update(); m1.on_cancel()
@@ -159,7 +159,7 @@ def test_smart_modal_lifecycle(root):
 # ── i18n integration ────────────────────────────────────────────────────────
 
 def test_language_switch_functional(root, engine):
-    from netstrip.i18n import set_language, available_languages
+    from netstrip.i18n import available_languages, set_language
     langs = available_languages()
     assert len(langs) >= 20, f"expected >=20 languages, got {len(langs)}"
     for lang in ["es", "de", "ar", "he"]:

@@ -28,13 +28,12 @@ if "jnius" not in sys.modules:
     jnius_stub.autoclass = _autoclass
     sys.modules["jnius"] = jnius_stub
 
-from netstrip.core.interceptor.android import (  # noqa: E402
+from netstrip.core.dns_proxy import ANDROID_DNS_PORT
+from netstrip.core.interceptor.android import (
     PROTO_TCP,
     PROTO_UDP,
     AndroidVPNInterceptor,
 )
-from netstrip.core.dns_proxy import ANDROID_DNS_PORT  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Packet builders
@@ -191,7 +190,7 @@ def test_callback_exception_fails_open(interceptor):
 
 
 def test_tcp_packets_reach_the_classifier(interceptor):
-    inst, tun = interceptor
+    inst, _tun = interceptor
     seen = []
     inst.callback = lambda s, sp, d, dp, proto, **kw: (seen.append((d, dp, proto)) or True)
 
