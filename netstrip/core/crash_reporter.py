@@ -10,6 +10,7 @@ sent when a genuine crash occurs, and they contain system/diagnostic info
 Target: cripple@frenzypenguin.media
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -83,7 +84,8 @@ def _get_engine_state() -> dict:
 
             # Get 24h stats (aggregate counts only, no domains/IPs)
             c.execute(
-                "SELECT SUM(total_blocked), SUM(total_allowed) FROM statistics WHERE date >= date('now', '-1 day')"
+                "SELECT SUM(total_blocked), SUM(total_allowed) FROM statistics "
+                "WHERE date >= date('now', '-1 day')"
             )
             row = c.fetchone()
             if row:
@@ -102,18 +104,25 @@ def _get_engine_state() -> dict:
                 state[f"setting_{key}"] = row[0] if row else "unset"
 
             # Detailed 24h stats from connection_log
-            c.execute("""
-                SELECT 
+            c.execute(
+                """
+                SELECT
                     COUNT(*) as total_queries,
-                    SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as total_blocked,
+                    SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END)
+                        as total_blocked,
                     SUM(CASE WHEN action = 'allow' THEN 1 ELSE 0 END) as total_allowed,
-                    SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_ads,
-                    SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_trackers,
-                    SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_telemetry,
-                    SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_malware
-                FROM connection_log 
+                    SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole')
+                        THEN 1 ELSE 0 END) as blocked_ads,
+                    SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole')
+                        THEN 1 ELSE 0 END) as blocked_trackers,
+                    SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole')
+                        THEN 1 ELSE 0 END) as blocked_telemetry,
+                    SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole')
+                        THEN 1 ELSE 0 END) as blocked_malware
+                FROM connection_log
                 WHERE timestamp >= datetime('now', '-24 hours')
-            """)
+                """
+            )
             row = c.fetchone()
             if row:
                 state["total_queries"] = row[0] or 0
@@ -134,10 +143,8 @@ def _get_engine_state() -> dict:
             c.execute("SELECT value FROM settings WHERE key='start_time'")
             row = c.fetchone()
             if row:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     state["uptime_seconds"] = int(time.time() - float(row[0]))
-                except (ValueError, TypeError):
-                    pass
     except Exception as e:
         state["db_error"] = str(e)
     finally:
@@ -443,11 +450,19 @@ def send_crash_report(
         f"Local:     {sys_info.get('timestamp_local', 'unknown')}",
         "",
         "--- SYSTEM INFO ---",
-        f"OS:        {sys_info.get('os', '?')} {sys_info.get('os_release', '')} ({sys_info.get('os_version', '')})",
+        (
+            "OS:        "
+            f"{sys_info.get('os', '?')} {sys_info.get('os_release', '')} "
+            f"({sys_info.get('os_version', '')})"
+        ),
         f"Arch:      {sys_info.get('arch', '?')}",
         f"Python:    {sys_info.get('python', '?')}",
         f"CPUs:      {sys_info.get('cpu_count', '?')}",
-        f"RAM:       {sys_info.get('ram_total_gb', '?')} GB ({sys_info.get('ram_used_pct', '?')}% used)",
+        (
+            "RAM:       "
+            f"{sys_info.get('ram_total_gb', '?')} GB "
+            f"({sys_info.get('ram_used_pct', '?')}% used)"
+        ),
         f"CPU Load:  {sys_info.get('cpu_pct', '?')}%",
         "",
         "--- ENGINE STATE ---",
@@ -492,7 +507,10 @@ def send_crash_report(
 
     # Subject line for email
     exc_type = type(exception).__name__ if exception else "CrashReport"
-    subject = f"[NetStrip Crash] {exc_type} in {context} — v{sys_info.get('netstrip_version', '?')} on {sys_info.get('os', '?')}"
+    subject = (
+        f"[NetStrip Crash] {exc_type} in {context} — "
+        f"v{sys_info.get('netstrip_version', '?')} on {sys_info.get('os', '?')}"
+    )
 
     # Always save locally first
     _save_crash_report_locally(report, crash_id)
@@ -533,22 +551,17 @@ def send_crash_report(
             pass
 
         # Channel 2: HTTPS endpoint (fallback)
-        if not sent:
-            if _send_via_https(subject, report):
-                sent = True
+        if not sent and _send_via_https(subject, report):
+            sent = True
 
         # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
         if is_crash:
-            try:
+            with contextlib.suppress(Exception):
                 _send_email(subject, report)
-            except Exception:
-                pass
         elif not sent:
             # For non-fatal errors, only email if GitHub delivery failed
-            try:
+            with contextlib.suppress(Exception):
                 _send_email(subject, report)
-            except Exception:
-                pass
 
         if sent:
             break
@@ -567,7 +580,9 @@ def send_crash_report(
         logger.info(f"Crash report {crash_id} delivered successfully")
     else:
         logger.warning(
-            f"Crash report {crash_id} saved locally only (delivery failed after {max_retries} attempts)"
+            "Crash report "
+            f"{crash_id} saved locally only (delivery failed after "
+            f"{max_retries} attempts)"
         )
 
     # Always show delivery confirmation to the user
@@ -592,14 +607,12 @@ def install_global_exception_hook():
 
         logger.critical(f"Unhandled exception: {exc_type.__name__}: {exc_value}")
 
-        try:
+        with contextlib.suppress(Exception):
             send_crash_report(
                 exception=exc_value,
                 context="unhandled_exception",
                 require_consent=True,
             )
-        except Exception:
-            pass
 
         # Call the original hook
         original_hook(exc_type, exc_value, exc_tb)

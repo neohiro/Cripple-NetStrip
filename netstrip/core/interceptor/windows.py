@@ -7,6 +7,8 @@ try:
 except ImportError:
     pydivert = None
 
+import contextlib
+
 from netstrip.core.interceptor.base import PacketInterceptor
 
 logger = logging.getLogger("NetStrip.WinDivert")
@@ -35,10 +37,8 @@ class WinDivertInterceptor(PacketInterceptor):
     def stop(self):
         self.is_running = False
         if self._w:
-            try:
+            with contextlib.suppress(Exception):
                 self._w.close()
-            except Exception:
-                pass
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
         logger.info("WinDivert packet interception stopped.")
@@ -94,16 +94,16 @@ class WinDivertInterceptor(PacketInterceptor):
 
                         except Exception as e:
                             logger.error(f"Error evaluating packet: {e}")
-                            # CRITICAL: If killswitch is active, failsafe = DROP to maintain block-all contract.
-                            # Otherwise, failsafe = ALLOW so we don't break the internet on transient errors.
+                            # CRITICAL: If killswitch is active, failsafe = DROP to
+                            # maintain block-all contract.
+                            # Otherwise, failsafe = ALLOW so we don't break the internet
+                            # on transient errors.
                             is_killswitch = self.engine and getattr(
                                 self.engine, "killswitch_active", False
                             )
                             if not is_killswitch:
-                                try:
+                                with contextlib.suppress(Exception):
                                     w.send(packet)
-                                except Exception:
-                                    pass
                             # else: packet is silently dropped (correct behavior under killswitch)
             except Exception as e:
                 logger.error(f"WinDivert engine failed: {e}")

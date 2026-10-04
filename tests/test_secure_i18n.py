@@ -22,7 +22,7 @@ def fake_home(tmp_path, monkeypatch):
 
 def test_psk_roundtrip_windows_dpapi(fake_home):
     """On Windows the keyfile must contain DPAPI-wrapped bytes, never plaintext."""
-    from netstrip.core.secure_store import store_psk, load_psk, _keyfile_path
+    from netstrip.core.secure_store import _keyfile_path, load_psk, store_psk
 
     class FakeDB:
         def get_setting(self, k, d=None):
@@ -42,9 +42,9 @@ def test_psk_roundtrip_windows_dpapi(fake_home):
 
 
 def test_legacy_db_plaintext_migrates_to_keyfile_and_is_scrubbed(fake_home):
-    from netstrip.core.secure_store import store_psk, load_psk, _keyfile_path
     import tempfile
 
+    from netstrip.core.secure_store import _keyfile_path, load_psk, store_psk
     from netstrip.data.database import Database
     db_path = os.path.join(tempfile.mkdtemp(), "m.db")
     db = Database(db_path=db_path)
@@ -80,7 +80,7 @@ def test_i18n_spanish_catalog_applies():
 
 
 def test_i18n_unknown_language_falls_back_to_english():
-    from netstrip.i18n import set_language, t, get_language
+    from netstrip.i18n import get_language, set_language, t
 
     set_language("xx")   # no catalog
     assert get_language() == "en"

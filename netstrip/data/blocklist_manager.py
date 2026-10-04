@@ -4,6 +4,7 @@ Manages the offline domain blocklists using high-performance Python sets,
 indexed category sets, and fast binary serialization.
 """
 
+import contextlib
 import datetime
 import hashlib
 import hmac
@@ -34,7 +35,8 @@ CATEGORY_PRIORITY = {
     ConnectionCategory.UNKNOWN: 0,
 }
 
-# 1. ESSENTIAL DOMAINS — Minimal set required for local IPC and NetStrip itself (Immune to all blocks)
+# 1. ESSENTIAL DOMAINS — Minimal set required for local IPC
+# and NetStrip itself (Immune to all blocks)
 ESSENTIAL_DOMAINS = {
     # NetStrip Core Self-Updates & Releases
     "api.github.com",
@@ -72,7 +74,8 @@ ESSENTIAL_DOMAINS = {
     "broadcasthost",
 }
 
-# 2. SYSTEM DOMAINS — OS Infrastructure, Search Engines & Cloud Services (Categorized as ConnectionCategory.SYSTEM)
+# 2. SYSTEM DOMAINS — OS Infrastructure, Search Engines &
+# Cloud Services (Categorized as ConnectionCategory.SYSTEM)
 SYSTEM_DOMAINS = {
     # Global Search & Core Web Portals
     "google.com",
@@ -205,7 +208,7 @@ DOM_RE = re.compile(r"^[a-z0-9_\*\-\.\u0080-\uFFFF]+$")
 class BlocklistManager:
     def __init__(
         self,
-        lists_dir: str = None,
+        lists_dir: str | None = None,
         db=None,
         progress_callback: Callable[[str, float], None] | None = None,
         async_load: bool = True,
@@ -250,10 +253,8 @@ class BlocklistManager:
             if os.path.exists(bundled_sources):
                 target_sources = os.path.join(user_dir, "updater_sources.json")
                 if not os.path.exists(target_sources):
-                    try:
+                    with contextlib.suppress(Exception):
                         shutil.copy2(bundled_sources, target_sources)
-                    except Exception:
-                        pass
                 else:
                     try:
                         # Self-healing merge: bundled definitions always win
@@ -331,14 +332,12 @@ class BlocklistManager:
 
             if os.path.exists(bundled_lists):
                 for item in os.listdir(bundled_lists):
-                    if item.endswith(".txt") or item.endswith(".json"):
+                    if item.endswith((".txt", ".json")):
                         src = os.path.join(bundled_lists, item)
                         dst = os.path.join(lists_dir, item)
                         if not os.path.exists(dst):
-                            try:
+                            with contextlib.suppress(Exception):
                                 shutil.copy2(src, dst)
-                            except Exception:
-                                pass
 
         self.lists_dir = lists_dir
         self.is_loading = True
@@ -371,10 +370,8 @@ class BlocklistManager:
     ):
         cb = callback or self.progress_callback
         if cb:
-            try:
+            with contextlib.suppress(Exception):
                 cb(text, min(1.0, max(0.0, progress)))
-            except Exception:
-                pass
 
     def _get_cache_paths(self) -> list[str]:
         """Return potential cache file locations in priority order (.pkl binary then .json)."""
@@ -440,15 +437,14 @@ class BlocklistManager:
         return BlocklistManager.CACHE_MAGIC + sig + body
 
     def _get_lists_hash(self) -> str:
-        """Generate a stable deterministic hash of the current lists directory, updater sources, and DNS settings."""
+        """Generate a stable deterministic hash of the current lists
+        directory, updater sources, and DNS settings."""
         h = hashlib.md5(usedforsecurity=False)  # non-crypto cache key only
         h.update(b"v3.5.15_cache_fix")
         allow_doh = "false"
         if hasattr(self, "db") and self.db:
-            try:
+            with contextlib.suppress(Exception):
                 allow_doh = str(self.db.get_setting("allow_in_browser_dns", "false")).lower()
-            except Exception:
-                pass
         h.update(f"allow_doh:{allow_doh}".encode())
 
         # Include updater_sources.json status/toggles in cache key
@@ -664,7 +660,8 @@ class BlocklistManager:
         progress_callback: Callable[[str, float], None] | None = None,
         force_reload: bool = False,
     ):
-        """Load all blocklists using ultra-fast binary cache or multi-core parallel parsing with live progress."""
+        """Load all blocklists using ultra-fast binary cache or
+        multi-core parallel parsing with live progress."""
         self.is_loading = True
         cb = progress_callback or self.progress_callback
         try:
@@ -697,7 +694,8 @@ class BlocklistManager:
                                 raw_map = cache_data["domain_map"]
                                 sample_val = next(iter(raw_map.values())) if raw_map else None
 
-                                # Robust Enum normalizer to handle PyInstaller / Pickle module path mismatches
+                                # Robust Enum normalizer to handle PyInstaller / Pickle
+                                # module path mismatches
                                 def _norm_enum(k):
                                     if isinstance(k, ConnectionCategory):
                                         return k
@@ -743,7 +741,9 @@ class BlocklistManager:
                                 self._report_progress("Filter engine fully loaded", 1.0, cb)
                                 self._notify_loaded()
                                 logger.info(
-                                    f"Blocklists successfully loaded from cache {os.path.basename(cache_file)} ({len(new_domain_map)} domains)"
+                                    "Blocklists successfully loaded from cache "
+                                    f"{os.path.basename(cache_file)} "
+                                    f"({len(new_domain_map)} domains)"
                                 )
                                 return
                         except Exception as e:
@@ -834,10 +834,7 @@ class BlocklistManager:
                                 == "true"
                             )
                             block_doh = not allow_doh
-                        if block_doh:
-                            cat = ConnectionCategory.TRACKER
-                        else:
-                            cat = ConnectionCategory.DNS
+                        cat = ConnectionCategory.TRACKER if block_doh else ConnectionCategory.DNS
                     elif filename.startswith("security_"):
                         cat = ConnectionCategory.SECURITY
                     elif filename.startswith("update_"):
@@ -896,13 +893,12 @@ class BlocklistManager:
                                     ConnectionCategory.TELEMETRY,
                                     ConnectionCategory.MALWARE,
                                     ConnectionCategory.SECURITY,
+                                ) and (
+                                    d in ESSENTIAL_DOMAINS
+                                    or d in SYSTEM_DOMAINS
+                                    or d in UPDATE_DOMAINS
                                 ):
-                                    if (
-                                        d in ESSENTIAL_DOMAINS
-                                        or d in SYSTEM_DOMAINS
-                                        or d in UPDATE_DOMAINS
-                                    ):
-                                        continue
+                                    continue
 
                                 if d not in new_domain_map:
                                     new_domain_map[d] = cat
@@ -928,7 +924,8 @@ class BlocklistManager:
 
             self._report_progress("Saving intelligence cache...", 0.95, cb)
 
-            # Save fast binary cache directly and asynchronously to both user directory and lists directory
+            # Save fast binary cache directly and asynchronously to both
+            # user directory and lists directory
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
 
@@ -955,19 +952,15 @@ class BlocklistManager:
                             with open(pkl_tmp, "wb") as f:
                                 f.write(sealed)
                             if os.path.exists(pkl_target):
-                                try:
+                                with contextlib.suppress(Exception):
                                     os.remove(pkl_target)
-                                except Exception:
-                                    pass
                             os.replace(pkl_tmp, pkl_target)
                             logger.info(f"Updated signed binary cache at {pkl_target}")
                         except Exception as e:
                             logger.debug(f"Could not write pkl cache to {pkl_target}: {e}")
                             if os.path.exists(pkl_tmp):
-                                try:
+                                with contextlib.suppress(Exception):
                                     os.remove(pkl_tmp)
-                                except Exception:
-                                    pass
                 except Exception as e:
                     logger.debug(f"Cache save worker error: {e}")
 
@@ -1031,7 +1024,7 @@ class BlocklistManager:
                 logger.debug(f"Failed to persist category override: {e}")
 
     def is_blocked(
-        self, domain: str, process_name: str = None
+        self, domain: str, process_name: str | None = None
     ) -> tuple[bool, ConnectionCategory | None]:
         """
         Check if a domain is blocked. Checks whitelist, blacklist, and Maps.
@@ -1200,39 +1193,37 @@ class BlocklistManager:
             # 1. User Whitelist (Global Domains + App Rules)
             if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_ALLOWED:
                 for domain in self.whitelist | self.app_whitelist:
-                    if not query or query in domain:
-                        if domain not in seen:
-                            seen.add(domain)
-                            if skipped < offset:
-                                skipped += 1
-                            else:
-                                results.append(
-                                    {
-                                        "domain": domain,
-                                        "category": ConnectionCategory.USER_ALLOWED.value,
-                                    }
-                                )
-                                if len(results) >= limit:
-                                    return results
+                    if (not query or query in domain) and domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append(
+                                {
+                                    "domain": domain,
+                                    "category": ConnectionCategory.USER_ALLOWED.value,
+                                }
+                            )
+                            if len(results) >= limit:
+                                return results
 
             # 2. User Blacklist (Global Domains + App Rules)
             if not target_cat_enum or target_cat_enum == ConnectionCategory.USER_BLOCKED:
                 blocked_items = set(self.blacklist.keys()) | self.app_blacklist
                 for domain in blocked_items:
-                    if not query or query in domain:
-                        if domain not in seen:
-                            seen.add(domain)
-                            if skipped < offset:
-                                skipped += 1
-                            else:
-                                results.append(
-                                    {
-                                        "domain": domain,
-                                        "category": ConnectionCategory.USER_BLOCKED.value,
-                                    }
-                                )
-                                if len(results) >= limit:
-                                    return results
+                    if (not query or query in domain) and domain not in seen:
+                        seen.add(domain)
+                        if skipped < offset:
+                            skipped += 1
+                        else:
+                            results.append(
+                                {
+                                    "domain": domain,
+                                    "category": ConnectionCategory.USER_BLOCKED.value,
+                                }
+                            )
+                            if len(results) >= limit:
+                                return results
 
             # 3. If filtered by category, search ONLY that category set!
             if target_cat_enum:
@@ -1260,19 +1251,18 @@ class BlocklistManager:
 
             # 4. If global search across all categories (query without category filter):
             for domain, category in self.domain_map.items():
-                if query in domain:
-                    if domain not in seen:
-                        seen.add(domain)
-                        if skipped < offset:
-                            skipped += 1
-                        else:
-                            results.append(
-                                {
-                                    "domain": domain,
-                                    "category": getattr(category, "value", str(category)),
-                                }
-                            )
-                            if len(results) >= limit:
-                                return results
+                if query in domain and domain not in seen:
+                    seen.add(domain)
+                    if skipped < offset:
+                        skipped += 1
+                    else:
+                        results.append(
+                            {
+                                "domain": domain,
+                                "category": getattr(category, "value", str(category)),
+                            }
+                        )
+                        if len(results) >= limit:
+                            return results
 
         return results

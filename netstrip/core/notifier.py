@@ -4,6 +4,7 @@ Silently queues unknown connections for the user to review in the GUI.
 No more popup storms.
 """
 
+import contextlib
 import threading
 from collections.abc import Callable
 from datetime import datetime
@@ -54,10 +55,8 @@ class NotificationManager:
             self.pending_items.append(PendingConnection(conn_data))
 
         if self.on_count_changed:
-            try:
+            with contextlib.suppress(Exception):
                 self.on_count_changed(self.pending_count)
-            except Exception:
-                pass
 
     def get_pending(self) -> list[PendingConnection]:
         """Get all pending items (thread-safe copy)."""
@@ -85,10 +84,8 @@ class NotificationManager:
             )
 
         if self.on_count_changed:
-            try:
+            with contextlib.suppress(Exception):
                 self.on_count_changed(self.pending_count)
-            except Exception:
-                pass
 
     def resolve_all(self, action: str):
         """Resolve ALL pending items with the same action."""
@@ -111,7 +108,5 @@ class NotificationManager:
                 )
 
         if self.on_count_changed:
-            try:
+            with contextlib.suppress(Exception):
                 self.on_count_changed(self.pending_count)
-            except Exception:
-                pass

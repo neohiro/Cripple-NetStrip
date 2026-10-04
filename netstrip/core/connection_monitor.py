@@ -27,6 +27,7 @@ except ImportError:
 
     psutil = DummyPsutil()
 import concurrent.futures
+import contextlib
 import logging
 import os
 import platform
@@ -128,7 +129,8 @@ class ConnectionMonitor:
             connections = psutil.net_connections(kind="all")
         except (psutil.AccessDenied, PermissionError):
             logger.warning(
-                "Access Denied when getting net_connections. Need admin privileges or unsupported on this OS (e.g., Android)."
+                "Access Denied when getting net_connections. Need admin "
+                "privileges or unsupported on this OS (e.g., Android)."
             )
             return
         except Exception as e:
@@ -151,7 +153,8 @@ class ConnectionMonitor:
             if not conn.raddr or conn.pid is None or not hasattr(conn.raddr, "ip"):
                 continue
 
-            # Ignore internal loopback connections (e.g. dnscrypt-proxy communicating locally, or DNS requests to 127.127.127.127)
+            # Ignore internal loopback connections (e.g. dnscrypt-proxy
+            # communicating locally, or DNS requests to 127.127.127.127)
             if conn.laddr and conn.laddr.ip.startswith("127.") and conn.raddr.ip.startswith("127."):
                 continue
             if conn.laddr and conn.laddr.ip == "::1" and conn.raddr.ip == "::1":
@@ -163,9 +166,12 @@ class ConnectionMonitor:
             current_connections.add(conn_sig)
 
             if conn_sig not in self.known_connections:
-                # Determine direction: if local port is in our listening ports, it's inbound. Otherwise outbound.
+                # Determine direction: if local port is in our listening
+                # ports, it's inbound. Otherwise outbound.
                 direction = (
-                    "inbound" if (conn.laddr and conn.laddr.port in listening_ports) else "outbound"
+                    "inbound"
+                    if (conn.laddr and conn.laddr.port in listening_ports)
+                    else "outbound"
                 )
 
                 # New connection found
@@ -217,7 +223,7 @@ class ConnectionMonitor:
                             )
             else:
                 proc = psutil.Process(conn.pid)
-                process_name, process_path, root_proc, original_exe = (
+                process_name, process_path, _root_proc, original_exe = (
                     self._resolve_process_identity(proc)
                 )
 
@@ -244,7 +250,8 @@ class ConnectionMonitor:
         port = conn.raddr.port
         protocol = "TCP" if conn.type == 1 else "UDP"
 
-        # Second-stage resolution: if domain is available and process is still System, resolve via domain map
+        # Second-stage resolution: if domain is available and process is
+        # still System, resolve via domain map
         domain = self.db.get_cached_domain(ip)
         if domain and process_name in ("System Idle Process", "System (Kernel/Driver)"):
             with self._origin_map_lock:
@@ -307,23 +314,22 @@ class ConnectionMonitor:
         self._rate_limits[ip] = [t for t in self._rate_limits[ip] if (now - t) < 2.0]
         self._rate_limits[ip].append(now)
 
-        if len(self._rate_limits[ip]) > 50:
+        if len(self._rate_limits[ip]) > 50 and self.on_malware_detected:
             # Over 50 new connections to/from this IP within 1 second!
-            if self.on_malware_detected:
-                self.on_malware_detected(
-                    {
-                        "name": "botnet_behavior",
-                        "message": f"IoT Botnet / Rapid Scan detected! {process_name} established >50 connections/sec to {ip}",
-                    }
-                )
+            self.on_malware_detected(
+                {
+                    "name": "botnet_behavior",
+                    "message": (
+                        f"IoT Botnet / Rapid Scan detected! {process_name} "
+                        f"established >50 connections/sec to {ip}"
+                    ),
+                }
+            )
 
         if not domain:
             # Basic check to avoid reversing loopback/local IPs
             is_local_ipv4 = (
-                ip in ("127.0.0.1", "0.0.0.0")
-                or ip.startswith("192.168.")
-                or ip.startswith("10.")
-                or ip.startswith("172.16.")
+                ip in ("127.0.0.1", "0.0.0.0") or ip.startswith(("192.168.", "10.", "172.16."))
             )
             is_local_ipv6 = (
                 ip in ("::1", "::")
@@ -391,14 +397,19 @@ class ConnectionMonitor:
                                     if (
                                         check_ip in self._arp_cache
                                         and self._arp_cache[check_ip] != mac
+                                        and self.on_malware_detected
                                     ):
-                                        if self.on_malware_detected:
-                                            self.on_malware_detected(
-                                                {
-                                                    "name": "arp_spoof_local",
-                                                    "message": f"Deep ARP Pinning failed! {check_ip} MAC changed from {self._arp_cache[check_ip]} to {mac}. Spoofing detected!",
-                                                }
-                                            )
+                                        self.on_malware_detected(
+                                            {
+                                                "name": "arp_spoof_local",
+                                                "message": (
+                                                    "Deep ARP Pinning failed! "
+                                                    f"{check_ip} MAC changed from "
+                                                    f"{self._arp_cache[check_ip]} to {mac}. "
+                                                    "Spoofing detected!"
+                                                ),
+                                            }
+                                        )
                                     self._arp_cache[check_ip] = mac
 
                                     # Prevent memory leak for ARP cache
@@ -411,10 +422,8 @@ class ConnectionMonitor:
                             except Exception:
                                 pass
 
-                        try:
+                        with contextlib.suppress(Exception):
                             self._dns_executor.submit(_arp_pinning_bg, ip)
-                        except Exception:
-                            pass
 
         # Fetch corporate identity if we have a domain
         identity = self.classifier.blocklist.get_identity(domain) if domain else None
@@ -434,7 +443,8 @@ class ConnectionMonitor:
             or ("dns" in process_name.lower())
         )
 
-        # Unconditionally whitelist known third-party local DNS proxies so they can reach upstream DoH/DoT endpoints
+        # Unconditionally whitelist known third-party local DNS proxies
+        # so they can reach upstream DoH/DoT endpoints
         if process_name.lower() in (
             "dnscrypt-proxy.exe",
             "yogadns.exe",
@@ -490,11 +500,13 @@ class ConnectionMonitor:
             if action.value == "block":
                 sound_manager.play_alert()
                 self.on_status(
-                    f"Autoblocked {category.value.capitalize()}: {process_name} -> {target_to_classify}"
+                    "Autoblocked "
+                    f"{category.value.capitalize()}: {process_name} -> {target_to_classify}"
                 )
             elif action.value == "allow" and category.value != "unknown":
                 self.on_status(
-                    f"Allowed {category.value.capitalize()}: {process_name} -> {target_to_classify}"
+                    "Allowed "
+                    f"{category.value.capitalize()}: {process_name} -> {target_to_classify}"
                 )
 
     def _handle_ebpf_event(self, ebpf_data):
@@ -504,15 +516,18 @@ class ConnectionMonitor:
         pid = ebpf_data["pid"]
         process_name = ebpf_data["process_name"]
 
-        # Create a signature to check against psutil known connections (match psutil format: PID:IP:PORT:LPORT:TYPE)
+        # Create a signature to check against psutil known connections
+        # (match psutil format: PID:IP:PORT:LPORT:TYPE)
         conn_sig = f"{pid}:{ip}:{port}:0:1"
 
         if conn_sig not in self.known_connections:
             # If eBPF sees it but psutil hasn't, log it uniquely.
-            # We add it to known_connections so we don't log it twice if psutil catches up.
+            # We add it to known_connections so we don't log it twice
+            # if psutil catches up.
             self.known_connections.add(conn_sig)
             logger.warning(
-                f"[eBPF verification] Captured direct kernel connection before/without user-space polling: {process_name} -> {ip}:{port}"
+                "[eBPF verification] Captured direct kernel connection "
+                f"before/without user-space polling: {process_name} -> {ip}:{port}"
             )
 
             # Formulate pseudo-connection object to feed into standard pipeline

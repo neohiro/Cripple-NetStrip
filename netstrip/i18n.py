@@ -52,6 +52,7 @@ def detect_language() -> str:
     return lang.split("_")[0].split(".")[0][:2].lower() or "en"
 
 
+import contextlib
 import sys  # noqa: E402
 
 # Native display names (shown in the Settings picker)
@@ -146,10 +147,8 @@ def t(key: str, **kwargs) -> str:
     if text is None:
         text = key.rsplit(".", 1)[-1]
     if kwargs:
-        try:
+        with contextlib.suppress(Exception):
             text = text.format(**kwargs)
-        except Exception:
-            pass
     return text
 
 

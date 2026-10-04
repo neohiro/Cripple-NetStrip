@@ -3,6 +3,7 @@ Database Module for NetStrip
 Thread-safe SQLite database for logging connections, user rules, statistics, and settings.
 """
 
+import contextlib
 import json
 import os
 import queue
@@ -17,7 +18,7 @@ MAX_WRITE_QUEUE_SIZE = 10000
 
 
 class Database:
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str | None = None):
         if db_path is None:
             # Default to ~/.NetStrip/NetStrip.db
             home = os.path.expanduser("~")
@@ -56,9 +57,8 @@ class Database:
         return self._local.conn
 
     def _init_db(self):
-        with self.lock:
-            with self._get_connection() as conn:
-                conn.executescript("""
+        with self.lock, self._get_connection() as conn:
+            conn.executescript("""
                     CREATE TABLE IF NOT EXISTS connection_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -77,7 +77,7 @@ class Database:
                     );
                     CREATE INDEX IF NOT EXISTS idx_log_timestamp ON connection_log(timestamp);
                     CREATE INDEX IF NOT EXISTS idx_log_domain ON connection_log(domain);
-                    
+
                     CREATE TABLE IF NOT EXISTS user_rules (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         pattern TEXT,
@@ -90,7 +90,7 @@ class Database:
                         expires_at DATETIME,
                         note TEXT
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS statistics (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         date DATE UNIQUE,
@@ -102,24 +102,24 @@ class Database:
                         blocked_telemetry INTEGER DEFAULT 0,
                         blocked_malware INTEGER DEFAULT 0
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS settings (
                         key TEXT PRIMARY KEY,
                         value TEXT
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS dns_cache (
                         ip TEXT PRIMARY KEY,
                         domain TEXT,
                         last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS bandwidth_stats (
                         hour DATETIME PRIMARY KEY,
                         bytes_sent INTEGER DEFAULT 0,
                         bytes_recv INTEGER DEFAULT 0
                     );
-                    
+
                     CREATE TABLE IF NOT EXISTS app_bandwidth (
             app_name TEXT PRIMARY KEY,
             bytes_sent INTEGER DEFAULT 0,
@@ -130,53 +130,53 @@ class Database:
                         name TEXT PRIMARY KEY,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
-                    
+
                     CREATE INDEX IF NOT EXISTS idx_conn_log_timestamp ON connection_log(timestamp);
                     CREATE INDEX IF NOT EXISTS idx_conn_log_domain ON connection_log(domain);
                     CREATE INDEX IF NOT EXISTS idx_conn_log_process ON connection_log(process_name);
-                    
+
                     CREATE INDEX IF NOT EXISTS idx_rules_app ON user_rules(app_name);
                 """)
-                # Initialize today's stats if not exists
-                today = datetime.now().strftime("%Y-%m-%d")
-                conn.execute("INSERT OR IGNORE INTO statistics (date) VALUES (?)", (today,))
+            # Initialize today's stats if not exists
+            today = datetime.now().strftime("%Y-%m-%d")
+            conn.execute("INSERT OR IGNORE INTO statistics (date) VALUES (?)", (today,))
 
-                # Attempt to add expires_at if upgrading from old DB
-                try:
-                    conn.execute("ALTER TABLE user_rules ADD COLUMN expires_at DATETIME;")
-                except sqlite3.OperationalError:
-                    pass  # Column already exists
+            # Attempt to add expires_at if upgrading from old DB
+            try:
+                conn.execute("ALTER TABLE user_rules ADD COLUMN expires_at DATETIME;")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
-                # Attempt to add mode_scope if upgrading from old DB
-                try:
-                    conn.execute(
-                        "ALTER TABLE user_rules ADD COLUMN mode_scope TEXT DEFAULT 'STANDARD';"
-                    )
-                except sqlite3.OperationalError:
-                    pass  # Column already exists
-
-                # Attempt to add original_exe if upgrading from old DB
-                try:
-                    conn.execute("ALTER TABLE connection_log ADD COLUMN original_exe TEXT;")
-                except sqlite3.OperationalError:
-                    pass  # Column already exists
-
-                # Ensure default settings are initialized
+            # Attempt to add mode_scope if upgrading from old DB
+            try:
                 conn.execute(
-                    "INSERT OR IGNORE INTO settings (key, value) VALUES ('lan_shield_enabled', 'true')"
+                    "ALTER TABLE user_rules ADD COLUMN mode_scope TEXT DEFAULT 'STANDARD';"
                 )
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
-                # Pre-load settings cache
-                self._settings_cache = {}
-                try:
-                    cursor = conn.execute("SELECT key, value FROM settings")
-                    for r in cursor.fetchall():
-                        try:
-                            self._settings_cache[r["key"]] = json.loads(r["value"])
-                        except (json.JSONDecodeError, TypeError):
-                            self._settings_cache[r["key"]] = r["value"]
-                except Exception:
-                    pass
+            # Attempt to add original_exe if upgrading from old DB
+            try:
+                conn.execute("ALTER TABLE connection_log ADD COLUMN original_exe TEXT;")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+            # Ensure default settings are initialized
+            conn.execute(
+                "INSERT OR IGNORE INTO settings (key, value) VALUES ('lan_shield_enabled', 'true')"
+            )
+
+            # Pre-load settings cache
+            self._settings_cache = {}
+            try:
+                cursor = conn.execute("SELECT key, value FROM settings")
+                for r in cursor.fetchall():
+                    try:
+                        self._settings_cache[r["key"]] = json.loads(r["value"])
+                    except (json.JSONDecodeError, TypeError):
+                        self._settings_cache[r["key"]] = r["value"]
+            except Exception:
+                pass
 
     def flush(self, timeout: float = 5.0):
         """Wait for the async write queue to drain completely to SQLite."""
@@ -194,10 +194,8 @@ class Database:
         if hasattr(self, "_writer_thread") and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=1.0)
         if hasattr(self, "_local") and hasattr(self._local, "conn") and self._local.conn:
-            try:
+            with contextlib.suppress(Exception):
                 self._local.conn.close()
-            except Exception:
-                pass
             self._local.conn = None
 
     def _async_writer_loop(self):
@@ -224,17 +222,18 @@ class Database:
 
                 write_success = False
                 try:
-                    with self.lock:
-                        with self._get_connection() as conn:
-                            if logs:
-                                conn.executemany(
-                                    """
-                                    INSERT INTO connection_log 
-                                    (process_name, process_path, pid, domain, ip, port, protocol, category, action, mode, resolved_name, original_exe)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    with self.lock, self._get_connection() as conn:
+                        if logs:
+                            conn.executemany(
+                                """
+                                INSERT INTO connection_log
+                                (process_name, process_path, pid, domain, ip, port,
+                                 protocol, category, action, mode, resolved_name,
+                                 original_exe)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 """,
-                                    logs,
-                                )
+                                logs,
+                            )
 
                             for action_val, category_val in stats:
                                 today = datetime.now().strftime("%Y-%m-%d")
@@ -334,7 +333,7 @@ class Database:
                 logging.getLogger(__name__).error(f"Error caching domain mapping: {e}")
 
     def get_recent_connections(
-        self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None
+        self, limit: int = 100, unique_only: bool = False, since_timestamp: str | None = None
     ) -> list[sqlite3.Row]:
         with self._read_lock:
             with self._get_connection() as conn:
@@ -346,14 +345,15 @@ class Database:
                     # where_clause is a compile-time constant ('WHERE ...' or '');
                     # all dynamic values flow through bound parameters.
                     if since_timestamp:
-                        query = """
-                            SELECT *, max(id) as max_id
-                            FROM (
-                                SELECT * FROM connection_log WHERE timestamp >= ? ORDER BY id DESC LIMIT 5000
-                            )
-                            GROUP BY process_name, coalesce(domain, ip)
-                            ORDER BY max_id DESC LIMIT ?
-                        """
+                        query = (
+                            "SELECT *, max(id) as max_id "
+                            "FROM ("
+                            "SELECT * FROM connection_log WHERE timestamp >= ? "
+                            "ORDER BY id DESC LIMIT 5000"
+                            ") "
+                            "GROUP BY process_name, coalesce(domain, ip) "
+                            "ORDER BY max_id DESC LIMIT ?"
+                        )
                     else:
                         query = """
                             SELECT *, max(id) as max_id
@@ -369,7 +369,8 @@ class Database:
                     params.append(limit)
                     if since_timestamp:
                         cursor = conn.execute(
-                            "SELECT * FROM connection_log WHERE timestamp >= ? ORDER BY id DESC LIMIT ?",
+                            "SELECT * FROM connection_log WHERE timestamp >= ? "
+                            "ORDER BY id DESC LIMIT ?",
                             params,
                         )
                     else:
@@ -379,13 +380,14 @@ class Database:
                 return cursor.fetchall()
 
     def get_unique_allowed_24h(self) -> int:
-        """Returns the number of unique allowed connections (process + destination) for the last 24 hours."""
+        """Returns the number of unique allowed connections
+        (process + destination) for the last 24 hours."""
         with self._read_lock, self._get_connection() as conn:
             cursor = conn.execute("""
                     SELECT COUNT(*) FROM (
-                        SELECT DISTINCT process_name, coalesce(domain, ip) 
-                        FROM connection_log 
-                        WHERE action='allow' 
+                        SELECT DISTINCT process_name, coalesce(domain, ip)
+                        FROM connection_log
+                        WHERE action='allow'
                         AND timestamp >= datetime('now', '-24 hours')
                     )
                 """)
@@ -397,14 +399,10 @@ class Database:
         engine watchdog so months-long sessions don't accumulate a giant -wal
         file or degraded query plans."""
         with self._get_connection() as conn:
-            try:
+            with contextlib.suppress(Exception):
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 conn.execute("PRAGMA optimize")
-            except Exception:
-                pass
 
     def get_setting(self, key: str, default: Any = None) -> Any:
         with self._read_lock:
@@ -450,10 +448,7 @@ class Database:
         if not hasattr(self, "_settings_cache"):
             self._settings_cache = {}
 
-        if isinstance(value, (dict, list, bool)):
-            str_value = json.dumps(value)
-        else:
-            str_value = str(value)
+        str_value = json.dumps(value) if isinstance(value, (dict, list, bool)) else str(value)
 
         with self.lock:
             self._settings_cache[key] = value
@@ -496,17 +491,19 @@ class Database:
                 if app_name is None:
                     conn.execute(
                         """
-                        DELETE FROM user_rules 
-                        WHERE pattern = ? AND scope = ? AND app_name IS NULL AND (mode_scope = ? OR mode_scope = 'ALL')
-                    """,
+                        DELETE FROM user_rules
+                        WHERE pattern = ? AND scope = ? AND app_name IS NULL
+                        AND (mode_scope = ? OR mode_scope = 'ALL')
+                        """,
                         (rule_data.get("pattern"), rule_data.get("scope", "global"), m_scope),
                     )
                 else:
                     conn.execute(
                         """
-                        DELETE FROM user_rules 
-                        WHERE pattern = ? AND scope = ? AND app_name = ? AND (mode_scope = ? OR mode_scope = 'ALL')
-                    """,
+                        DELETE FROM user_rules
+                        WHERE pattern = ? AND scope = ? AND app_name = ?
+                        AND (mode_scope = ? OR mode_scope = 'ALL')
+                        """,
                         (
                             rule_data.get("pattern"),
                             rule_data.get("scope", "global"),
@@ -517,7 +514,7 @@ class Database:
 
                 conn.execute(
                     """
-                    INSERT INTO user_rules 
+                    INSERT INTO user_rules
                     (pattern, action, scope, app_name, category, note, expires_at, mode_scope)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -576,7 +573,8 @@ class Database:
             with self._get_connection() as conn:
                 if mode_scope:
                     cursor = conn.execute(
-                        "SELECT * FROM user_rules WHERE mode_scope = 'ALL' OR mode_scope = ? ORDER BY id DESC",
+                        "SELECT * FROM user_rules WHERE mode_scope = 'ALL' "
+                        "OR mode_scope = ? ORDER BY id DESC",
                         (mode_scope,),
                     )
                 else:
@@ -600,7 +598,8 @@ class Database:
                 self._rules_cache.clear()
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "DELETE FROM user_rules WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP"
+                    "DELETE FROM user_rules WHERE expires_at IS NOT NULL "
+                    "AND expires_at < CURRENT_TIMESTAMP"
                 )
                 conn.commit()
                 return cursor.rowcount
@@ -613,20 +612,26 @@ class Database:
 
     def get_24h_statistics(self) -> dict:
         """Get accurate rolling statistics for the last 24 hours from the connection log."""
-        with self._read_lock:
-            with self._get_connection() as conn:
-                cursor = conn.execute("""
-                    SELECT 
+        with self._read_lock, self._get_connection() as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT
                         COUNT(*) as total_queries,
-                        SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as total_blocked,
+                        SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END)
+                            as total_blocked,
                         SUM(CASE WHEN action = 'allow' THEN 1 ELSE 0 END) as total_allowed,
-                        SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_ads,
-                        SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_trackers,
-                        SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_telemetry,
-                        SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_malware
-                    FROM connection_log 
+                        SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole')
+                            THEN 1 ELSE 0 END) as blocked_ads,
+                        SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole')
+                            THEN 1 ELSE 0 END) as blocked_trackers,
+                        SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole')
+                            THEN 1 ELSE 0 END) as blocked_telemetry,
+                        SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole')
+                            THEN 1 ELSE 0 END) as blocked_malware
+                    FROM connection_log
                     WHERE timestamp >= datetime('now', '-24 hours')
-                """)
+                    """
+                )
                 row = cursor.fetchone()
 
                 return {
@@ -651,7 +656,7 @@ class Database:
                     """
                     INSERT INTO bandwidth_stats (hour, bytes_sent, bytes_recv)
                     VALUES (?, ?, ?)
-                    ON CONFLICT(hour) DO UPDATE SET 
+                    ON CONFLICT(hour) DO UPDATE SET
                         bytes_sent = bytes_sent + ?,
                         bytes_recv = bytes_recv + ?
                 """,
@@ -759,7 +764,7 @@ class Database:
                 for rule in rules:
                     conn.execute(
                         """
-                        INSERT INTO user_rules 
+                        INSERT INTO user_rules
                         (pattern, action, scope, app_name, category, note)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """,

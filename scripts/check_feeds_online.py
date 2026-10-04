@@ -1,9 +1,9 @@
 """One-off: verify every online feed/endpoint used by Cripple is reachable."""
+import concurrent.futures
 import json
 import os
-import urllib.request
 import ssl
-import concurrent.futures
+import urllib.request
 
 UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36'}
 ctx = ssl.create_default_context()
@@ -42,7 +42,7 @@ dead = [r for r in results if not r[4]]
 allowed = {a.strip().lower() for a in os.environ.get("ALLOWED_DEAD", "ipapi.co").split(",") if a.strip()}
 unexpected = [r for r in dead if not any(a in (r[1] or "") for a in allowed)]
 print(f"TOTAL {len(results)} | ALIVE {len(results)-len(dead)} | DEAD {len(dead)} | UNEXPECTED {len(unexpected)}")
-for name, url, code, size, ok in results:
+for name, url, code, _size, ok in results:
     if not ok:
         marker = "ALLOWED" if any(a in (url or "") for a in allowed) else "DEAD"
         print(f"{marker} [{code}] {name} :: {url}")

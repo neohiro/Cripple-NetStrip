@@ -9,11 +9,10 @@ interchangeable — peers never need to agree on a backend.
 import time
 
 import pytest
-
 from netstrip.core.crypto_utils import (
+    _NATIVE_AVAILABLE,
     InvalidToken,
     QuantumFernet,
-    _NATIVE_AVAILABLE,
 )
 
 MSG = b'LAN_KILLSWITCH_TRIGGER {"nonce":"abc","ts":1690000000}'

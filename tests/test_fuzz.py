@@ -20,12 +20,12 @@ if "jnius" not in sys.modules:
     stub.autoclass = lambda *a, **k: (_ for _ in ()).throw(ImportError)
     sys.modules["jnius"] = stub
 
-from netstrip.core.interceptor.android import AndroidVPNInterceptor  # noqa: E402
+from netstrip.core.interceptor.android import AndroidVPNInterceptor
 
 SEED = 0xC11E  # deterministic fuzz seed
 random.seed(SEED)
 
-FUZZ_CHARS = list("abc019.:*/@$%^&|<>[]{}\\\"'`\t\r\n\x00\xffé中") + ["||", "@@", "$", "^", "#!"]
+FUZZ_CHARS = [*list("abc019.:*/@$%^&|<>[]{}\\\"'`\t\r\n\x00ÿé中"), "||", "@@", "$", "^", "#!"]
 
 
 def _rand_line(rng):
@@ -45,8 +45,7 @@ def parser():
 
 def temp_lists_dir():
     import tempfile
-    d = tempfile.mkdtemp(prefix="ns_fuzz_")
-    return d
+    return tempfile.mkdtemp(prefix="ns_fuzz_")
 
 
 def test_feed_parser_survives_hostile_lines(parser):

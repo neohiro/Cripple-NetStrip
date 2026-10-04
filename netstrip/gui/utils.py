@@ -52,9 +52,7 @@ def is_ip(text: str) -> bool:
     if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", text):
         return True
     # Basic IPv6
-    if re.match(r"^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$", text):
-        return True
-    return False
+    return bool(re.match(r"^(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}$", text))
 
 
 class ClipboardTooltipManager:
@@ -120,6 +118,7 @@ def bind_copy_tooltip(widget, text_to_copy, message=None):
     widget.bind("<Button-1>", on_click)
 
 
+import contextlib
 import re
 
 
@@ -132,8 +131,7 @@ def mask_ip_string(text: str) -> str:
     # Mask IPv4
     text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "<HIDDEN_IP>", text)
     # Mask common IPv6 patterns
-    text = re.sub(r"\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b", "<HIDDEN_IP>", text)
-    return text
+    return re.sub(r"\b(?:[a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}\b", "<HIDDEN_IP>", text)
 
 
 _SCROLL_SPEED_PRESETS = {
@@ -160,15 +158,13 @@ def set_scroll_speed_preset(preset: str):
 def apply_saved_scroll_speed(db) -> str:
     """Load the persisted gui_scroll_speed setting into the scroll engine."""
     preset = "normal"
-    try:
+    with contextlib.suppress(Exception):
         preset = str(db.get_setting("gui_scroll_speed", "normal")).lower()
-    except Exception:
-        pass
     set_scroll_speed_preset(preset)
     return preset if preset in _SCROLL_SPEED_PRESETS else "normal"
 
 
-def get_scroll_step(platform: str = None) -> int:
+def get_scroll_step(platform: str | None = None) -> int:
     """Centralized mousewheel scroll speed (units per notch), honoring the
     user's Scroll Speed setting. Matches the app.py CTkScrollableFrame patch."""
     import sys
@@ -180,7 +176,7 @@ def get_scroll_step(platform: str = None) -> int:
         base = 12
     else:
         base = 10
-    return max(1, int(round(base * _scroll_multiplier)))
+    return max(1, round(base * _scroll_multiplier))
 
 
 def apply_treeview_scroll_patch(tree_widget):
@@ -289,8 +285,8 @@ def get_screen_bounds(window=None):
             scale = 1.0
             if hasattr(ctk, "ScalingTracker"):
                 scale = ctk.ScalingTracker.get_window_scaling(window)
-            w = int(round(window.winfo_screenwidth() * scale))
-            h = int(round(window.winfo_screenheight() * scale))
+            w = round(window.winfo_screenwidth() * scale)
+            h = round(window.winfo_screenheight() * scale)
             if w > 100 and h > 100:
                 return w, h, 0, 0
         except Exception:
@@ -313,10 +309,8 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
     Universally centers any Tk / CustomTkinter window on the primary screen or over a parent window.
     Accounts for DPI scaling in CustomTkinter so windows are pixel-perfect centered across all resolutions.
     """
-    try:
+    with contextlib.suppress(Exception):
         window.update_idletasks()
-    except Exception:
-        pass
 
     # Get CustomTkinter window scaling factor
     scale = 1.0
@@ -337,34 +331,34 @@ def center_window(window, width=None, height=None, parent=None, max_w_ratio=0.92
             actual_w = window.winfo_width()
             if actual_w <= 1:
                 actual_w = window.winfo_reqwidth()
-            width = int(round(actual_w / scale))
+            width = round(actual_w / scale)
         except Exception:
             width = 400
-            actual_w = int(round(width * scale))
+            actual_w = round(width * scale)
     else:
-        actual_w = int(round(width * scale))
+        actual_w = round(width * scale)
 
     if height is None:
         try:
             actual_h = window.winfo_height()
             if actual_h <= 1:
                 actual_h = window.winfo_reqheight()
-            height = int(round(actual_h / scale))
+            height = round(actual_h / scale)
         except Exception:
             height = 300
-            actual_h = int(round(height * scale))
+            actual_h = round(height * scale)
     else:
-        actual_h = int(round(height * scale))
+        actual_h = round(height * scale)
 
     max_actual_w = max(300, int(screen_w * max_w_ratio))
     max_actual_h = max(200, int(screen_h * max_h_ratio))
 
     if actual_w > max_actual_w:
         actual_w = max_actual_w
-        width = int(round(actual_w / scale))
+        width = round(actual_w / scale)
     if actual_h > max_actual_h:
         actual_h = max_actual_h
-        height = int(round(actual_h / scale))
+        height = round(actual_h / scale)
 
     if parent is not None:
         try:
@@ -442,10 +436,8 @@ def apply_window_icon(window):
 
         icon_path = os.path.join(base_path, "assets", "logo.ico")
         if os.path.exists(icon_path):
-            try:
+            with contextlib.suppress(Exception):
                 window.iconbitmap(icon_path)
-            except Exception:
-                pass
 
             if sys.platform.startswith("win"):
 
@@ -466,9 +458,7 @@ def apply_window_icon(window):
                 # Execute immediately and also schedule after 10ms in case window wasn't fully mapped
                 _set_win_icon()
                 if hasattr(window, "after"):
-                    try:
+                    with contextlib.suppress(Exception):
                         window.after(10, _set_win_icon)
-                    except Exception:
-                        pass
     except Exception as e:
         logger.debug(f"Failed to apply window icon: {e}")

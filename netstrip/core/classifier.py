@@ -52,7 +52,7 @@ class TrafficClassifier:
             return ConnectionCategory.LAN
 
         # Check blocklist manager (whitelist, blacklist, trie, and fallback domain sets)
-        is_blocked, category = self.blocklist.is_blocked(domain, process_name)
+        _is_blocked, category = self.blocklist.is_blocked(domain, process_name)
         if category and category != ConnectionCategory.UNKNOWN:
             self._domain_cache[cache_key] = category
             return category
@@ -107,9 +107,7 @@ class TrafficClassifier:
 
             p_base = p_lower.replace(".exe", "")
             if (
-                is_system_process(p_base)
-                or p_base.startswith("service host (")
-                or p_base.startswith("svchost (")
+                is_system_process(p_base) or p_base.startswith(("service host (", "svchost ("))
             ):
                 self._domain_cache[cache_key] = ConnectionCategory.SYSTEM
                 return ConnectionCategory.SYSTEM
@@ -204,23 +202,17 @@ class TrafficClassifier:
         if not ip:
             return False
         # Simplified check for private IPs
-        if ip.startswith("10.") or ip.startswith("192.168."):
+        if ip.startswith(("10.", "192.168.")):
             return True
         if ip.startswith("172."):
             parts = ip.split(".")
-            if len(parts) == 4 and parts[1].isdigit():
-                if 16 <= int(parts[1]) <= 31:
-                    return True
+            if len(parts) == 4 and parts[1].isdigit() and 16 <= int(parts[1]) <= 31:
+                return True
         if ip.startswith("169.254."):
             return True
         if ip.startswith("100."):  # CGNAT 100.64.0.0/10
             parts = ip.split(".")
-            if len(parts) == 4 and parts[1].isdigit():
-                if 64 <= int(parts[1]) <= 127:
-                    return True
+            if len(parts) == 4 and parts[1].isdigit() and 64 <= int(parts[1]) <= 127:
+                return True
         ip_lower = ip.lower()
-        if ip_lower.startswith("fc") or ip_lower.startswith("fd"):  # IPv6 ULA
-            return True
-        if ip_lower.startswith("fe80:"):  # IPv6 link-local
-            return True
-        return False
+        return ip_lower.startswith(("fc", "fd", "fe80:"))

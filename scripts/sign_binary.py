@@ -3,11 +3,13 @@ FrenzyPenguin Media - Authenticode Code Signing & Packaging Helper
 Automatically signs Windows binaries for FrenzyPenguin Media with Authenticode SHA-256
 when an official PFX certificate is provided via CI environment variables.
 """
+import base64
+import contextlib
 import os
 import subprocess
-import base64
 import tempfile
 from pathlib import Path
+
 
 def sign_and_package():
     print("=" * 60)
@@ -114,16 +116,12 @@ def sign_and_package():
             subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", temp_ps1], capture_output=True, text=True)
             print(f"[+] Signed {exe_path.name} with PowerShell Authenticode SHA-256.")
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 os.remove(temp_ps1)
-            except Exception:
-                pass
 
     if temp_pfx_file and os.path.exists(temp_pfx_file):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(temp_pfx_file)
-        except Exception:
-            pass
 
     print("=" * 60)
     print(" Code Signing Complete!")

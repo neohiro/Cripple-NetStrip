@@ -3,6 +3,7 @@ LAN Shield for NetStrip
 Isolates the local network by instructing the platform firewall to block private IP ranges.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -80,10 +81,8 @@ class LANShield:
             except Exception as e:
                 logger.error(f"LAN Shield listener failed to bind: {e}, retrying in 3s...")
                 if sock:
-                    try:
+                    with contextlib.suppress(Exception):
                         sock.close()
-                    except Exception:
-                        pass
                 time.sleep(3)
                 continue
 
@@ -109,7 +108,8 @@ class LANShield:
                             nonce = payload.get("nonce") or f"{pkt_time}_{addr[0]}"
                             if abs(time.time() - pkt_time) > 60:
                                 logger.warning(
-                                    f"LAN Shield: Dropped expired broadcast from {addr[0]} (clock drift/replay attempt)."
+                                    "LAN Shield: Dropped expired broadcast from "
+                                    f"{addr[0]} (clock drift/replay attempt)."
                                 )
                                 continue
                             if nonce in seen_nonces:
@@ -126,7 +126,8 @@ class LANShield:
                             btype = payload.get("type")
                             if btype == "LAN_THREAT_BROADCAST":
                                 logger.critical(
-                                    f"LAN SHIELD: Received Post-Quantum Encrypted Threat Broadcast from {addr[0]}! Initiating local lockdown..."
+                                    "LAN SHIELD: Received Post-Quantum Encrypted Threat "
+                                    f"Broadcast from {addr[0]}! Initiating local lockdown..."
                                 )
                                 if self.engine:
                                     threading.Thread(
@@ -144,13 +145,15 @@ class LANShield:
                                     ).start()
                             elif btype == "LAN_RESTORE_BROADCAST":
                                 logger.info(
-                                    f"LAN SHIELD: Received Post-Quantum Encrypted Restore Broadcast from {addr[0]}. Disabling local killswitch..."
+                                    "LAN SHIELD: Received Post-Quantum Encrypted Restore "
+                                    f"Broadcast from {addr[0]}. Disabling local killswitch..."
                                 )
                                 if self.engine:
                                     threading.Thread(target=self._handle_remote_restore).start()
                             elif btype == "LAN_KILLSWITCH_TRIGGER":
                                 logger.critical(
-                                    f"LAN SHIELD: Received Post-Quantum Encrypted Killswitch Trigger from {addr[0]}. Engaging Killswitch..."
+                                    "LAN SHIELD: Received Post-Quantum Encrypted Killswitch "
+                                    f"Trigger from {addr[0]}. Engaging Killswitch..."
                                 )
                                 if self.engine:
                                     threading.Thread(
@@ -171,10 +174,8 @@ class LANShield:
 
             # Clean up dead socket before rebind attempt
             if sock:
-                try:
+                with contextlib.suppress(Exception):
                     sock.close()
-                except Exception:
-                    pass
             if self._running:
                 time.sleep(3)  # Backoff before rebind
 
@@ -194,7 +195,9 @@ class LANShield:
             trusted_wifis = self.engine.db.get_trusted_wifis()
             if current_ssid not in trusted_wifis:
                 logger.warning(
-                    f"LAN Shield Passive Mode: Dropping '{btype}' broadcast. Untrusted WiFi: {current_ssid or '<unknown>'}"
+                    "LAN Shield Passive Mode: Dropping "
+                    f"'{btype}' broadcast. Untrusted WiFi: "
+                    f"{current_ssid or '<unknown>'}"
                 )
                 return
 
@@ -215,16 +218,15 @@ class LANShield:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.sendto(msg, ("255.255.255.255", 54321))
             logger.info(
-                f"LAN Shield: Successfully broadcasted {btype} to LAN clients (Post-Quantum AES-256)."
+                "LAN Shield: Successfully broadcasted "
+                f"{btype} to LAN clients (Post-Quantum AES-256)."
             )
         except Exception as e:
             logger.error(f"Failed to broadcast {btype}: {e}")
         finally:
             if sock:
-                try:
+                with contextlib.suppress(Exception):
                     sock.close()
-                except Exception:
-                    pass
 
     def broadcast_anomaly(self, anomaly_data: dict):
         self._send_encrypted_broadcast(
@@ -241,10 +243,7 @@ class LANShield:
 
     def apply_mode(self, level):
         """Apply LAN shielding based on the selected mode and user preference."""
-        if hasattr(level, "block_lan"):
-            mode_config = level
-        else:
-            mode_config = get_mode(level)
+        mode_config = level if hasattr(level, "block_lan") else get_mode(level)
 
         if mode_config.block_lan:
             # Paranoid mode forces LAN shield on temporarily, without mutating the DB preference

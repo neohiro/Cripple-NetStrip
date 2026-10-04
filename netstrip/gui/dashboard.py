@@ -4,6 +4,8 @@ from netstrip.gui.popups import check_killswitch_override
 Dashboard View for Cripple GUI
 """
 
+import contextlib
+
 import customtkinter as ctk
 
 from netstrip.gui.theme import CTK_FRAME_STYLE, Colors, Fonts, Icons, Spacing
@@ -292,10 +294,8 @@ class DashboardView(ctk.CTkFrame):
             val = "true" if self.system_toggle.get() else "false"
             self.engine.db.set_setting("block_system_connections", val)
             if hasattr(self.engine, "gui_update_callback") and self.engine.gui_update_callback:
-                try:
+                with contextlib.suppress(Exception):
                     self.engine.gui_update_callback("MODE_CHANGED")
-                except Exception:
-                    pass
 
         is_on = self.system_toggle.get()
         if not is_on:  # They toggled it to OFF
@@ -358,10 +358,8 @@ class DashboardView(ctk.CTkFrame):
                 recent_conns = self.engine.db.get_recent_connections(limit=300)
 
                 # Real 24h volume from bandwidth_stats (sampled by the engine)
-                try:
+                with contextlib.suppress(Exception):
                     self._cached_bandwidth = self.engine.db.get_24h_bandwidth()
-                except Exception:
-                    pass
 
                 # Bandwidth snapshot (off the UI thread — psutil syscall)
                 bandwidth_payload = None

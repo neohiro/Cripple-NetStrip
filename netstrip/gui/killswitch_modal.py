@@ -1,3 +1,5 @@
+import contextlib
+
 import customtkinter as ctk
 
 from netstrip.gui.theme import Colors, Fonts
@@ -224,9 +226,7 @@ class CriticalRecoveryModal(ctk.CTkToplevel):
 
         # Sync the UI switch if the parent app has the home_view loaded
         if hasattr(self.master, "home_view"):
-            try:
+            with contextlib.suppress(Exception):
                 self.master.home_view.sync_killswitch_state()
-            except Exception:
-                pass
 
         self.destroy()

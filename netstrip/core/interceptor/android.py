@@ -10,6 +10,7 @@ Supports two modes:
      them to NetStrip's internal DNS proxy. All other traffic bypasses.
 """
 
+import contextlib
 import logging
 import os
 import select
@@ -131,18 +132,14 @@ class AndroidVPNInterceptor(PacketInterceptor):
             response_payload = self._process_dns(payload)
             if response_payload:
                 response_packet = self._build_ipv4_udp_response(packet, response_payload, ihl)
-                try:
+                with contextlib.suppress(Exception):
                     os.write(self._fd, response_packet)
-                except Exception:
-                    pass
             return
 
         # In DNS_ONLY mode, we don't filter non-DNS traffic
         if not self._is_full_mode:
-            try:
+            with contextlib.suppress(Exception):
                 os.write(self._fd, packet)
-            except Exception:
-                pass
             return
 
         # FULL mode: Apply NetStrip filtering via the callback
@@ -156,10 +153,8 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
         if allowed:
             # Write the packet back — Android will route it to the internet
-            try:
+            with contextlib.suppress(Exception):
                 os.write(self._fd, packet)
-            except Exception:
-                pass
         # else: silently drop (packet is simply not written back)
 
     def _process_ipv6(self, packet):
@@ -169,10 +164,8 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
         # In DNS_ONLY mode, pass all IPv6 through
         if not self._is_full_mode:
-            try:
+            with contextlib.suppress(Exception):
                 os.write(self._fd, packet)
-            except Exception:
-                pass
             return
 
         # FULL mode: Parse IPv6 header
@@ -206,10 +199,8 @@ class AndroidVPNInterceptor(PacketInterceptor):
             allowed = True
 
         if allowed:
-            try:
+            with contextlib.suppress(Exception):
                 os.write(self._fd, packet)
-            except Exception:
-                pass
 
     def _process_dns(self, payload):
         """Forward a DNS payload to NetStrip's internal DNS proxy and return the response."""

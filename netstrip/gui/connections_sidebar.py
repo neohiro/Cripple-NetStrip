@@ -3,6 +3,7 @@ Persistent Connections Sidebar for Cripple GUI.
 Displays a live list of connections grouped by app name, target, classification color, and allow/block toggle.
 """
 
+import contextlib
 import os
 import threading
 
@@ -13,7 +14,7 @@ from netstrip.gui.components.sidebar_components import AppGroupFrame
 from netstrip.gui.icon_manager import IconManager
 from netstrip.gui.popups import check_killswitch_override
 from netstrip.gui.theme import Colors, Fonts, Spacing
-from netstrip.gui.utils import enable_smooth_scrolling, safe_loop
+from netstrip.gui.utils import safe_loop
 
 
 class ConnectionsSidebar(ctk.CTkFrame):
@@ -189,9 +190,6 @@ class ConnectionsSidebar(ctk.CTkFrame):
             self.lan_toggle.deselect()
         self.lan_toggle.pack(side="right")
 
-        # Smooth mousewheel scroll handling
-        enable_smooth_scrolling(self.scroll_frame)
-
         self._refresh_loop()
 
     def _on_lan_toggle(self):
@@ -345,7 +343,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 from netstrip.core.process_utils import normalize_process_name
 
                 # Process newest first, limit to 50 per app to prevent UI widget thrashing
-                for i, row_data in enumerate(conns):
+                for _i, row_data in enumerate(conns):
                     conn_dict = dict(row_data)
                     raw_p_name = conn_dict.get("process_name") or "Unknown"
                     pid_val = conn_dict.get("pid")
@@ -576,10 +574,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
 
         # Instantly snap scroll view to top when collapsing all to avoid empty void from batch shrinking
         if not self._all_expanded:
-            try:
+            with contextlib.suppress(Exception):
                 self.scroll_frame._parent_canvas.yview_moveto(0)
-            except Exception:
-                pass
 
         groups_to_update = list(self.app_groups.values())
         self._is_expanding_all = True
@@ -613,10 +609,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         )
 
             # Yield to UI loop
-            try:
+            with contextlib.suppress(Exception):
                 self.after(2, lambda: _update_next(index + batch_size))
-            except Exception:
-                pass
 
         _update_next()
 
@@ -632,10 +626,8 @@ class ConnectionsSidebar(ctk.CTkFrame):
             batch_size = 30
             for i in range(index, min(index + batch_size, len(groups_to_update))):
                 groups_to_update[i].set_expanded(expanded)
-            try:
+            with contextlib.suppress(Exception):
                 self.after(1, lambda: _update_next(index + batch_size))
-            except Exception:
-                pass
 
         _update_next()
 

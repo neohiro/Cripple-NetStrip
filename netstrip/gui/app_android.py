@@ -64,16 +64,13 @@ def fast_check_if_valid_scroll(self, widget):
         canvas_str = str(canvas)
         widget_str = str(widget)
         if (
-            widget_str == canvas_str
-            or widget_str.startswith(canvas_str + ".")
-            or widget_str == str(self)
-            or widget_str.startswith(str(self) + ".")
+            widget_str == canvas_str or widget_str.startswith((canvas_str + ".", str(self) + ".")) or widget_str == str(self)
         ):
             return True
 
         curr = widget
         while curr is not None:
-            if curr == canvas or curr == self:
+            if curr in (canvas, self):
                 return True
             curr = getattr(curr, "master", None)
     except Exception:

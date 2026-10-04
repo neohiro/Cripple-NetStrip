@@ -37,8 +37,9 @@ def main():
     manifest = Path("SHA256SUMS.txt")
 
     if cmd == "gen":
-        from cryptography.hazmat.primitives.asymmetric import ed25519
         import base64 as b64
+
+        from cryptography.hazmat.primitives.asymmetric import ed25519
         priv = ed25519.Ed25519PrivateKey.generate()
         print("PRIVATE (GitHub secret NETSTRIP_UPDATE_SIGNING_KEY):")
         print(b64.b64encode(priv.private_bytes_raw()).decode())

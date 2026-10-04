@@ -3,6 +3,7 @@ Cripple GUI Views — App Rules, Blocklist, Logs, Settings.
 Fully functional views with auto-refresh, color-coding, and error handling.
 """
 
+import contextlib
 from datetime import datetime
 
 import customtkinter as ctk
@@ -137,7 +138,7 @@ class AppRulesView(ctk.CTkFrame):
             items = []
 
         self._pending_badge.configure(text=str(len(items)))
-        current_targets = set(item.target for item in items)
+        current_targets = {item.target for item in items}
 
         # Remove old rows
         for target in list(self._pending_rows.keys()):
@@ -265,26 +266,20 @@ class AppRulesView(ctk.CTkFrame):
         return row
 
     def _resolve_item(self, item, action):
-        try:
+        with contextlib.suppress(Exception):
             self.engine.notifier.resolve(item, action)
-        except Exception:
-            pass
         self._refresh_pending()
         self._refresh_rules()
 
     def _allow_all(self):
-        try:
+        with contextlib.suppress(Exception):
             self.engine.notifier.resolve_all("allow")
-        except Exception:
-            pass
         self._refresh_pending()
         self._refresh_rules()
 
     def _block_all(self):
-        try:
+        with contextlib.suppress(Exception):
             self.engine.notifier.resolve_all("block")
-        except Exception:
-            pass
         self._refresh_pending()
         self._refresh_rules()
 
@@ -423,7 +418,7 @@ class AppRulesView(ctk.CTkFrame):
                 mode_scope = (
                     rule.get("mode_scope", "STANDARD")
                     if isinstance(rule, dict)
-                    else (rule["mode_scope"] if "mode_scope" in rule.keys() else "STANDARD")
+                    else (rule.get("mode_scope", "STANDARD"))
                 )
 
                 if mode_scope in ("PARANOID", "GHOST"):
@@ -465,10 +460,8 @@ class AppRulesView(ctk.CTkFrame):
 
     def _delete_rule(self, rule_id):
         if rule_id is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.engine.db.delete_user_rule(rule_id)
-            except Exception:
-                pass
         self._last_rules_sig = None
         self._refresh_rules()
 
