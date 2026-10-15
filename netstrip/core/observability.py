@@ -3,23 +3,25 @@ Structured Logging & OpenTelemetry for Cripple-NetStrip
 Provides JSON-structured logs, OTLP export, and trace correlation.
 """
 
-import os
-import sys
 import inspect
 import logging
-import structlog
-from structlog.types import EventDict, WrappedLogger
-from typing import Any, Optional
+import os
+import sys
 import threading
+
+import structlog
 
 # OpenTelemetry imports
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.sdk.resources import SERVICE_NAME as OTEL_SERVICE_NAME_KEY
+from opentelemetry.sdk.resources import SERVICE_VERSION as OTEL_SERVICE_VERSION_KEY
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import SpanKind, Status, StatusCode
+from structlog.types import EventDict, WrappedLogger
 
 from netstrip import __version__
 
@@ -99,8 +101,8 @@ def init_otel(
         try:
             # Create resource with service info
             resource = Resource.create({
-                SERVICE_NAME: service_name,
-                SERVICE_VERSION: __version__,
+                OTEL_SERVICE_NAME_KEY: service_name,
+                OTEL_SERVICE_VERSION_KEY: __version__,
                 "deployment.environment": os.getenv("CRIPPLE_ENV", "production"),
             })
             
@@ -128,7 +130,7 @@ def init_otel(
             _OTEL_INITIALIZED = True
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fail silently - logging still works without OTel
             print(f"[OTel] Initialization failed: {e}", file=sys.stderr)
             return False
@@ -271,7 +273,7 @@ class TraceContext:
         self,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[dict] = None,
+        attributes: dict | None = None,
         tracer_name: str = SERVICE_NAME,
     ):
         self.name = name
