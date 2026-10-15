@@ -5,6 +5,7 @@ Provides JSON-structured logs, OTLP export, and trace correlation.
 
 import os
 import sys
+import inspect
 import logging
 import structlog
 from structlog.types import EventDict, WrappedLogger
@@ -284,24 +285,41 @@ class TraceContext:
         self.span = self.tracer.start_span(self.name, kind=self.kind)
         for key, value in self.attributes.items():
             self.span.set_attribute(key, value)
-        self.token = trace.use_span(self.span, end_on_exit=True)
+        # Activate the span for downstream trace.get_current_span() usage.
+        use_span_cm = trace.use_span(self.span, end_on_exit=True)
+        self.token = use_span_cm.__enter__()
         return self.span
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type:
-            self.span.set_status(Status(StatusCode.ERROR, str(exc_val)))
-            self.span.record_exception(exc_val)
-        else:
-            self.span.set_status(Status(StatusCode.OK))
+        try:
+            if exc_type:
+                self.span.set_status(Status(StatusCode.ERROR, str(exc_val)))
+                self.span.record_exception(exc_val)
+            else:
+                self.span.set_status(Status(StatusCode.OK))
+        finally:
+            self.token.__exit__(exc_type, exc_val, exc_tb)
         return False
 
 
 def traced(name: str, kind: SpanKind = SpanKind.INTERNAL, **attributes):
-    """Decorator for tracing function calls."""
+    """Decorator for tracing sync and coroutine function calls."""
     def decorator(func):
+        if inspect.iscoroutinefunction(func):
+            async def wrapper(*args, **kwargs):
+                with TraceContext(name, kind, attributes) as span:
+                    span.set_attribute("function", func.__name__)
+                    return await func(*args, **kwargs)
+            wrapper.__name__ = func.__name__
+            wrapper.__doc__ = func.__doc__
+            wrapper.__wrapped__ = func
+            return wrapper
         def wrapper(*args, **kwargs):
             with TraceContext(name, kind, attributes) as span:
                 span.set_attribute("function", func.__name__)
                 return func(*args, **kwargs)
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__wrapped__ = func
         return wrapper
     return decorator

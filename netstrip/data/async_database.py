@@ -158,10 +158,8 @@ class AsyncDatabase:
         while retries <= max_retries:
             try:
                 async with aiosqlite.connect(self.db_path, timeout=30.0) as conn:
-                    # Configure for performance
-                    await conn.execute('PRAGMA journal_mode=WAL;')
+                    # WAL mode + durability flags configured at DB init (hot path stays light)
                     await conn.execute('PRAGMA busy_timeout=30000;')
-                    await conn.execute('PRAGMA synchronous=NORMAL;')
                     await conn.execute('PRAGMA cache_size=-32768;')  # 32MB cache
                     
                     if logs:
@@ -341,6 +339,12 @@ class AsyncDatabase:
     
     async def update_daily_stats(self, action: str, category: str):
         """Queue a stats update."""
+        if action not in ("block", "allow"):
+            logger.warning("invalid_stat_action", action=action)
+            return
+        if category not in ("ads", "trackers", "telemetry", "malware", None):
+            logger.warning("invalid_stat_category", category=category)
+            return
         self._write_queue.put({'type': 'stat', 'data': (action, category)})
     
     @traced("db.get_recent_connections")
@@ -400,10 +404,12 @@ class AsyncDatabase:
         self._write_queue.put({'type': 'setting', 'data': (key, str_value)})
     
     async def flush(self, timeout: float = 5.0):
-        """Flush all pending writes."""
-        # Single flush - drains whatever is currently in the queue
-        # This avoids race conditions from polling empty()
-        await self._flush_batch()
+        """Flush all pending writes within the timeout budget."""
+        start = time.monotonic()
+        while not self._write_queue.empty() and (time.monotonic() - start) < timeout:
+            await self._flush_batch()
+        if not self._write_queue.empty():
+            await self._flush_batch() # best-effort final drain
     
     def stop(self):
         """Stop the database and flush pending writes."""
