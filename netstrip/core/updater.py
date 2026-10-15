@@ -3,64 +3,61 @@ Auto-Updater for NetStrip
 Downloads updates for offline blocklists on the first internet connection after boot.
 """
 
-import contextlib
 import json
-import logging
 import os
 import re
-import threading
-import time
 import urllib.request
-from collections.abc import Callable
+import threading
+import logging
+import time
+from typing import Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
-
-def parse_version_tuple(v: str) -> tuple:
+def parse_version_tuple(v: str) -> Tuple:
     """
     Parse a semantic version string into a comparable tuple.
     Handles 'v3.3.2', '3.10.0', '3.3.1.2', '3.3.2-beta1', 'v3.3.2-rc2', etc.
     """
     if not v:
-        return (0, 0, 0, 0, "")
-    clean_v = str(v).strip().lstrip("vV")
-
-    pre_release_weight = 0  # 0 means release / final
+        return (0, 0, 0, 0, '')
+    clean_v = str(v).strip().lstrip('vV')
+    
+    pre_release_weight = 0 # 0 means release / final
     pre_tag = ""
-    if "-" in clean_v:
-        parts = clean_v.split("-", 1)
+    if '-' in clean_v:
+        parts = clean_v.split('-', 1)
         clean_v = parts[0]
         pre_tag = parts[1].lower()
         pre_release_weight = -1
-    elif "rc" in clean_v.lower():
-        idx = clean_v.lower().find("rc")
+    elif 'rc' in clean_v.lower():
+        idx = clean_v.lower().find('rc')
         pre_tag = clean_v[idx:].lower()
-        clean_v = clean_v[:idx].rstrip(".")
+        clean_v = clean_v[:idx].rstrip('.')
         pre_release_weight = -1
-    elif "beta" in clean_v.lower():
-        idx = clean_v.lower().find("beta")
+    elif 'beta' in clean_v.lower():
+        idx = clean_v.lower().find('beta')
         pre_tag = clean_v[idx:].lower()
-        clean_v = clean_v[:idx].rstrip(".")
+        clean_v = clean_v[:idx].rstrip('.')
         pre_release_weight = -2
-    elif "alpha" in clean_v.lower():
-        idx = clean_v.lower().find("alpha")
+    elif 'alpha' in clean_v.lower():
+        idx = clean_v.lower().find('alpha')
         pre_tag = clean_v[idx:].lower()
-        clean_v = clean_v[:idx].rstrip(".")
+        clean_v = clean_v[:idx].rstrip('.')
         pre_release_weight = -3
 
     numbers = []
-    for part in clean_v.split("."):
-        digits = re.findall(r"\d+", part)
+    for part in clean_v.split('.'):
+        digits = re.findall(r'\d+', part)
         if digits:
             numbers.append(int(digits[0]))
         else:
             numbers.append(0)
-
+            
     while len(numbers) < 3:
         numbers.append(0)
-
-    return (*tuple(numbers), pre_release_weight, pre_tag)
-
+        
+    return tuple(numbers) + (pre_release_weight, pre_tag)
 
 def is_newer_version(remote: str, current: str) -> bool:
     """Return True if remote version is strictly newer than current version."""
@@ -71,69 +68,48 @@ def is_newer_version(remote: str, current: str) -> bool:
 
 
 class BlocklistUpdater:
-    def __init__(self, lists_dir: str | None = None, on_update_callback: Callable | None = None):
-        self._update_lock = threading.Lock()
+    def __init__(self, lists_dir: str = None, on_update_callback: callable = None):
         if lists_dir is None:
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             self.lists_dir = os.path.join(user_dir, "lists")
             os.makedirs(self.lists_dir, exist_ok=True)
         else:
             self.lists_dir = lists_dir
-        self.sources_file = os.path.join(self.lists_dir, "..", "updater_sources.json")
+        self.sources_file = os.path.join(self.lists_dir, '..', 'updater_sources.json')
         self.is_updating = False
-
         self.on_update_callback = on_update_callback
         self.last_update_stats = {"success": 0, "failed": 0, "total": 0}
 
-    def check_and_update(
-        self,
-        force: bool = False,
-        on_complete: Callable | None = None,
-        on_progress: Callable | None = None,
-    ):
-        """Run the update in a background thread (TOCTOU-safe)."""
-        with self._update_lock:
-            if self.is_updating:
-                return
-            self.is_updating = True
-        threading.Thread(
-            target=self._perform_update, args=(force, on_complete, on_progress), daemon=True
-        ).start()
+    def check_and_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
+        """Run the update in a background thread."""
+        if self.is_updating:
+            return
+            
+        threading.Thread(target=self._perform_update, args=(force, on_complete, on_progress), daemon=True).start()
 
-    def _perform_update(
-        self,
-        force: bool = False,
-        on_complete: Callable | None = None,
-        on_progress: Callable | None = None,
-    ):
+    def _perform_update(self, force: bool = False, on_complete: callable = None, on_progress: callable = None):
         self.is_updating = True
-        _completed = False
         try:
             try:
                 if not os.path.exists(self.sources_file):
                     logger.warning(f"Updater sources file not found: {self.sources_file}")
                     if on_complete:
                         on_complete(0)
-                    _completed = True
                     return False
 
-                with open(self.sources_file, encoding="utf-8") as f:
+                with open(self.sources_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
-                sources = data.get("sources", [])
-                enabled_sources = [
-                    s
-                    for s in sources
-                    if s.get("enabled", False) and s.get("url") and s.get("category")
-                ]
+                sources = data.get('sources', [])
+                enabled_sources = [s for s in sources if s.get('enabled', False) and s.get('url') and s.get('category')]
                 total_enabled = len(enabled_sources)
-
+                
                 # Load state
-                state_file = os.path.join(self.lists_dir, "updater_state.json")
+                state_file = os.path.join(self.lists_dir, 'updater_state.json')
                 state_data = {}
                 if os.path.exists(state_file):
                     try:
-                        with open(state_file, encoding="utf-8") as f:
+                        with open(state_file, 'r', encoding='utf-8') as f:
                             state_data = json.load(f)
                     except Exception:
                         pass
@@ -142,241 +118,210 @@ class BlocklistUpdater:
                 any_updated = False
                 updated_count = 0
 
-                # Downloads go through requests (TLS-verified by default).
+                # Create robust SSL context
+                import ssl
+                try:
+                    import certifi
+                    ssl_context = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                
                 self.last_update_stats = {"success": 0, "failed": 0, "total": total_enabled}
                 for idx, source in enumerate(enabled_sources, 1):
-                    url = source.get("url")
-                    category = source.get("category")
-                    name = source.get("name")
-
+                    url = source.get('url')
+                    category = source.get('category')
+                    name = source.get('name')
+                    
                     name = str(name) if name else f"unknown_{category}_{int(time.time())}"
-                    safe_name = name.replace(" ", "_").replace("/", "_").replace(":", "")
+                    safe_name = name.replace(' ', '_').replace('/', '_').replace(':', '')
                     temp_file = os.path.join(self.lists_dir, f"temp_{category}_{safe_name}.txt")
                     target_file = os.path.join(self.lists_dir, f"{category}_{safe_name}.txt")
-
+                    
                     # Report progress
                     if on_progress:
-                        with contextlib.suppress(Exception):
+                        try:
                             on_progress(idx, total_enabled, name)
+                        except Exception:
+                            pass
 
                     # Get the update interval for this source (default 24h)
-                    update_interval_hours = float(source.get("update_interval_hours", 24))
+                    update_interval_hours = float(source.get('update_interval_hours', 24))
                     update_interval_seconds = update_interval_hours * 3600
-
+                    
                     if not force:
-                        # Check file age (skip if updated within the
-                        # required interval)
+                        # Check file age (skip if updated within the required interval)
                         if os.path.exists(target_file):
                             file_age_seconds = time.time() - os.path.getmtime(target_file)
                             if file_age_seconds < update_interval_seconds:
                                 continue
 
-                        # Throttle recent attempts — but always retry sources that
-                        # have never been downloaded
+                        # Throttle recent attempts — but always retry sources that have never been downloaded
                         if os.path.exists(target_file):
                             throttle_seconds = min(3600, update_interval_seconds / 2.0)
-                            last_attempt = state_data.get(name, {}).get("last_attempt", 0)
+                            last_attempt = state_data.get(name, {}).get('last_attempt', 0)
                             if time.time() - last_attempt < throttle_seconds:
                                 continue
-
+                        
                     logger.info(f"Updating blocklist '{name}' for category '{category}' from {url}")
-
+                    
                     max_attempts = 2
                     last_error = None
                     for attempt in range(1, max_attempts + 1):
                         try:
                             import requests
-
-                            headers = {
-                                "User-Agent": (
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                    "Chrome/120.0.0.0 Safari/537.36"
-                                )
-                            }
+                            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
                             response = requests.get(url, headers=headers, stream=True, timeout=30)
                             response.raise_for_status()
-
-                            with open(temp_file, "wb") as out_file:
+                            
+                            with open(temp_file, 'wb') as out_file:
                                 for chunk in response.iter_content(chunk_size=8192):
                                     if chunk:
                                         out_file.write(chunk)
-
+                            
                             if os.path.exists(target_file):
-                                with contextlib.suppress(Exception):
-                                    os.remove(target_file)
+                                try: os.remove(target_file)
+                                except Exception: pass
                             os.replace(temp_file, target_file)
-
+                                
                             logger.info(f"Successfully updated '{name}' (attempt {attempt})")
-                            state_data[name] = {
-                                "last_attempt": time.time(),
-                                "consecutive_failures": 0,
-                            }
+                            state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': 0}
                             self.last_update_stats["success"] += 1
                             any_updated = True
                             updated_count += 1
                             last_error = None
                             break  # Success — exit retry loop
-
+                            
                         except Exception as e:
                             last_error = e
                             if os.path.exists(temp_file):
-                                with contextlib.suppress(Exception):
-                                    os.remove(temp_file)
+                                try: os.remove(temp_file)
+                                except Exception: pass
                             if attempt < max_attempts:
-                                logger.warning(
-                                    f"Attempt {attempt} failed for '{name}': {e} — retrying..."
-                                )
+                                logger.warning(f"Attempt {attempt} failed for '{name}': {e} — retrying...")
                                 time.sleep(2)
-
+                            
                     if last_error:
-                        logger.error(
-                            "Failed to update blocklist "
-                            f"'{name}' after {max_attempts} attempts: {last_error}"
-                        )
+                        logger.error(f"Failed to update blocklist '{name}' after {max_attempts} attempts: {last_error}")
                         self.last_update_stats["failed"] += 1
-                        failures = state_data.get(name, {}).get("consecutive_failures", 0) + 1
-                        state_data[name] = {
-                            "last_attempt": time.time(),
-                            "consecutive_failures": failures,
-                        }
-
+                        failures = state_data.get(name, {}).get('consecutive_failures', 0) + 1
+                        state_data[name] = {'last_attempt': time.time(), 'consecutive_failures': failures}
+                        
                         if failures >= 10 and name.startswith("Custom:"):
-                            logger.warning(
-                                "Auto-disabling dead custom blocklist "
-                                f"'{name}' after {failures} consecutive failures."
-                            )
-                            source["enabled"] = False
+                            logger.warning(f"Auto-disabling dead custom blocklist '{name}' after {failures} consecutive failures.")
+                            source['enabled'] = False
                             sources_modified = True
-
+                    
                     # Short delay between sources
                     time.sleep(0.05)
-
+                            
                 # Save state
                 try:
-                    with open(state_file, "w", encoding="utf-8") as f:
+                    with open(state_file, 'w', encoding='utf-8') as f:
                         json.dump(state_data, f, indent=2)
                 except Exception:
                     pass
-
+                    
                 # Save modified sources if any were disabled
                 if sources_modified:
                     try:
-                        with open(self.sources_file, "w", encoding="utf-8") as f:
+                        with open(self.sources_file, 'w', encoding='utf-8') as f:
                             json.dump(data, f, indent=2)
                     except Exception as e:
                         logger.error(f"Failed to save updated sources: {e}")
-
+                        
                 # Trigger blocklist reload if any updates were made
                 if any_updated and self.on_update_callback:
                     self.on_update_callback()
-
+                    
                 # Fetch DNSCrypt resolvers to build dynamic upstream options
                 self._fetch_dnscrypt_resolvers()
-
+                
                 if on_complete:
-                    _completed = True
-                    with contextlib.suppress(Exception):
-                        on_complete(updated_count)
-
+                    try: on_complete(updated_count)
+                    except Exception: pass
+                    
                 return any_updated
             except Exception as e:
                 logger.error(f"Catastrophic failure in blocklist updater thread: {e}")
                 return False
         finally:
             self.is_updating = False
-            # Guarantee on_complete fires even on catastrophic errors so the
-            # GUI Update button never gets stuck in "Updating..." state.
-            if not _completed and on_complete:
-                with contextlib.suppress(Exception):
-                    on_complete(0)
 
     def _decode_stamp(self, stamp_str):
         import base64
-
-        b64_str = stamp_str.replace("sdns://", "")
-        b64_str += "=" * (-len(b64_str) % 4)
+        b64_str = stamp_str.replace('sdns://', '')
+        b64_str += '=' * (-len(b64_str) % 4)
         try:
             data = base64.urlsafe_b64decode(b64_str)
         except Exception:
             return None
-        if len(data) < 1:
-            return None
+        if len(data) < 1: return None
         proto = data[0]
-        if proto not in (0x02, 0x03):
-            return None
-
+        if proto not in (0x02, 0x03): return None
+        
         idx = 9
-
         def read_pascal(buf, i):
-            if i >= len(buf):
-                return None, i
+            if i >= len(buf): return None, i
             length = buf[i]
             i += 1
-            if i + length > len(buf):
-                return None, i
-            return buf[i : i + length].decode("utf-8", errors="ignore"), i + length
-
+            if i + length > len(buf): return None, i
+            return buf[i:i+length].decode('utf-8', errors='ignore'), i + length
+            
         ip, idx = read_pascal(data, idx)
-        if not ip:
-            return None
-        ip_clean = ip.split(":")[0]
-        if "[" in ip_clean or ":" in ip_clean:
-            return None  # Skip IPv6 for simplicity in UI
-
-        _pk, idx = read_pascal(data, idx)
+        if not ip: return None
+        ip_clean = ip.split(':')[0]
+        if '[' in ip_clean or ':' in ip_clean: return None # Skip IPv6 for simplicity in UI
+        
+        pk, idx = read_pascal(data, idx)
         provider_name, idx = read_pascal(data, idx)
-        if not provider_name:
-            return None
-
+        if not provider_name: return None
+        
         path = "/dns-query"
         if proto == 0x02:
             path_parsed, idx = read_pascal(data, idx)
-            if path_parsed:
-                path = path_parsed
-
+            if path_parsed: path = path_parsed
+            
         return {
             "type": "DoH" if proto == 0x02 else "DoT",
             "ip": ip_clean,
             "hostname": provider_name,
-            "path": path,
+            "path": path
         }
 
     def _fetch_dnscrypt_resolvers(self):
         target_file = os.path.join(self.lists_dir, "doh_providers_online.json")
-
+        
         # Check file age (skip if updated within the last 24 hours)
         if os.path.exists(target_file):
             file_age_seconds = time.time() - os.path.getmtime(target_file)
-            if file_age_seconds < 86400:  # 24 hours
+            if file_age_seconds < 86400: # 24 hours
                 return
-
+                
         try:
             logger.info("Fetching dynamic DNSCrypt resolvers list...")
-            req = urllib.request.Request(
-                "https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md",
-                headers={"User-Agent": "NetStrip/1.0"},
-            )
+            req = urllib.request.Request('https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md', headers={'User-Agent':'NetStrip/1.0'})
             with urllib.request.urlopen(req, timeout=15) as response:
-                content = response.read().decode("utf-8")
-
+                content = response.read().decode('utf-8')
+                
             providers = []
-            for line in content.split("\n"):
+            for line in content.split('\n'):
                 line = line.strip()
-                if line.startswith("sdns://"):
+                if line.startswith('sdns://'):
                     parsed = self._decode_stamp(line)
-                    if parsed and parsed["ip"] and parsed["hostname"]:
+                    if parsed and parsed['ip'] and parsed['hostname']:
                         providers.append(parsed)
-
+                        
             if providers:
                 # Group by IP in case of duplicates, prioritizing DoH over DoT
                 unique_providers = {}
                 for p in providers:
-                    ip = p["ip"]
-                    if ip not in unique_providers or p["type"] == "DoH":
+                    ip = p['ip']
+                    if ip not in unique_providers or p['type'] == 'DoH':
                         unique_providers[ip] = p
-
-                with open(target_file, "w", encoding="utf-8") as f:
+                        
+                with open(target_file, 'w', encoding='utf-8') as f:
                     json.dump(list(unique_providers.values()), f, indent=2)
                 logger.info(f"Saved {len(unique_providers)} dynamic DoH/DoT upstream providers.")
         except Exception as e:

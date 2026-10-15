@@ -1,15 +1,13 @@
 """
 Linux Platform Implementation for NetStrip
 """
-
-import logging
 import os
 import subprocess
-
+import logging
+from typing import List, Optional
 from netstrip.platform.base import PlatformBase
 
 logger = logging.getLogger(__name__)
-
 
 class LinuxPlatform(PlatformBase):
     def __init__(self):
@@ -30,31 +28,15 @@ class LinuxPlatform(PlatformBase):
             logger.error(f"Failed to elevate privileges: {e}")
             return False
 
-    def _run_cmd(self, cmd: list[str]) -> subprocess.CompletedProcess:
+    def _run_cmd(self, cmd: List[str]) -> subprocess.CompletedProcess:
         return subprocess.run(cmd, capture_output=True, text=True)
 
     def set_system_dns(self, interface: str, dns_server: str) -> bool:
         # Simplified: using iptables redirect instead of touching resolv.conf
         try:
             for proto in ["udp", "tcp"]:
-                self._run_cmd(
-                    [
-                        "iptables",
-                        "-t",
-                        "nat",
-                        "-A",
-                        "OUTPUT",
-                        "-p",
-                        proto,
-                        "--dport",
-                        "53",
-                        "-j",
-                        "REDIRECT",
-                        "--to-ports",
-                        "53",
-                    ]
-                )
-
+                self._run_cmd(["iptables", "-t", "nat", "-A", "OUTPUT", "-p", proto, "--dport", "53", "-j", "REDIRECT", "--to-ports", "53"])
+                
             # Disable IPv6 Router Advertisements (SLAAC)
             self._run_cmd(["sysctl", "-w", f"net.ipv6.conf.{interface}.accept_ra=0"])
             self._run_cmd(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=0"])
@@ -62,27 +44,11 @@ class LinuxPlatform(PlatformBase):
         except Exception:
             return False
 
-    def restore_system_dns(self, interface: str, original_dns_server: str | None = None) -> bool:
+    def restore_system_dns(self, interface: str, original_dns_server: Optional[str] = None) -> bool:
         try:
             for proto in ["udp", "tcp"]:
-                self._run_cmd(
-                    [
-                        "iptables",
-                        "-t",
-                        "nat",
-                        "-D",
-                        "OUTPUT",
-                        "-p",
-                        proto,
-                        "--dport",
-                        "53",
-                        "-j",
-                        "REDIRECT",
-                        "--to-ports",
-                        "53",
-                    ]
-                )
-
+                self._run_cmd(["iptables", "-t", "nat", "-D", "OUTPUT", "-p", proto, "--dport", "53", "-j", "REDIRECT", "--to-ports", "53"])
+                
             # Restore IPv6 Router Advertisements
             self._run_cmd(["sysctl", "-w", f"net.ipv6.conf.{interface}.accept_ra=1"])
             self._run_cmd(["sysctl", "-w", "net.ipv6.conf.all.accept_ra=1"])
@@ -90,13 +56,13 @@ class LinuxPlatform(PlatformBase):
         except Exception:
             return False
 
-    def get_original_dns(self, interface: str) -> str | None:
+    def get_original_dns(self, interface: str) -> Optional[str]:
         return "8.8.8.8"
 
-    def get_active_interfaces(self) -> list[str]:
+    def get_active_interfaces(self) -> List[str]:
         return ["eth0", "wlan0"]
 
-    def get_default_gateway(self) -> str | None:
+    def get_default_gateway(self) -> Optional[str]:
         res = self._run_cmd(["ip", "route", "show", "default"])
         if res.stdout:
             parts = res.stdout.split()
@@ -108,25 +74,21 @@ class LinuxPlatform(PlatformBase):
         # Simplistic default for Linux (can be expanded with iwgetid)
         return ""
 
-    def add_firewall_rule(
-        self,
-        rule_name: str,
-        direction: str,
-        action: str,
-        remote_ip: str | None = None,
-        remote_port: int | None = None,
-        protocol: str | None = None,
-        program: str | None = None,
-    ) -> bool:
+    def add_firewall_rule(self, rule_name: str, direction: str, action: str, 
+                          remote_ip: Optional[str] = None, remote_port: Optional[int] = None, 
+                          protocol: Optional[str] = None, program: Optional[str] = None) -> bool:
         chain = "INPUT" if direction == "in" else "OUTPUT"
         target = "DROP" if action == "block" else "ACCEPT"
-
+        
         ips = []
-        ips = [ip.strip() for ip in remote_ip.split(",") if ip.strip()] if remote_ip else [None]
-
+        if remote_ip:
+            ips = [ip.strip() for ip in remote_ip.split(",") if ip.strip()]
+        else:
+            ips = [None]
+            
         success = True
         added_ips = []
-
+        
         for ip in ips:
             cmd = ["iptables", "-A", chain]
             if ip:
@@ -136,19 +98,19 @@ class LinuxPlatform(PlatformBase):
             if remote_port:
                 cmd.extend(["--dport", str(remote_port)])
             cmd.extend(["-j", target])
-
+            
             res = self._run_cmd(cmd)
             if res.returncode == 0:
                 if ip:
                     added_ips.append(ip)
             else:
                 success = False
-
+                
         if rule_name and added_ips:
             if rule_name not in self._iptables_rules:
                 self._iptables_rules[rule_name] = []
             self._iptables_rules[rule_name].extend(added_ips)
-
+            
         return success
 
     def remove_firewall_rule(self, rule_name: str) -> bool:
@@ -163,115 +125,31 @@ class LinuxPlatform(PlatformBase):
         return rule_name in self._iptables_rules
 
     def remove_all_NetStrip_rules(self) -> bool:
-        rules_to_remove = [
-            k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_")
-        ]
+        rules_to_remove = [k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_")]
         for rule in rules_to_remove:
             self.remove_firewall_rule(rule)
         return True
 
     def remove_all_app_block_rules(self) -> bool:
-        rules_to_remove = [
-            k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_AppBlock_")
-        ]
+        rules_to_remove = [k for k in list(self._iptables_rules.keys()) if k.startswith("NetStrip_AppBlock_")]
         for rule in rules_to_remove:
             self.remove_firewall_rule(rule)
         return True
 
     def disable_ipv4(self) -> bool:
-        res1 = self._run_cmd(
-            [
-                "iptables",
-                "-I",
-                "INPUT",
-                "1",
-                "!",
-                "-i",
-                "lo",
-                "-p",
-                "all",
-                "-m",
-                "comment",
-                "--comment",
-                "NetStrip_IPv4_Block",
-                "-j",
-                "DROP",
-            ]
-        )
-        res2 = self._run_cmd(
-            [
-                "iptables",
-                "-I",
-                "OUTPUT",
-                "1",
-                "!",
-                "-o",
-                "lo",
-                "-p",
-                "all",
-                "-m",
-                "comment",
-                "--comment",
-                "NetStrip_IPv4_Block",
-                "-j",
-                "DROP",
-            ]
-        )
+        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
         return res1.returncode == 0 and res2.returncode == 0
 
     def enable_ipv4(self) -> bool:
-        while (
-            self._run_cmd(
-                [
-                    "iptables",
-                    "-D",
-                    "INPUT",
-                    "!",
-                    "-i",
-                    "lo",
-                    "-p",
-                    "all",
-                    "-m",
-                    "comment",
-                    "--comment",
-                    "NetStrip_IPv4_Block",
-                    "-j",
-                    "DROP",
-                ]
-            ).returncode
-            == 0
-        ):
-            pass
-        while (
-            self._run_cmd(
-                [
-                    "iptables",
-                    "-D",
-                    "OUTPUT",
-                    "!",
-                    "-o",
-                    "lo",
-                    "-p",
-                    "all",
-                    "-m",
-                    "comment",
-                    "--comment",
-                    "NetStrip_IPv4_Block",
-                    "-j",
-                    "DROP",
-                ]
-            ).returncode
-            == 0
-        ):
-            pass
+        while self._run_cmd(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
+        while self._run_cmd(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
         return True
 
     def is_ipv4_enabled(self) -> bool:
         return True
 
-    def kill_tcp_connections(
-        self, target_ip: str | None = None, target_process_path: str | None = None
-    ):
+    def kill_tcp_connections(self, target_ip: Optional[str] = None, target_process_path: Optional[str] = None):
         """Forcefully terminate active TCP connections on Linux using ss."""
         try:
             if not target_ip and not target_process_path:
@@ -280,53 +158,32 @@ class LinuxPlatform(PlatformBase):
             else:
                 targets = self._get_target_connections(target_ip, target_process_path)
                 for t in targets:
-                    self._run_cmd(
-                        [
-                            "ss",
-                            "-K",
-                            "src",
-                            t["l_ip"],
-                            "sport",
-                            f"={t['l_port']}",
-                            "dst",
-                            t["r_ip"],
-                            "dport",
-                            f"={t['r_port']}",
-                        ]
-                    )
+                    self._run_cmd(["ss", "-K", "src", t['l_ip'], "sport", f"={t['l_port']}", 
+                                   "dst", t['r_ip'], "dport", f"={t['r_port']}"])
         except Exception as e:
             logger.error(f"Failed to kill TCP connections on Linux: {e}")
 
     def enable_killswitch(self) -> bool:
-        # Absolute ghost mode - block everything unconditionally (v4 AND v6).
+        # Absolute ghost mode - block everything unconditionally
         res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
-        if not (res1 and res2):
-            logger.error("IPv4 killswitch rules failed to install")
-        if not (res3 and res4):
-            logger.error("IPv6 killswitch rules failed to install — possible IPv6 leak path")
         self.kill_tcp_connections()
-        return res1 and res2 and res3 and res4
+        return res1 and res2
 
     def disable_killswitch(self) -> bool:
         res1 = self._run_cmd(["iptables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
         res2 = self._run_cmd(["iptables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
         res3 = self._run_cmd(["ip6tables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
         res4 = self._run_cmd(["ip6tables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
-        if not (res3 and res4):
-            logger.error("IPv6 killswitch rules failed to remove — network may stay blocked")
-        return res1 and res2 and res3 and res4
+        return res1 and res2
 
     def block_lan_traffic(self) -> bool:
         lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         success = True
         for subnet in lan_subnets:
-            if (
-                self._run_cmd(["iptables", "-A", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode
-                != 0
-            ):
+            if self._run_cmd(["iptables", "-A", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode != 0:
                 success = False
         return success
 
@@ -334,22 +191,16 @@ class LinuxPlatform(PlatformBase):
         success = True
         subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         for subnet in subnets:
-            if (
-                self._run_cmd(["iptables", "-D", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode
-                != 0
-            ):
+            if self._run_cmd(["iptables", "-D", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode != 0:
                 success = False
-            if (
-                self._run_cmd(["iptables", "-D", "INPUT", "-s", subnet, "-j", "DROP"]).returncode
-                != 0
-            ):
+            if self._run_cmd(["iptables", "-D", "INPUT", "-s", subnet, "-j", "DROP"]).returncode != 0:
                 success = False
         return success
 
     def lockdown_arp(self, ip: str, mac: str) -> bool:
         res = self._run_cmd(["arp", "-s", ip, mac])
         return res.returncode == 0
-
+        
     def unlock_arp(self, ip: str) -> bool:
         res = self._run_cmd(["arp", "-d", ip])
         return res.returncode == 0
@@ -372,7 +223,7 @@ class LinuxPlatform(PlatformBase):
 
     def is_ipv6_enabled(self) -> bool:
         try:
-            with open("/proc/sys/net/ipv6/conf/all/disable_ipv6") as f:
+            with open("/proc/sys/net/ipv6/conf/all/disable_ipv6", "r") as f:
                 return f.read().strip() == "0"
         except Exception:
             return True
@@ -381,13 +232,12 @@ class LinuxPlatform(PlatformBase):
         if not self.is_admin():
             logger.error("Root privileges required to install systemd service.")
             return False
-
-        import os
+            
         import sys
-
+        import os
         exe_path = os.path.abspath(sys.argv[0])
         service_path = "/etc/systemd/system/netstrip.service"
-
+        
         service_content = f"""[Unit]
 Description=Cripple NetStrip Daemon
 After=network.target
@@ -416,7 +266,7 @@ WantedBy=multi-user.target
         if not self.is_admin():
             logger.error("Root privileges required to uninstall systemd service.")
             return False
-
+            
         service_path = "/etc/systemd/system/netstrip.service"
         try:
             self._run_cmd(["systemctl", "disable", "netstrip.service"])
@@ -431,7 +281,6 @@ WantedBy=multi-user.target
 
     def is_autostart_installed(self) -> bool:
         import os
-
         return os.path.exists("/etc/systemd/system/netstrip.service")
 
     def disable_protocol_bindings(self) -> bool:

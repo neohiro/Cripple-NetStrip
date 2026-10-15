@@ -9,16 +9,14 @@ Supports two modes:
   2. DNS_ONLY mode — Only intercepts DNS queries (UDP port 53) and forwards
      them to NetStrip's internal DNS proxy. All other traffic bypasses.
 """
-
-import contextlib
-import logging
 import os
+import threading
 import select
 import socket
 import struct
-import threading
 import time
-from collections.abc import Callable
+import logging
+from typing import Callable
 
 from netstrip.core.interceptor.base import PacketInterceptor
 
@@ -41,8 +39,7 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
         try:
             from jnius import autoclass
-
-            self.NetStripVpnService = autoclass("org.cripple.netstrip.NetStripVpnService")
+            self.NetStripVpnService = autoclass('org.cripple.netstrip.NetStripVpnService')
         except ImportError:
             self.NetStripVpnService = None
             logger.error("Failed to load NetStripVpnService via pyjnius.")
@@ -103,7 +100,6 @@ class AndroidVPNInterceptor(PacketInterceptor):
         except Exception as e:
             logger.error(f"VPN loop error: {e}")
             import traceback
-
             traceback.print_exc()
 
     def _process_ipv4(self, packet):
@@ -120,41 +116,43 @@ class AndroidVPNInterceptor(PacketInterceptor):
         src_port = 0
         dst_port = 0
         if len(packet) >= ihl + 4:
-            src_port, dst_port = struct.unpack("!HH", packet[ihl : ihl + 4])
+            src_port, dst_port = struct.unpack("!HH", packet[ihl:ihl + 4])
 
-        proto_str = (
-            "tcp" if protocol == PROTO_TCP else "udp" if protocol == PROTO_UDP else str(protocol)
-        )
+        proto_str = "tcp" if protocol == PROTO_TCP else "udp" if protocol == PROTO_UDP else str(protocol)
 
         # DNS queries (UDP port 53) — always intercept and forward to our DNS proxy
         if protocol == PROTO_UDP and dst_port == 53:
-            payload = packet[ihl + 8 :]
+            payload = packet[ihl + 8:]
             response_payload = self._process_dns(payload)
             if response_payload:
                 response_packet = self._build_ipv4_udp_response(packet, response_payload, ihl)
-                with contextlib.suppress(Exception):
+                try:
                     os.write(self._fd, response_packet)
+                except Exception:
+                    pass
             return
 
         # In DNS_ONLY mode, we don't filter non-DNS traffic
         if not self._is_full_mode:
-            with contextlib.suppress(Exception):
+            try:
                 os.write(self._fd, packet)
+            except Exception:
+                pass
             return
 
         # FULL mode: Apply NetStrip filtering via the callback
         # callback returns True if the connection should be ALLOWED
         try:
-            allowed = self.callback(
-                src_ip, src_port, dst_ip, dst_port, proto_str, length=len(packet)
-            )
+            allowed = self.callback(src_ip, src_port, dst_ip, dst_port, proto_str)
         except Exception:
             allowed = True  # Fail-open: allow on error
 
         if allowed:
             # Write the packet back — Android will route it to the internet
-            with contextlib.suppress(Exception):
+            try:
                 os.write(self._fd, packet)
+            except Exception:
+                pass
         # else: silently drop (packet is simply not written back)
 
     def _process_ipv6(self, packet):
@@ -164,8 +162,10 @@ class AndroidVPNInterceptor(PacketInterceptor):
 
         # In DNS_ONLY mode, pass all IPv6 through
         if not self._is_full_mode:
-            with contextlib.suppress(Exception):
+            try:
                 os.write(self._fd, packet)
+            except Exception:
+                pass
             return
 
         # FULL mode: Parse IPv6 header
@@ -177,20 +177,17 @@ class AndroidVPNInterceptor(PacketInterceptor):
         dst_port = 0
         header_len = 40
         if next_header in (PROTO_TCP, PROTO_UDP) and len(packet) >= header_len + 4:
-            src_port, dst_port = struct.unpack("!HH", packet[header_len : header_len + 4])
+            src_port, dst_port = struct.unpack("!HH", packet[header_len:header_len + 4])
 
-        proto_str = (
-            "tcp"
-            if next_header == PROTO_TCP
-            else "udp"
-            if next_header == PROTO_UDP
-            else str(next_header)
-        )
+        proto_str = "tcp" if next_header == PROTO_TCP else "udp" if next_header == PROTO_UDP else str(next_header)
 
         # DNS queries
         if next_header == PROTO_UDP and dst_port == 53:
-            # IPv6 DNS response building is complex; drop and let the client
-            # fall back to IPv4 DNS resolution through our proxy.
+            # For IPv6 DNS, we still forward to our local IPv4 DNS proxy
+            payload = packet[header_len + 8:]
+            response_payload = self._process_dns(payload)
+            # IPv6 DNS response building is complex; for now, just drop and
+            # let it fall back to IPv4 DNS resolution
             return
 
         try:
@@ -199,19 +196,17 @@ class AndroidVPNInterceptor(PacketInterceptor):
             allowed = True
 
         if allowed:
-            with contextlib.suppress(Exception):
+            try:
                 os.write(self._fd, packet)
+            except Exception:
+                pass
 
     def _process_dns(self, payload):
         """Forward a DNS payload to NetStrip's internal DNS proxy and return the response."""
-        # NOTE: must match the port the engine binds on Android (root-less
-        # devices cannot use 53). Single source of truth in dns_proxy.
-        from netstrip.core.dns_proxy import ANDROID_DNS_PORT
-
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(3.0)
-            sock.sendto(payload, ("127.0.0.1", ANDROID_DNS_PORT))
+            sock.sendto(payload, ("127.0.0.1", 5053))
             resp, _ = sock.recvfrom(4096)
             sock.close()
             return resp
@@ -233,27 +228,27 @@ class AndroidVPNInterceptor(PacketInterceptor):
         ip_header[16:20] = dst_ip
 
         # Recalculate IP Checksum
-        ip_header[10:12] = b"\x00\x00"
+        ip_header[10:12] = b'\x00\x00'
         chksum = self._calc_checksum(ip_header)
         ip_header[10:12] = struct.pack("!H", chksum)
 
         # UDP Header — swap ports
-        udp_header = bytearray(req_packet[ihl : ihl + 8])
-        src_port = req_packet[ihl + 2 : ihl + 4]
-        dst_port = req_packet[ihl : ihl + 2]
+        udp_header = bytearray(req_packet[ihl:ihl + 8])
+        src_port = req_packet[ihl + 2:ihl + 4]
+        dst_port = req_packet[ihl:ihl + 2]
         udp_header[0:2] = src_port
         udp_header[2:4] = dst_port
         udp_len = 8 + len(resp_payload)
         udp_header[4:6] = struct.pack("!H", udp_len)
-        udp_header[6:8] = b"\x00\x00"  # Zero checksum (valid for IPv4 UDP)
+        udp_header[6:8] = b'\x00\x00'  # Zero checksum (valid for IPv4 UDP)
 
         return bytes(ip_header) + bytes(udp_header) + resp_payload
 
     def _calc_checksum(self, data):
         """Calculate IP header checksum."""
         if len(data) % 2 == 1:
-            data += b"\0"
+            data += b'\0'
         s = sum(struct.unpack("!%dH" % (len(data) // 2), data))
-        s = (s >> 16) + (s & 0xFFFF)
+        s = (s >> 16) + (s & 0xffff)
         s += s >> 16
-        return (~s) & 0xFFFF
+        return (~s) & 0xffff

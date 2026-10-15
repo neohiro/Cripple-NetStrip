@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <img src="assets/cripple_logo.png" alt="Cripple Logo" width="200"/>
 
   # NetStrip  —  Cripple
@@ -8,11 +8,7 @@
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
   [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-lightgray.svg)](https://github.com/)
   [![License: Custom EULA](https://img.shields.io/badge/license-Custom%20EULA-red.svg)](LICENSE.md)
-  [![Build Status](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/release.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions)
-[![CodeQL](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/codeql.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/codeql.yml)
-[![Android Gate](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/android.yml/badge.svg)](https://github.com/neohiro/Cripple-NetStrip/actions/workflows/android.yml)
-
-  > **Compatibility :** Cripple is designed to work seamlessly alongside your existing network and security tools—including dnscrypt-proxy, torifier, YogaDNS, NextDNS, AVG and other antivirus & VPN programs. It intelligently detects local proxies and security suites to operate cooperatively without creating network conflicts or infinite DNS loops.
+    > **Compatibility :** Cripple is designed to work seamlessly alongside your existing network and security tools—including dnscrypt-proxy, torifier, YogaDNS, NextDNS, AVG and other antivirus & VPN programs. It intelligently detects local proxies and security suites to operate cooperatively without creating network conflicts or infinite DNS loops.
 </div>
 
 ---
@@ -301,28 +297,19 @@ Cripple is engineered to align with two major cybersecurity standards:
 
 | Optimization | Effect |
 |---|---|
-| Adaptive polling | 250ms dashboard refresh when visible, 1000ms sidebar, 2000ms headless |
+| Adaptive polling | 250ms refresh when GUI visible, 2000ms when headless |
 | View caching | Tab swaps in O(1) via `grid_remove()`, never destroyed |
 | Lazy preloading | Tabs pre-instantiated at 300ms intervals for zero-delay switching |
 | Debounced resize | Batched window resize events prevent layout thrashing |
 | Flicker-free dashboard | Pre-allocated widget pool with in-place `configure()` updates |
-| User-configurable scroll speed | Slow / Normal / Fast / Ultra presets applied live to all scrollers |
-| Connection-monitor cadence | 1 Hz desktop / 2 Hz headless psutil enumeration (was 5 Hz) — ~80% less monitoring CPU, zero blocking-latency cost |
-| Async app icons | First paint uses instant glyphs; real icons resolve off the UI thread |
+| 15x scroll speed | Framework-level mouse wheel patching |
 
 ---
 
 ## 📖 Getting Started
 
 ### Option 1: Download (Recommended)
-Grab your platform download from [Releases](https://github.com/neohiro/Cripple-NetStrip/releases):
-
-| OS | Download |
-|----|----------|
-| Windows | `NetStrip-Setup-*.exe` (single installer — verifies itself against SHA256SUMS during self-update) |
-| Linux / macOS / Android | `NetStrip-*-<OS>.zip` (native build) |
-
-Run as Administrator/sudo. No Python required.
+Grab the pre-compiled binary from [Releases](https://github.com/neohiro/Cripple-NetStrip/releases). Run as Administrator/sudo. No Python required.
 
 ### Option 2: Run from Source
 ```bash
@@ -444,21 +431,6 @@ pip install -r requirements.txt
 
 ---
 
-
-## 🌍 Supported Languages
-
-The interface ships in **26 languages** — including hovertips — with automatic
-OS detection and a picker under *Settings → General → Language*:
-
-English · Español · Deutsch · Français · Italiano · Português · Nederlands ·
-Polski · Türkçe · Русский · Українська · 日本語 · 한국어 · 简体中文 · 繁體中文 ·
-हिन्दी · Bahasa Indonesia · Tiếng Việt · العربية · Svenska · Dansk · Suomi ·
-Čeština · Ελληνικά · Magyar · Română
-
-Missing strings gracefully fall back to English. Contribute a catalog by
-adding `netstrip/locales/<code>.json` (see `scripts/build_locales.py`); CI
-enforces key parity automatically.
-
 ## 🙏 Credits
 
 **Core Technologies:**  
@@ -472,16 +444,3 @@ enforces key parity automatically.
 ## 📄 License
 
 Copyright © 2026 FrenzyPenguin Media — All rights reserved. Free for personal, non-commercial use. Redistribution and modification are not permitted without written permission. See [LICENSE.md](LICENSE.md) for the full terms.
-
----
-
-<div align="center">
-  </a>
-</div>
-
-<p align="center">
-  <a href="https://github.com/sponsors/neohiro"><img src="https://img.shields.io/badge/Sponsor%20on%20GitHub-%E2%9D%A4-EA4AAA?logo=githubsponsors&style=for-the-badge" alt="GitHub Sponsors"></a>&nbsp;&nbsp;
-  <a href="https://www.patreon.com/frenzypenguin_media"><img src="https://img.shields.io/badge/Patreon-frenzypenguin__media-F96854?logo=patreon&style=for-the-badge" alt="Support on Patreon"></a>
-</p>
-
-[![Visitors](https://api.visitorbadge.io/api/visitors?path=github.com%2Fneohiro%2FCripple-NetStrip&label=Visitors&countColor=%23263759)](https://visitorbadge.io/status?path=github.com%2Fneohiro%2FCripple-NetStrip)

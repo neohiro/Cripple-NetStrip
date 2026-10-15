@@ -1,13 +1,5 @@
-from .blocklists import BlocklistView
-from .connections import ConnectionsView
-from .logs import LogView
 from .rules import AppRulesView
+from .blocklists import BlocklistView
+from .logs import LogView
 from .settings import SettingsView
-
-__all__ = [
-    "AppRulesView",
-    "BlocklistView",
-    "ConnectionsView",
-    "LogView",
-    "SettingsView",
-]
+from .connections import ConnectionsView

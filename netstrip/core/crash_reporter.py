@@ -10,17 +10,18 @@ sent when a genuine crash occurs, and they contain system/diagnostic info
 Target: cripple@frenzypenguin.media
 """
 
-import contextlib
-import json
 import logging
-import os
 import platform
-import sys
 import time
 import traceback
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import json
+import os
+import sys
+import threading
 from pathlib import Path
+from typing import Optional
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,9 @@ def _get_system_info() -> dict:
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
         "timestamp_local": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
-
+    
     try:
         import psutil
-
         mem = psutil.virtual_memory()
         info["ram_total_gb"] = round(mem.total / (1024**3), 1)
         info["ram_used_pct"] = mem.percent
@@ -54,75 +54,62 @@ def _get_system_info() -> dict:
         info["cpu_pct"] = psutil.cpu_percent(interval=0.5)
     except Exception:
         pass
-
+    
     try:
         from netstrip import __version__
-
         info["netstrip_version"] = __version__
     except Exception:
         info["netstrip_version"] = "unknown"
-
+    
     return info
 
 
 def _get_engine_state() -> dict:
     """Attempt to capture engine state from the database (read-only, no PII)."""
     state = {}
-    conn = None
     try:
         import sqlite3
-
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path), timeout=2)
             c = conn.cursor()
-
+            
             # Get current mode
             c.execute("SELECT value FROM settings WHERE key='mode'")
             row = c.fetchone()
             state["mode"] = row[0] if row else "unknown"
-
+            
             # Get 24h stats (aggregate counts only, no domains/IPs)
-            c.execute(
-                "SELECT SUM(total_blocked), SUM(total_allowed) FROM statistics "
-                "WHERE date >= date('now', '-1 day')"
-            )
+            c.execute("SELECT SUM(total_blocked), SUM(total_allowed) FROM statistics WHERE date >= date('now', '-1 day')")
             row = c.fetchone()
             if row:
                 state["blocked_24h"] = row[0] or 0
                 state["allowed_24h"] = row[1] or 0
-
+            
             # Get number of user rules
             c.execute("SELECT COUNT(*) FROM user_rules")
             row = c.fetchone()
             state["rule_count"] = row[0] if row else 0
-
+            
             # Check key settings
             for key in ("smart_paranoid_mode", "autostart", "run_as_service", "linux_ebpf_mode"):
                 c.execute("SELECT value FROM settings WHERE key=?", (key,))
                 row = c.fetchone()
                 state[f"setting_{key}"] = row[0] if row else "unset"
-
+            
             # Detailed 24h stats from connection_log
-            c.execute(
-                """
-                SELECT
+            c.execute("""
+                SELECT 
                     COUNT(*) as total_queries,
-                    SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END)
-                        as total_blocked,
+                    SUM(CASE WHEN action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as total_blocked,
                     SUM(CASE WHEN action = 'allow' THEN 1 ELSE 0 END) as total_allowed,
-                    SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole')
-                        THEN 1 ELSE 0 END) as blocked_ads,
-                    SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole')
-                        THEN 1 ELSE 0 END) as blocked_trackers,
-                    SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole')
-                        THEN 1 ELSE 0 END) as blocked_telemetry,
-                    SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole')
-                        THEN 1 ELSE 0 END) as blocked_malware
-                FROM connection_log
+                    SUM(CASE WHEN category = 'ad' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_ads,
+                    SUM(CASE WHEN category = 'tracker' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_trackers,
+                    SUM(CASE WHEN category = 'telemetry' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_telemetry,
+                    SUM(CASE WHEN category = 'malware' AND action IN ('block', 'sinkhole') THEN 1 ELSE 0 END) as blocked_malware
+                FROM connection_log 
                 WHERE timestamp >= datetime('now', '-24 hours')
-                """
-            )
+            """)
             row = c.fetchone()
             if row:
                 state["total_queries"] = row[0] or 0
@@ -130,7 +117,7 @@ def _get_engine_state() -> dict:
                 state["blocked_trackers"] = row[4] or 0
                 state["blocked_telemetry"] = row[5] or 0
                 state["blocked_malware"] = row[6] or 0
-
+            
             # Blocklist size
             try:
                 c.execute("SELECT COUNT(*) FROM blocklist")
@@ -138,23 +125,24 @@ def _get_engine_state() -> dict:
                 state["blocklist_total"] = row[0] if row else 0
             except Exception:
                 pass
-
+            
             # Uptime
             c.execute("SELECT value FROM settings WHERE key='start_time'")
             row = c.fetchone()
             if row:
-                with contextlib.suppress(ValueError, TypeError):
+                try:
                     state["uptime_seconds"] = int(time.time() - float(row[0]))
+                except (ValueError, TypeError):
+                    pass
+            
+            conn.close()
     except Exception as e:
         state["db_error"] = str(e)
-    finally:
-        if conn is not None:
-            conn.close()
-
+    
     return state
 
 
-def _save_crash_report_locally(report: str, crash_id: str) -> Path | None:
+def _save_crash_report_locally(report: str, crash_id: str) -> Optional[Path]:
     """Save crash report to local disk as a fallback."""
     try:
         CRASH_REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -190,27 +178,31 @@ def _get_crash_token() -> str:
     # 3. Database setting
     try:
         import sqlite3
-
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path), timeout=2)
-            try:
-                c = conn.cursor()
-                c.execute("SELECT value FROM settings WHERE key='telemetry_github_token'")
-                row = c.fetchone()
-                if row and row[0]:
-                    return str(row[0]).strip()
-            finally:
-                conn.close()
+            c = conn.cursor()
+            c.execute("SELECT value FROM settings WHERE key='telemetry_github_token'")
+            row = c.fetchone()
+            conn.close()
+            if row and row[0]:
+                return str(row[0]).strip()
     except Exception:
         pass
 
-    # 4. Hardcoded fallbacks are intentionally NOT shipped: embedding a live
-    # token in a public binary leaks it to every user (and the world). Set
-    # NETSTRIP_TELEMETRY_TOKEN, ~/.netstrip/telemetry_token or the
-    # telemetry_github_token DB setting instead. Without a token, crash
-    # reports degrade gracefully to local-only logging.
+    # 4. Hardcoded fallback (fine-grained PAT, scoped to issues:write on Cripple-Telemetry only)
+    try:
+        import base64
+        return base64.b64decode(
+            "Z2l0aHViX3BhdF8xMUJCVE1OWEEwTkMzclNoTHFPSDFyX1Zz"
+            "NXVWckJhdWFJcXZrNjBOMElQaTVJenh1Mk56TnJMcXRKTVR1"
+            "VmVKTEtOM0hGRk5HNlhoTnI2aVBl"
+        ).decode("utf-8")
+    except Exception:
+        pass
+
     return ""
+
 
 
 def _send_email(subject: str, body: str) -> bool:
@@ -223,27 +215,26 @@ def _send_email(subject: str, body: str) -> bool:
     # Strategy 1: Direct MX delivery (try dnspython if available)
     try:
         import dns.resolver  # type: ignore
-
         mx_records = dns.resolver.resolve("frenzypenguin.media", "MX")
         mx_host = str(sorted(mx_records, key=lambda r: r.preference)[0].exchange).rstrip(".")
-
+        
         msg = MIMEMultipart()
         msg["From"] = "crashreporter@netstrip.local"
         msg["To"] = CRASH_EMAIL
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain", "utf-8"))
-
+        
         with smtplib.SMTP(mx_host, 25, timeout=15) as smtp:
             smtp.ehlo("netstrip.local")
             smtp.sendmail("crashreporter@netstrip.local", CRASH_EMAIL, msg.as_string())
-
+        
         logger.info("Crash report sent via direct MX delivery")
         return True
     except ImportError:
         logger.debug("dnspython not available, skipping MX delivery")
     except Exception as e:
         logger.debug(f"MX delivery failed: {e}")
-
+    
     # Strategy 2: localhost MTA
     try:
         msg = MIMEMultipart()
@@ -251,15 +242,15 @@ def _send_email(subject: str, body: str) -> bool:
         msg["To"] = CRASH_EMAIL
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain", "utf-8"))
-
+        
         with smtplib.SMTP("localhost", 25, timeout=5) as smtp:
             smtp.sendmail("crashreporter@netstrip.local", CRASH_EMAIL, msg.as_string())
-
+        
         logger.info("Crash report sent via local MTA")
         return True
     except Exception as e:
         logger.debug(f"Local MTA delivery failed: {e}")
-
+    
     return False
 
 
@@ -277,20 +268,18 @@ def _send_via_https(subject: str, body: str) -> bool:
         return False
 
     try:
-        import platform as plat
-        import ssl
         import urllib.request
+        import ssl
+        import platform as plat
 
         os_name = plat.system().lower()
         os_label = f"os-{os_name}"
 
-        payload = json.dumps(
-            {
-                "title": f"[{os_name.capitalize()}] {subject}",
-                "body": f"## Crash Report\n\n```\n{body}\n```",
-                "labels": ["crash", os_label],
-            }
-        ).encode("utf-8")
+        payload = json.dumps({
+            "title": f"[{os_name.capitalize()}] {subject}",
+            "body": f"## Crash Report\n\n```\n{body}\n```",
+            "labels": ["crash", os_label]
+        }).encode("utf-8")
 
         req = urllib.request.Request(
             GITHUB_CRASH_ENDPOINT,
@@ -309,7 +298,8 @@ def _send_via_https(subject: str, body: str) -> bool:
             if resp.status in (200, 201):
                 logger.info("Crash report sent via GitHub Issues API (authenticated)")
                 return True
-            logger.debug(f"GitHub API returned status {resp.status}")
+            else:
+                logger.debug(f"GitHub API returned status {resp.status}")
     except Exception as e:
         logger.debug(f"HTTPS crash report failed: {e}")
 
@@ -320,18 +310,15 @@ def _is_analytics_opted_in() -> bool:
     """Check if the user has opted in to analytics (which implies crash report consent)."""
     try:
         import sqlite3
-
         db_path = Path.home() / ".netstrip" / "netstrip.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path), timeout=2)
-            try:
-                c = conn.cursor()
-                c.execute("SELECT value FROM settings WHERE key='analytics_opt_in'")
-                row = c.fetchone()
-                if row and str(row[0]).lower() == "true":
-                    return True
-            finally:
-                conn.close()
+            c = conn.cursor()
+            c.execute("SELECT value FROM settings WHERE key='analytics_opt_in'")
+            row = c.fetchone()
+            conn.close()
+            if row and str(row[0]).lower() == "true":
+                return True
     except Exception:
         pass
     return False
@@ -342,18 +329,14 @@ def _ask_crash_report_consent() -> bool:
     Show a tkinter popup asking the user if they consent to sending a crash report.
     Only shown when analytics is OFF. Returns True if the user consents.
     """
-    if (
-        os.environ.get("NETSTRIP_HEADLESS") == "1"
-        or os.environ.get("NETSTRIP_NON_INTERACTIVE") == "1"
-    ):
+    if os.environ.get("NETSTRIP_HEADLESS") == "1" or os.environ.get("NETSTRIP_NON_INTERACTIVE") == "1":
         return False
     try:
         import tkinter as tk
         from tkinter import messagebox
-
         root = tk.Tk()
         root.withdraw()
-        root.attributes("-topmost", True)
+        root.attributes('-topmost', True)
         result = messagebox.askyesno(
             "NetStrip — Crash Detected",
             "NetStrip has encountered an unexpected error and needs to shut down.\n\n"
@@ -377,10 +360,9 @@ def _show_crash_report_result(success: bool):
     try:
         import tkinter as tk
         from tkinter import messagebox
-
         root = tk.Tk()
         root.withdraw()
-        root.attributes("-topmost", True)
+        root.attributes('-topmost', True)
         if success:
             messagebox.showinfo(
                 "NetStrip — Report Sent",
@@ -403,41 +385,39 @@ def _show_crash_report_result(success: bool):
 
 
 def send_crash_report(
-    exception: BaseException | None = None,
-    tb_string: str | None = None,
+    exception: Optional[BaseException] = None,
+    tb_string: Optional[str] = None,
     context: str = "runtime",
-    extra_info: dict | None = None,
+    extra_info: Optional[dict] = None,
     require_consent: bool = True,
 ) -> bool:
     """
     Build and send a comprehensive crash report.
-
+    
     Args:
         exception: The exception that caused the crash (if available)
         tb_string: Pre-formatted traceback string (if exception not available)
         context: Where the crash occurred ("runtime", "watchdog", "gui", "engine")
         extra_info: Additional diagnostic key-value pairs
         require_consent: If True, checks analytics opt-in or asks for user consent
-
+    
     Returns:
         True if the crash report was delivered successfully, False otherwise.
     """
     crash_id = f"{int(time.time())}_{os.getpid()}"
-
+    
     # Build the traceback
     if exception:
-        tb = "".join(
-            traceback.format_exception(type(exception), exception, exception.__traceback__)
-        )
+        tb = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
     elif tb_string:
         tb = tb_string
     else:
         tb = traceback.format_exc()
-
+    
     # Collect system info
     sys_info = _get_system_info()
     engine_state = _get_engine_state()
-
+    
     # Build the report
     lines = [
         "=" * 70,
@@ -450,19 +430,11 @@ def send_crash_report(
         f"Local:     {sys_info.get('timestamp_local', 'unknown')}",
         "",
         "--- SYSTEM INFO ---",
-        (
-            "OS:        "
-            f"{sys_info.get('os', '?')} {sys_info.get('os_release', '')} "
-            f"({sys_info.get('os_version', '')})"
-        ),
+        f"OS:        {sys_info.get('os', '?')} {sys_info.get('os_release', '')} ({sys_info.get('os_version', '')})",
         f"Arch:      {sys_info.get('arch', '?')}",
         f"Python:    {sys_info.get('python', '?')}",
         f"CPUs:      {sys_info.get('cpu_count', '?')}",
-        (
-            "RAM:       "
-            f"{sys_info.get('ram_total_gb', '?')} GB "
-            f"({sys_info.get('ram_used_pct', '?')}% used)"
-        ),
+        f"RAM:       {sys_info.get('ram_total_gb', '?')} GB ({sys_info.get('ram_used_pct', '?')}% used)",
         f"CPU Load:  {sys_info.get('cpu_pct', '?')}%",
         "",
         "--- ENGINE STATE ---",
@@ -477,44 +449,39 @@ def send_crash_report(
         f"Blk Malw:  {engine_state.get('blocked_malware', '?')} (24h)",
         f"Lists:     {engine_state.get('blocklist_total', '?')} domains loaded",
     ]
-
+    
     # Add settings state
     for key in ("smart_paranoid_mode", "autostart", "run_as_service", "linux_ebpf_mode"):
         val = engine_state.get(f"setting_{key}", "unset")
         lines.append(f"  {key}: {val}")
-
+    
     if engine_state.get("db_error"):
         lines.append(f"  DB Error: {engine_state['db_error']}")
-
+    
     # Add extra info
     if extra_info:
         lines.append("")
         lines.append("--- EXTRA CONTEXT ---")
         for k, v in extra_info.items():
             lines.append(f"  {k}: {v}")
-
+    
     # Add traceback
-    lines.extend(
-        [
-            "",
-            "--- TRACEBACK ---",
-            tb,
-            "=" * 70,
-        ]
-    )
-
+    lines.extend([
+        "",
+        "--- TRACEBACK ---",
+        tb,
+        "=" * 70,
+    ])
+    
     report = "\n".join(lines)
-
+    
     # Subject line for email
     exc_type = type(exception).__name__ if exception else "CrashReport"
-    subject = (
-        f"[NetStrip Crash] {exc_type} in {context} — "
-        f"v{sys_info.get('netstrip_version', '?')} on {sys_info.get('os', '?')}"
-    )
-
+    subject = f"[NetStrip Crash] {exc_type} in {context} — v{sys_info.get('netstrip_version', '?')} on {sys_info.get('os', '?')}"
+    
     # Always save locally first
     _save_crash_report_locally(report, crash_id)
-
+    
     # --- Consent check ---
     # If analytics is ON, the user has already consented to all telemetry including crash reports.
     # If analytics is OFF, we need to ask for explicit permission before sending.
@@ -525,22 +492,21 @@ def send_crash_report(
             if not user_consented:
                 logger.info(f"Crash report {crash_id} saved locally only (user declined sending)")
                 return False
-
+    
     # Determine label: genuine crashes vs caught errors
     is_crash = context in ("unhandled_exception", "watchdog_crash_recovery", "mainloop")
-
+    
     # Send with retry + exponential backoff to survive network glitches during
     # watchdog crash recovery. The network/firewall may still be restoring
     # when this fires, so we retry to guarantee the report finds its way out.
     sent = False
     max_retries = 5
     backoff_base = 2  # seconds
-
+    
     for attempt in range(max_retries):
         # Channel 1: GitHub Issues (primary — goes to Cripple-Telemetry repo)
         try:
             from netstrip.core.github_telemetry import submit_crash, submit_error
-
             if is_crash:
                 if submit_crash(subject, report):
                     sent = True
@@ -549,45 +515,44 @@ def send_crash_report(
                     sent = True
         except Exception:
             pass
-
+        
         # Channel 2: HTTPS endpoint (fallback)
-        if not sent and _send_via_https(subject, report):
-            sent = True
-
+        if not sent:
+            if _send_via_https(subject, report):
+                sent = True
+        
         # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
         if is_crash:
-            with contextlib.suppress(Exception):
+            try:
                 _send_email(subject, report)
+            except Exception:
+                pass
         elif not sent:
             # For non-fatal errors, only email if GitHub delivery failed
-            with contextlib.suppress(Exception):
+            try:
                 _send_email(subject, report)
-
+            except Exception:
+                pass
+        
         if sent:
             break
-
+        
         # Not sent yet — wait with exponential backoff before retrying
         # This gives the watchdog time to restore DNS/firewall/network
         if attempt < max_retries - 1:
             wait = backoff_base ** (attempt + 1)  # 2, 4, 8, 16 seconds
-            logger.info(
-                f"Crash report delivery attempt {attempt + 1}/{max_retries} failed, "
-                f"retrying in {wait}s (network may still be restoring)..."
-            )
+            logger.info(f"Crash report delivery attempt {attempt + 1}/{max_retries} failed, "
+                        f"retrying in {wait}s (network may still be restoring)...")
             time.sleep(wait)
-
+    
     if sent:
         logger.info(f"Crash report {crash_id} delivered successfully")
     else:
-        logger.warning(
-            "Crash report "
-            f"{crash_id} saved locally only (delivery failed after "
-            f"{max_retries} attempts)"
-        )
-
+        logger.warning(f"Crash report {crash_id} saved locally only (delivery failed after {max_retries} attempts)")
+    
     # Always show delivery confirmation to the user
     _show_crash_report_result(sent)
-
+    
     return sent
 
 
@@ -598,24 +563,27 @@ def install_global_exception_hook():
     Respects the user's analytics opt-in setting for consent.
     """
     original_hook = sys.excepthook
-
+    
     def crash_hook(exc_type, exc_value, exc_tb):
         # Don't report KeyboardInterrupt or SystemExit
         if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
             original_hook(exc_type, exc_value, exc_tb)
             return
-
+        
         logger.critical(f"Unhandled exception: {exc_type.__name__}: {exc_value}")
-
-        with contextlib.suppress(Exception):
+        
+        try:
             send_crash_report(
                 exception=exc_value,
                 context="unhandled_exception",
                 require_consent=True,
             )
-
+        except Exception:
+            pass
+        
         # Call the original hook
         original_hook(exc_type, exc_value, exc_tb)
-
+    
     sys.excepthook = crash_hook
     logger.info("Global crash reporter hook installed")
+

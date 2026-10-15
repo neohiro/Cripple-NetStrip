@@ -15,7 +15,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,md,txt,db,yml
 
 # (str) Application versioning
-version = 3.8.9
+version = 3.6.8
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
@@ -50,13 +50,6 @@ android.extra_manifest_application = extra_manifest_app.xml
 
 # (bool) If True, then automatically accept SDK license
 android.accept_sdk_license = True
-
-# (intentionally pinned) NDK r28c clang dropped the GNUC compatibility macros
-# glibc host headers rely on, which breaks Kivy/SDL2 C extensions; unpinned
-# python-for-android also drifted onto Python 3.14 snapshots. This exact pair
-# cross-compiles cleanly.
-android.ndk = 25b
-p4a.branch = v2024.01.21
 
 # (str) Android entry point, default is ok for Kivy-based app
 android.entrypoint = android_main.py

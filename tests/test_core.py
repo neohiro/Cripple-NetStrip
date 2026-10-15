@@ -1,8 +1,10 @@
+import pytest
+import sys
+import os
 
 def test_version():
-    import re
-
     from netstrip import __version__
+    import re
     assert re.match(r'^\d+\.\d+\.\d+$', __version__) is not None
 
 def test_engine_import():
@@ -14,7 +16,7 @@ def test_classifier_import():
     assert TrafficClassifier is not None
 
 def test_dns_proxy_import():
-    from netstrip.core.dns_proxy import DOH_PROVIDERS
+    from netstrip.core.dns_proxy import DNSProxyService, DOH_PROVIDERS
     assert len(DOH_PROVIDERS) > 0
 
 def test_mac_randomizer_import():
@@ -22,7 +24,7 @@ def test_mac_randomizer_import():
     assert MACRandomizer.is_supported() in (True, False)
 
 def test_geoip_import():
-    from netstrip.core.geoip import GeoIPService
+    from netstrip.core.geoip import GeoIPService, OfflineGeoIP
     assert GeoIPService is not None
 
 def test_updater_import():
