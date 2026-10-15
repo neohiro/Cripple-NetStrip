@@ -1,0 +1,2 @@
+# IP Blacklist (Known Malicious/C&C IPs)
+# Add IPs here one per line. They will be blocked unconditionally.

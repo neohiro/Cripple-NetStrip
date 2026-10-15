@@ -1,0 +1,341 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., 3.2.0)'
+        required: false
+        type: string
+      platforms:
+        description: 'Comma-separated platforms to build'
+        required: false
+        default: 'windows,linux,macos,android'
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  PYTHON_VERSION: '3.11'
+  PIP_CACHE_DIR: ~/.cache/pip
+
+jobs:
+  # ──────────────────────────────────────────────
+  #  Lint & Type Check (Fast, runs on all PRs)
+  # ──────────────────────────────────────────────
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # For version detection
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install lint deps
+        run: |
+          pip install -q --upgrade pip
+          pip install -q flake8 mypy types-requests types-psutil types-cryptography
+
+      - name: Lint (flake8)
+        run: |
+          flake8 netstrip/ main.py --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 netstrip/ main.py --count --exit-zero --max-complexity=15 --statistics
+
+      - name: Type check (mypy)
+        run: |
+          mypy netstrip/ --ignore-missing-imports --no-error-summary --show-error-codes || true
+
+      - name: Syntax check
+        run: python -m compileall -q main.py netstrip/
+
+  # ──────────────────────────────────────────────
+  #  Unit Tests (Runs on all PRs, matrix)
+  # ──────────────────────────────────────────────
+  test:
+    name: Test on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            python: '3.11'
+            deps: 'python3-tk libssl-dev libffi-dev python3-dev'
+          - os: windows-latest
+            name: Windows
+            python: '3.11'
+            deps: ''
+          - os: macos-latest
+            name: macOS
+            python: '3.11'
+            deps: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install system deps (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y ${{ matrix.deps }}
+
+      - name: Install Python deps
+        run: |
+          pip install -q --upgrade pip
+          pip install -q --retries 3 --timeout 60 -r requirements.txt
+          pip install -q pytest pytest-timeout pytest-cov pytest-mock
+          pip install -e .
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --timeout=30 --tb=short -q --cov=netstrip --cov-report=term-missing --cov-fail-under=50
+
+      - name: Verify imports
+        run: |
+          python -c "import netstrip; print(f'NetStrip v{netstrip.__version__} imported successfully')"
+          python -c "from netstrip.core.engine import NetStripEngine; print('Engine module OK')"
+          python -c "from netstrip.core.classifier import TrafficClassifier; print('Classifier module OK')"
+          python -c "from netstrip.core.dns_proxy import DNSProxyService; print('DNS Proxy OK')"
+          python -c "from netstrip.core.geoip import GeoIPService; print('GeoIP OK')"
+          python -c "from netstrip.core.mac_randomizer import MACRandomizer; print('MAC Randomizer OK')"
+          python -c "from netstrip.core.updater import BlocklistUpdater; print('Updater OK')"
+          python -c "from netstrip.data.async_database import AsyncDatabase; print('AsyncDB OK')"
+          python -c "from netstrip.core.observability import get_logger, init_otel; print('Observability OK')"
+
+  # ──────────────────────────────────────────────
+  #  Build Matrix (Cross-platform binaries)
+  # ──────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    needs: [lint, test]
+    if: github.event_name == 'push' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows
+          - platform: windows
+            os: windows-latest
+            python: '3.11'
+            build_script: build.bat
+            artifact_name: NetStrip-${{ env.VERSION }}-Windows
+            asset_pattern: 'dist/Cripple/**'
+            zip_cmd: Compress-Archive -Path "dist/Cripple/*" -DestinationPath "NetStrip-${{ env.VERSION }}-Windows.zip" -Force
+            
+          # Linux (AppImage + portable)
+          - platform: linux
+            os: ubuntu-latest
+            python: '3.11'
+            build_script: build.sh
+            artifact_name: NetStrip-${{ env.VERSION }}-Linux
+            asset_pattern: 'dist/**'
+            zip_cmd: |
+              cd dist && zip -r ../NetStrip-${{ env.VERSION }}-Linux.zip * && cd ..
+            
+          # macOS (DMG + portable)
+          - platform: macos
+            os: macos-latest
+            python: '3.11'
+            build_script: build.sh
+            artifact_name: NetStrip-${{ env.VERSION }}-macOS
+            asset_pattern: 'dist/**'
+            zip_cmd: |
+              cd dist && zip -r ../NetStrip-${{ env.VERSION }}-macOS.zip * && cd ..
+            
+          # Android (APK via Buildozer)
+          - platform: android
+            os: ubuntu-latest
+            python: '3.11'
+            build_script: buildozer android debug
+            artifact_name: NetStrip-${{ env.VERSION }}-Android
+            asset_pattern: 'bin/*.apk'
+            zip_cmd: |
+              mkdir -p artifacts
+              mv bin/*.apk artifacts/NetStrip-${{ env.VERSION }}-Android.apk
+              cd artifacts && zip ../NetStrip-${{ env.VERSION }}-Android.zip NetStrip-${{ env.VERSION }}-Android.apk && cd ..
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y \
+            python3-tk build-essential libssl-dev libffi-dev python3-dev \
+            openjdk-17-jdk-headless zip unzip autoconf libtool pkg-config \
+            zlib1g-dev libncurses-dev cmake git curl wget \
+            libc6-dev-i386 libstdc++6 libgcc-s1
+          # Android SDK/NDK for Buildozer
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            sudo apt-get install -qq -y \
+              libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+              libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+              libfreetype6-dev libjpeg-dev libpng-dev libssl-dev
+            # Setup Buildozer deps
+            pip install -q --retries 3 cython==0.29.36 virtualenv
+          fi
+
+      - name: Install Python dependencies
+        run: |
+          pip install -q --upgrade pip
+          pip install -q --retries 3 --timeout 120 -r requirements.txt
+          pip install -q pyinstaller
+          pip install -e .
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
+            echo "VERSION=v$VERSION" >> $GITHUB_ENV
+          fi
+          echo "Using version: ${{ env.VERSION }}"
+
+      - name: Build ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Building for ${{ matrix.platform }}..."
+          
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            cmd.exe /c ${{ matrix.build_script }}
+          elif [ "${{ matrix.platform }}" = "android" ]; then
+            export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+            export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+            export ANDROID_NDK_HOME=$HOME/.buildozer/android/platform/android-ndk
+            yes | buildozer android debug 2>&1 | tee build.log
+          else
+            chmod +x ${{ matrix.build_script }}
+            ./${{ matrix.build_script }} 2>&1 | tee build.log
+          fi
+          
+          # Verify build output
+          if [ ! -d "dist" ] && [ "${{ matrix.platform }}" != "android" ]; then
+            echo "ERROR: dist/ directory not found"
+            exit 1
+          fi
+          if [ "${{ matrix.platform }}" = "android" ] && [ ! -f "bin/NetStrip-${{ env.VERSION }}-Android.apk" ] && [ ! -f "bin/*.apk" ]; then
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+
+      - name: Package artifact
+        if: success()
+        shell: bash
+        run: |
+          ${{ matrix.zip_cmd }}
+          ls -la NetStrip-${{ env.VERSION }}-${{ matrix.platform }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-build
+          path: NetStrip-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload build logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-build-logs
+          path: build.log
+          retention-days: 3
+
+  # ──────────────────────────────────────────────
+  #  Release (Create GitHub Release with assets)
+  # ──────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+          pattern: NetStrip-*.zip
+
+      - name: List artifacts
+        run: |
+          ls -la artifacts/
+          echo "Total: $(ls artifacts/ | wc -l) files"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
+            echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create/Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: NetStrip ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: artifacts/NetStrip-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to PyPI (optional)
+        if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          password: ${{ secrets.PYPI_API_TOKEN }}

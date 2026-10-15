@@ -1,0 +1,9 @@
+<service
+    android:name="org.cripple.netstrip.NetStripVpnService"
+    android:permission="android.permission.BIND_VPN_SERVICE"
+    android:exported="false"
+    android:foregroundServiceType="specialUse">
+    <intent-filter>
+        <action android:name="android.net.VpnService" />
+    </intent-filter>
+</service>
