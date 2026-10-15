@@ -4,15 +4,14 @@ High-performance SQLite with aiosqlite, dedicated event loop, and batch writes.
 """
 
 import asyncio
-import aiosqlite
 import json
-import time
 import threading
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
-from contextlib import asynccontextmanager
-from queue import Queue, Empty
-import logging
+import time
+from datetime import datetime, timezone
+from queue import Empty, Queue
+from typing import Any
+
+import aiosqlite
 
 from netstrip.core.observability import get_logger, traced
 
@@ -29,7 +28,7 @@ class AsyncDatabase:
     - Graceful shutdown with flush
     """
     
-    def __init__(self, db_path: str = None, batch_size: int = 100, flush_interval: float = 0.1):
+    def __init__(self, db_path: str | None = None, batch_size: int = 100, flush_interval: float = 0.1):
         if db_path is None:
             import os
             home = os.path.expanduser("~")
@@ -45,8 +44,8 @@ class AsyncDatabase:
         self._write_queue: Queue = Queue()
         
         # Event loop management
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._loop_thread: Optional[threading.Thread] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._loop_thread: threading.Thread | None = None
         self._loop_ready = threading.Event()
         self._shutdown = False
         
@@ -59,7 +58,7 @@ class AsyncDatabase:
         }
         
         # Periodic flush task handle
-        self._flush_task: Optional[asyncio.Task] = None
+        self._flush_task: asyncio.Task | None = None
         
         # Start background loop
         self._start_loop()
@@ -99,7 +98,7 @@ class AsyncDatabase:
                 await asyncio.sleep(0.01)  # Small yield
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error("async_db_loop_error", error=str(e))
                 self._stats['errors'] += 1
                 await asyncio.sleep(0.1)
@@ -140,10 +139,9 @@ class AsyncDatabase:
     async def _process_read_queue(self):
         """Process pending read futures."""
         # This is handled via direct async calls now
-        pass
     
     @traced("db.execute_batch")
-    async def _execute_batch(self, batch: List[Dict]):
+    async def _execute_batch(self, batch: list[dict]):
         """Execute a batch of writes."""
         logs = [b['data'] for b in batch if b['type'] == 'log']
         stats = [b['data'] for b in batch if b['type'] == 'stat']
@@ -158,10 +156,8 @@ class AsyncDatabase:
         while retries <= max_retries:
             try:
                 async with aiosqlite.connect(self.db_path, timeout=30.0) as conn:
-                    # Configure for performance
-                    await conn.execute('PRAGMA journal_mode=WAL;')
+                    # WAL mode + durability flags configured at DB init (hot path stays light)
                     await conn.execute('PRAGMA busy_timeout=30000;')
-                    await conn.execute('PRAGMA synchronous=NORMAL;')
                     await conn.execute('PRAGMA cache_size=-32768;')  # 32MB cache
                     
                     if logs:
@@ -172,7 +168,7 @@ class AsyncDatabase:
                         ''', logs)
                     
                     for action_val, category_val in stats:
-                        today = datetime.now().strftime('%Y-%m-%d')
+                        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
                         await conn.execute('INSERT OR IGNORE INTO statistics (date) VALUES (?)', (today,))
                         
                         query = "UPDATE statistics SET total_queries = total_queries + 1"
@@ -311,7 +307,7 @@ class AsyncDatabase:
                 );
             ''')
             
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
             conn.execute('INSERT OR IGNORE INTO statistics (date) VALUES (?)', (today,))
             
             # Migrations
@@ -329,7 +325,7 @@ class AsyncDatabase:
     #  Public Async API
     # ──────────────────────────────────────────────
     
-    async def log_connection(self, data: Dict[str, Any]):
+    async def log_connection(self, data: dict[str, Any]):
         """Queue a connection log for async write."""
         row = (
             data.get('process_name'), data.get('process_path'), data.get('pid'),
@@ -341,12 +337,18 @@ class AsyncDatabase:
     
     async def update_daily_stats(self, action: str, category: str):
         """Queue a stats update."""
+        if action not in ("block", "allow"):
+            logger.warning("invalid_stat_action", action=action)
+            return
+        if category not in ("ads", "trackers", "telemetry", "malware", None):
+            logger.warning("invalid_stat_category", category=category)
+            return
         self._write_queue.put({'type': 'stat', 'data': (action, category)})
     
     @traced("db.get_recent_connections")
     async def get_recent_connections(
-        self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None
-    ) -> List[aiosqlite.Row]:
+        self, limit: int = 100, unique_only: bool = False, since_timestamp: str | None = None
+    ) -> list[aiosqlite.Row]:
         """Get recent connections asynchronously."""
         self._stats['reads'] += 1
         async with aiosqlite.connect(self.db_path, timeout=30.0) as conn:
@@ -400,10 +402,12 @@ class AsyncDatabase:
         self._write_queue.put({'type': 'setting', 'data': (key, str_value)})
     
     async def flush(self, timeout: float = 5.0):
-        """Flush all pending writes."""
-        # Single flush - drains whatever is currently in the queue
-        # This avoids race conditions from polling empty()
-        await self._flush_batch()
+        """Flush all pending writes within the timeout budget."""
+        start = time.monotonic()
+        while not self._write_queue.empty() and (time.monotonic() - start) < timeout:
+            await self._flush_batch()
+        if not self._write_queue.empty():
+            await self._flush_batch() # best-effort final drain
     
     def stop(self):
         """Stop the database and flush pending writes."""
@@ -414,8 +418,9 @@ class AsyncDatabase:
             future = asyncio.run_coroutine_threadsafe(self.flush(), self._loop)
             try:
                 future.result(timeout=10.0)
-            except Exception:
-                pass  # Best effort flush
+            except Exception:  # noqa: BLE001
+                # best-effort flush; ignoring failures here
+                logger.debug("async_db_stop_flush_failed")
         
         # Cancel periodic flush task if it exists
         # (The loop runner will exit naturally when _shutdown is True)
@@ -426,7 +431,7 @@ class AsyncDatabase:
         
         logger.info("async_db_stopped", stats=self._stats)
     
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get database statistics."""
         return self._stats.copy()
 
@@ -452,13 +457,13 @@ class SyncDatabaseWrapper:
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result(timeout=30.0)
     
-    def log_connection(self, data: Dict[str, Any]):
+    def log_connection(self, data: dict[str, Any]):
         self._run_async(self.async_db.log_connection(data))
     
     def update_daily_stats(self, action: str, category: str):
         self._run_async(self.async_db.update_daily_stats(action, category))
     
-    def get_recent_connections(self, limit: int = 100, unique_only: bool = False, since_timestamp: str = None):
+    def get_recent_connections(self, limit: int = 100, unique_only: bool = False, since_timestamp: str | None = None):
         return self._run_async(self.async_db.get_recent_connections(limit, unique_only, since_timestamp))
     
     def get_setting(self, key: str, default: Any = None) -> Any:
@@ -478,7 +483,7 @@ class SyncDatabaseWrapper:
 
 
 # Factory function
-def create_async_database(db_path: str = None, **kwargs) -> Tuple[AsyncDatabase, SyncDatabaseWrapper]:
+def create_async_database(db_path: str | None = None, **kwargs) -> tuple[AsyncDatabase, SyncDatabaseWrapper]:
     """Create async database and sync wrapper."""
     async_db = AsyncDatabase(db_path, **kwargs)
     sync_wrapper = SyncDatabaseWrapper(async_db)

@@ -3,22 +3,25 @@ Structured Logging & OpenTelemetry for Cripple-NetStrip
 Provides JSON-structured logs, OTLP export, and trace correlation.
 """
 
+import inspect
+import logging
 import os
 import sys
-import logging
-import structlog
-from structlog.types import EventDict, WrappedLogger
-from typing import Any, Optional
 import threading
+
+import structlog
 
 # OpenTelemetry imports
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.sdk.resources import SERVICE_NAME as OTEL_SERVICE_NAME_KEY
+from opentelemetry.sdk.resources import SERVICE_VERSION as OTEL_SERVICE_VERSION_KEY
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import SpanKind, Status, StatusCode
+from structlog.types import EventDict, WrappedLogger
 
 from netstrip import __version__
 
@@ -98,8 +101,8 @@ def init_otel(
         try:
             # Create resource with service info
             resource = Resource.create({
-                SERVICE_NAME: service_name,
-                SERVICE_VERSION: __version__,
+                OTEL_SERVICE_NAME_KEY: service_name,
+                OTEL_SERVICE_VERSION_KEY: __version__,
                 "deployment.environment": os.getenv("CRIPPLE_ENV", "production"),
             })
             
@@ -127,7 +130,7 @@ def init_otel(
             _OTEL_INITIALIZED = True
             return True
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Fail silently - logging still works without OTel
             print(f"[OTel] Initialization failed: {e}", file=sys.stderr)
             return False
@@ -270,7 +273,7 @@ class TraceContext:
         self,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[dict] = None,
+        attributes: dict | None = None,
         tracer_name: str = SERVICE_NAME,
     ):
         self.name = name
@@ -284,24 +287,41 @@ class TraceContext:
         self.span = self.tracer.start_span(self.name, kind=self.kind)
         for key, value in self.attributes.items():
             self.span.set_attribute(key, value)
-        self.token = trace.use_span(self.span, end_on_exit=True)
+        # Activate the span for downstream trace.get_current_span() usage.
+        use_span_cm = trace.use_span(self.span, end_on_exit=True)
+        self.token = use_span_cm.__enter__()
         return self.span
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type:
-            self.span.set_status(Status(StatusCode.ERROR, str(exc_val)))
-            self.span.record_exception(exc_val)
-        else:
-            self.span.set_status(Status(StatusCode.OK))
+        try:
+            if exc_type:
+                self.span.set_status(Status(StatusCode.ERROR, str(exc_val)))
+                self.span.record_exception(exc_val)
+            else:
+                self.span.set_status(Status(StatusCode.OK))
+        finally:
+            self.token.__exit__(exc_type, exc_val, exc_tb)
         return False
 
 
 def traced(name: str, kind: SpanKind = SpanKind.INTERNAL, **attributes):
-    """Decorator for tracing function calls."""
+    """Decorator for tracing sync and coroutine function calls."""
     def decorator(func):
+        if inspect.iscoroutinefunction(func):
+            async def wrapper(*args, **kwargs):
+                with TraceContext(name, kind, attributes) as span:
+                    span.set_attribute("function", func.__name__)
+                    return await func(*args, **kwargs)
+            wrapper.__name__ = func.__name__
+            wrapper.__doc__ = func.__doc__
+            wrapper.__wrapped__ = func
+            return wrapper
         def wrapper(*args, **kwargs):
             with TraceContext(name, kind, attributes) as span:
                 span.set_attribute("function", func.__name__)
                 return func(*args, **kwargs)
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__wrapped__ = func
         return wrapper
     return decorator
