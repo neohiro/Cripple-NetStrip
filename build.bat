@@ -30,6 +30,7 @@ pyinstaller ^
     --noconfirm ^
     --noconsole ^
     --windowed ^
+    --onefile ^
     --manifest "app.manifest" ^
     --noupx ^
     --version-file "version_info.txt" ^
