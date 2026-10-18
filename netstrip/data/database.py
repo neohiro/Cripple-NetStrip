@@ -72,6 +72,7 @@ class Database:
                     );
                     CREATE INDEX IF NOT EXISTS idx_log_timestamp ON connection_log(timestamp);
                     CREATE INDEX IF NOT EXISTS idx_log_domain ON connection_log(domain);
+                    CREATE INDEX IF NOT EXISTS idx_log_domain_action_time ON connection_log(domain, action, timestamp);
                     
                     CREATE TABLE IF NOT EXISTS user_rules (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
