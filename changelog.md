@@ -1,7 +1,15 @@
 ## [v3.9.3] - 2026-10-19
 ### Database / Performance
-- Added composite DB index `idx_conn_log_action_time_proc` for faster stats, unique-connection, and 24h bandwidth queries.
+- Added composite DB index `idx_conn_log_action_time_proc` for faster stats and unique-connection queries.
+- DB layer: improved domain dedup representation, async writer batching stays robust.
 - Domain dedup audited: blocklist identity map and category sets verified; no redundant storage or lookup leaks.
+
+## [v3.9.2] - 2026-10-18
+### Release
+- Merged all branch changes (master, fix/, ci/, chore/, doctor-sync); deleted merged branches.
+- UI: 4Hz adaptive sidebar refresh (250ms poll) for snappy live-traffic feel.
+- Build: `--onefile` single executable deploy; cleaned dead `pystray._win32` import.
+- Version bumped to 3.9.2 across package, version info, and setup.
 
 ## [v3.6.8] - 2026-08-13
 ### Security & Core
