@@ -28,6 +28,7 @@ permissions:
 env:
   PYTHON_VERSION: '3.11'
   PIP_CACHE_DIR: ~/.cache/pip
+  VERSION: ${{ github.event.inputs.version || github.ref_name || '3.9.3' }}
 
 jobs:
   # ──────────────────────────────────────────────
@@ -149,41 +150,41 @@ jobs:
             os: windows-latest
             python: '3.11'
             build_script: build.bat
-            artifact_name: NetStrip-${{ env.VERSION }}-Windows
+            artifact_name: NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Windows
             asset_pattern: 'dist/Cripple/**'
-            zip_cmd: Compress-Archive -Path "dist/Cripple/*" -DestinationPath "NetStrip-${{ env.VERSION }}-Windows.zip" -Force
+            zip_cmd: Compress-Archive -Path "dist/Cripple/*" -DestinationPath "NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Windows.zip" -Force
             
           # Linux (AppImage + portable)
           - platform: linux
             os: ubuntu-latest
             python: '3.11'
             build_script: build.sh
-            artifact_name: NetStrip-${{ env.VERSION }}-Linux
+            artifact_name: NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Linux
             asset_pattern: 'dist/**'
             zip_cmd: |
-              cd dist && zip -r ../NetStrip-${{ env.VERSION }}-Linux.zip * && cd ..
+              cd dist && zip -r ../NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Linux.zip * && cd ..
             
           # macOS (DMG + portable)
           - platform: macos
             os: macos-latest
             python: '3.11'
             build_script: build.sh
-            artifact_name: NetStrip-${{ env.VERSION }}-macOS
+            artifact_name: NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-macOS
             asset_pattern: 'dist/**'
             zip_cmd: |
-              cd dist && zip -r ../NetStrip-${{ env.VERSION }}-macOS.zip * && cd ..
+              cd dist && zip -r ../NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-macOS.zip * && cd ..
             
           # Android (APK via Buildozer)
           - platform: android
             os: ubuntu-latest
             python: '3.11'
             build_script: buildozer android debug
-            artifact_name: NetStrip-${{ env.VERSION }}-Android
+            artifact_name: NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Android
             asset_pattern: 'bin/*.apk'
             zip_cmd: |
               mkdir -p artifacts
-              mv bin/*.apk artifacts/NetStrip-${{ env.VERSION }}-Android.apk
-              cd artifacts && zip ../NetStrip-${{ env.VERSION }}-Android.zip NetStrip-${{ env.VERSION }}-Android.apk && cd ..
+              mv bin/*.apk artifacts/NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Android.apk
+              cd artifacts && zip ../NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Android.zip NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Android.apk && cd ..
 
     steps:
       - name: Checkout
@@ -235,7 +236,7 @@ jobs:
             VERSION=$(python -c "import netstrip; print(netstrip.__version__)")
             echo "VERSION=v$VERSION" >> $GITHUB_ENV
           fi
-          echo "Using version: ${{ env.VERSION }}"
+          echo "Using version: ${{ github.event.inputs.version || github.ref_name || '3.9.3' }}"
 
       - name: Build ${{ matrix.platform }}
         shell: bash
@@ -260,7 +261,7 @@ jobs:
             echo "ERROR: dist/ directory not found"
             exit 1
           fi
-          if [ "${{ matrix.platform }}" = "android" ] && [ ! -f "bin/NetStrip-${{ env.VERSION }}-Android.apk" ] && [ ! -f "bin/*.apk" ]; then
+          if [ "${{ matrix.platform }}" = "android" ] && [ ! -f "bin/NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-Android.apk" ] && [ ! -f "bin/*.apk" ]; then
             echo "ERROR: APK not found"
             exit 1
           fi
@@ -270,13 +271,13 @@ jobs:
         shell: bash
         run: |
           ${{ matrix.zip_cmd }}
-          ls -la NetStrip-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          ls -la NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-${{ matrix.platform }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-build
-          path: NetStrip-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          path: NetStrip-${{ github.event.inputs.version || github.ref_name || '3.9.3' }}-${{ matrix.platform }}.zip
           retention-days: 7
           compression-level: 0
 
