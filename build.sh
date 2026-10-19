@@ -112,6 +112,7 @@ if [ "$OS" = "Darwin" ]; then
 
     # macOS
     pyinstaller \
+        --cachedir build_cache \\
         --noconfirm \
         --onefile \
         --windowed \
@@ -128,6 +129,7 @@ if [ "$OS" = "Darwin" ]; then
         main.py
 else
     # Linux
+        --cachedir build_cache \\
     pyinstaller \
         --noconfirm \
         --onefile \

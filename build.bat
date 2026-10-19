@@ -34,6 +34,7 @@ pyinstaller ^
     --manifest "app.manifest" ^
     --noupx ^
     --version-file "version_info.txt" ^
+    --cachedir build_cache ^
     --name "Cripple" ^
     --icon "assets/logo.ico" ^
     --paths "." ^
