@@ -44,7 +44,6 @@ pyinstaller ^
     --add-data "netstrip/data/updater_sources.json;netstrip/data" ^
     --add-data "assets;assets/" ^
     --hidden-import "PIL._tkinter_finder" ^
-    --hidden-import "pystray._win32" ^
     --hidden-import "netstrip" ^
     --hidden-import "netstrip.core" ^
     --hidden-import "netstrip.core.engine" ^

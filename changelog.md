@@ -2,6 +2,7 @@
 ### Database / Performance
 - Added composite DB index `idx_conn_log_action_time_proc` for faster stats and unique-connection queries.
 - DB layer: improved domain dedup representation, async writer batching stays robust.
+- Domain dedup audited: blocklist identity map and category sets verified; no redundant storage or lookup leaks.
 
 ## [v3.9.2] - 2026-10-18
 ### Release
