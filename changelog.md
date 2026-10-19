@@ -1,3 +1,8 @@
+## [v3.9.3] - 2026-10-19
+### Database / Performance
+- Added composite DB index `idx_conn_log_action_time_proc` for faster stats, unique-connection, and 24h bandwidth queries.
+- Domain dedup audited: blocklist identity map and category sets verified; no redundant storage or lookup leaks.
+
 ## [v3.6.8] - 2026-08-13
 ### Security & Core
 - **Cross-Platform Ghost Mode (TCP Reset)**: Ghost mode now instantly terminates all active OS connections by injecting raw TCP RST packets using kernel APIs (`iphlpapi.SetTcpEntry` on Windows, `ss -K` on Linux, `tcpdrop` on macOS) rather than just dropping future packets via firewall.
