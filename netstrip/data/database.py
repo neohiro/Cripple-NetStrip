@@ -14,6 +14,8 @@ from typing import List, Dict, Any, Optional
 
 class Database:
     def __init__(self, db_path: str = None):
+        if db_path is not None:
+            db_path = os.path.abspath(os.path.normpath(db_path))
         if db_path is None:
             # Default to ~/.NetStrip/NetStrip.db
             home = os.path.expanduser("~")
@@ -171,6 +173,12 @@ class Database:
         start = time.time()
         while hasattr(self, 'write_queue') and not self.write_queue.empty() and (time.time() - start) < timeout:
             time.sleep(0.02)
+
+    def __del__(self):
+        try:
+            self.stop()
+        except Exception:
+            pass
 
     def stop(self):
         self.flush(timeout=2.0)
