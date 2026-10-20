@@ -55,11 +55,25 @@ def setup_logging():
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
     )
 
+def _is_headless_run() -> bool:
+    """True when no GUI can be started: --service, or a Linux box with no display.
+
+    Headless/CLI runs must not require tkinter-backed GUI dependencies
+    (customtkinter -> tkinter), otherwise servers without a display can never
+    start the daemon or use the CLI (e.g. `--update-blocklists`).
+    """
+    if "--service" in sys.argv:
+        return True
+    if sys.platform.startswith("linux"):
+        return not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    return False
+
+
 def check_dependencies():
     missing = []
     is_android = os.environ.get('NETSTRIP_ANDROID') == '1' or hasattr(sys, 'getandroidapilevel')
     
-    if not is_android:
+    if not is_android and not _is_headless_run():
         try:
             import customtkinter
         except ImportError:
@@ -690,6 +704,12 @@ def main():
                 clean_exit_path.parent.mkdir(parents=True, exist_ok=True)
                 clean_exit_path.touch()
             except: pass
+        except Exception:
+            # Never swallow the reason the headless engine died: `finally` calls
+            # sys.exit(0), which would otherwise mask the original traceback and
+            # make the daemon look like a clean exit on every crash.
+            logger.exception("Fatal error in headless engine loop; stopping engine.")
+            raise
         finally:
             engine_instance.stop()
             sys.exit(0)

@@ -449,6 +449,7 @@ class SyncDatabaseWrapper:
     def __init__(self, async_db: AsyncDatabase):
         self.async_db = async_db
         self._loop = async_db._loop
+        self._sync_db: "Database | None" = None
     
     def _run_async(self, coro):
         """Run coroutine in background loop and wait for result."""
@@ -456,6 +457,31 @@ class SyncDatabaseWrapper:
             raise RuntimeError("Database loop not running")
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result(timeout=30.0)
+
+    def _get_sync_db(self) -> "Database":
+        """Lazily create the synchronous Database handle for the same file.
+
+        The async migration only ported a subset of the query surface onto
+        AsyncDatabase. Anything the engine still calls on the sync handle
+        (get_user_rules, prune_old_logs, add_user_rule, ...) is served by the
+        original synchronous Database implementation, which points at the very
+        same SQLite file.
+        """
+        if self._sync_db is None:
+            from netstrip.data.database import Database
+            self._sync_db = Database(self.async_db.db_path)
+        return self._sync_db
+
+    def __getattr__(self, name: str):
+        """Delegate unknown attributes to the synchronous Database handle.
+
+        Only reached when normal attribute lookup fails, so the explicitly
+        defined methods above keep priority. Private/dunder names are not
+        delegated to avoid masking real AttributeErrors.
+        """
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self._get_sync_db(), name)
     
     def log_connection(self, data: dict[str, Any]):
         self._run_async(self.async_db.log_connection(data))
@@ -476,6 +502,17 @@ class SyncDatabaseWrapper:
         self._run_async(self.async_db.flush(timeout))
     
     def stop(self):
+        # Tear down the delegating sync handle FIRST: it owns a background
+        # writer thread and its own SQLite connection, and `async_db.stop()`
+        # knows nothing about it. Without this the thread/connection is orphaned
+        # until GC (leaking one per wrapper lifecycle).
+        sync_db = getattr(self, "_sync_db", None)
+        if sync_db is not None:
+            try:
+                sync_db.stop()
+            except Exception:  # noqa: BLE001
+                logger.debug("sync_db_stop_failed")
+            self._sync_db = None  # avoid double-stop via Database.__del__
         self.async_db.stop()
     
     def get_stats(self):

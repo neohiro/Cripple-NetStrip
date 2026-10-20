@@ -305,11 +305,49 @@ def restore_network():
             clear_db_setting("disable_ipv6_globally")
             clear_db_setting("killswitch_active")
             
-            # Flush any IPv4 drops
-            while subprocess.run(["iptables", "-C", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
-            while subprocess.run(["iptables", "-C", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"], capture_output=True).returncode == 0:
-                subprocess.run(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+            # Flush any IPv4 drops. Handle BOTH the current self-contained form
+            # (`! -i lo ! -s 100.64.0.0/10 -p all ...`) and the legacy form
+            # without the management exemption; otherwise a crash during "IPv4
+            # globally blocked" leaves the host blackholed.
+            for mgmt_clause in (["!", "-s", "100.64.0.0/10"], []):
+                check = ["iptables", "-C", "INPUT", "!", "-i", "lo", *mgmt_clause,
+                         "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]
+                delete = ["iptables", "-D", "INPUT", "!", "-i", "lo", *mgmt_clause,
+                          "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]
+                while subprocess.run(check, capture_output=True).returncode == 0:
+                    subprocess.run(delete)
+            for mgmt_clause in (["!", "-d", "100.64.0.0/10"], []):
+                check = ["iptables", "-C", "OUTPUT", "!", "-o", "lo", *mgmt_clause,
+                         "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]
+                delete = ["iptables", "-D", "OUTPUT", "!", "-o", "lo", *mgmt_clause,
+                          "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]
+                while subprocess.run(check, capture_output=True).returncode == 0:
+                    subprocess.run(delete)
+
+            # Remove ghost-mode killswitch DROP rules (new self-contained form
+            # with a management exemption, the older plain form, and legacy
+            # untagged rules). Without this a killswitch trip survives the crash
+            # and leaves the host blackholed forever — the fail-open guarantee fails.
+            _MGMT = {"iptables": "100.64.0.0/10", "ip6tables": "fd7a:115c:a1e0::/48"}
+            for table in ("iptables", "ip6tables"):
+                mgmt = _MGMT[table]
+                for chain, flag in (("INPUT", "-i"), ("OUTPUT", "-o")):
+                    direction = "-s" if chain == "INPUT" else "-d"
+                    for mgmt_clause in (["!", direction, mgmt], []):
+                        check = [table, "-C", chain, "!", flag, "lo", *mgmt_clause,
+                                 "-m", "comment", "--comment", "NetStrip_Killswitch", "-j", "DROP"]
+                        delete = [table, "-D", chain, "!", flag, "lo", *mgmt_clause,
+                                  "-m", "comment", "--comment", "NetStrip_Killswitch", "-j", "DROP"]
+                        while subprocess.run(check, capture_output=True).returncode == 0:
+                            subprocess.run(delete)
+                    # Legacy untagged global DROP (pre-comment-tag versions).
+                    # Match the exact spec, never the positional `chain 1` form,
+                    # which could delete an unrelated top-of-chain DROP rule.
+                    while subprocess.run([table, "-C", chain, "-j", "DROP"], capture_output=True).returncode == 0:
+                        subprocess.run([table, "-D", chain, "-j", "DROP"])
+                    # Stray tailnet ACCEPT exemptions from an intermediate revision.
+                    while subprocess.run([table, "-D", chain, direction, mgmt, "-j", "ACCEPT"], capture_output=True).returncode == 0:
+                        pass
             
         logging.info("Emergency network restore completed successfully.")
     except Exception as e:

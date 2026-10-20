@@ -578,9 +578,12 @@ class NetStripEngine:
         # NOW start the packet interceptor — engine is ready to evaluate packets
         self.interceptor.start()
         
-        # Start detached subprocess watchdog to ensure DNS is restored on hard crash
+        # Start detached subprocess watchdog to ensure DNS/firewall/network is
+        # restored on hard crash. This MUST also run in headless mode: without it
+        # there is no fail-open path at all, so a killswitch trip on a remote node
+        # locks out Tailscale SSH permanently with no way back in.
         import subprocess as _subprocess
-        if not getattr(sys, 'frozen', False) and not self.is_headless:
+        if not getattr(sys, 'frozen', False):
             watchdog_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'watchdog.py'))
             if os.path.exists(watchdog_path):
                 is_frozen = getattr(sys, 'frozen', False)
@@ -875,7 +878,17 @@ class NetStripEngine:
             self.lan_shield.enable()
             if broadcast_lan and hasattr(self.lan_shield, 'broadcast_killswitch'):
                 self.lan_shield.broadcast_killswitch()
+
+            # Headless safety net: an automatic killswitch (e.g. a false-positive
+            # AF_PACKET anomaly on a remote node) has no GUI to dismiss it, and
+            # systemd restarts would re-apply it forever. Auto-revert after a
+            # bounded window so the host always becomes reachable again.
+            if getattr(self, 'is_headless', False):
+                self._schedule_killswitch_autorevert()
         else:
+            # Cancel any pending headless auto-revert: the killswitch is being
+            # released deliberately, so the timer must not fire later.
+            self._cancel_killswitch_autorevert()
             self.platform.disable_killswitch()
             
             # Restore Normal Mode settings accurately
@@ -895,6 +908,50 @@ class NetStripEngine:
                     
             if broadcast_lan and hasattr(self.lan_shield, 'broadcast_restore'):
                 self.lan_shield.broadcast_restore()
+
+    def _schedule_killswitch_autorevert(self, timeout_seconds: int = 300):
+        """Fail-open timer for headless killswitch trips.
+
+        A headless node has no operator sitting in front of a GUI, so an
+        automatic lockdown (threat escalation, false-positive kernel anomaly)
+        must never be permanent. After `timeout_seconds` the killswitch is
+        released automatically, guaranteeing remote recoverability.
+        """
+        self._cancel_killswitch_autorevert()
+
+        self._killswitch_autorevert_timer = threading.Timer(
+            timeout_seconds, self._auto_revert_killswitch
+        )
+        self._killswitch_autorevert_timer.daemon = True
+        self._killswitch_autorevert_timer.start()
+        logger.warning(
+            f"Headless killswitch engaged; auto-revert scheduled in {timeout_seconds}s."
+        )
+
+    def _cancel_killswitch_autorevert(self):
+        """Cancel the headless auto-revert timer if one is pending."""
+        existing = getattr(self, '_killswitch_autorevert_timer', None)
+        if existing is not None:
+            try:
+                existing.cancel()
+            except Exception:
+                pass
+            self._killswitch_autorevert_timer = None
+
+    def _auto_revert_killswitch(self):
+        if not getattr(self, 'killswitch_active', False):
+            return
+        logger.warning("Headless killswitch auto-revert: restoring fail-open network state.")
+        try:
+            self.set_killswitch(False, broadcast_lan=False)
+        except Exception as e:
+            logger.error(f"Killswitch auto-revert failed: {e}")
+            # Last-resort: strip the platform rules directly.
+            try:
+                if hasattr(self.platform, 'disable_killswitch'):
+                    self.platform.disable_killswitch()
+            except Exception as e2:
+                logger.error(f"Direct killswitch strip failed: {e2}")
 
     def _handle_geoip_change(self, old_ip: str, geo_data: dict):
         if not old_ip or not geo_data or not isinstance(geo_data, dict):

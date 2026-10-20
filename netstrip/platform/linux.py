@@ -137,13 +137,33 @@ class LinuxPlatform(PlatformBase):
         return True
 
     def disable_ipv4(self) -> bool:
-        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
-        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+        # Single self-contained rule per direction: drop non-loopback traffic
+        # EXCEPT the Tailscale management path. (A separate ACCEPT rule would be
+        # shadowed, because the DROP is also inserted at position 1.)
+        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "!", "-i", "lo", "!", "-s", self._MGMT_V4, "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
+        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "!", "-o", "lo", "!", "-d", self._MGMT_V4, "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"])
         return res1.returncode == 0 and res2.returncode == 0
 
     def enable_ipv4(self) -> bool:
-        while self._run_cmd(["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
-        while self._run_cmd(["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"]).returncode == 0: pass
+        # Delete by comment (matches how disable_ipv4 inserted it). The old code
+        # deleted a rule spec without the comment, so it never matched and the
+        # host stayed blackholed forever — a real fail-open regression.
+        patterns = (
+            ["iptables", "-D", "INPUT", "!", "-i", "lo", "!", "-s", self._MGMT_V4, "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"],
+            ["iptables", "-D", "OUTPUT", "!", "-o", "lo", "!", "-d", self._MGMT_V4, "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"],
+            # Older revision without the management exemption.
+            ["iptables", "-D", "INPUT", "!", "-i", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"],
+            ["iptables", "-D", "OUTPUT", "!", "-o", "lo", "-p", "all", "-m", "comment", "--comment", "NetStrip_IPv4_Block", "-j", "DROP"],
+        )
+        for delete in patterns:
+            check = list(delete)
+            check[1] = "-C"
+            while self._run_cmd(check).returncode == 0:
+                self._run_cmd(delete)
+        # Remove management-path exemptions left by the intermediate revision.
+        for chain, flag in (("INPUT", "-s"), ("OUTPUT", "-d")):
+            while self._run_cmd(["iptables", "-D", chain, flag, self._MGMT_V4, "-j", "ACCEPT"]).returncode == 0:
+                pass
         return True
 
     def is_ipv4_enabled(self) -> bool:
@@ -163,21 +183,90 @@ class LinuxPlatform(PlatformBase):
         except Exception as e:
             logger.error(f"Failed to kill TCP connections on Linux: {e}")
 
+    # Management paths that must NEVER be blackholed by the killswitch.
+    # Losing these makes a remote/headless host permanently unreachable.
+    #   100.64.0.0/10  -> Tailscale CGNAT (tailnet + Tailscale SSH)
+    #   fd7a:115c:a1e0::/48 -> Tailscale IPv6 ULA
+    _MGMT_V4 = "100.64.0.0/10"
+    _MGMT_V6 = "fd7a:115c:a1e0::/48"
+    _KS_COMMENT = "NetStrip_Killswitch"
+
     def enable_killswitch(self) -> bool:
-        # Absolute ghost mode - block everything unconditionally
-        res1 = self._run_cmd(["iptables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
-        res2 = self._run_cmd(["iptables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
-        res3 = self._run_cmd(["ip6tables", "-I", "INPUT", "1", "-j", "DROP"]).returncode == 0
-        res4 = self._run_cmd(["ip6tables", "-I", "OUTPUT", "1", "-j", "DROP"]).returncode == 0
+        """Ghost-mode lockdown.
+
+        Unlike the old implementation, the rules are comment-tagged so they can
+        be removed deterministically, and they always exempt loopback plus the
+        Tailscale management ranges. Without those exemptions a headless node
+        loses Tailscale SSH the instant the killswitch trips and can never be
+        recovered remotely.
+
+        IMPORTANT: the exemption is expressed *inside* each DROP rule via `! -s`
+        / `! -d`. An earlier revision inserted a separate ACCEPT rule at position
+        1 and then inserted the DROP at position 1 as well — iptables prepends,
+        so the DROP ended up ABOVE the ACCEPT and shadowed it, leaving the tailnet
+        blocked. A single self-contained rule has no ordering hazard.
+        """
+        # Idempotency: never stack duplicate killswitch rules.
+        self.disable_killswitch()
+
+        res = []
+        # IPv4: drop everything except loopback and the tailnet management path.
+        res.append(self._run_cmd([
+            "iptables", "-I", "INPUT", "1", "!", "-i", "lo", "!", "-s", self._MGMT_V4,
+            "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP",
+        ]).returncode == 0)
+        res.append(self._run_cmd([
+            "iptables", "-I", "OUTPUT", "1", "!", "-o", "lo", "!", "-d", self._MGMT_V4,
+            "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP",
+        ]).returncode == 0)
+        # IPv6: same, for the Tailscale ULA range.
+        res.append(self._run_cmd([
+            "ip6tables", "-I", "INPUT", "1", "!", "-i", "lo", "!", "-s", self._MGMT_V6,
+            "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP",
+        ]).returncode == 0)
+        res.append(self._run_cmd([
+            "ip6tables", "-I", "OUTPUT", "1", "!", "-o", "lo", "!", "-d", self._MGMT_V6,
+            "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP",
+        ]).returncode == 0)
         self.kill_tcp_connections()
-        return res1 and res2
+        return all(res)
 
     def disable_killswitch(self) -> bool:
-        res1 = self._run_cmd(["iptables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
-        res2 = self._run_cmd(["iptables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
-        res3 = self._run_cmd(["ip6tables", "-D", "INPUT", "-j", "DROP"]).returncode == 0
-        res4 = self._run_cmd(["ip6tables", "-D", "OUTPUT", "-j", "DROP"]).returncode == 0
-        return res1 and res2
+        """Remove every killswitch rule (comment-tagged + legacy untagged).
+
+        The loop is deliberately unbounded-safe: it removes duplicate rules left
+        behind by older versions and by crash/restart cycles, guaranteeing a
+        fail-open state. It also cleans up the separate tailnet ACCEPT rules used
+        by an intermediate revision, and any stray untagged global DROP.
+        """
+        removed = False
+        for table in ("iptables", "ip6tables"):
+            mgmt = self._MGMT_V4 if table == "iptables" else self._MGMT_V6
+            for chain, flag in (("INPUT", "-i"), ("OUTPUT", "-o")):
+                direction = "-s" if chain == "INPUT" else "-d"
+                # Comment-tagged DROP rules: both the current self-contained form
+                # (`! -s <mgmt>`) and the older plain form, in case of an upgrade.
+                for mgmt_clause in (["!", direction, mgmt], []):
+                    check = [table, "-C", chain, "!", flag, "lo", *mgmt_clause,
+                             "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP"]
+                    delete = [table, "-D", chain, "!", flag, "lo", *mgmt_clause,
+                              "-m", "comment", "--comment", self._KS_COMMENT, "-j", "DROP"]
+                    while self._run_cmd(check).returncode == 0:
+                        self._run_cmd(delete)
+                        removed = True
+                # Separate tailnet ACCEPT exemptions (intermediate revision).
+                while self._run_cmd([table, "-C", chain, direction, mgmt, "-j", "ACCEPT"]).returncode == 0:
+                    self._run_cmd([table, "-D", chain, direction, mgmt, "-j", "ACCEPT"])
+                    removed = True
+                # Legacy untagged global DROP from pre-comment-tag versions.
+                # Match the EXACT spec the old enable_killswitch inserted rather
+                # than a positional `-D <chain> 1 -j DROP`: the positional form
+                # can delete an unrelated rule that merely happens to be a bare
+                # DROP at the top of the chain.
+                while self._run_cmd([table, "-C", chain, "-j", "DROP"]).returncode == 0:
+                    self._run_cmd([table, "-D", chain, "-j", "DROP"])
+                    removed = True
+        return True
 
     def block_lan_traffic(self) -> bool:
         lan_subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
@@ -188,14 +277,24 @@ class LinuxPlatform(PlatformBase):
         return success
 
     def unblock_lan_traffic(self) -> bool:
-        success = True
+        """Remove every LAN-shield DROP rule (idempotent, order-independent).
+
+        Returns True when no matching rule remains afterwards, regardless of
+        whether any were present to begin with.
+        """
         subnets = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
         for subnet in subnets:
-            if self._run_cmd(["iptables", "-D", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode != 0:
-                success = False
-            if self._run_cmd(["iptables", "-D", "INPUT", "-s", subnet, "-j", "DROP"]).returncode != 0:
-                success = False
-        return success
+            while self._run_cmd(["iptables", "-D", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode == 0:
+                pass
+            while self._run_cmd(["iptables", "-D", "INPUT", "-s", subnet, "-j", "DROP"]).returncode == 0:
+                pass
+        # Verify the end state rather than trusting delete exit codes.
+        for subnet in subnets:
+            if self._run_cmd(["iptables", "-C", "OUTPUT", "-d", subnet, "-j", "DROP"]).returncode == 0:
+                return False
+            if self._run_cmd(["iptables", "-C", "INPUT", "-s", subnet, "-j", "DROP"]).returncode == 0:
+                return False
+        return True
 
     def lockdown_arp(self, ip: str, mac: str) -> bool:
         res = self._run_cmd(["arp", "-s", ip, mac])
