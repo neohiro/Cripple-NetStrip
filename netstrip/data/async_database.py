@@ -9,11 +9,16 @@ import threading
 import time
 from datetime import datetime, timezone
 from queue import Empty, Queue
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiosqlite
 
 from netstrip.core.observability import get_logger, traced
+
+if TYPE_CHECKING:
+    # Imported only for type-checkers: the runtime import is done lazily inside
+    # SyncDatabaseWrapper._get_sync_db to avoid a circular import at module load.
+    from netstrip.data.database import Database
 
 logger = get_logger(__name__)
 
