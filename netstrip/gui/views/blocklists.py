@@ -778,6 +778,11 @@ class BlocklistView(ctk.CTkFrame):
         
         self._loaded_results = []
         self._results_row_pool = []
+        # Live list of the per-result Block/Whitelist ("override") buttons.
+        # Exposed as an attribute so the view's action controls can be located
+        # and driven programmatically (tests, automation, future bulk actions);
+        # each row's button is appended in _get_or_create_row.
+        self._override_buttons = []
         self._has_more = False
         self._is_fetching = False
         self._page_size = 50
@@ -842,6 +847,7 @@ class BlocklistView(ctk.CTkFrame):
                 'cat_badge': cat_badge,
                 'btn': btn
             })
+            self._override_buttons.append(btn)
         return self._results_row_pool[index]
 
     def _restore_empty_state(self):

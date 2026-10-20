@@ -24,6 +24,12 @@ class Database:
         self.db_path = db_path
         self.lock = threading.RLock()
         self._settings_cache = {}
+        # Separate TTL cache behind get_setting_cached(). Keyed by setting name
+        # to (value, expires_at); kept apart from _settings_cache (the
+        # authoritative write-through map) so a bounded-staleness read on the
+        # hot path does not force every other read to pay the TTL.
+        self._setting_ttl_cache = {}
+        self._setting_ttl_default = 5.0
         self._rules_cache = {}
         self._init_db()
         
@@ -112,6 +118,15 @@ class Database:
                     
                     CREATE TABLE IF NOT EXISTS bandwidth_stats (
                         hour DATETIME PRIMARY KEY,
+                        bytes_sent INTEGER DEFAULT 0,
+                        bytes_recv INTEGER DEFAULT 0
+                    );
+
+                    -- Per-application lifetime totals, distinct from the
+                    -- hourly aggregate above. Keyed by the app's identity
+                    -- (exe name / path) so totals survive restarts.
+                    CREATE TABLE IF NOT EXISTS app_bandwidth (
+                        app TEXT PRIMARY KEY,
                         bytes_sent INTEGER DEFAULT 0,
                         bytes_recv INTEGER DEFAULT 0
                     );
@@ -371,6 +386,25 @@ class Database:
                 self._settings_cache[key] = default
                 return default
 
+    def get_setting_cached(self, key: str, default: Any = None, ttl: float = None) -> Any:
+        """Read a setting through a short-TTL cache.
+
+        Identical result to get_setting(), but repeated hot-path reads within
+        `ttl` seconds skip the (already dict-cached) lookup. Invalidated
+        eagerly by set_setting/delete_setting so a write is always visible on
+        the next read regardless of TTL.
+        """
+        if ttl is None:
+            ttl = getattr(self, "_setting_ttl_default", 5.0)
+        now = time.time()
+        with self.lock:
+            entry = self._setting_ttl_cache.get(key)
+            if entry is not None and entry[1] > now:
+                return entry[0]
+            value = self.get_setting(key, default)
+            self._setting_ttl_cache[key] = (value, now + ttl)
+            return value
+
     def set_setting(self, key: str, value: Any):
         if not hasattr(self, '_settings_cache'):
             self._settings_cache = {}
@@ -382,6 +416,9 @@ class Database:
             
         with self.lock:
             self._settings_cache[key] = value
+            # Drop any TTL-cached copy so the new value is visible immediately
+            # even if a long ttl was requested.
+            self._setting_ttl_cache.pop(key, None)
             with self._get_connection() as conn:
                 conn.execute(
                     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
@@ -396,8 +433,45 @@ class Database:
         with self.lock:
             if key in self._settings_cache:
                 del self._settings_cache[key]
+            self._setting_ttl_cache.pop(key, None)
             with self._get_connection() as conn:
                 conn.execute('DELETE FROM settings WHERE key = ?', (key,))
+
+    def save_app_bandwidth(self, totals: Dict[str, Any]):
+        """Persist per-application lifetime byte totals.
+
+        `totals` maps an app identity to a (bytes_sent, bytes_recv) pair.
+        Stored as an UPSERT so a caller may pass only the apps it has fresh
+        numbers for without clobbering the rest.
+        """
+        with self.lock:
+            with self._get_connection() as conn:
+                for app, pair in totals.items():
+                    try:
+                        sent, recv = pair
+                    except (TypeError, ValueError):
+                        continue
+                    conn.execute(
+                        'INSERT INTO app_bandwidth (app, bytes_sent, bytes_recv) '
+                        'VALUES (?, ?, ?) '
+                        'ON CONFLICT(app) DO UPDATE SET '
+                        'bytes_sent = excluded.bytes_sent, '
+                        'bytes_recv = excluded.bytes_recv',
+                        (app, int(sent), int(recv))
+                    )
+                conn.commit()
+
+    def get_app_bandwidth(self) -> Dict[str, tuple]:
+        """Return {app: (bytes_sent, bytes_recv)} for every stored app."""
+        with self.lock:
+            with self._get_connection() as conn:
+                cursor = conn.execute(
+                    'SELECT app, bytes_sent, bytes_recv FROM app_bandwidth'
+                )
+                return {
+                    row['app']: (row['bytes_sent'], row['bytes_recv'])
+                    for row in cursor.fetchall()
+                }
 
     def update_daily_stats(self, action: str, category: str):
         """Non-blocking update of daily statistics via async writer queue."""

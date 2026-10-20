@@ -275,8 +275,72 @@ class SettingsView(ctk.CTkFrame):
         self._add_switch_row(card, "Allow in-browser DNS", 'allow_in_browser_dns', tooltip_text="Use Case: If you use Chrome/Firefox DoH features and don't want NetStrip filtering your web browsing.")
         self._add_subtitle(card, "Allows browsers to use their own DoH settings (bypasses NetStrip filtering).")
 
+        # Language picker. The i18n layer already resolves a language on start
+        # (NETSTRIP_LANG -> OS locale); this exposes the choice in the UI and
+        # persists it, so the next launch honours it.
+        self._lang_var = ctk.StringVar(
+            value=self._current_language_code()
+        )
+        lang_row = ctk.CTkFrame(card, fg_color="transparent")
+        lang_row.pack(fill="x", padx=Spacing.LG, pady=(Spacing.SM, Spacing.XS))
+        ctk.CTkLabel(
+            lang_row, text="Language",
+            font=(Fonts.FAMILY_PRIMARY[0], Fonts.SIZE_SM, Fonts.WEIGHT_BOLD),
+            text_color=Colors.TEXT_PRIMARY,
+        ).pack(side="left")
+        self._lang_menu = ctk.CTkOptionMenu(
+            lang_row,
+            variable=self._lang_var,
+            values=self._language_display_names(),
+            command=self._on_language_change,
+            fg_color=Colors.BG_INPUT,
+            button_color=Colors.BG_ELEVATED,
+            text_color=Colors.TEXT_PRIMARY,
+            width=160,
+        )
+        self._lang_menu.pack(side="right")
+        self._add_subtitle(card, "Interface language. Applied immediately where possible and saved for the next launch.")
+
         # Bottom padding
         ctk.CTkFrame(card, fg_color=Colors.BG_PANEL, height=Spacing.SM).pack()
+
+    # -- language helpers ---------------------------------------------------
+
+    def _current_language_code(self) -> str:
+        """Display name for the persisted language, falling back to detection."""
+        try:
+            from netstrip.i18n import get_language, language_name
+            try:
+                saved = self.engine.db.get_setting("language", None)
+            except Exception:
+                saved = None
+            code = saved or get_language() or "en"
+            return language_name(code)
+        except Exception:
+            return "English"
+
+    def _language_display_names(self):
+        try:
+            from netstrip.i18n import available_languages, language_name
+            return [language_name(c) for c in available_languages()]
+        except Exception:
+            return ["English"]
+
+    def _on_language_change(self, display_name: str):
+        """Persist and apply the selected language."""
+        try:
+            from netstrip.i18n import available_languages, language_name, set_language
+            code = next(
+                (c for c in available_languages() if language_name(c) == display_name),
+                "en",
+            )
+            set_language(code)
+            try:
+                self.engine.db.set_setting("language", code)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     def _add_subtitle(self, parent, text, pady=(2, Spacing.MD)):
         lbl = ctk.CTkLabel(

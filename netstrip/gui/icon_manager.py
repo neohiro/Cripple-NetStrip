@@ -101,6 +101,11 @@ class IconManager:
         # In-memory caches
         self._image_cache = {}      # PIL Images
         self._ctk_image_cache = {}  # CTkImage objects
+        # Upper bound on each cache. Over a long session a busy host resolves
+        # many thousands of distinct executables; without a cap both dicts (and
+        # the decoded images they hold) grow without limit. Trimmed oldest-key
+        # first on insert - see _trim_caches().
+        self._cache_cap = 512
         
         # Thread safety
         self._lock = threading.Lock()
@@ -110,6 +115,23 @@ class IconManager:
         
         # Bounded worker pool to prevent spawning dozens of PowerShell / download threads
         self._worker_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+
+    def _trim_caches(self):
+        """Evict oldest entries once either cache exceeds _cache_cap.
+
+        Called after every insert. Plain dicts preserve insertion order, so the
+        oldest-inserted keys are dropped first (a simple, allocation-free FIFO;
+        an LRU would need per-access bookkeeping this hot path should not pay).
+        The two caches are keyed the same way, so they are trimmed to the same
+        key set to keep a CTkImage from outliving its backing PIL image.
+        """
+        cap = max(1, int(getattr(self, "_cache_cap", 512)))
+        for cache in (self._image_cache, self._ctk_image_cache):
+            if len(cache) <= cap:
+                continue
+            excess = len(cache) - cap
+            for key in list(cache.keys())[:excess]:
+                cache.pop(key, None)
 
     def get_icon(self, process_path: str, process_name: str, callback=None) -> Optional[ctk.CTkImage]:
         """

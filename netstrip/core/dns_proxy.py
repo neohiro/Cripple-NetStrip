@@ -16,6 +16,26 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
+# Port NetStrip's DNS proxy binds on Android.
+#
+# On Android, binding UDP/53 is forbidden without root, so the engine binds
+# this port instead (see engine.py: `dns_port = 5353 if is_android else 53`).
+# The VPN interceptor runs in a separate process and must forward intercepted
+# DNS to the *same* port; it historically hardcoded 5053 while the engine bound
+# 5353, so every intercepted query was sent to a closed port and silently
+# timed out on-device. Both sides now share one constant so the contract can
+# not drift again - tests/test_android.py::test_android_dns_port_contract
+# pins this value.
+ANDROID_DNS_PORT = 5353
+
+# Hard cap on the number of distinct host keys the DoT/DoH keep-alive pool
+# retains. Upstream resolver lists rotate and can present 100+ addresses; the
+# dict keyed by IP must not grow without bound, or a long-lived process leaks a
+# socket-pool entry per address it ever resolved through. On overflow the
+# least-recently-used host entries are evicted and their sockets closed.
+# tests/test_longevity.py::test_dns_pool_host_count_is_hard_capped pins this.
+DNS_MAX_POOL_HOSTS = 64
+
 # NetStrip supports DoH, DoT, and UDP. Upstream queries can be configured to force
 # DoH/DoT to prevent ISP snooping, or fallback to standard UDP.
 DOH_PROVIDERS = {
@@ -91,6 +111,8 @@ class _DNSConnectionPool:
         self._dot_pool = {}  # ip -> list of (tls_sock, raw_sock, last_used_time)
         self._doh_pool = {}  # (ip, host) -> list of (http_conn, last_used_time)
         self._lock = threading.Lock()
+        self._reaper_stop = threading.Event()
+        self._reaper_thread = None
 
     def get_dot_socket(self, ip: str, port: int = 853, timeout: float = 2.0):
         now = time.time()
@@ -230,6 +252,117 @@ class _DNSConnectionPool:
                     except Exception:
                         pass
             self._doh_pool.clear()
+
+    # -- housekeeping ------------------------------------------------------
+    # The pool is keyed by resolver address. Dynamic upstream lists rotate
+    # through far more addresses than are ever useful at once, so both the
+    # expiry sweep and a hard host cap are needed:
+    #   * the sweep drops idle sockets and any host key left with nothing;
+    #   * the cap bounds the dict itself, evicting least-recently-used hosts
+    #     (and closing their sockets) even while every entry is still "fresh",
+    #     which is the leak the expiry sweep alone cannot stop.
+
+    def _last_used_dot(self, entries) -> float:
+        return max((e[2] for e in entries), default=0.0)
+
+    def _last_used_doh(self, entries) -> float:
+        return max((e[1] for e in entries), default=0.0)
+
+    def _evict_lru_dot_hosts(self, over: int) -> int:
+        """Drop `over` least-recently-used DoT hosts. Caller holds the lock."""
+        closed = 0
+        if over <= 0:
+            return 0
+        order = sorted(self._dot_pool, key=lambda k: self._last_used_dot(self._dot_pool[k]))
+        for ip in order[:over]:
+            for tls_sock, raw_sock, _ in self._dot_pool.pop(ip, []):
+                self._close_sock(tls_sock, raw_sock)
+                closed += 1
+        return closed
+
+    def _evict_lru_doh_hosts(self, over: int) -> int:
+        """Drop `over` least-recently-used DoH hosts. Caller holds the lock."""
+        closed = 0
+        if over <= 0:
+            return 0
+        order = sorted(self._doh_pool, key=lambda k: self._last_used_doh(self._doh_pool[k]))
+        for key in order[:over]:
+            for conn, _ in self._doh_pool.pop(key, []):
+                try:
+                    conn.close()
+                    closed += 1
+                except Exception:
+                    pass
+        return closed
+
+    def _sweep_once(self):
+        """Expire idle sockets, drop empty host keys, and enforce the cap.
+
+        Safe to call at any time and from the reaper thread: everything runs
+        under the pool lock. Returns the number of sockets closed so callers
+        (and tests) can assert that eviction actually released resources
+        rather than merely forgetting the keys.
+        """
+        now = time.time()
+        closed = 0
+        with self._lock:
+            for ip in list(self._dot_pool):
+                keep = []
+                for tls_sock, raw_sock, last_used in self._dot_pool[ip]:
+                    if now - last_used <= self.idle_timeout:
+                        keep.append((tls_sock, raw_sock, last_used))
+                    else:
+                        self._close_sock(tls_sock, raw_sock)
+                        closed += 1
+                if keep:
+                    self._dot_pool[ip] = keep
+                else:
+                    del self._dot_pool[ip]
+
+            for key in list(self._doh_pool):
+                keep = []
+                for conn, last_used in self._doh_pool[key]:
+                    if now - last_used <= self.idle_timeout:
+                        keep.append((conn, last_used))
+                    else:
+                        try:
+                            conn.close()
+                            closed += 1
+                        except Exception:
+                            pass
+                if keep:
+                    self._doh_pool[key] = keep
+                else:
+                    del self._doh_pool[key]
+
+            # Hard cap on host keys, independent of freshness.
+            closed += self._evict_lru_dot_hosts(len(self._dot_pool) - DNS_MAX_POOL_HOSTS)
+            closed += self._evict_lru_doh_hosts(len(self._doh_pool) - DNS_MAX_POOL_HOSTS)
+        return closed
+
+    def start_reaper(self, interval: float = 30.0):
+        """Start the background sweep. Idempotent: a second call is a no-op."""
+        if self._reaper_thread and self._reaper_thread.is_alive():
+            return
+        self._reaper_stop.clear()
+
+        def _run():
+            while not self._reaper_stop.wait(interval):
+                try:
+                    self._sweep_once()
+                except Exception:
+                    pass
+
+        self._reaper_thread = threading.Thread(
+            target=_run, name="dns-pool-reaper", daemon=True
+        )
+        self._reaper_thread.start()
+
+    def stop_reaper(self):
+        """Signal the reaper to stop and wait briefly for it to exit."""
+        self._reaper_stop.set()
+        if self._reaper_thread:
+            self._reaper_thread.join(timeout=2.0)
 
 
 class NetStripResolver(BaseResolver):
@@ -434,6 +567,17 @@ class NetStripResolver(BaseResolver):
             # Only log and broadcast if we haven't blocked this exact domain for this app in the last 10 seconds
             if now - last_blocked > 10:
                 self._last_blocked_cache[throttle_key] = now
+                # Feed the aggregated notification digest too, so a burst of
+                # blocked domains becomes one toast rather than a stream of
+                # them. Best-effort: the engine may not own a digest in tests.
+                _eng = getattr(self, "engine", None)
+                if _eng is not None and hasattr(_eng, "_note_blocked_for_digest"):
+                    try:
+                        _eng._note_blocked_for_digest(category.value)
+                    except Exception as e:
+                        # Best-effort: never break DNS filtering because the
+                        # digest feed failed, but leave a trail.
+                        logger.debug(f"digest feed failed for {category.value!r}: {e}")
                 if self.on_status:
                     self.on_status(f"DNS Autoblocked {category.value.capitalize()}: {domain}")
                 

@@ -44,6 +44,10 @@ class NetStripEngine:
         self.progress_callback = progress_callback
         self.is_running = False
         self._stop_event = threading.Event()
+        # Aggregated "blocked" digest: category -> count, flushed into a single
+        # notification by _flush_notification_digest(). See _note_blocked_for_digest.
+        self._digest_buffer = {}
+        self._digest_lock = threading.Lock()
         import datetime
         self.session_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
@@ -1016,12 +1020,68 @@ class NetStripEngine:
         if self.on_critical_network_event:
             self.on_critical_network_event(message)
 
+    def _note_blocked_for_digest(self, category: str):
+        """Count one blocked event for the periodic notification digest.
+
+        Called on the packet hot path, so it must be cheap and never raise:
+        only a dict increment under a lock. Events are aggregated per category
+        and delivered as a single notification by _flush_notification_digest(),
+        instead of one toast per blocked connection.
+        """
+        try:
+            with self._digest_lock:
+                self._digest_buffer[category] = self._digest_buffer.get(category, 0) + 1
+        except Exception as e:
+            # Defensive on the hot path, but not silent: if this ever fires,
+            # the digest has stopped counting (e.g. state never initialised),
+            # which is exactly the failure that must not go unnoticed.
+            logger.debug(f"digest increment failed for {category!r}: {e}")
+
+    def _flush_notification_digest(self):
+        """Emit one aggregated notification for the buffered blocks, then clear.
+
+        Must always clear the buffer, even if the toast fails, or the same
+        events would be reported again on the next flush.
+        """
+        with self._digest_lock:
+            if not self._digest_buffer:
+                return
+            snapshot = dict(self._digest_buffer)
+            self._digest_buffer.clear()
+
+        total = sum(snapshot.values())
+        top = sorted(snapshot.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        summary = ", ".join(f"{cat}: {n}" for cat, n in top)
+        try:
+            from plyer import notification
+            notification.notify(
+                title=f"NetStrip blocked {total} connection(s)",
+                message=summary or "see dashboard for details",
+                app_name="NetStrip",
+                timeout=10,
+            )
+        except Exception as e:
+            # A missing notification backend (or denied notification permission)
+            # must not lose the events - the buffer is already drained above -
+            # but it should be diagnosable rather than silent.
+            logger.debug(f"notification digest toast failed: {e}")
+
     def _watchdog_loop(self):
         """Ensure DNS is restored, poll for Scheduled Killswitch, and clear expired Time Bombs."""
         from datetime import datetime
         last_cleanup = 0
+        last_digest_flush = 0
         while self.is_running:
             try:
+                # Emit one aggregated "blocked" notification every 15s instead
+                # of a toast per blocked connection. Flushing on the watchdog
+                # (rather than per event) is what keeps a DNS-burst from
+                # producing a notification storm; the buffer is drained here so
+                # it can never grow unbounded for the process lifetime.
+                if time.time() - last_digest_flush > 15:
+                    self._flush_notification_digest()
+                    last_digest_flush = time.time()
+
                 # Clean up expired user rules (Time Bombs) every 10 seconds
                 if time.time() - last_cleanup > 10:
                     cleaned_count = self.db.cleanup_expired_rules()
@@ -1065,7 +1125,7 @@ class NetStripEngine:
             except Exception as e:
                 logger.error(f"Watchdog error: {e}")
             
-            self._stop_event.wait(60.0) # Poll every minute
+            self._stop_event.wait(15.0)  # Poll every 15s (digest cadence)
                 
     def _fast_route_monitor_loop(self):
         """Monitors for routing changes (like connecting to a new Wi-Fi) and rapidly re-applies DNS hijacking."""
