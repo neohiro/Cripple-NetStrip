@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# netstrip-check — durable health check for Cripple-NetStrip headless
+# Modeled from node-verify (tailscale-exit hardening).
+# Usage: sudo bash deploy/netstrip-check
+set -uo pipefail
+PASS=0; FAIL=0
+label() { printf '%-22s %s\n' "$1" "$2"; [ "$2" = PASS ] && PASS=$((PASS+1)) || FAIL=$((FAIL+1)); }
+echo "=== NetStrip health check ==="
+# service
+systemctl --no-pager is-active cripple.service 2>/dev/null | grep -q active && label "cripple.service" PASS || label "cripple.service" FAIL
+# DB exists + has 3M+ domain count
+DB="${HOME}/.NetStrip/NetStrip.db"
+if [ -f "$DB" ]; then
+  CNT=$(sqlite3 "$DB" "SELECT COUNT(DISTINCT domain) FROM blocklist;" 2>/dev/null || echo 0)
+  [ -n "$CNT" ] && [ "$CNT" -ge 100000 ] 2>/dev/null && label "blocklist-count" PASS "domains=${CNT}" || label "blocklist-count" FAIL "domains=${CNT:-0} (target 100000+)"
+else
+  label "blocklist-count" FAIL "missing $DB"
+fi
+# list sources available
+SRC="${HOME}/.NetStrip/updater_sources.json"
+if [ -f "$SRC" ]; then
+  label "updater-sources" PASS "$SRC exists"
+else
+  label "updater-sources" WARN "missing $SRC"
+fi
+# binary cache exists
+for c in "${HOME}/.NetStrip/NetStrip_cache.pkl" "${HOME}/.NetStrip/lists/NetStrip_cache.pkl"; do
+  [ -f "$c" ] && label "cache-file" PASS "$c" && break
+done
+# fail-open can be invoked
+if [ -x /opt/cripple/netstrip/deploy/netstrip-failopen-recovery.sh ]; then
+  label "failopen-recovery" PASS "script executable"
+else
+  label "failopen-recovery" FAIL "missing /opt/cripple/netstrip/deploy/netstrip-failopen-recovery.sh"
+fi
+echo "=== passed=$PASS failed=$FAIL ==="
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1
