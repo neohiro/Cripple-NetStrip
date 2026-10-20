@@ -8,13 +8,21 @@ from netstrip.gui.theme import Colors, Fonts, Spacing, Icons, CTK_FRAME_STYLE
 from netstrip.gui.widgets import StatCard, ModeSelector, ShieldIndicator
 from netstrip.gui.utils import safe_loop, bind_copy_tooltip, add_card_bloom, add_bloom_hover
 
-class DashboardView(ctk.CTkScrollableFrame):
+class DashboardView(ctk.CTkFrame):
     def __init__(self, master, engine, **kwargs):
+        # The view root is a plain frame, *not* a scrollable one. Nesting a
+        # CTkScrollableFrame directly where the view is packed makes Tk create
+        # two competing scroll regions (the view and the window's tab host),
+        # which breaks wheel routing and makes the tab jump. The scrollable
+        # region is therefore created here as an explicit child.
         super().__init__(master, fg_color=Colors.BG_DARK, **kwargs)
         self.engine = engine
-        
+
+        self._scroll = ctk.CTkScrollableFrame(self, fg_color=Colors.BG_DARK)
+        self._scroll.pack(fill="both", expand=True)
+
         # Inner Frame with generous bottom padding so the user can scroll all the way down
-        self.inner = ctk.CTkFrame(self, fg_color="transparent")
+        self.inner = ctk.CTkFrame(self._scroll, fg_color="transparent")
         self.inner.pack(fill="both", expand=True, padx=24, pady=(20, 60))
         
         # Grid layout - enforce uniform column widths so dynamic text doesn't shift the UI

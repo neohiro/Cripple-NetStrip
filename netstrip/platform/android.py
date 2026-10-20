@@ -17,6 +17,14 @@ class AndroidPlatform(PlatformBase):
     def __init__(self):
         super().__init__()
         self.vpn_fd = -1
+        # Defined unconditionally. They used to be assigned only inside the
+        # try below, so a device (or a test) without pyjnius left them missing
+        # entirely and every method that touched them raised AttributeError
+        # instead of returning its documented False.
+        self.PythonActivity = None
+        self.VpnService = None
+        self.Context = None
+        self.Builder = None
         try:
             from jnius import autoclass
             self.PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -26,7 +34,6 @@ class AndroidPlatform(PlatformBase):
             self.Builder = autoclass('android.net.VpnService$Builder')
         except ImportError:
             logger.warning("pyjnius not available - Android native calls will fail.")
-            self.VpnService = None
 
     def is_admin(self) -> bool:
         # We don't use 'root' on Android, we use VpnService.
@@ -39,19 +46,23 @@ class AndroidPlatform(PlatformBase):
 
     def set_system_dns(self, interface: str, dns_server: str) -> bool:
         """
-        On Android, DNS is set when the VpnService is established using builder.addDnsServer().
-        We simulate it returning True.
+        On Android, DNS is set when the VpnService is established using
+        builder.addDnsServer(). There is no per-interface DNS setting to make:
+        the VpnService builder owns the resolver for the tunnel, so this only
+        needs to confirm a VpnService handle exists.
+
+        It deliberately does not touch PythonActivity.mActivity - that call
+        was never needed (nothing is done with the result) and it raised
+        AttributeError on any build without a live Activity, turning a
+        straightforward "is the VPN up" check into a crash.
         """
-        if not self.VpnService: return False
-        try:
-            context = self.PythonActivity.mActivity
-            # Note: We must have a running VpnService instance.
-            # In a full implementation, we'd pass this via an IPC or bound service.
-            logger.info(f"Android VpnService builder will intercept DNS queries and route to {dns_server}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to set Android DNS: {e}")
+        if not getattr(self, "VpnService", None):
             return False
+        logger.info(
+            f"Android VpnService builder will intercept DNS queries "
+            f"on {interface} and route to {dns_server}"
+        )
+        return True
 
     def restore_system_dns(self, interface: str) -> bool:
         # Bringing down the VpnService naturally restores DNS
@@ -152,3 +163,30 @@ class AndroidPlatform(PlatformBase):
 
     def is_autostart_installed(self) -> bool:
         return False
+
+    def disable_protocol_bindings(self) -> bool:
+        """No-op on Android.
+
+        The base class declares this abstract so every platform states its
+        answer explicitly. On Linux/Windows/macOS the method turns off
+        WPAD/LLDP/LLMNR/NetBIOS/SMB and the sysctls that accept those
+        protocols, all of which are adapter-level features of a desktop OS.
+        Android has none of them: there is no sysctl, no systemd, and no
+        smbd/avahi to stop - traffic is captured by VpnService at the fd
+        level before it reaches any adapter. Returning True records "nothing
+        to do, and that is correct", rather than raising and making the
+        platform uninstantiable (which is what happened before: the class was
+        abstract and `AndroidPlatform.__new__` raised TypeError, so the
+        Android path could not be constructed at all).
+        """
+        logger.debug(
+            "disable_protocol_bindings: no-op on Android (VpnService model)"
+        )
+        return True
+
+    def restore_protocol_bindings(self) -> bool:
+        """No-op on Android; the counterpart of disable_protocol_bindings."""
+        logger.debug(
+            "restore_protocol_bindings: no-op on Android (VpnService model)"
+        )
+        return True

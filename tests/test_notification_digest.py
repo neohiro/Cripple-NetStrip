@@ -3,10 +3,26 @@ Tests for the notification digest system.
 Verifies buffering, aggregation, flush-on-stop, and lock safety.
 """
 
+import builtins
+import os
 import threading
 
 import pytest
+
 from netstrip.core.engine import NetStripEngine
+
+_HERE = os.path.dirname(__file__)
+
+
+def _read_source(*parts: str) -> str:
+    """Read a source file from the package via a context manager.
+
+    Test-only helper for the wiring assertions below: they grep the real
+    source to confirm a call site exists, and must not leak the file handle.
+    """
+    path = os.path.join(_HERE, "..", "netstrip", *parts)
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
 
 
 @pytest.fixture()
@@ -34,15 +50,21 @@ class TestNotificationDigest:
     def test_flush_clears_buffer(self, engine_stub, monkeypatch):
         """Flush must clear the buffer so events aren't double-counted."""
         toasted = []
-        monkeypatch.setattr(
-            "builtins.__import__",
-            lambda name, *a, **kw: (
-                type("M", (), {"notification": type("N", (), {
+        # Capture the real __import__ *before* patching builtins. Calling
+        # __import__ from inside the replacement looks up the name again and
+        # finds the replacement, so it recursed until Python raised
+        # RecursionError - which pytest then turned into a hard INTERNALERROR
+        # that aborted the entire test run (not just this file).
+        real_import = builtins.__import__
+
+        def fake_import(name, *a, **kw):
+            if name == "plyer":
+                return type("M", (), {"notification": type("N", (), {
                     "notify": staticmethod(lambda **kw2: toasted.append(kw2))
                 })()})
-                if name == "plyer" else __import__(name, *a, **kw)
-            ),
-        )
+            return real_import(name, *a, **kw)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
         engine_stub._note_blocked_for_digest("malware")
         engine_stub._flush_notification_digest()
         assert engine_stub._digest_buffer == {}
@@ -73,12 +95,15 @@ class TestNotificationDigest:
     def test_dns_sinkhole_feeds_digest(self, tmp_path):
         """DNS sinkholed domains must appear in the digest (regression)."""
         # This is verified by checking the call exists in dns_proxy source
-        src = open(
-            os.path.join(os.path.dirname(__file__), "..", "netstrip", "core", "dns_proxy.py"),
-            encoding="utf-8",
-        ).read()
-        assert "_note_blocked_for_digest" in src, \
+        assert "_note_blocked_for_digest" in _read_source("core", "dns_proxy.py"), \
             "dns_proxy.py does not feed the notification digest"
 
+    def test_digest_is_flushed_by_runtime_loop(self):
+        """The digest must actually be drained at runtime, not only in tests.
 
-import os  # noqa: E402 — needed at module level for test above
+        Defining _flush_notification_digest() (or feeding the buffer) is not
+        enough: if nothing periodic calls it, blocked events accumulate for the
+        process lifetime and no aggregate toast is ever shown. Pin the wiring.
+        """
+        assert "_flush_notification_digest()" in _read_source("core", "engine.py"), \
+            "engine.py defines the digest flush but never calls it from a loop"

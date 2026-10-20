@@ -13,6 +13,28 @@ import hmac
 import hashlib
 import logging
 
+# Native backend detection (see QuantumFernet.prefer_native).
+#
+# AES-256-CBC output is byte-identical whether computed in pure Python here or
+# by the `cryptography` (OpenSSL) backend, so tokens stay interchangeable
+# between peers that disagree on backend. We only use OpenSSL as a speed-up:
+# the pure-Python implementation below remains the always-available fallback
+# (e.g. Windows Defender Application Control environments where native wheels
+# cannot load, and Android builds without the wheel).
+#
+# `_NATIVE_AVAILABLE` is True only when the full cipher stack imported cleanly;
+# any ImportError/OSError leaves it False and every call stays pure Python.
+_NATIVE_AVAILABLE = False
+_aes_cbc = None
+try:
+    from cryptography.hazmat.primitives.ciphers import Cipher as _Cipher  # noqa: F401
+    from cryptography.hazmat.primitives.ciphers import algorithms as _algorithms  # noqa: F401
+    from cryptography.hazmat.primitives.ciphers import modes as _modes  # noqa: F401
+    _aes_cbc = (_Cipher, _algorithms, _modes)
+    _NATIVE_AVAILABLE = True
+except Exception:
+    _aes_cbc = None
+
 logger = logging.getLogger(__name__)
 
 # Rijndael S-Box and Inverse S-Box
@@ -200,7 +222,8 @@ class QuantumFernet:
     VERSION_POST_QUANTUM = 0x90
     VERSION_LEGACY = 0x80
 
-    def __init__(self, key):
+    def __init__(self, key, prefer_native: bool = True):
+        self.prefer_native = bool(prefer_native) and _NATIVE_AVAILABLE
         if isinstance(key, str):
             key = key.strip().encode('utf-8')
         try:
@@ -235,7 +258,7 @@ class QuantumFernet:
             data = data.encode('utf-8')
         current_time = int(time.time())
         iv = os.urandom(16)
-        ciphertext = aes_256_cbc_encrypt(data, self._encryption_key, iv)
+        ciphertext = self._aes_encrypt_block(data, iv)
         # Format: Version (1 byte) | Timestamp (8 bytes uint64) | IV (16 bytes) | Ciphertext
         basic_parts = bytes([self.VERSION_POST_QUANTUM]) + struct.pack('>Q', current_time) + iv + ciphertext
         # 32-byte truncated HMAC-SHA512 for optimal packet efficiency and quantum integrity
@@ -272,13 +295,70 @@ class QuantumFernet:
             
         if ttl is not None:
             now = int(time.time())
-            if timestamp + ttl < now or timestamp > now + 60:
+            # Expire once the token has *reached* ttl seconds of age, i.e.
+            # now >= timestamp + ttl. Using a strict `<` meant a ttl=1 token
+            # minted at second T was still accepted at second T+1 (the age was
+            # already 1 but the comparison asked for >1), so the shortest
+            # useful ttl behaved as ttl=2. The 60s future-drift allowance is
+            # unchanged.
+            if timestamp + ttl <= now or timestamp > now + 60:
                 raise InvalidToken("Token expired")
                 
         try:
-            return aes_256_cbc_decrypt(ciphertext, self._encryption_key, iv)
+            return self._aes_decrypt_block(ciphertext, iv)
+        except InvalidToken:
+            raise
         except Exception as e:
             raise InvalidToken(f"Decryption failed: {e}")
+
+    # -- AES backend dispatch ---------------------------------------------
+    # These two helpers are the only place the native/pure-Python choice is
+    # made. Both raise the same ValueError surface as the pure-Python
+    # primitives, and both fall back to pure Python if the native backend
+    # fails at runtime (never worse than the pre-native behaviour).
+
+    def _aes_encrypt_block(self, data: bytes, iv: bytes) -> bytes:
+        if self.prefer_native and _aes_cbc is not None:
+            try:
+                return self._native_cbc_encrypt(data, iv)
+            except Exception:
+                pass
+        return aes_256_cbc_encrypt(data, self._encryption_key, iv)
+
+    def _aes_decrypt_block(self, ciphertext: bytes, iv: bytes) -> bytes:
+        if self.prefer_native and _aes_cbc is not None:
+            try:
+                return self._native_cbc_decrypt(ciphertext, iv)
+            except InvalidToken:
+                raise
+            except Exception:
+                pass
+        return aes_256_cbc_decrypt(ciphertext, self._encryption_key, iv)
+
+    def _native_cbc_encrypt(self, data: bytes, iv: bytes) -> bytes:
+        Cipher, algorithms, modes = _aes_cbc
+        pad_len = 16 - (len(data) % 16)
+        padded = data + bytes([pad_len] * pad_len)
+        enc = Cipher(algorithms.AES(self._encryption_key), modes.CBC(iv)).encryptor()
+        return enc.update(padded) + enc.finalize()
+
+    def _native_cbc_decrypt(self, data: bytes, iv: bytes) -> bytes:
+        Cipher, algorithms, modes = _aes_cbc
+        if len(data) % 16 != 0:
+            raise ValueError("Ciphertext length must be a multiple of 16")
+        dec = Cipher(algorithms.AES(self._encryption_key), modes.CBC(iv)).decryptor()
+        decrypted = dec.update(data) + dec.finalize()
+        # PKCS7 unpad, mirroring aes_256_cbc_decrypt's validation exactly
+        # (same messages and empty-output rejection) so the two backends are
+        # indistinguishable to callers and to tamper detection.
+        if not decrypted:
+            raise ValueError("Decrypted output is empty")
+        pad_len = decrypted[-1]
+        if pad_len < 1 or pad_len > 16:
+            raise ValueError("Invalid PKCS7 padding")
+        if decrypted[-pad_len:] != bytes([pad_len]) * pad_len:
+            raise ValueError("Invalid PKCS7 padding")
+        return decrypted[:-pad_len]
 
 # Transparent drop-in alias
 Fernet = QuantumFernet

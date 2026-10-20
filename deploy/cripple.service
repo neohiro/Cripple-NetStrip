@@ -1,0 +1,41 @@
+[Unit]
+Description=Cripple NetStrip 3.9.3 Headless (fail-open hardened)
+Documentation=file:///opt/cripple/netstrip/README.md
+After=network-online.target
+Wants=network-online.target
+# Never let a bad state wedge the boot sequence.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cripple/netstrip
+Environment=PYTHONPATH=/opt/cripple/netstrip
+Environment=PYTHONUNBUFFERED=1
+# Headless hint: some builds key off this instead of a missing DISPLAY.
+Environment=NETSTRIP_HEADLESS=1
+
+# --- Fail-open guarantees -------------------------------------------------
+# 1. Strip any blackhole rules left by a previous run BEFORE starting the
+#    engine. Without this a killswitch trip survives restarts and a remote
+#    node can never be reached again.
+ExecStartPre=-/bin/bash /opt/cripple/netstrip/deploy/netstrip-failopen-recovery.sh
+
+ExecStart=/usr/bin/python3 /opt/cripple/netstrip/main_fixed.py --service
+
+# 2. If the process dies, restore the network immediately. The engine also
+#    spawns its own watchdog, but this is the belt-and-braces layer that works
+#    even when the engine dies before it can spawn one.
+ExecStopPost=-/bin/bash /opt/cripple/netstrip/deploy/netstrip-failopen-recovery.sh
+
+Restart=always
+RestartSec=10
+TimeoutStopSec=20
+KillMode=mixed
+
+# --- Hardening ------------------------------------------------------------
+NoNewPrivileges=no
+ProtectSystem=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

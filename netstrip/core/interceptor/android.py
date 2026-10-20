@@ -19,6 +19,7 @@ import logging
 from typing import Callable
 
 from netstrip.core.interceptor.base import PacketInterceptor
+from netstrip.core.dns_proxy import ANDROID_DNS_PORT
 
 logger = logging.getLogger("AndroidInterceptor")
 
@@ -206,7 +207,11 @@ class AndroidVPNInterceptor(PacketInterceptor):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(3.0)
-            sock.sendto(payload, ("127.0.0.1", 5053))
+            # Shared constant, not a literal: the engine binds ANDROID_DNS_PORT
+            # on Android while this runs in the VPN process. Hardcoding 5053
+            # here (when the engine used 5353) sent every intercepted query to
+            # a closed port, so DNS silently timed out on-device.
+            sock.sendto(payload, ("127.0.0.1", ANDROID_DNS_PORT))
             resp, _ = sock.recvfrom(4096)
             sock.close()
             return resp
