@@ -148,7 +148,7 @@ class GeoIPService:
         
         while self.is_running:
             # Poll every 30 seconds (Event-driven changes are handled instantly by WindowsMicroMonitor)
-            self._stop_event.wait(30) 
+            self._stop_event.wait(10) 
             if self.is_running:
                 self.fetch_now()
 
