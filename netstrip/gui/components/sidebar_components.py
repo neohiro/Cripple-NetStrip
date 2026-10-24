@@ -614,81 +614,87 @@ class AppGroupFrame(ctk.CTkFrame):
         # The system block visual override is handled in refresh_global_state during the UI loop
     def _toggle_global_action(self, target_action: str):
         def proceed():
-            # Determine if we are turning the action ON or OFF (Explicit 3-State Toggle)
+            # Fast 3-state toggle
             if self._global_action_state == target_action:
-                # Toggle OFF -> Set explicit Neutral state (both buttons transparent, individual evaluation active)
                 new_state = 'neutral'
                 db_action = 'neutral'
             else:
-                # Toggle ON -> Set state
                 new_state = target_action
                 db_action = target_action
-                
+
             self._global_action_state = new_state
-            
-            # Update button visuals immediately
+
+            # Immediate button recolor (no bloom overhead during bulk)
             if new_state == 'block':
                 self.btn_block_all.configure(fg_color="#f43f5e", text_color=Colors.TEXT_PRIMARY)
                 self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
             elif new_state == 'allow':
                 self.btn_allow_all.configure(fg_color=Colors.SUCCESS, text_color=Colors.TEXT_PRIMARY)
                 self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-            else: # 'neutral' / both off
+            else:
                 self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
                 self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
-                
-            # Update OS Firewall
+
+            # Firewall update (fast native call)
             rule_name = f"NetStrip_AppBlock_{self.process_name}"
-            if new_state == 'block' and self.process_path:
-                self.engine.platform.add_firewall_rule(
-                    rule_name=rule_name,
-                    direction="out",
-                    action="block",
-                    program=self.process_path
-                )
-            else:
-                self.engine.platform.remove_firewall_rule(rule_name=rule_name)
-                
-            # Update Database
-            current_mode = self.engine.classifier.mode.name
-            mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
-            
-            # First remove any existing global app rule for this app under the current mode scope
             try:
-                conn = self.engine.db._get_connection()
-                conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
-                conn.commit()
-            except:
+                if new_state == 'block' and self.process_path:
+                    self.engine.platform.add_firewall_rule(rule_name=rule_name, direction="out", action="block", program=self.process_path)
+                else:
+                    self.engine.platform.remove_firewall_rule(rule_name=rule_name)
+            except Exception:
                 pass
-                
-            # Store explicit rule (allow, block, or neutral)
-            self.engine.db.add_user_rule({
-                'pattern': '*',
-                'action': db_action,
-                'scope': 'app',
-                'app_name': self.process_name,
-                'category': 'user_allowed' if db_action == 'allow' else ('user_blocked' if db_action == 'block' else 'essential'),
-                'note': self.process_path,
-                'mode_scope': mode_scope
-            })
-                
-            # Sync memory instantly for this mode scope
-            if hasattr(self.engine.blocklist, 'sync_user_rules'):
-                self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
-                if hasattr(self.engine, 'on_status_update'):
-                    self.engine.on_status_update("rules_changed")
-                
-            # Apply action to all existing child rows
+
+            # Async DB write so UI never stalls
+            def _db_write():
+                try:
+                    current_mode = self.engine.classifier.mode.name
+                    mode_scope = "PARANOID" if current_mode.upper() in ("GHOST", "PARANOID") else "STANDARD"
+                    conn = self.engine.db._get_connection()
+                    conn.execute("DELETE FROM user_rules WHERE scope='app' AND app_name=? AND (mode_scope=? OR mode_scope='ALL')", (self.process_name, mode_scope))
+                    conn.commit()
+                    self.engine.db.add_user_rule({
+                        'pattern': '*', 'action': db_action, 'scope': 'app',
+                        'app_name': self.process_name,
+                        'category': 'user_allowed' if db_action == 'allow' else ('user_blocked' if db_action == 'block' else 'essential'),
+                        'note': self.process_path, 'mode_scope': mode_scope
+                    })
+                except Exception:
+                    pass
+            self.after(1, _db_write)
+
+            # Sync blocklist (deferred)
+            def _sync():
+                try:
+                    if hasattr(self.engine.blocklist, 'sync_user_rules'):
+                        self.engine.blocklist.sync_user_rules(self.engine.db.get_user_rules(mode_scope=mode_scope))
+                    if hasattr(self.engine, 'on_status_update'):
+                        self.engine.on_status_update("rules_changed")
+                except Exception:
+                    pass
+            self.after(50, _sync)
+
+            # Apply to child rows efficiently (batch update, skip pulse/draw overhead)
             if db_action in ('neutral', 'remove'):
                 for target, row in list(self.rows.items()):
-                    row.destroy()
+                    try:
+                        row.destroy()
+                    except Exception:
+                        pass
                 self.rows.clear()
                 self.visible_count = 0
             else:
-                for target, row in self.rows.items():
+                for target, row in list(self.rows.items()):
                     try:
-                        row._on_action(db_action)
-                    except:
+                        # Fast action toggle without full pulse redraw
+                        action = db_action
+                        if action == 'allow':
+                            row.btn_allow.configure(fg_color=Colors.SUCCESS_DIM, text_color=Colors.TEXT_PRIMARY)
+                            row.btn_block.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                        elif action == 'block':
+                            row.btn_block.configure(fg_color="#4a1525", text_color=Colors.TEXT_PRIMARY)
+                            row.btn_allow.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+                    except Exception:
                         pass
 
         if target_action == 'allow' and self._global_action_state != 'allow':
