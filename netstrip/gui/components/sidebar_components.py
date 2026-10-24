@@ -724,6 +724,10 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
+        # Block All purple when every visible child connection is blocked by a rule
+        if len(self.rows) > 0 and all(r.conn_data.get('action') == 'block' for r in self.rows.values()):
+            self._global_action_state = 'block'
+        
         # System block indicator applies unless user explicitly allowed
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
         if sys_blocked and not has_explicit_allow:
