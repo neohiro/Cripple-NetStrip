@@ -93,7 +93,7 @@ class GeoIPService:
             ssl_ctx.verify_mode = ssl.CERT_NONE
 
         # Helper to try a provider URL
-        def try_provider(url: str, is_json: bool = True, timeout: float = 3.0) -> Optional[Dict]:
+        def try_provider(url: str, is_json: bool = True, timeout: float = 1.5) -> Optional[Dict]:
             try:
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NetStrip/1.0'})
                 with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx if url.startswith('https') else None) as resp:
@@ -108,15 +108,13 @@ class GeoIPService:
         # Randomize provider pool for redundancy and privacy (don't always hit same domain)
         providers = [
             {'url': 'https://ipapi.co/json/', 'type': 'ipapi'},
-            {'url': 'https://ipinfo.io/json', 'type': 'ipinfo'},
             {'url': 'https://ipwho.is/', 'type': 'ipwho'},
-            {'url': 'http://ip-api.com/json/', 'type': 'ip-api'}
         ]
         import random
         random.shuffle(providers)
         
         for prov in providers:
-            d = try_provider(prov['url'])
+            d = try_provider(prov['url'], timeout=1.5)
             if d and (d.get('ip') or d.get('query')):
                 cc = d.get('country_code') or d.get('countryCode') or d.get('country', 'XX')
                 ip_str = d.get('ip') or d.get('query')
@@ -134,7 +132,7 @@ class GeoIPService:
                 return True
 
         # Fallback to ipify for IP-only
-        d5 = try_provider('https://api.ipify.org', is_json=False)
+        d5 = try_provider('https://api.ipify.org', is_json=False, timeout=1.5)
         if d5 and d5.get('ip'):
             self.current_data['ip'] = d5.get('ip')
             for cb in self.callbacks:
