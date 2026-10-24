@@ -9,12 +9,28 @@ class AnimatedLogo(ctk.CTkCanvas):
         self.width = width
         self.height = height
         
+        # sx, sy computed explicitly so initial frame coords are valid before first draw
         self._scale_x = width / 200.0
         self._scale_y = height / 160.0
+        sx = self._scale_x
+        sy = self._scale_y
+        cx = self.width / 2
+        cy = self.height / 2
         
         # Main logo shape - shield with circuit pattern
+        shield_pts_initial = [
+            cx, cy - 70*sy,
+            cx + 50*sx, cy - 40*sy,
+            cx + 65*sx, cy + 10*sy,
+            cx + 45*sx, cy + 55*sy,
+            cx, cy + 80*sy,
+            cx - 45*sx, cy + 55*sy,
+            cx - 65*sx, cy + 10*sy,
+            cx - 50*sx, cy - 40*sy,
+        ]
+        flat_pts_initial = [coord for pt in zip(shield_pts_initial[::2], shield_pts_initial[1::2]) for coord in pt]
         self.shield_path = self.create_polygon(
-            [0]*14, fill=Colors.ACCENT_PRIMARY, outline="", smooth=True
+            flat_pts_initial, fill=Colors.ACCENT_PRIMARY, outline="", smooth=True
         )
         self.circuit_lines = []
         for _ in range(6):
@@ -24,7 +40,7 @@ class AnimatedLogo(ctk.CTkCanvas):
         # Glow layers for bloom effect
         self.glow_layers = []
         for i in range(3):
-            glow = self.create_polygon([0]*14, fill="", outline="", smooth=True)
+            glow = self.create_polygon(*flat_pts_initial, fill="", outline="", smooth=True)
             self.glow_layers.append(glow)
         
         self._animation_step = 0
