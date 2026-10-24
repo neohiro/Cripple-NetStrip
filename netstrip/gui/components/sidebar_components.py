@@ -730,9 +730,10 @@ class AppGroupFrame(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # Block All purple when every visible child connection is blocked by a rule
+        # Block All purple (inferred) when every visible child connection is blocked by a rule
+        self._inferred_purple = False
         if len(self.rows) > 0 and all(r.conn_data.get('action') == 'block' for r in self.rows.values()):
-            self._global_action_state = 'block'
+            self._inferred_purple = True
         
         # System block indicator applies unless user explicitly allowed
         sys_blocked = self.engine.db.get_setting("block_system_connections", "false") == "true"
@@ -742,8 +743,8 @@ class AppGroupFrame(ctk.CTkFrame):
             if p_lower in ('explorer.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe', 'svchost.exe', 'services.exe', 'wininit.exe', 'smss.exe', 'systemd', 'init', 'bash', 'sh', 'zsh', 'conhost.exe', 'wsl.exe', 'taskhostw.exe', 'spoolsv.exe', 'wermgr.exe', 'csrss.exe', 'lsass.exe', 'system', 'system (kernel/driver)', 'system idle process'):
                 is_system = True
             elif len(self.rows) > 0 and all(r.conn_data.get('action') == 'block' for r in self.rows.values()):
-                # All visible child connections blocked by rule -> parent shows Block All
-                self._global_action_state = 'block'
+                # Inferred purple (all blocked by rule) — not user override
+                self._inferred_purple = True
             elif len(self.rows) > 0 and all(r.conn_data.get('category') in ('system', ConnectionCategory.SYSTEM.value, 'telemetry', 'tracker', 'ad', 'malware') or r.conn_data.get('action') == 'block' for r in self.rows.values()):
                 is_system = True
                 
@@ -762,6 +763,10 @@ class AppGroupFrame(ctk.CTkFrame):
         elif self._global_action_state == 'neutral':
             # User explicitly turned off both toggles — both transparent!
             self.btn_block_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+            self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
+        elif self._inferred_purple:
+            # All visible child connections blocked by rule — purple (not user override)
+            self.btn_block_all.configure(fg_color="#8b5cf6", text_color=Colors.TEXT_PRIMARY)
             self.btn_allow_all.configure(fg_color="transparent", text_color=Colors.TEXT_SECONDARY)
         elif self._system_blocked:
             # Block System Connections is active for this system process -> Block All lights up RED!
