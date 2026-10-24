@@ -66,7 +66,8 @@ class DNSSelectorModal(ctk.CTkToplevel):
         self._populate_list(list(self.dns_options_map.keys()))
         
         # Center window
-        self.update_idletasks()
+        # Defer layout to avoid blocking initial draw
+        self.after(50, lambda: self.update())
         x = master.winfo_rootx() + (master.winfo_width() // 2) - (400 // 2)
         y = master.winfo_rooty() + (master.winfo_height() // 2) - (500 // 2)
         self.geometry(f"+{x}+{y}")

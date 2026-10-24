@@ -577,10 +577,8 @@ class NetStripApp(ctk.CTk):
             self.connections_list.set_expanded(False)
             self.btn_expand.configure(text="◀ Expand Sidebar", font=(Fonts.FAMILY_PRIMARY[0], 12, "bold"))
             
-        try:
-            self.update_idletasks()
-        except Exception:
-            pass
+        # Defer layout finalization to avoid blocking redraw
+        self.after(10, lambda: self.update())
 
     def _add_nav_btn(self, row, text, icon, view_class):
         btn_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=40)
@@ -651,7 +649,7 @@ class NetStripApp(ctk.CTk):
         if self.current_view:
             self.current_view.grid_remove()
             
-        self.update_idletasks()
+        self.after(10, lambda: self.update())
         
         def _build_and_show():
             try:
@@ -745,7 +743,7 @@ class NetStripApp(ctk.CTk):
         btn_frame = ctk.CTkFrame(modal, fg_color="transparent")
         btn_frame.pack()
         
-        ctk.CTkButton(btn_frame, text="Cancel", command=modal.destroy, fg_color=Colors.BG_INPUT, hover_color=Colors.BORDER_HOVER, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="Cancel", height=36, command=modal.destroy, fg_color=Colors.BG_INPUT, hover_color=Colors.BORDER_HOVER, text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=5)
         
         def confirm_bypass():
             self.engine.set_killswitch(False)
@@ -753,7 +751,7 @@ class NetStripApp(ctk.CTk):
             self.btn_killswitch.configure(text="CRIPPLE: OFF (BYPASS)", fg_color=Colors.WARNING)
             modal.destroy()
             
-        ctk.CTkButton(btn_frame, text="Proceed to OFF", command=confirm_bypass, fg_color=Colors.WARNING, text_color="white").pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="Proceed to OFF", height=36, command=confirm_bypass, fg_color=Colors.WARNING, text_color="white").pack(side="left", padx=5)
 
     def _show_critical_recovery_modal(self, message: str):
         try:

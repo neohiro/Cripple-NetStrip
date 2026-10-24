@@ -53,13 +53,13 @@ class ManualKillswitchModal(ctk.CTkToplevel):
         btn_frame.pack(fill="x", pady=(10, 0))
         
         btn_cancel = ctk.CTkButton(
-            btn_frame, text="ABORT", fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
+            btn_frame, text="ABORT", height=44, fg_color="transparent", border_width=1, border_color=Colors.BORDER_SUBTLE, 
             hover_color=Colors.BG_PANEL, text_color=Colors.TEXT_TERTIARY, bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_cancel
         )
         btn_cancel.pack(side="left", expand=True, padx=(0, 5))
         
         btn_confirm = ctk.CTkButton(
-            btn_frame, text="ENGAGE", fg_color=Colors.DANGER, 
+            btn_frame, text="ENGAGE", height=44, fg_color=Colors.DANGER, 
             hover_color="#991b1b", text_color="#ffffff", bg_color=Colors.BG_DARKEST, corner_radius=8, command=self.on_confirm
         )
         btn_confirm.pack(side="right", expand=True, padx=(5, 0))

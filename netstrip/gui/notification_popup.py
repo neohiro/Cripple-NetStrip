@@ -35,10 +35,10 @@ class NotificationPopup(ctk.CTkToplevel):
         
         btn_frame.grid_columnconfigure((0, 1, 2), weight=1)
         
-        allow_btn = ctk.CTkButton(btn_frame, text="Allow Always", fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS, command=lambda: self._resolve('allow'))
+        allow_btn = ctk.CTkButton(btn_frame, text="Allow Always", height=36, fg_color=Colors.SUCCESS_DIM, hover_color=Colors.SUCCESS, command=lambda: self._resolve('allow'))
         allow_btn.grid(row=0, column=0, padx=Spacing.SM)
         
-        block_btn = ctk.CTkButton(btn_frame, text="Block Always", fg_color=Colors.DANGER_DIM, hover_color=Colors.DANGER, command=lambda: self._resolve('block'))
+        block_btn = ctk.CTkButton(btn_frame, text="Block Always", height=36, fg_color=Colors.DANGER_DIM, hover_color=Colors.DANGER, command=lambda: self._resolve('block'))
         block_btn.grid(row=0, column=1, padx=Spacing.SM)
         
         # Auto-timeout logic can be added here
