@@ -137,7 +137,7 @@ class SplashScreen(ctk.CTkToplevel):
         except Exception:
             pass
             
-        self._cycle_id = self.after(600, self._cycle_loading_text)
+        self._cycle_id = self.after(2500, self._cycle_loading_text)
 
     def fade_out(self, callback=None, step=0, total_steps=10):
         """Fade out the splash screen smoothly before destroying it."""

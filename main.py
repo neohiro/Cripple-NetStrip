@@ -886,7 +886,7 @@ def main():
     
                 # Wait for both the engine's blocklist to load AND our UI to be fully built and packed
                 is_blocklist_ready = hasattr(engine, 'blocklist') and not engine.blocklist.is_loading
-                if (is_blocklist_ready and ui_ready and elapsed >= 1.2) or elapsed >= 30.0:
+                if (is_blocklist_ready and ui_ready and elapsed >= 1.2) or elapsed >= 8.0:
                     transition_started = True
                     if splash and splash.winfo_exists():
                         try:
