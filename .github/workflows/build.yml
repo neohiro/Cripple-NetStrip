@@ -119,6 +119,10 @@ jobs:
         run: |
           python -m pytest tests/ -v --timeout=30 --tb=short -q --cov=netstrip --cov-report=term-missing --cov-fail-under=50
 
+      - name: Security regression gate (Dutch audit hardening)
+        run: |
+          python tests/test_security_hardening.py || (echo "SECURITY REGRESSION FAILED — do not release"; exit 1)
+
       - name: Verify imports
         run: |
           python -c "import netstrip; print(f'NetStrip v{netstrip.__version__} imported successfully')"
