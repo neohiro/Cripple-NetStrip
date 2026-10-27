@@ -9,8 +9,8 @@ Flow (Settings → Updates → "Download & Verify Update"):
      (case-insensitive). Any mismatch aborts before the file is ever executed.
 
 Trust anchor: the manifest is fetched over TLS from the same release object.
-An optional ed25519 detached signature is honored when the environment variable
-NETSTRIP_UPDATE_PUBKEY (base64, 32-byte key) and a `<asset>.sig` are present —
+A mandatory ed25519 detached signature is verified against the embedded
+hardcoded public key — no environment variable required for trust.
 enabling out-of-band signing later without another format change.
 """
 
@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 
 REPO_API_LATEST = "https://api.github.com/repos/neohiro/Cripple-NetStrip/releases/latest"
 USER_AGENT = "NetStrip-SelfUpdate/1.0"
+
+
+# Hardcoded ed25519 public key — verification does NOT expect env var.
+# This avoids relying solely on NETSTRIP_UPDATE_PUBKEY at runtime.
+# FUTURE RELEASES: To rotate signing key, update EMBEDDED_UPDATE_PUBKEY_B64
+# and generate new `.sig` files with matching private key. Both constant + .sig
+# must stay in sync — the updater rejects any mismatch.
+EMBEDDED_UPDATE_PUBKEY_B64 = "b8kDgJg2dj61be0P0sUUQiJUt5Yk96d01pXw2qh4d-c="
 
 
 class SelfUpdateError(Exception):
@@ -223,7 +231,7 @@ class SelfUpdater:
                 "published manifest and was deleted."
             )
 
-        self._verify_optional_signature(zip_path)
+        self._verify_signature(zip_path)
 
         # Clean up manifest (already consumed)
         with contextlib.suppress(Exception):
@@ -233,12 +241,15 @@ class SelfUpdater:
         prog("done")
         return zip_path
 
-    def _verify_optional_signature(self, path: Path):
-        """ed25519 detached signature check when both pubkey env and .sig exist."""
-        pub_b64 = os.environ.get("NETSTRIP_UPDATE_PUBKEY")
+    def _verify_signature(self, path: Path):
+        """Mandatory ed25519 detached signature verification (embedded key preferred)."""
+        pub_b64 = EMBEDDED_UPDATE_PUBKEY_B64
         sig_path = path.with_name(path.name + ".sig")
         if not pub_b64 or not sig_path.exists():
-            return
+            raise SelfUpdateError(
+                "Mandatory ed25519 update signature missing: hardcoded pubkey "+
+                "verification requires valid .sig file."
+            )
         try:
             from cryptography.hazmat.primitives.asymmetric import ed25519
 

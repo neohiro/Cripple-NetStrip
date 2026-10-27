@@ -26,7 +26,7 @@ It's not just a DNS blocker. It intercepts traffic at the raw packet level — b
 
 - **Complete visibility** — A live dashboard showing every connection every app on your system is making, right now, in real time.
 - **Surgical control** — Block individual domains, entire apps, or nuke your entire network connection with one click.
-- **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS kernel level. Apps can't bypass it, and neither can your browser's DNS-over-HTTPS.
+- **Protection that actually works** — Unlike browser extensions or hosts-file blockers, Cripple operates at the OS packet-interception layer using WinDivert (Windows), NFQueue (Linux), or PF (macOS). Apps can't bypass it, and neither can your browser's DNS-over-HTTPS.
 - **Zero-configuration privacy** — Ships with **3.2+ Million unique blocked domains** out of the box across 49 active threat feeds. Ads, trackers, telemetry, and malware — gone before you even open a browser.
 - **Hardware stealth** — Includes MAC Address Randomization and network adapter hardening to prevent device fingerprinting.
 - **Native OS Firewall Sync** — Automatically detects your manually set Windows Firewall block/allow rules and natively enforces them at the packet level.
@@ -269,7 +269,7 @@ For the technically curious — here's what powers the engine.
 ### Architecture
 Two independent layers that never block each other:
 
-1. **Core Engine** — Multi-threaded C-level daemon: packet evaluation, SQLite logging, DNS proxying, kernel route monitoring, anomaly detection
+1. **Core Engine** — Multi-threaded Python engine with WinDivert (Windows), NFQueue (Linux), PF (macOS) packet interception, SQLite logging, DNS proxying, kernel route monitoring, anomaly detection
 2. **GUI** — Hardware-accelerated CustomTkinter visualizer, fully optional. Can be closed for pure headless operation
 
 ### Security Hardening
@@ -278,7 +278,7 @@ Two independent layers that never block each other:
 |---|---|
 | **🛡️ NIST CSF 2.0 Resilience** | Process watchdog with crash recovery, memory-bound caching, IPC timeouts (Slowloris mitigation), and thread exhaust prevention |
 | **🛡️ ISO/IEC 25010 Quality** | Architecture meets ISO standards for Reliability, Performance Efficiency, and Security via strict fail-safe state handling and WAL DB |
-| **🛡️ Post-Quantum Cryptography** | Pure-Python AES-256-CBC + HMAC-SHA512 + HKDF-SHA512 (immune to Grover's quantum attack & WDAC blocks) |
+| **🔒 Post-Quantum Resistant Crypto** | AES-256-CBC + HMAC-SHA512 + HKDF-SHA512 with `cryptography` native backend. Provides enhanced resistance (not full quantum immunity — no practical quantum-resistant cryptosystem is fully standardized yet) |
 | **🔍 HMAC-SHA512 Watchdog** | Ephemeral 512-bit keyed hashes continuously verify integrity of all engine files & modules against live tampering |
 | **DLL Sideloading Mitigation** | `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` + dynamic `_MEIPASS` search path restriction at startup |
 | **IPC Command Validation** | Regex-validated domain commands on the IPC socket |
@@ -291,8 +291,8 @@ Two independent layers that never block each other:
 
 ### Compliance Standards
 Cripple is engineered to align with two major cybersecurity standards:
-- **NIST Cybersecurity Framework 2.0 (CSF 2.0)**: Specifically addressing the **Govern, Protect, Detect, and Recover** functions. Cripple automatically restores network configurations (DNS, firewall rules, active bindings) on ungraceful exits, monitors process integrity via a cryptographic watchdog, and implements local Denial of Service (DoS) protections.
-- **ISO/IEC 25010:2011**: System quality strictly models the standards for **Reliability** (fault tolerance, recoverability), **Security** (confidentiality, integrity), and **Performance Efficiency** (memory-bound caches, socket timeouts, adaptive thread polling).
+- **NIST Cybersecurity Framework 2.0 (CSF 2.0)**: Cripple is designed to align with the **Govern, Protect, Detect, and Recover** functions (not certified or formally audited to NIST/ISO standards). It automatically restores network configurations on ungraceful exits, monitors process integrity via a cryptographic watchdog, and implements local DoS protections.
+- **ISO/IEC 25010:2011**: System quality is modeled after (not certified to) the standards for **Reliability** (fault tolerance, recoverability), **Security** (confidentiality, integrity), and **Performance Efficiency** (memory-bound caches, socket timeouts, adaptive thread polling).
 
 ### Performance
 

@@ -7,14 +7,20 @@ indexed category sets, and fast binary serialization.
 import os
 import threading
 import json
-import pickle
 import hashlib
 import logging
 import re
 import datetime
+import hmac
+import base64
 from typing import Tuple, Optional, Dict, Set, List, Any, Callable
 from concurrent.futures import ThreadPoolExecutor
 from netstrip.core.modes import ConnectionCategory
+
+# Cache security constants
+CACHE_HMAC_KEY_ENV = "NETSTRIP_CACHE_HMAC_KEY"
+CACHE_FORMAT_ENV = "NETSTRIP_CACHE_FORMAT"  # "auto" (default), "json", "pickle"
+DEFAULT_CACHE_FORMAT = "auto"
 
 logger = logging.getLogger(__name__)
 
@@ -275,17 +281,14 @@ class BlocklistManager:
                 pass
 
     def _get_cache_paths(self) -> List[str]:
-        """Return potential cache file locations in priority order (.pkl binary then .json)."""
+        """Return potential cache file locations in priority order (.json preferred, avoid pickle)."""
         paths = []
         user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
-        # 1. High-speed binary pickle caches
-        paths.append(os.path.join(user_dir, "NetStrip_cache.pkl"))
-        if self.lists_dir:
-            paths.append(os.path.join(self.lists_dir, "NetStrip_cache.pkl"))
-        # 2. JSON caches (fallback / compatibility)
+        # Prefer JSON caches for safety
         paths.append(os.path.join(user_dir, "NetStrip_cache.json"))
         if self.lists_dir:
             paths.append(os.path.join(self.lists_dir, "NetStrip_cache.json"))
+        # Do not load pickle caches (unsafe). Old .pkl files will be ignored/rebuilt.
         return paths
 
     def _get_lists_hash(self) -> str:
@@ -491,7 +494,7 @@ class BlocklistManager:
             self._report_progress("Checking intelligence cache...", 0.1, cb)
             current_hash = self._get_lists_hash()
             
-            # 1. Try loading from existing high-speed binary cache (.pkl)
+            # 1. Try loading from existing high-speed cache (JSON only for safety)
             if not force_reload:
                 ConnectionCategory_dict = {cat.value: cat for cat in ConnectionCategory}
                 for cat in ConnectionCategory:
@@ -502,10 +505,7 @@ class BlocklistManager:
                         try:
                             self._report_progress("Loading domain database cache...", 0.3, cb)
                             cache_data = None
-                            if cache_file.endswith('.pkl'):
-                                with open(cache_file, "rb") as f:
-                                    cache_data = pickle.load(f)
-                            elif cache_file.endswith('.json'):
+                            if cache_file.endswith('.json'):
                                 with open(cache_file, "r", encoding="utf-8") as f:
                                     cache_data = json.load(f)
 
@@ -513,9 +513,15 @@ class BlocklistManager:
                                 raw_map = cache_data["domain_map"]
                                 sample_val = next(iter(raw_map.values())) if raw_map else None
                                 
-                                # Robust Enum normalizer to handle PyInstaller / Pickle module path mismatches
+                                # Robust Enum normalizer
                                 def _norm_enum(k):
                                     if isinstance(k, ConnectionCategory): return k
+                                    if isinstance(k, str):
+                                        # try by name or value
+                                        for cat in ConnectionCategory:
+                                            if cat.name == k or cat.value == k:
+                                                return cat
+                                        return ConnectionCategory_dict.get(k, ConnectionCategory.UNKNOWN)
                                     return ConnectionCategory_dict.get(getattr(k, 'value', str(k)), ConnectionCategory.UNKNOWN)
 
                                 if isinstance(sample_val, ConnectionCategory):
@@ -541,7 +547,7 @@ class BlocklistManager:
                                     raw_cat_doms = cache_data["category_domains"]
                                     for k, dom_set in raw_cat_doms.items():
                                         cat_enum = _norm_enum(k)
-                                        new_category_domains[cat_enum] = dom_set if isinstance(dom_set, set) else set(dom_set)
+                                        new_category_domains[cat_enum] = set(dom_set) if dom_set is not None else set()
                                 else:
                                     for d, cat_enum in new_domain_map.items():
                                         new_category_domains[cat_enum].add(d)
@@ -715,40 +721,65 @@ class BlocklistManager:
 
             self._report_progress("Saving intelligence cache...", 0.95, cb)
             
-            # Save fast binary cache directly and asynchronously to both user directory and lists directory
+            # Save fast cache directly and asynchronously to both user directory and lists directory (JSON only)
             user_dir = os.path.join(os.path.expanduser("~"), ".NetStrip")
             os.makedirs(user_dir, exist_ok=True)
 
+            # Remove any old pickle caches
+            try:
+                for p in [os.path.join(user_dir, "NetStrip_cache.pkl")]:
+                    if os.path.exists(p):
+                        try: os.remove(p)
+                        except Exception: pass
+                if self.lists_dir:
+                    p2 = os.path.join(self.lists_dir, "NetStrip_cache.pkl")
+                    if os.path.exists(p2):
+                        try: os.remove(p2)
+                        except Exception: pass
+            except Exception:
+                pass
+
             def _save_cache_worker(user_d, lists_d, c_hash, d_map, cat_doms, i_map, st, sm):
                 try:
-                    pkl_payload = {
+                    def _ser_enum(k):
+                        if isinstance(k, ConnectionCategory):
+                            return k.name
+                        return k
+                    def _ser_val(v):
+                        if isinstance(v, ConnectionCategory):
+                            return v.name
+                        if isinstance(v, set):
+                            return list(v)
+                        return v
+
+                    json_payload = {
                         "hash": c_hash,
-                        "domain_map": d_map,
-                        "category_domains": cat_doms,
+                        "domain_map": {k: _ser_val(v) for k, v in d_map.items()},
+                        "category_domains": {_ser_enum(k): list(v) for k, v in cat_doms.items()},
                         "identity_map": i_map,
-                        "stats": st,
-                        "sources_metadata": sm
+                        "stats": {_ser_enum(k): v for k, v in st.items()},
+                        "sources_metadata": {_ser_enum(k): v for k, v in sm.items()}
                     }
                     
                     target_dirs = [user_d]
                     if lists_d and os.path.exists(lists_d):
                         target_dirs.append(lists_d)
-                        
+                         
                     for t_dir in target_dirs:
-                        pkl_target = os.path.join(t_dir, "NetStrip_cache.pkl")
-                        pkl_tmp = pkl_target + ".tmp"
+                        json_target = os.path.join(t_dir, "NetStrip_cache.json")
+                        json_tmp = json_target + ".tmp"
                         try:
-                            with open(pkl_tmp, "wb") as f:
-                                pickle.dump(pkl_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-                            if os.path.exists(pkl_target):
-                                try: os.remove(pkl_target)
+                            with open(json_tmp, "w", encoding="utf-8") as f:
+                                json.dump(json_payload, f)
+                            if os.path.exists(json_target):
+                                try: os.remove(json_target)
                                 except Exception: pass
-                            os.replace(pkl_tmp, pkl_target)
-                            logger.info(f"Updated high-speed binary cache at {pkl_target}")
+                            os.replace(json_tmp, json_target)
+                            logger.info(f"Updated cache at {json_target}")
                         except Exception as e:
-                            logger.debug(f"Could not write pkl cache to {pkl_target}: {e}")
-                            if os.path.exists(pkl_tmp):
-                                try: os.remove(pkl_tmp)
+                            logger.debug(f"Could not write json cache to {json_target}: {e}")
+                            if os.path.exists(json_tmp):
+                                try: os.remove(json_tmp)
                                 except Exception: pass
                 except Exception as e:
                     logger.debug(f"Cache save worker error: {e}")

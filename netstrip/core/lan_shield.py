@@ -53,7 +53,9 @@ class LANShield:
     def _listen_for_broadcasts(self):
         """Resilient listener loop with auto-recovery. If the UDP socket dies
         (e.g. interface down during killswitch), it rebinds after a delay."""
-        seen_nonces = set()
+        seen_nonces = {}
+        max_nonce_age = 60
+        max_nonce_count = 500
 
         while self._running:
             sock = None
@@ -74,6 +76,15 @@ class LANShield:
             # Inner receive loop — stays in here until a fatal socket error
             while self._running:
                 try:
+                    now = time.time()
+                    # Prune old nonces
+                    try:
+                        expired = [n for n, t in seen_nonces.items() if now - t > max_nonce_age]
+                        for n in expired:
+                            seen_nonces.pop(n, None)
+                    except Exception:
+                        pass
+
                     data, addr = sock.recvfrom(4096)
                     encrypted_payload = None
                     if data.startswith(b"NetStrip:PQANOMALY:"):
@@ -89,14 +100,20 @@ class LANShield:
                             # Replay Attack Prevention Audit: Validate timestamp drift & nonce
                             pkt_time = float(payload.get('timestamp', 0))
                             nonce = payload.get('nonce') or f"{pkt_time}_{addr[0]}"
-                            if abs(time.time() - pkt_time) > 60:
+                            if abs(now - pkt_time) > max_nonce_age:
                                 logger.warning(f"LAN Shield: Dropped expired broadcast from {addr[0]} (clock drift/replay attempt).")
                                 continue
                             if nonce in seen_nonces:
                                 continue
-                            seen_nonces.add(nonce)
-                            if len(seen_nonces) > 200:
-                                seen_nonces.clear()
+                            seen_nonces[nonce] = now
+                            if len(seen_nonces) > max_nonce_count:
+                                # Remove oldest entries
+                                try:
+                                    oldest = sorted(seen_nonces.items(), key=lambda x: x[1])[:len(seen_nonces) - max_nonce_count + 50]
+                                    for n, _ in oldest:
+                                        seen_nonces.pop(n, None)
+                                except Exception:
+                                    seen_nonces.clear()
 
                             # Validate the payload
                             btype = payload.get('type')

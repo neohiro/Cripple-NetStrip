@@ -2,7 +2,11 @@ import logging
 import threading
 import socket
 import time
+import hmac
 from typing import Optional
+
+import hmac
+import secrets
 
 from flask import Flask, jsonify
 
@@ -27,12 +31,12 @@ class IoTLocalAPI:
                 return jsonify({"status": "starting"}), 503
 
             # Security Authentication Audit: Validate token if set in database
-            required_token = self.engine.db.get_setting("iot_sensor_auth_token", "")
+            required_token = self.engine.db.get_setting("iot_sensor_auth_token", "") if self.engine.db else ""
             if required_token:
                 auth_header = request.headers.get("Authorization", "")
                 custom_header = request.headers.get("X-NetStrip-Token", "")
                 token_provided = auth_header.replace("Bearer ", "").strip() if auth_header else custom_header.strip()
-                if token_provided != required_token:
+                if not token_provided or not hmac.compare_digest(str(token_provided), str(required_token)):
                     logger.warning(f"Unauthorized IoT Local API access attempt from {request.remote_addr}")
                     return jsonify({"error": "Unauthorized"}), 401
                 
@@ -72,6 +76,18 @@ class IoTLocalAPI:
         # Security Binding Audit: Default to local loopback (127.0.0.1) unless external bind is explicitly enabled
         bind_all = self.engine.db.get_setting("iot_local_sensor_bind_all", "false") == "true"
         bind_host = "0.0.0.0" if bind_all else "127.0.0.1"
+
+        # If binding to all interfaces, require authentication token
+        if bind_all and self.engine.db:
+            required_token = self.engine.db.get_setting("iot_sensor_auth_token", "")
+            if not required_token:
+                import secrets
+                required_token = secrets.token_urlsafe(32)
+                try:
+                    self.engine.db.set_setting("iot_sensor_auth_token", required_token)
+                    logger.warning("Generated IoT API auth token because binding to 0.0.0.0 without a token. Store this token securely.")
+                except Exception:
+                    pass
 
         logger.info(f"Starting IoT Local API on {bind_host}:{self.port}...")
         self._is_running = True

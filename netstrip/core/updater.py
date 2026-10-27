@@ -125,8 +125,13 @@ class BlocklistUpdater:
                     ssl_context = ssl.create_default_context(cafile=certifi.where())
                 except Exception:
                     ssl_context = ssl.create_default_context()
-                    ssl_context.check_hostname = False
-                    ssl_context.verify_mode = ssl.CERT_NONE
+                    try:
+                        ssl_context.verify_mode = ssl.CERT_REQUIRED
+                    except Exception:
+                        pass
+                    if not getattr(ssl_context, 'get_ca_certs', None) or len(ssl_context.get_ca_certs()) == 0:
+                        logger.error("No CA bundle available for blocklist updates; refusing to disable TLS verification.")
+                        raise RuntimeError("TLS verification unavailable")
                 
                 self.last_update_stats = {"success": 0, "failed": 0, "total": total_enabled}
                 for idx, source in enumerate(enabled_sources, 1):
@@ -172,7 +177,10 @@ class BlocklistUpdater:
                         try:
                             import requests
                             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-                            response = requests.get(url, headers=headers, stream=True, timeout=30)
+                            if not str(url).lower().startswith('https://'):
+                                logger.warning(f"Skipping non-HTTPS blocklist source: {url}")
+                                raise ValueError("Non-HTTPS blocklist source not allowed")
+                            response = requests.get(url, headers=headers, stream=True, timeout=30, verify=True)
                             response.raise_for_status()
                             
                             with open(temp_file, 'wb') as out_file:

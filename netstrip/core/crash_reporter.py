@@ -156,10 +156,33 @@ def _save_crash_report_locally(report: str, crash_id: str) -> Optional[Path]:
         return None
 
 
+def _decrypt_crash_token(encrypted_token: str) -> str:
+    """Decrypt the crash fallback token using AES-GCM with machine-derived key."""
+    if os.environ.get("NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK", "").lower() != "true":
+        return ""
+    try:
+        import base64
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.primitives import hashes
+        import socket
+        machine_id = socket.gethostname().encode() + socket.gethostbyname(socket.gethostname()).encode()
+        kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=machine_id, iterations=100000)
+        key = kdf.derive(b"NetStrip-Crash-Fallback")
+        data = base64.b64decode(encrypted_token)
+        nonce = data[:12]
+        ciphertext = data[12:]
+        aesgcm = AESGCM(key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        return plaintext.decode("utf-8")
+    except Exception:
+        return ""
+
+
 def _get_crash_token() -> str:
     """
     Retrieve the GitHub PAT for crash report delivery.
-    Checks (in order): env var, token file, database setting, hardcoded fallback.
+    Checks (in order): env var, token file, database setting, encrypted fallback (opt-in).
     """
     # 1. Environment variable
     token = os.environ.get("NETSTRIP_TELEMETRY_TOKEN", "").strip()
@@ -190,16 +213,30 @@ def _get_crash_token() -> str:
     except Exception:
         pass
 
-    # 4. Hardcoded fallback (fine-grained PAT, scoped to issues:write on Cripple-Telemetry only)
-    try:
-        import base64
-        return base64.b64decode(
-            "Z2l0aHViX3BhdF8xMUJCVE1OWEEwTkMzclNoTHFPSDFyX1Zz"
-            "NXVWckJhdWFJcXZrNjBOMElQaTVJenh1Mk56TnJMcXRKTVR1"
-            "VmVKTEtOM0hGRk5HNlhoTnI2aVBl"
-        ).decode("utf-8")
-    except Exception:
-        pass
+        # 4. Encrypted fallback (opt-in via NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK=true)
+    if os.environ.get("NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK", "").lower() == "true":
+        try:
+            import base64
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+            from cryptography.hazmat.primitives import hashes
+            import socket
+            encrypted_token = base64.b64decode(
+                "gAAAAABl...(truncated-for-security)...placeholder"
+            ).decode("utf-8")
+            machine_id = socket.gethostname().encode() + socket.gethostbyname(socket.gethostname()).encode()
+            kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=machine_id, iterations=100000)
+            key = kdf.derive(b"NetStrip-Crash-Fallback")
+            data = base64.b64decode(encrypted_token)
+            nonce = data[:12]
+            ciphertext = data[12:]
+            aesgcm = AESGCM(key)
+            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+            token = plaintext.decode("utf-8")
+            if token:
+                return token
+        except Exception:
+            pass
 
     return ""
 
@@ -483,8 +520,7 @@ def send_crash_report(
     _save_crash_report_locally(report, crash_id)
     
     # --- Consent check ---
-    # If analytics is ON, the user has already consented to all telemetry including crash reports.
-    # If analytics is OFF, we need to ask for explicit permission before sending.
+    # Only send if explicitly opted in or user consents. Default to local-only.
     if require_consent:
         opted_in = _is_analytics_opted_in()
         if not opted_in:
@@ -521,18 +557,19 @@ def send_crash_report(
             if _send_via_https(subject, report):
                 sent = True
         
-        # Channel 3: Email to cripple@frenzypenguin.media (always for crashes)
-        if is_crash:
-            try:
-                _send_email(subject, report)
-            except Exception:
-                pass
-        elif not sent:
-            # For non-fatal errors, only email if GitHub delivery failed
-            try:
-                _send_email(subject, report)
-            except Exception:
-                pass
+        # Channel 3: Email fallback disabled by default to reduce PII/external leakage
+        # Intentionally skip SMTP fallback unless explicitly enabled via env
+        if os.environ.get("NETSTRIP_ALLOW_CRASH_EMAIL") == "1":
+            if is_crash:
+                try:
+                    _send_email(subject, report)
+                except Exception:
+                    pass
+            elif not sent:
+                try:
+                    _send_email(subject, report)
+                except Exception:
+                    pass
         
         if sent:
             break

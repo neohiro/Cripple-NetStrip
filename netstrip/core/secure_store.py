@@ -147,3 +147,66 @@ def load_psk(db) -> str | None:
             logger.info("Migrated LAN Shield PSK from database to protected keyfile.")
             return legacy
     return None
+
+
+class SecureStore:
+    """Encrypted key-value store for sensitive tokens/credentials."""
+
+    def __init__(self, db=None):
+        self.db = db
+        self._store_path = Path.home() / ".NetStrip" / "secrets.enc"
+        self._store_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _load_store(self):
+        if not self._store_path.exists():
+            return {}
+        try:
+            raw = self._store_path.read_bytes()
+            if raw.startswith(_PREFIX_DPAPI):
+                try:
+                    data = _dpapi_unprotect(raw)
+                    import json
+                    return json.loads(data.decode("utf-8"))
+                except Exception:
+                    return {}
+            elif raw.startswith(_PREFIX_RAW):
+                data = base64.b64decode(raw[len(_PREFIX_RAW):])
+                import json
+                return json.loads(data.decode("utf-8"))
+            else:
+                # try as json
+                try:
+                    import json
+                    return json.loads(raw.decode("utf-8"))
+                except Exception:
+                    return {}
+        except Exception:
+            return {}
+
+    def _save_store(self, data):
+        try:
+            import json
+            payload = json.dumps(data).encode("utf-8")
+            if os.name == "nt":
+                content = _dpapi_protect(payload)
+            else:
+                content = _PREFIX_RAW + base64.b64encode(payload)
+            tmp = self._store_path.with_suffix(".tmp")
+            with open(tmp, "wb") as f:
+                f.write(content)
+            try:
+                os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
+            except Exception:
+                pass
+            os.replace(tmp, self._store_path)
+        except Exception:
+            pass
+
+    def set(self, key: str, value: str):
+        data = self._load_store()
+        data[key] = value
+        self._save_store(data)
+
+    def get(self, key: str):
+        data = self._load_store()
+        return data.get(key)

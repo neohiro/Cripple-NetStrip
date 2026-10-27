@@ -4,8 +4,11 @@
 
 This software and associated documentation files (the "Software") are the proprietary property of FrenzyPenguin Media.
 
-### 1. License Grant
-FrenzyPenguin Media grants you a personal, non-exclusive, non-transferable, limited license to download, install, and use the Software for personal and non-commercial purposes strictly in accordance with the terms of this Agreement.
+### 1. License Grant (Non-Commercial & Corporate Preservation)
+FrenzyPenguin Media grants you:
+- A **free, non-exclusive, limited license** for **non-commercial personal use** of this Software.
+- **Corporate-use rights**: Organizations and corporate entities retain the right to evaluate, internally test, and later adopt this Software under a separate commercial licensing agreement. This license does **not** revoke future corporate-use rights; commercial licensing remains available by contacting FrenzyPenguin Media.
+- **Future-use preservation**: Nothing in this Agreement prevents any party from later obtaining a commercial or corporate-use license for this Software.
 
 ### 2. Restrictions
 You may not:

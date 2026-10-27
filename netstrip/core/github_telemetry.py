@@ -8,7 +8,7 @@ categorized by label.
 The token is read from (in priority order):
   1. Environment variable NETSTRIP_TELEMETRY_TOKEN
   2. Database setting 'telemetry_github_token'
-  3. Hardcoded fallback (set during build)
+  3. Encrypted fallback (enabled via NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK=true)
 
 Each report becomes a GitHub Issue with the appropriate label:
   - 'analytics' for opt-in usage stats
@@ -21,7 +21,15 @@ import logging
 import os
 import urllib.request
 import ssl
+import base64
 from typing import Optional
+
+# Encrypted fallback token (AES-GCM encrypted with machine-derived key)
+# To generate: use scripts/generate_telemetry_token.py during build
+# Only used if NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK=true
+ENCRYPTED_TELEMETRY_FALLBACK = (
+    "gAAAAABl...(truncated-for-security)...placeholder"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +38,48 @@ TELEMETRY_REPO = "neohiro/Cripple-Telemetry"
 ISSUES_ENDPOINT = f"{GITHUB_API_BASE}/repos/{TELEMETRY_REPO}/issues"
 
 
+def _decrypt_telemetry_token(encrypted_token: str) -> Optional[str]:
+    """Decrypt the telemetry fallback token using AES-GCM with machine-derived key.
+
+    Only returns a result if NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK=true is set.
+    The key is derived from machine hardware characteristics for bind-security.
+    """
+    if os.environ.get("NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK", "").lower() != "true":
+        return None
+
+    try:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.primitives import hashes
+        import socket
+
+        # Derive key from machine-specific data
+        machine_id = socket.gethostname().encode() + socket.gethostbyname(socket.gethostname()).encode()
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=machine_id,
+            iterations=100000,
+        )
+        key = kdf.derive(b"NetStrip-Telemetry-Fallback")
+
+        # Decode and decrypt
+        data = base64.b64decode(encrypted_token)
+        nonce = data[:12]
+        ciphertext = data[12:]
+        aesgcm = AESGCM(key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        return plaintext.decode("utf-8")
+    except Exception as e:
+        logger.debug(f"Failed to decrypt telemetry fallback token: {e}")
+        return None
+
+
 def _get_token() -> Optional[str]:
     """
     Retrieve the GitHub PAT for telemetry submission.
-    Checks environment variable first, then token file, then database.
+    Checks environment variable first, then token file, then database,
+    then encrypted fallback (opt-in) last.
     """
     # 1. Environment variable (highest priority)
     token = os.environ.get("NETSTRIP_TELEMETRY_TOKEN")
@@ -65,16 +111,17 @@ def _get_token() -> Optional[str]:
     except Exception:
         pass
 
-    # 4. Hardcoded fallback (fine-grained PAT, scoped to issues:write on Cripple-Telemetry only)
-    try:
-        import base64
-        return base64.b64decode(
-            "Z2l0aHViX3BhdF8xMUJCVE1OWEEwTkMzclNoTHFPSDFyX1Zz"
-            "NXVWckJhdWFJcXZrNjBOMElQaTVJenh1Mk56TnJMcXRKTVR1"
-            "VmVKTEtOM0hGRk5HNlhoTnI2aVBl"
-        ).decode("utf-8")
-    except Exception:
-        pass
+    # 4. Encrypted fallback (opt-in via NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK=true)
+    if os.environ.get("NETSTRIP_TELEMETRY_ENCRYPTED_FALLBACK", "").lower() == "true":
+        try:
+            encrypted_token = base64.b64decode(
+                ENCRYPTED_TELEMETRY_FALLBACK
+            ).decode("utf-8")
+            token = _decrypt_telemetry_token(encrypted_token)
+            if token:
+                return token
+        except Exception as e:
+            logger.debug(f"Encrypted telemetry fallback failed: {e}")
 
     # 5. No token available
     return None
@@ -151,28 +198,30 @@ def submit_analytics(payload: dict) -> bool:
     """Submit an analytics report as a GitHub Issue."""
     from netstrip import __version__
 
-    title = f"[Analytics] v{payload.get('version', '?')} — {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
+    safe_payload = dict(payload)
+    safe_payload.pop('id', None)
+
+    title = f"[Analytics] v{safe_payload.get('version', '?')} — {safe_payload.get('os', '?')}"
 
     lines = [
         "## NetStrip Analytics Report",
         "",
-        f"**Installation ID:** `{payload.get('id', '?')}`",
-        f"**Version:** {payload.get('version', '?')}",
-        f"**OS:** {payload.get('os', '?')} ({payload.get('arch', '?')})",
-        f"**Python:** {payload.get('python', '?')}",
-        f"**Mode:** {payload.get('mode', '?')}",
-        f"**Uptime:** {payload.get('uptime_hours', 0)} hours",
-        f"**Headless:** {payload.get('headless', False)}",
+        f"**Version:** {safe_payload.get('version', '?')}",
+        f"**OS:** {safe_payload.get('os', '?')} ({safe_payload.get('arch', '?')})",
+        f"**Python:** {safe_payload.get('python', '?')}",
+        f"**Mode:** {safe_payload.get('mode', '?')}",
+        f"**Uptime:** {safe_payload.get('uptime_hours', 0)} hours",
+        f"**Headless:** {safe_payload.get('headless', False)}",
         "",
         "### 24h Statistics",
-        f"- Blocked: {payload.get('blocked_24h', 0)}",
-        f"- Allowed: {payload.get('allowed_24h', 0)}",
-        f"- User rules: {payload.get('rule_count', 0)}",
-        f"- Blocklist domains: {payload.get('blocklist_domains', 0)}",
+        f"- Blocked: {safe_payload.get('blocked_24h', 0)}",
+        f"- Allowed: {safe_payload.get('allowed_24h', 0)}",
+        f"- User rules: {safe_payload.get('rule_count', 0)}",
+        f"- Blocklist domains: {safe_payload.get('blocklist_domains', 0)}",
         "",
         "### Raw Payload",
         "```json",
-        json.dumps(payload, indent=2),
+        json.dumps(safe_payload, indent=2),
         "```",
     ]
 

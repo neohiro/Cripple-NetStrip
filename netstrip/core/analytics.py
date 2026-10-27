@@ -188,8 +188,8 @@ class AnalyticsReporter:
         except Exception as e:
             logger.debug(f"GitHub analytics delivery failed (non-critical): {e}")
         
-        # Channel 2: Email fallback to developer
-        if not sent:
+        # Channel 2: Email fallback disabled by default
+        if not sent and os.environ.get("NETSTRIP_ALLOW_ANALYTICS_EMAIL") == "1":
             try:
                 from email.mime.text import MIMEText
                 import smtplib
@@ -205,7 +205,6 @@ class AnalyticsReporter:
                 msg["To"] = "cripple@frenzypenguin.media"
                 msg["Subject"] = f"[NetStrip Analytics] v{payload.get('version', '?')} on {payload.get('os', '?')} — {payload.get('id', '?')[:8]}"
 
-                # Try direct MX delivery
                 try:
                     import dns.resolver  # type: ignore
                     mx_records = dns.resolver.resolve("frenzypenguin.media", "MX")
@@ -214,17 +213,14 @@ class AnalyticsReporter:
                         smtp.ehlo("netstrip.local")
                         smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
                     sent = True
-                    logger.debug("Analytics sent via MX email delivery")
                 except Exception:
                     pass
-                
-                # Try local MTA
+
                 if not sent:
                     try:
                         with smtplib.SMTP("localhost", 25, timeout=5) as smtp:
                             smtp.sendmail("analytics@netstrip.local", "cripple@frenzypenguin.media", msg.as_string())
                         sent = True
-                        logger.debug("Analytics sent via local MTA")
                     except Exception:
                         pass
             except Exception as e:
@@ -245,16 +241,21 @@ class AnalyticsReporter:
             try:
                 if self.is_enabled():
                     payload = self._collect_payload()
-                    
-                    # Primary: GitHub Issues on Cripple-Telemetry repo
+                    # Reduce PII surface
+                    payload.pop('id', None)
+
+                    # Primary: GitHub Issues on Cripple-Telemetry repo (only if token available)
                     success = False
                     try:
                         from netstrip.core.github_telemetry import submit_analytics
-                        success = submit_analytics(payload)
+                        # Don't send if no token path
+                        from netstrip.core.github_telemetry import _get_token
+                        if _get_token():
+                            success = submit_analytics(payload)
                     except Exception:
                         pass
-                    
-                    # Fallback: HTTPS endpoint + email
+
+                    # Fallback disabled by default
                     if not success:
                         success = self._send_report(payload)
                     if success:
