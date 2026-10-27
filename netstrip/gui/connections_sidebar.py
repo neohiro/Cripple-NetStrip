@@ -179,10 +179,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
         self._refresh_loop()
         
     def _get_poll_interval(self):
-        """Adaptive polling: fast when GUI visible for live traffic feel, slow when headless."""
+        """Adaptive polling: 250ms visible / 2000ms hidden. Batches rapid updates."""
         if getattr(self.engine, 'is_headless', False):
             return 2000
-        return 250  # 4Hz visual refresh for snappy live-traffic UX with batched updates
+        top = self.winfo_toplevel()
+        if top and (str(top.state()) == 'withdrawn' or not self.winfo_ismapped()):
+            return 2000  # Hidden/minimized — slow poll saves CPU / battery
+        return 250
 
     @safe_loop(delay_ms=1000)
     def _refresh_loop(self):
@@ -208,11 +211,23 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 self.after(poll_ms, self._refresh_loop)
             return
             
+        # Batch/debounce: accumulate refresh requests to prevent blocking GUI
+        if getattr(self, '_pending_batch', False):
+            return  # Skip; already scheduled
+        self._pending_batch = True
+        
         self._is_fetching = True
         # Fetch recent connections in background thread to prevent UI micro-stutters
+        # Use engine's thread-safe GUI cache if fresh (<800ms) to eliminate DB blocking
         def fetch():
             try:
-                conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
+                # Prefer cached state for responsive GUI
+                cache = getattr(self.engine, '_gui_state_cache', {})
+                cache_time = cache.get('_updated_at', 0) if isinstance(cache, dict) else 0
+                if (time.time() - cache_time) < 0.8:
+                    conns = cache.get('recent_connections', [])
+                else:
+                    conns = self.engine.db.get_recent_connections(limit=500, unique_only=True)
                 sys_val = self.engine.db.get_setting("block_system_connections", "false")
                 
                 sort_val = self.sort_var.get()
@@ -220,7 +235,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 
                 fingerprint = (len(conns), conns[0]['timestamp'] if conns and 'timestamp' in conns[0] else 0, conns[-1]['timestamp'] if conns and 'timestamp' in conns[-1] else 0)
                 if fingerprint == getattr(self, '_last_conn_fingerprint', None) and (sort_val, current_filter) == getattr(self, '_last_sort_filter', None) and getattr(self, 'app_groups', None):
-                    self._is_fetching = False
+                    self._is_fetching = False; self._pending_batch = False
                     return
                 
                 self._last_conn_fingerprint = fingerprint
@@ -229,7 +244,7 @@ class ConnectionsSidebar(ctk.CTkFrame):
                 def process_ui_batch(index=0, current_counts=None):
                     try:
                         if getattr(self, '_destroyed', False) or not self.winfo_exists():
-                            self._is_fetching = False
+                            self._is_fetching = False; self._pending_batch = False
                             return
                         
                         if current_counts is None:
@@ -247,13 +262,13 @@ class ConnectionsSidebar(ctk.CTkFrame):
                         if not is_final_batch:
                             self.after(20, lambda: process_ui_batch(index + batch_size, current_counts))
                         else:
-                            self._is_fetching = False
+                            self._is_fetching = False; self._pending_batch = False
                     except Exception:
-                        self._is_fetching = False
+                        self._is_fetching = False; self._pending_batch = False
                         
                 self.after(0, process_ui_batch)
             except Exception:
-                self._is_fetching = False
+                self._is_fetching = False; self._pending_batch = False
                 # Reschedule even on fetch failure so the loop survives
                 if not getattr(self, '_destroyed', False):
                     self.after(1000, self._refresh_loop)

@@ -48,6 +48,10 @@ class NetStripEngine:
         # notification by _flush_notification_digest(). See _note_blocked_for_digest.
         self._digest_buffer = {}
         self._digest_lock = threading.Lock()
+        
+        # Thread-safe GUI state cache: engine writes here, GUI reads here — zero DB blocking on refresh
+        self._gui_state_cache = {}
+        self._gui_state_lock = threading.Lock()
         import datetime
         self.session_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         

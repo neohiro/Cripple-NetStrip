@@ -32,6 +32,7 @@ class NotificationPopup(ctk.CTkToplevel):
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=Spacing.LG, pady=Spacing.MD)
+        self._btn_frame = btn_frame
         
         btn_frame.grid_columnconfigure((0, 1, 2), weight=1)
         
@@ -41,7 +42,20 @@ class NotificationPopup(ctk.CTkToplevel):
         block_btn = ctk.CTkButton(btn_frame, text="Block Always", fg_color=Colors.DANGER_DIM, hover_color=Colors.DANGER, command=lambda: self._resolve('block'))
         block_btn.grid(row=0, column=1, padx=Spacing.SM)
         
-        # Auto-timeout logic can be added here
+        # Auto-timeout + keyboard dismiss for accessibility / stuck-popup fix
+        self.after(15000, lambda: self._resolve('block') if self.winfo_exists() else None)
+        self.bind("<Escape>", lambda e: self._resolve('block'))
+        self.bind("<Button-1>", lambda e: self._resolve('block') if not self._btn_frame.winfo_containing(e.x_root, e.y_root) else None)
+        
+        # Click-away: if mouse clicks outside button frame, dismiss
+        self.bind("<ButtonRelease-1>", lambda e: self._on_click_outside(e))
+        
+    def _on_click_outside(self, event):
+        try:
+            if hasattr(self, '_btn_frame') and not self._btn_frame.winfo_containing(event.x_root, event.y_root):
+                self._resolve('block')
+        except Exception:
+            pass
         
     def _resolve(self, action):
         self.on_resolve(self.conn_data, action)
