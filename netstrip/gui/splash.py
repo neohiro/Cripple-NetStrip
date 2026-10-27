@@ -47,7 +47,7 @@ class SplashScreen(ctk.CTkToplevel):
         
         self._cycle_id = None
         # Start dynamic loading animation
-        self._cycle_id = self.after(500, self._cycle_loading_text)
+        self._cycle_id = self.after(100, self._cycle_loading_text)
         
     def stop_animation(self):
         """Stops all background timers and canvas animations."""
@@ -102,7 +102,7 @@ class SplashScreen(ctk.CTkToplevel):
         import random
         # If we received a live progress update within the last 3.0 seconds, don't overwrite it
         if time.time() - getattr(self, '_last_custom_update', 0) < 3.0:
-            self._cycle_id = self.after(500, self._cycle_loading_text)
+            self._cycle_id = self.after(100, self._cycle_loading_text)
             return
 
         if not hasattr(self, '_phrases'):
@@ -137,7 +137,7 @@ class SplashScreen(ctk.CTkToplevel):
         except Exception:
             pass
             
-        self._cycle_id = self.after(1500, self._cycle_loading_text)
+        self._cycle_id = self.after(2500, self._cycle_loading_text)
 
     def fade_out(self, callback=None, step=0, total_steps=10):
         """Fade out the splash screen smoothly before destroying it."""

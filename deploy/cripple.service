@@ -1,5 +1,5 @@
 [Unit]
-Description=Cripple NetStrip 3.9.3 Headless (fail-open hardened)
+Description=Cripple NetStrip 3.9.6 Headless (fail-open hardened)
 Documentation=file:///opt/cripple/netstrip/README.md
 After=network-online.target
 Wants=network-online.target

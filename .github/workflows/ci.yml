@@ -88,3 +88,49 @@ jobs:
         run: |
           python -m compileall main.py netstrip/
           echo "All Python files compile successfully"
+
+  release-build:
+    name: Build Release Zips
+    needs: test
+    runs-on: ${{ matrix.os }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            build_script: build.sh
+            zip_name: Cripple-Linux
+          - os: windows-latest
+            name: Windows
+            build_script: build.bat
+            zip_name: Cripple-Windows
+          - os: macos-latest
+            name: macOS
+            build_script: build.sh
+            zip_name: Cripple-macOS
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install --retries 3 --timeout 60 -r requirements.txt
+          pip install pyinstaller
+      - name: Build Binary
+        run: ${{ matrix.build_script }}
+      - name: Package Zip
+        shell: bash
+        run: |
+          mkdir -p release
+          if [ -f "dist/Cripple" ]; then cp -r dist/Cripple release/; else cp dist/Cripple.exe release/ 2>/dev/null || true; fi
+          cp -r assets release/ 2>/dev/null || true
+          zip -r "${{ matrix.zip_name }}-$(echo ${{ github.ref }} | sed 's/refs\/tags\///').zip" release/
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$(echo ${{ github.ref }} | sed 's/refs\/tags\///')" "${{ matrix.zip_name }}-$(echo ${{ github.ref }} | sed 's/refs\/tags\///').zip" --repo ${{ github.repository }} --clobber
